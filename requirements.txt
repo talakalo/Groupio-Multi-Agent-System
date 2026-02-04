@@ -1,0 +1,45 @@
+# Core framework
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+
+# AI & LLM
+anthropic>=0.39.0
+openai>=1.6.0
+langchain>=0.1.0
+langchain-anthropic>=0.1.0
+langchain-openai>=0.0.5
+langchain-community>=0.0.10
+langgraph>=0.0.30
+tiktoken>=0.5.0
+
+# Databases
+qdrant-client>=1.7.0
+neo4j>=5.15.0
+supabase>=2.3.0
+redis[hiredis]>=5.0.0
+
+# HTTP & Networking
+httpx>=0.25.0
+python-multipart>=0.0.6
+tenacity>=8.2.0
+
+# Monitoring
+sentry-sdk[fastapi]>=1.39.0
+prometheus-client>=0.19.0
+structlog>=23.2.0
+
+# Auth
+python-jose[cryptography]>=3.3.0
+
+# Utilities
+numpy>=1.26.0
+
+# Development
+pytest>=7.4.0
+pytest-asyncio>=0.23.0
+pytest-cov>=4.1.0
+pytest-mock>=3.12.0
+ruff>=0.1.0
+mypy>=1.7.0

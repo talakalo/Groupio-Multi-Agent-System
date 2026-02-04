@@ -1,0 +1,72 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "groupio-agents"
+version = "1.0.0"
+description = "Multi-agent AI system for Groupio marketplace"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.11"
+authors = [
+    {name = "Groupio", email = "dev@groupio.co.il"}
+]
+
+dependencies = [
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "pydantic>=2.5.0",
+    "pydantic-settings>=2.1.0",
+    "anthropic>=0.39.0",
+    "openai>=1.6.0",
+    "langchain>=0.1.0",
+    "langchain-anthropic>=0.1.0",
+    "langchain-openai>=0.0.5",
+    "langchain-community>=0.0.10",
+    "langgraph>=0.0.30",
+    "qdrant-client>=1.7.0",
+    "neo4j>=5.15.0",
+    "supabase>=2.3.0",
+    "redis[hiredis]>=5.0.0",
+    "httpx>=0.25.0",
+    "python-multipart>=0.0.6",
+    "tiktoken>=0.5.0",
+    "numpy>=1.26.0",
+    "tenacity>=8.2.0",
+    "sentry-sdk[fastapi]>=1.39.0",
+    "prometheus-client>=0.19.0",
+    "python-jose[cryptography]>=3.3.0",
+    "structlog>=23.2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.12.0",
+    "ruff>=0.1.0",
+    "mypy>=1.7.0",
+    "httpx>=0.25.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = false
+warn_return_any = true
+warn_unused_configs = true

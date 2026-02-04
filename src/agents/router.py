@@ -1,0 +1,122 @@
+"""Router Agent for intent classification and routing."""
+
+import logging
+from typing import Any
+
+from src.agents.base import AgentConfig, BaseAgent
+from src.config.prompts.router import ROUTER_SYSTEM_PROMPT
+from src.models.agent_state import AgentState
+from src.utils.monitoring import track_agent_execution
+
+logger = logging.getLogger(__name__)
+
+# Intent-to-agent mapping
+INTENT_AGENT_MAP = {
+    "contractor_search": "matching",
+    "pricing_question": "pricing",
+    "order_status": "support",
+    "complaint": "support",
+    "contractor_verification": "vetting",
+    "analytics_query": "analytics",
+    "general_info": "support",
+    "technical_support": "support",
+}
+
+
+class RouterAgent(BaseAgent):
+    """Intent classification and routing agent.
+
+    Analyzes incoming messages to determine user intent, extract entities,
+    and route to the appropriate specialist agent.
+    """
+
+    def __init__(self) -> None:
+        config = AgentConfig(
+            name="router",
+            description="Classify user intent and route to specialist agents",
+            system_prompt=ROUTER_SYSTEM_PROMPT,
+            tools=[],
+            rag_enabled=False,
+            temperature=0.3,
+            max_tokens=500,
+        )
+        super().__init__(config)
+
+    @track_agent_execution("router")
+    async def run(self, state: AgentState) -> AgentState:
+        """Classify intent and determine routing."""
+        user_message = self._get_last_user_message(state)
+
+        if not user_message:
+            state["intent"] = "general_info"
+            state["confidence"] = 0.0
+            state["current_agent"] = "support"
+            return state
+
+        # Build context-aware system prompt
+        system_prompt = self._build_system_prompt(state)
+
+        # Call LLM for intent classification
+        result = await self._call_llm_structured(
+            messages=[{"role": "user", "content": user_message}],
+            system=system_prompt,
+            output_schema={
+                "intent": "string",
+                "entities": {
+                    "category": "string or null",
+                    "building_id": "string or null",
+                    "contractor_id": "string or null",
+                    "offer_id": "string or null",
+                },
+                "confidence": "float between 0 and 1",
+                "clarifying_question": "string or null",
+                "suggested_agent": "string",
+            },
+        )
+
+        # Handle parse errors
+        if result.get("parse_error"):
+            logger.warning("Router parse error, defaulting to support")
+            state["intent"] = "general_info"
+            state["confidence"] = 0.5
+            state["current_agent"] = "support"
+            return state
+
+        # Update state with classification results
+        state["intent"] = result.get("intent", "general_info")
+        state["confidence"] = float(result.get("confidence", 0.5))
+
+        # Determine agent based on intent
+        suggested = result.get("suggested_agent", "")
+        intent = state["intent"]
+        state["current_agent"] = INTENT_AGENT_MAP.get(intent, suggested or "support")
+
+        # If low confidence, add clarifying question as assistant message
+        if state["confidence"] < 0.7 and result.get("clarifying_question"):
+            state["actions_taken"] = [
+                {
+                    "agent": "router",
+                    "action": "clarification_needed",
+                    "response": {
+                        "type": "clarification",
+                        "message": result["clarifying_question"],
+                    },
+                    "requires_followup": False,
+                }
+            ]
+            state["current_agent"] = "support"
+
+        # Store extracted entities in state
+        entities = result.get("entities", {})
+        if entities.get("building_id") and not state.get("building_id"):
+            state["building_id"] = entities["building_id"]
+
+        logger.info(
+            "Router: intent=%s confidence=%.2f agent=%s",
+            state["intent"],
+            state["confidence"],
+            state["current_agent"],
+        )
+
+        self._metrics["calls"] += 1
+        return state
