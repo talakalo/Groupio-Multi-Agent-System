@@ -60,3 +60,21 @@ Thumbs.db
 # Temporary
 tmp/
 temp/
+
+# Node.js
+node_modules/
+.pnpm-store/
+
+# Turbo
+.turbo/
+
+# TypeScript
+*.tsbuildinfo
+
+# Next.js
+.next/
+out/
+
+# Expo
+.expo/
+dist/
