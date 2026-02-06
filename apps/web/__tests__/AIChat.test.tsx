@@ -1,0 +1,88 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { AIChat } from "../components/features/chat/AIChat";
+
+// Mock fetch
+const mockFetch = vi.fn();
+global.fetch = mockFetch;
+
+function renderWithProviders(ui: React.ReactElement) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
+  );
+}
+
+describe("AIChat", () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it("renders chat input", () => {
+    renderWithProviders(
+      <AIChat buildingId="bld_001" suggestions={["מצא קבלן"]} />
+    );
+    expect(screen.getByPlaceholderText(/הקלד/)).toBeDefined();
+  });
+
+  it("renders suggestion chips", () => {
+    const suggestions = ["מצא קבלן מזגנים", "כמה עולה?"];
+    renderWithProviders(
+      <AIChat buildingId="bld_001" suggestions={suggestions} />
+    );
+    expect(screen.getByText("מצא קבלן מזגנים")).toBeDefined();
+    expect(screen.getByText("כמה עולה?")).toBeDefined();
+  });
+
+  it("renders welcome message", () => {
+    renderWithProviders(
+      <AIChat buildingId="bld_001" suggestions={[]} />
+    );
+    expect(screen.getByText(/גרופיו/)).toBeDefined();
+  });
+
+  it("sends message on form submit", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          conversationId: "conv_1",
+          response: { type: "text", message: "Test response" },
+          metadata: { intent: "general_info", confidence: 0.9, agentsUsed: ["support"], tokensUsed: 100, durationMs: 500, needsHuman: false },
+        }),
+    });
+
+    renderWithProviders(
+      <AIChat buildingId="bld_001" suggestions={[]} />
+    );
+
+    const input = screen.getByPlaceholderText(/הקלד/);
+    fireEvent.change(input, { target: { value: "שלום" } });
+    fireEvent.submit(input.closest("form")!);
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("disables input while loading", async () => {
+    mockFetch.mockImplementation(
+      () => new Promise(() => {}) // Never resolves
+    );
+
+    renderWithProviders(
+      <AIChat buildingId="bld_001" suggestions={[]} />
+    );
+
+    const input = screen.getByPlaceholderText(/הקלד/) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "test" } });
+    fireEvent.submit(input.closest("form")!);
+
+    await waitFor(() => {
+      expect(input.disabled).toBe(true);
+    });
+  });
+});

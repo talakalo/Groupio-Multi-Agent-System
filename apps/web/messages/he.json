@@ -1,0 +1,108 @@
+{
+  "common": {
+    "appName": "גרופיו",
+    "loading": "טוען...",
+    "error": "שגיאה",
+    "retry": "נסה שוב",
+    "save": "שמור",
+    "cancel": "ביטול",
+    "confirm": "אישור",
+    "back": "חזרה",
+    "next": "הבא",
+    "search": "חיפוש",
+    "filter": "סינון",
+    "share": "שתף",
+    "close": "סגור"
+  },
+  "auth": {
+    "login": "התחברות",
+    "signup": "הרשמה",
+    "logout": "התנתקות",
+    "email": "אימייל",
+    "phone": "טלפון",
+    "password": "סיסמה",
+    "forgotPassword": "שכחתי סיסמה",
+    "iAmResident": "אני דייר",
+    "iAmContractor": "אני קבלן",
+    "welcome": "ברוכים הבאים לגרופיו"
+  },
+  "dashboard": {
+    "welcome": "שלום, {name}!",
+    "activeOffers": "הצעות פעילות",
+    "neighborsJoined": "שכנים הצטרפו",
+    "totalSavings": "סך חיסכון",
+    "yourBuilding": "הבניין שלך",
+    "quickActions": "פעולות מהירות",
+    "findContractor": "מצא קבלן",
+    "viewOffers": "צפה בהצעות",
+    "askQuestion": "שאל שאלה"
+  },
+  "offers": {
+    "title": "הצעות",
+    "active": "פעילות",
+    "expired": "פגו תוקף",
+    "completed": "הושלמו",
+    "joinOffer": "הצטרף להצעה",
+    "joined": "הצטרפת",
+    "participants": "{count} שכנים הצטרפו",
+    "discount": "{percent}% הנחה",
+    "expiresIn": "פג תוקף בעוד {days} ימים",
+    "nextTier": "עוד {needed} שכנים ל-{discount}% הנחה",
+    "basePrice": "מחיר בסיס",
+    "currentPrice": "מחיר נוכחי",
+    "yourPrice": "המחיר שלך",
+    "pricingTiers": "מדרגות מחיר",
+    "shareWithNeighbors": "שתף עם השכנים",
+    "noOffers": "אין הצעות פעילות כרגע"
+  },
+  "contractors": {
+    "title": "קבלנים",
+    "verified": "מאומת",
+    "rating": "דירוג",
+    "projects": "פרויקטים",
+    "experience": "{years} שנות ניסיון",
+    "contactContractor": "צור קשר",
+    "viewProfile": "צפה בפרופיל",
+    "noContractors": "לא נמצאו קבלנים"
+  },
+  "chat": {
+    "placeholder": "הקלד הודעה...",
+    "send": "שלח",
+    "thinking": "חושב...",
+    "suggestions": {
+      "findAC": "מצא קבלן מזגנים",
+      "pricing": "כמה עולה התקנת מזגנים?",
+      "orderStatus": "מה הסטטוס של ההזמנה שלי?",
+      "help": "עזרה"
+    },
+    "welcome": "היי! 👋 אני העוזר הדיגיטלי של גרופיו. איך אוכל לעזור?"
+  },
+  "categories": {
+    "ac_installation": "התקנת מזגנים",
+    "ac_maintenance": "תחזוקת מזגנים",
+    "kitchen": "מטבחים",
+    "electrical": "חשמל",
+    "plumbing": "אינסטלציה",
+    "heating": "חימום",
+    "renovations": "שיפוצים",
+    "painting": "צביעה",
+    "flooring": "ריצוף",
+    "windows": "חלונות"
+  },
+  "regions": {
+    "center": "מרכז",
+    "tel_aviv": "תל אביב",
+    "jerusalem": "ירושלים",
+    "haifa": "חיפה",
+    "north": "צפון",
+    "south": "דרום",
+    "sharon": "שרון",
+    "shfela": "שפלה"
+  },
+  "payment": {
+    "securePayment": "תשלום מאובטח",
+    "escrowProtection": "התשלום מוחזק ב-Escrow עד סיום העבודה",
+    "payNow": "שלם עכשיו",
+    "total": "סה\"כ"
+  }
+}

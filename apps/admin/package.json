@@ -1,0 +1,34 @@
+{
+  "name": "@groupio/admin",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --port 3001",
+    "build": "next build",
+    "start": "next start --port 3001",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@groupio/api-client": "workspace:*",
+    "@groupio/types": "workspace:*",
+    "@groupio/utils": "workspace:*",
+    "@tanstack/react-query": "^5.51.0",
+    "autoprefixer": "^10.4.19",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.400.0",
+    "next": "^14.2.0",
+    "postcss": "^8.4.38",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "recharts": "^2.12.0",
+    "tailwind-merge": "^2.3.0",
+    "tailwindcss": "^3.4.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "typescript": "^5.4.0"
+  }
+}
