@@ -49,3 +49,34 @@ export {
   SkeletonAvatar,
 } from "./components/LoadingSpinner";
 export type { LoadingSpinnerProps } from "./components/LoadingSpinner";
+
+// Navigation components
+export { Navbar, navbarVariants } from "./components/Navbar";
+export type { NavbarProps, NavItem } from "./components/Navbar";
+
+export { Sidebar, sidebarVariants } from "./components/Sidebar";
+export type { SidebarProps, SidebarItem, SidebarSection } from "./components/Sidebar";
+
+export { Footer, footerVariants } from "./components/Footer";
+export type { FooterProps, FooterSection, FooterLink, SocialLink } from "./components/Footer";
+
+// Form components
+export { Textarea, textareaVariants } from "./components/Textarea";
+export type { TextareaProps } from "./components/Textarea";
+
+export { Checkbox } from "./components/Checkbox";
+export type { CheckboxProps } from "./components/Checkbox";
+
+export { Radio, RadioGroup } from "./components/Radio";
+export type { RadioProps, RadioGroupProps } from "./components/Radio";
+
+export { Switch } from "./components/Switch";
+export type { SwitchProps } from "./components/Switch";
+
+// Error handling
+export { ErrorBoundary } from "./components/ErrorBoundary";
+export type { ErrorBoundaryProps } from "./components/ErrorBoundary";
+
+// Auth components
+export { SocialAuthButtons, AuthDivider } from "./components/SocialAuthButtons";
+export type { SocialAuthButtonsProps, SocialAuthProvider, AuthDividerProps } from "./components/SocialAuthButtons";
