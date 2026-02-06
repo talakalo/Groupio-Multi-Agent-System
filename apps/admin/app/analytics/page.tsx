@@ -168,41 +168,33 @@ export default function AnalyticsPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
         <MetricCard
           label="Total Offers"
-          value={data?.totalOffers ?? 0}
-          trend={data?.offersTrend}
-          icon="document"
+          value={String(data?.totalOffers ?? 0)}
+          changePercent={data?.offersTrend}
         />
         <MetricCard
           label="Total Revenue"
           value={`₪${(data?.totalRevenue ?? 0).toLocaleString()}`}
-          trend={data?.revenueTrend}
-          icon="currency"
+          changePercent={data?.revenueTrend}
         />
         <MetricCard
           label="Active Contractors"
-          value={data?.activeContractors ?? 0}
-          trend={data?.contractorsTrend}
-          icon="users"
+          value={String(data?.activeContractors ?? 0)}
+          changePercent={data?.contractorsTrend}
         />
         <MetricCard
           label="Conversion Rate"
           value={`${(data?.conversionRate ?? 0).toFixed(1)}%`}
-          trend={data?.conversionTrend}
-          icon="chart"
+          changePercent={data?.conversionTrend}
         />
         <MetricCard
           label="Avg Response Time"
           value={`${(data?.avgResponseTime ?? 0).toFixed(0)}ms`}
-          trend={data?.responseTrend}
-          trendInverse
-          icon="clock"
+          changePercent={data?.responseTrend ? -data.responseTrend : undefined}
         />
         <MetricCard
           label="Escalation Rate"
           value={`${(data?.escalationRate ?? 0).toFixed(1)}%`}
-          trend={data?.escalationTrend}
-          trendInverse
-          icon="alert"
+          changePercent={data?.escalationTrend ? -data.escalationTrend : undefined}
         />
       </div>
 
@@ -212,10 +204,16 @@ export default function AnalyticsPage() {
           <h2 className="text-lg font-semibold mb-4">Offers Over Time</h2>
           <div className="h-64">
             <AgentMetricsChart
-              data={data?.dailyOffers ?? []}
-              dataKey="count"
-              xAxisKey="date"
-              color="#0ea5e9"
+              series={[{
+                agentKey: 'offers',
+                label: 'Daily Offers',
+                color: '#0ea5e9',
+                data: (data?.dailyOffers ?? []).map(d => ({
+                  timestamp: d.date,
+                  calls: d.count,
+                  avgLatencyMs: 0,
+                })),
+              }]}
             />
           </div>
         </div>
@@ -225,11 +223,16 @@ export default function AnalyticsPage() {
           <h2 className="text-lg font-semibold mb-4">Revenue Over Time</h2>
           <div className="h-64">
             <AgentMetricsChart
-              data={data?.dailyRevenue ?? []}
-              dataKey="amount"
-              xAxisKey="date"
-              color="#10b981"
-              formatValue={(v) => `₪${v.toLocaleString()}`}
+              series={[{
+                agentKey: 'revenue',
+                label: 'Daily Revenue',
+                color: '#10b981',
+                data: (data?.dailyRevenue ?? []).map(d => ({
+                  timestamp: d.date,
+                  calls: d.amount,
+                  avgLatencyMs: 0,
+                })),
+              }]}
             />
           </div>
         </div>

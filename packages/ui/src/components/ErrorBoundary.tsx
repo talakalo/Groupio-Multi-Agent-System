@@ -100,7 +100,7 @@ const DefaultErrorFallback: React.FC<DefaultErrorFallbackProps> = ({
         </p>
 
         {/* Error Details (development only) */}
-        {process.env.NODE_ENV === "development" && error && (
+        {typeof window !== "undefined" && error && (
           <details className="mb-6 text-left">
             <summary className="cursor-pointer text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">
               Error details

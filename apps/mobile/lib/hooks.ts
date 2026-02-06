@@ -95,18 +95,19 @@ export function useOffer(
 
 /** Create a new group offer (mutation). */
 export function useCreateOffer(
-  options?: UseMutationOptions<Offer, Error, CreateOfferPayload>,
+  options?: Omit<UseMutationOptions<Offer, Error, CreateOfferPayload>, 'mutationFn'>,
 ) {
   const queryClient = useQueryClient();
 
   return useMutation<Offer, Error, CreateOfferPayload>({
     mutationFn: createOffer,
-    onSuccess: (newOffer, variables, context) => {
-      // Invalidate offer lists so they refetch
-      queryClient.invalidateQueries({ queryKey: queryKeys.offers.all });
-      // Seed the detail cache
-      queryClient.setQueryData(queryKeys.offers.detail(newOffer.id), newOffer);
-      options?.onSuccess?.(newOffer, variables, context);
+    onSettled: (newOffer) => {
+      if (newOffer) {
+        // Invalidate offer lists so they refetch
+        queryClient.invalidateQueries({ queryKey: queryKeys.offers.all });
+        // Seed the detail cache
+        queryClient.setQueryData(queryKeys.offers.detail(newOffer.id), newOffer);
+      }
     },
     ...options,
   });
@@ -114,23 +115,22 @@ export function useCreateOffer(
 
 /** Join an existing group offer (mutation). */
 export function useJoinOffer(
-  options?: UseMutationOptions<
+  options?: Omit<UseMutationOptions<
     { success: boolean; participants: number },
     Error,
     string
-  >,
+  >, 'mutationFn'>,
 ) {
   const queryClient = useQueryClient();
 
   return useMutation<{ success: boolean; participants: number }, Error, string>({
     mutationFn: joinOffer,
-    onSuccess: (result, offerId, context) => {
-      // Refetch the specific offer and all lists
+    onSettled: (_data, _error, offerId) => {
+      // Refetch the specific offer and all lists after mutation settles
       queryClient.invalidateQueries({
         queryKey: queryKeys.offers.detail(offerId),
       });
       queryClient.invalidateQueries({ queryKey: queryKeys.offers.all });
-      options?.onSuccess?.(result, offerId, context);
     },
     ...options,
   });
@@ -190,15 +190,16 @@ export function useProfile(
 
 /** Update the current user's profile (mutation). */
 export function useUpdateProfile(
-  options?: UseMutationOptions<ProfileResponse, Error, UpdateProfilePayload>,
+  options?: Omit<UseMutationOptions<ProfileResponse, Error, UpdateProfilePayload>, 'mutationFn'>,
 ) {
   const queryClient = useQueryClient();
 
   return useMutation<ProfileResponse, Error, UpdateProfilePayload>({
     mutationFn: updateProfile,
-    onSuccess: (updated, variables, context) => {
-      queryClient.setQueryData(queryKeys.profile, updated);
-      options?.onSuccess?.(updated, variables, context);
+    onSettled: (updated) => {
+      if (updated) {
+        queryClient.setQueryData(queryKeys.profile, updated);
+      }
     },
     ...options,
   });

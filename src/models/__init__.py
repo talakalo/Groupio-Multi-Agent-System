@@ -33,57 +33,69 @@ from src.models.residents import (
     UserProfile,
 )
 
-# New API models
+# API models - User
 from src.models.user import (
-    User,
+    UserBase,
     UserCreate,
     UserUpdate,
     UserInDB,
+    UserResponse,
     UserRole,
     TokenResponse,
     TokenPayload,
 )
+
+# API models - Offer
 from src.models.offer import (
     OfferStatus,
     ServiceCategory,
     PricingTier as ApiPricingTier,
     OfferBase,
-    OfferCreateRequest,
-    OfferUpdateRequest,
+    OfferCreate as ApiOfferCreate,
+    OfferUpdate,
     OfferResponse,
     OfferListResponse,
-    OfferParticipant,
+    OfferInDB,
 )
+
+# API models - Contractor
 from src.models.contractor import (
     Region,
     VerificationStatus,
     TrustScoreBreakdown,
     ContractorBase,
-    ContractorRegisterRequest,
-    ContractorUpdateRequest,
+    ContractorCreate as ApiContractorCreate,
+    ContractorUpdate,
     ContractorResponse,
     ContractorReview,
-    ContractorSearchParams,
+    ContractorSearchRequest,
 )
+
+# API models - Building
 from src.models.building import (
     BuildingBase,
-    BuildingCreateRequest,
+    BuildingCreate,
+    BuildingUpdate,
     BuildingResponse,
     BuildingResident,
-    BuildingInvitation,
     BuildingStats,
 )
+
+# API models - Escalation
 from src.models.escalation import (
     EscalationPriority,
     EscalationStatus,
     EscalationSource,
-    EscalationType,
+    EscalationReason,
     EscalationBase,
-    EscalationCreateRequest,
+    EscalationCreate,
+    EscalationUpdate,
     EscalationResponse,
-    EscalationResolution,
-    EscalationQueueStats,
+    EscalationStats,
 )
+
+# Aliases for convenience
+User = UserResponse
 
 __all__ = [
     # Core models
@@ -111,11 +123,13 @@ __all__ = [
     "Resident",
     "ResidentCreate",
     "UserProfile",
-    # User models
+    # User API models
     "User",
+    "UserBase",
     "UserCreate",
     "UserUpdate",
     "UserInDB",
+    "UserResponse",
     "UserRole",
     "TokenResponse",
     "TokenPayload",
@@ -124,36 +138,36 @@ __all__ = [
     "ServiceCategory",
     "ApiPricingTier",
     "OfferBase",
-    "OfferCreateRequest",
-    "OfferUpdateRequest",
+    "ApiOfferCreate",
+    "OfferUpdate",
     "OfferResponse",
     "OfferListResponse",
-    "OfferParticipant",
+    "OfferInDB",
     # Contractor API models
     "Region",
     "VerificationStatus",
     "TrustScoreBreakdown",
     "ContractorBase",
-    "ContractorRegisterRequest",
-    "ContractorUpdateRequest",
+    "ApiContractorCreate",
+    "ContractorUpdate",
     "ContractorResponse",
     "ContractorReview",
-    "ContractorSearchParams",
+    "ContractorSearchRequest",
     # Building API models
     "BuildingBase",
-    "BuildingCreateRequest",
+    "BuildingCreate",
+    "BuildingUpdate",
     "BuildingResponse",
     "BuildingResident",
-    "BuildingInvitation",
     "BuildingStats",
     # Escalation API models
     "EscalationPriority",
     "EscalationStatus",
     "EscalationSource",
-    "EscalationType",
+    "EscalationReason",
     "EscalationBase",
-    "EscalationCreateRequest",
+    "EscalationCreate",
+    "EscalationUpdate",
     "EscalationResponse",
-    "EscalationResolution",
-    "EscalationQueueStats",
+    "EscalationStats",
 ]

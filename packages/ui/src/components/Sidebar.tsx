@@ -156,7 +156,7 @@ export const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(
                   <SidebarNavItem
                     key={item.id}
                     item={item}
-                    collapsed={isCollapsed}
+                    collapsed={isCollapsed ?? false}
                     variant={variant}
                     onClick={() => onItemClick?.(item)}
                   />
