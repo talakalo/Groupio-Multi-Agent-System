@@ -1,0 +1,109 @@
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+
+// Routes that require authentication
+const protectedRoutes = [
+  '/dashboard',
+  '/offers',
+  '/contractors',
+  '/building',
+  '/profile',
+  '/chat',
+];
+
+// Routes only for unauthenticated users
+const authRoutes = ['/login', '/signup'];
+
+// Routes that require specific roles
+const contractorRoutes = ['/contractor'];
+const adminRoutes = ['/admin'];
+
+export function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  // Get locale from cookie or header
+  const locale = request.cookies.get('NEXT_LOCALE')?.value ||
+    request.headers.get('accept-language')?.split(',')[0].split('-')[0] ||
+    'he';
+
+  // Check for auth token in cookies
+  const authCookie = request.cookies.get('groupio-auth');
+  let isAuthenticated = false;
+  let userRole: string | null = null;
+
+  if (authCookie) {
+    try {
+      const authData = JSON.parse(authCookie.value);
+      isAuthenticated = !!authData?.state?.accessToken;
+      userRole = authData?.state?.user?.role;
+    } catch {
+      // Invalid cookie format
+    }
+  }
+
+  // Handle protected routes
+  const isProtectedRoute = protectedRoutes.some((route) =>
+    pathname.startsWith(route)
+  );
+  const isAuthRoute = authRoutes.some((route) => pathname.startsWith(route));
+  const isContractorRoute = contractorRoutes.some((route) =>
+    pathname.startsWith(route)
+  );
+  const isAdminRoute = adminRoutes.some((route) => pathname.startsWith(route));
+
+  // Redirect unauthenticated users from protected routes
+  if (isProtectedRoute && !isAuthenticated) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/login';
+    url.searchParams.set('redirect', pathname);
+    return NextResponse.redirect(url);
+  }
+
+  // Redirect authenticated users from auth routes
+  if (isAuthRoute && isAuthenticated) {
+    const redirect = request.nextUrl.searchParams.get('redirect');
+    const url = request.nextUrl.clone();
+    url.pathname = redirect || '/dashboard';
+    url.searchParams.delete('redirect');
+    return NextResponse.redirect(url);
+  }
+
+  // Check contractor routes
+  if (isContractorRoute && userRole !== 'contractor') {
+    const url = request.nextUrl.clone();
+    url.pathname = '/dashboard';
+    return NextResponse.redirect(url);
+  }
+
+  // Check admin routes
+  if (isAdminRoute && !['admin', 'super_admin'].includes(userRole || '')) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/dashboard';
+    return NextResponse.redirect(url);
+  }
+
+  // Add locale header for i18n
+  const response = NextResponse.next();
+  response.headers.set('x-locale', locale);
+
+  // Add security headers
+  response.headers.set('X-Frame-Options', 'DENY');
+  response.headers.set('X-Content-Type-Options', 'nosniff');
+  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+
+  return response;
+}
+
+export const config = {
+  matcher: [
+    /*
+     * Match all request paths except:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - public folder
+     * - api routes
+     */
+    '/((?!_next/static|_next/image|favicon.ico|public|api).*)',
+  ],
+};

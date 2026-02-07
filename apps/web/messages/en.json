@@ -1,0 +1,108 @@
+{
+  "common": {
+    "appName": "Groupio",
+    "loading": "Loading...",
+    "error": "Error",
+    "retry": "Retry",
+    "save": "Save",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "back": "Back",
+    "next": "Next",
+    "search": "Search",
+    "filter": "Filter",
+    "share": "Share",
+    "close": "Close"
+  },
+  "auth": {
+    "login": "Log In",
+    "signup": "Sign Up",
+    "logout": "Log Out",
+    "email": "Email",
+    "phone": "Phone",
+    "password": "Password",
+    "forgotPassword": "Forgot Password",
+    "iAmResident": "I'm a Resident",
+    "iAmContractor": "I'm a Contractor",
+    "welcome": "Welcome to Groupio"
+  },
+  "dashboard": {
+    "welcome": "Hello, {name}!",
+    "activeOffers": "Active Offers",
+    "neighborsJoined": "Neighbors Joined",
+    "totalSavings": "Total Savings",
+    "yourBuilding": "Your Building",
+    "quickActions": "Quick Actions",
+    "findContractor": "Find Contractor",
+    "viewOffers": "View Offers",
+    "askQuestion": "Ask a Question"
+  },
+  "offers": {
+    "title": "Offers",
+    "active": "Active",
+    "expired": "Expired",
+    "completed": "Completed",
+    "joinOffer": "Join Offer",
+    "joined": "Joined",
+    "participants": "{count} neighbors joined",
+    "discount": "{percent}% discount",
+    "expiresIn": "Expires in {days} days",
+    "nextTier": "{needed} more neighbors for {discount}% discount",
+    "basePrice": "Base Price",
+    "currentPrice": "Current Price",
+    "yourPrice": "Your Price",
+    "pricingTiers": "Pricing Tiers",
+    "shareWithNeighbors": "Share with Neighbors",
+    "noOffers": "No active offers at the moment"
+  },
+  "contractors": {
+    "title": "Contractors",
+    "verified": "Verified",
+    "rating": "Rating",
+    "projects": "Projects",
+    "experience": "{years} years experience",
+    "contactContractor": "Contact",
+    "viewProfile": "View Profile",
+    "noContractors": "No contractors found"
+  },
+  "chat": {
+    "placeholder": "Type a message...",
+    "send": "Send",
+    "thinking": "Thinking...",
+    "suggestions": {
+      "findAC": "Find AC installer",
+      "pricing": "How much does AC installation cost?",
+      "orderStatus": "What's my order status?",
+      "help": "Help"
+    },
+    "welcome": "Hi! I'm Groupio's digital assistant. How can I help?"
+  },
+  "categories": {
+    "ac_installation": "AC Installation",
+    "ac_maintenance": "AC Maintenance",
+    "kitchen": "Kitchen",
+    "electrical": "Electrical",
+    "plumbing": "Plumbing",
+    "heating": "Heating",
+    "renovations": "Renovations",
+    "painting": "Painting",
+    "flooring": "Flooring",
+    "windows": "Windows"
+  },
+  "regions": {
+    "center": "Center",
+    "tel_aviv": "Tel Aviv",
+    "jerusalem": "Jerusalem",
+    "haifa": "Haifa",
+    "north": "North",
+    "south": "South",
+    "sharon": "Sharon",
+    "shfela": "Shfela"
+  },
+  "payment": {
+    "securePayment": "Secure Payment",
+    "escrowProtection": "Payment held in escrow until work completion",
+    "payNow": "Pay Now",
+    "total": "Total"
+  }
+}

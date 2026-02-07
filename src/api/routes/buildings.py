@@ -1,0 +1,350 @@
+"""Building API routes."""
+
+import logging
+from typing import Optional
+from uuid import uuid4
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from src.api.middleware.auth import get_current_user
+from src.databases.postgres import get_postgres_client
+from src.models.building import (
+    BuildingCreate,
+    BuildingListResponse,
+    BuildingResident,
+    BuildingResponse,
+    BuildingStats,
+    BuildingUpdate,
+)
+from src.models.contractor import Region
+from src.models.user import UserInDB, UserRole
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/api/v1/buildings", tags=["buildings"])
+
+
+@router.post("/", response_model=BuildingResponse)
+async def create_building(
+    request: BuildingCreate,
+    current_user: UserInDB = Depends(get_current_user),
+) -> BuildingResponse:
+    """Create a new building."""
+    db = get_postgres_client()
+
+    building_id = str(uuid4())
+    building_data = request.model_dump()
+    building_data["id"] = building_id
+    building_data["admin_user_id"] = current_user.id
+
+    building = await db.create_building(building_data)
+
+    # Add creator as first resident
+    await db.add_resident_to_building(
+        user_id=current_user.id,
+        building_id=building_id,
+        unit_number="admin",
+        floor=1,
+        is_owner=True,
+    )
+
+    return building
+
+
+@router.get("/", response_model=BuildingListResponse)
+async def list_buildings(
+    city: Optional[str] = None,
+    region: Optional[Region] = None,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    current_user: UserInDB = Depends(get_current_user),
+) -> BuildingListResponse:
+    """List buildings."""
+    db = get_postgres_client()
+
+    filters = {}
+    if city:
+        filters["city"] = city
+    if region:
+        filters["region"] = region.value
+
+    # Non-admins can only see their own buildings
+    if current_user.role not in ("admin", "super_admin"):
+        filters["user_id"] = current_user.id
+
+    buildings, total = await db.list_buildings(
+        filters=filters,
+        page=page,
+        page_size=page_size,
+    )
+
+    return BuildingListResponse(
+        items=buildings,
+        total=total,
+        page=page,
+        page_size=page_size,
+        has_more=(page * page_size) < total,
+    )
+
+
+@router.get("/{building_id}", response_model=BuildingResponse)
+async def get_building(
+    building_id: str,
+    current_user: UserInDB = Depends(get_current_user),
+) -> BuildingResponse:
+    """Get building by ID."""
+    db = get_postgres_client()
+
+    building = await db.get_building(building_id)
+    if not building:
+        raise HTTPException(status_code=404, detail="Building not found")
+
+    # Check access
+    if current_user.role not in ("admin", "super_admin"):
+        is_resident = await db.is_user_in_building(current_user.id, building_id)
+        if not is_resident:
+            raise HTTPException(status_code=403, detail="Not authorized")
+
+    return building
+
+
+@router.put("/{building_id}", response_model=BuildingResponse)
+async def update_building(
+    building_id: str,
+    request: BuildingUpdate,
+    current_user: UserInDB = Depends(get_current_user),
+) -> BuildingResponse:
+    """Update building."""
+    db = get_postgres_client()
+
+    building = await db.get_building(building_id)
+    if not building:
+        raise HTTPException(status_code=404, detail="Building not found")
+
+    # Only admin of building or system admin can update
+    if building.admin_user_id != current_user.id and current_user.role not in ("admin", "super_admin"):
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    update_data = request.model_dump(exclude_unset=True)
+    updated = await db.update_building(building_id, update_data)
+
+    return updated
+
+
+@router.delete("/{building_id}")
+async def delete_building(
+    building_id: str,
+    current_user: UserInDB = Depends(get_current_user),
+) -> dict[str, str]:
+    """Delete a building (admin only)."""
+    if current_user.role not in ("admin", "super_admin"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    db = get_postgres_client()
+
+    building = await db.get_building(building_id)
+    if not building:
+        raise HTTPException(status_code=404, detail="Building not found")
+
+    # Check for active offers
+    active_offers = await db.count_active_offers(building_id)
+    if active_offers > 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot delete building with {active_offers} active offers",
+        )
+
+    await db.delete_building(building_id)
+
+    return {"status": "deleted", "building_id": building_id}
+
+
+@router.get("/{building_id}/residents")
+async def get_building_residents(
+    building_id: str,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=50, ge=1, le=100),
+    current_user: UserInDB = Depends(get_current_user),
+) -> dict:
+    """Get building residents."""
+    db = get_postgres_client()
+
+    building = await db.get_building(building_id)
+    if not building:
+        raise HTTPException(status_code=404, detail="Building not found")
+
+    # Only building admin or system admin can see all residents
+    if building.admin_user_id != current_user.id and current_user.role not in ("admin", "super_admin"):
+        is_resident = await db.is_user_in_building(current_user.id, building_id)
+        if not is_resident:
+            raise HTTPException(status_code=403, detail="Not authorized")
+
+    residents, total = await db.get_building_residents(building_id, page, page_size)
+
+    return {
+        "items": residents,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    }
+
+
+@router.post("/{building_id}/residents")
+async def add_resident(
+    building_id: str,
+    unit_number: str,
+    floor: int,
+    is_owner: bool = True,
+    current_user: UserInDB = Depends(get_current_user),
+) -> BuildingResident:
+    """Add current user as a resident of the building."""
+    db = get_postgres_client()
+
+    building = await db.get_building(building_id)
+    if not building:
+        raise HTTPException(status_code=404, detail="Building not found")
+
+    # Check if already a resident
+    is_resident = await db.is_user_in_building(current_user.id, building_id)
+    if is_resident:
+        raise HTTPException(status_code=400, detail="Already a resident")
+
+    # Check if unit is available
+    unit_taken = await db.is_unit_taken(building_id, unit_number)
+    if unit_taken:
+        raise HTTPException(status_code=400, detail="Unit already occupied")
+
+    resident = await db.add_resident_to_building(
+        user_id=current_user.id,
+        building_id=building_id,
+        unit_number=unit_number,
+        floor=floor,
+        is_owner=is_owner,
+    )
+
+    return resident
+
+
+@router.delete("/{building_id}/residents/{user_id}")
+async def remove_resident(
+    building_id: str,
+    user_id: str,
+    current_user: UserInDB = Depends(get_current_user),
+) -> dict[str, str]:
+    """Remove a resident from building."""
+    db = get_postgres_client()
+
+    building = await db.get_building(building_id)
+    if not building:
+        raise HTTPException(status_code=404, detail="Building not found")
+
+    # Can remove self or building admin can remove others
+    if user_id != current_user.id:
+        if building.admin_user_id != current_user.id and current_user.role not in ("admin", "super_admin"):
+            raise HTTPException(status_code=403, detail="Not authorized")
+
+    # Cannot remove building admin
+    if user_id == building.admin_user_id:
+        raise HTTPException(status_code=400, detail="Cannot remove building admin")
+
+    await db.remove_resident_from_building(user_id, building_id)
+
+    return {"status": "removed", "user_id": user_id, "building_id": building_id}
+
+
+@router.get("/{building_id}/stats", response_model=BuildingStats)
+async def get_building_stats(
+    building_id: str,
+    current_user: UserInDB = Depends(get_current_user),
+) -> BuildingStats:
+    """Get building statistics."""
+    db = get_postgres_client()
+
+    building = await db.get_building(building_id)
+    if not building:
+        raise HTTPException(status_code=404, detail="Building not found")
+
+    # Check access
+    if current_user.role not in ("admin", "super_admin"):
+        is_resident = await db.is_user_in_building(current_user.id, building_id)
+        if not is_resident:
+            raise HTTPException(status_code=403, detail="Not authorized")
+
+    stats = await db.get_building_stats(building_id)
+    return stats
+
+
+@router.get("/{building_id}/offers")
+async def get_building_offers(
+    building_id: str,
+    status: Optional[str] = None,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    current_user: UserInDB = Depends(get_current_user),
+) -> dict:
+    """Get offers for a building."""
+    db = get_postgres_client()
+
+    building = await db.get_building(building_id)
+    if not building:
+        raise HTTPException(status_code=404, detail="Building not found")
+
+    # Check access
+    if current_user.role not in ("admin", "super_admin"):
+        is_resident = await db.is_user_in_building(current_user.id, building_id)
+        if not is_resident:
+            raise HTTPException(status_code=403, detail="Not authorized")
+
+    filters = {"building_id": building_id}
+    if status:
+        filters["status"] = status
+
+    offers, total = await db.list_offers(
+        filters=filters,
+        page=page,
+        page_size=page_size,
+    )
+
+    return {
+        "items": offers,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    }
+
+
+@router.post("/{building_id}/invite")
+async def invite_residents(
+    building_id: str,
+    emails: list[str],
+    current_user: UserInDB = Depends(get_current_user),
+) -> dict:
+    """Invite residents to join the building (building admin only)."""
+    db = get_postgres_client()
+
+    building = await db.get_building(building_id)
+    if not building:
+        raise HTTPException(status_code=404, detail="Building not found")
+
+    if building.admin_user_id != current_user.id and current_user.role not in ("admin", "super_admin"):
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    # In production, send invitation emails
+    invited = []
+    for email in emails:
+        # Create invitation record
+        invite_id = str(uuid4())
+        await db.create_invitation(
+            invite_id=invite_id,
+            building_id=building_id,
+            email=email,
+            invited_by=current_user.id,
+        )
+        invited.append(email)
+        logger.info("Invitation sent to %s for building %s", email, building_id)
+
+    return {
+        "status": "invitations_sent",
+        "building_id": building_id,
+        "invited": invited,
+    }

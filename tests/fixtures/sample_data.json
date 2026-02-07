@@ -1,0 +1,106 @@
+{
+  "contractors": [
+    {
+      "id": "con_001",
+      "business_name": "Cool Air Ltd",
+      "license_number": "AC-12345",
+      "verified": true,
+      "rating": 4.8,
+      "categories": ["ac_installation", "ac_maintenance"],
+      "regions": ["center", "tel_aviv"],
+      "phone": "050-1234567",
+      "email": "info@coolair.co.il",
+      "years_in_business": 8,
+      "description": "Professional AC installation and maintenance for residential and commercial buildings."
+    },
+    {
+      "id": "con_002",
+      "business_name": "Kitchen Masters",
+      "license_number": "KT-67890",
+      "verified": true,
+      "rating": 4.6,
+      "categories": ["kitchen"],
+      "regions": ["center", "jerusalem"],
+      "phone": "052-9876543",
+      "email": "info@kitchenmasters.co.il",
+      "years_in_business": 12,
+      "description": "Premium kitchen design and installation with custom cabinetry."
+    },
+    {
+      "id": "con_003",
+      "business_name": "ElectroFix",
+      "license_number": "EL-11111",
+      "verified": false,
+      "rating": 3.5,
+      "categories": ["electrical"],
+      "regions": ["center"],
+      "phone": "053-5555555",
+      "email": "info@electrofix.co.il",
+      "years_in_business": 2,
+      "description": "Electrical installations and repairs."
+    }
+  ],
+  "buildings": [
+    {
+      "id": "bld_001",
+      "address": "Rothschild 15",
+      "city": "Tel Aviv",
+      "region": "center",
+      "units": 24,
+      "age": 2,
+      "type": "new_residential"
+    },
+    {
+      "id": "bld_002",
+      "address": "HaPalmach 30",
+      "city": "Jerusalem",
+      "region": "jerusalem",
+      "units": 16,
+      "age": 5,
+      "type": "new_residential"
+    }
+  ],
+  "residents": [
+    {
+      "id": "user_123",
+      "name": "Yael Cohen",
+      "email": "yael@example.com",
+      "phone": "050-1111111",
+      "building_id": "bld_001"
+    },
+    {
+      "id": "user_456",
+      "name": "David Levy",
+      "email": "david@example.com",
+      "phone": "052-2222222",
+      "building_id": "bld_001"
+    }
+  ],
+  "offers": [
+    {
+      "id": "offer_001",
+      "category": "ac_installation",
+      "base_price": 4500,
+      "status": "active",
+      "building_id": "bld_001",
+      "contractor_id": "con_001",
+      "participants": 5,
+      "created_at": "2026-01-01T10:00:00",
+      "expires_at": "2026-03-01T10:00:00"
+    }
+  ],
+  "knowledge_base": [
+    {
+      "doc_type": "faq",
+      "category": "general",
+      "language": "he",
+      "text": "שאלות נפוצות: איך עובד גרופיו? גרופיו מחבר בין דיירי בניינים לקבלנים מאומתים לעבודות שיפוץ משותפות בהנחה קבוצתית."
+    },
+    {
+      "doc_type": "pricing_guide",
+      "category": "ac_installation",
+      "language": "he",
+      "text": "מדריך תמחור התקנת מזגנים: מחיר ממוצע ליחידה 3,500-5,500 ש\"ח. כולל התקנה, צנרת, וחומרים. מחירים משתנים לפי גודל היחידה ומורכבות ההתקנה."
+    }
+  ]
+}

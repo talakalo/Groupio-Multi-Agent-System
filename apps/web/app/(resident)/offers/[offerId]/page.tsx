@@ -1,0 +1,417 @@
+'use client';
+
+import { useTranslations } from 'next-intl';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
+import {
+  ArrowRight,
+  Users,
+  Clock,
+  Star,
+  Shield,
+  Share2,
+  Check,
+  Loader2,
+  Phone,
+  Mail,
+  Calendar,
+  TrendingDown,
+  ChevronLeft,
+  AlertCircle,
+} from 'lucide-react';
+import { cn } from '@/lib/utils/cn';
+import { apiClient } from '@/lib/api/client';
+import { formatPrice, formatDate } from '@groupio/utils';
+import type { Offer, PricingTier, Contractor } from '@groupio/types';
+
+// ---------------------------------------------------------------------------
+// Pricing Tier Card
+// ---------------------------------------------------------------------------
+
+function TierCard({
+  tier,
+  index,
+  isCurrentTier,
+  participants,
+}: {
+  tier: PricingTier;
+  index: number;
+  isCurrentTier: boolean;
+  participants: number;
+}) {
+  const t = useTranslations('offers');
+
+  const isReached = participants >= tier.min;
+  const discountPercent = Math.round(tier.discount * 100);
+
+  return (
+    <div
+      className={cn(
+        'relative rounded-xl border-2 p-4 transition-all',
+        isCurrentTier
+          ? 'border-primary-500 bg-primary-50 shadow-sm'
+          : isReached
+            ? 'border-emerald-300 bg-emerald-50'
+            : 'border-gray-200 bg-white'
+      )}
+    >
+      {isCurrentTier && (
+        <span className="absolute -top-3 start-4 badge-primary text-xs">
+          {t('currentTier')}
+        </span>
+      )}
+
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-sm font-medium text-gray-500">
+          {t('tierLevel', { level: index + 1 })}
+        </span>
+        {isReached && <Check className="h-4 w-4 text-emerald-500" />}
+      </div>
+
+      <p className="text-xl font-bold text-gray-900 mb-1">{formatPrice(tier.price)}</p>
+
+      <div className="flex items-center justify-between text-sm">
+        <span className="text-emerald-600 font-medium">
+          {t('discount', { percent: discountPercent })}
+        </span>
+        <span className="text-gray-400">
+          {tier.min}
+          {tier.max ? `-${tier.max}` : '+'} {t('residents')}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Timeline step
+// ---------------------------------------------------------------------------
+
+function TimelineStep({
+  label,
+  date,
+  isComplete,
+  isCurrent,
+}: {
+  label: string;
+  date?: string;
+  isComplete: boolean;
+  isCurrent: boolean;
+}) {
+  return (
+    <div className="flex items-start gap-3">
+      <div className="flex flex-col items-center">
+        <div
+          className={cn(
+            'w-8 h-8 rounded-full flex items-center justify-center',
+            isComplete
+              ? 'bg-primary-500'
+              : isCurrent
+                ? 'bg-primary-100 border-2 border-primary-500'
+                : 'bg-gray-200'
+          )}
+        >
+          {isComplete ? (
+            <Check className="h-4 w-4 text-white" />
+          ) : (
+            <div className={cn('w-2 h-2 rounded-full', isCurrent ? 'bg-primary-500' : 'bg-gray-400')} />
+          )}
+        </div>
+        <div className="w-0.5 h-8 bg-gray-200 last:hidden" />
+      </div>
+      <div className="pb-6">
+        <p className={cn('text-sm font-medium', isComplete || isCurrent ? 'text-gray-900' : 'text-gray-400')}>
+          {label}
+        </p>
+        {date && <p className="text-xs text-gray-400 mt-0.5">{date}</p>}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main page
+// ---------------------------------------------------------------------------
+
+export default function OfferDetailPage() {
+  const params = useParams<{ offerId: string }>();
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const t = useTranslations('offers');
+  const tCat = useTranslations('categories');
+  const tContractors = useTranslations('contractors');
+
+  const offerId = params.offerId;
+
+  const offerQuery = useQuery<Offer>({
+    queryKey: ['offer', offerId],
+    queryFn: () => apiClient.getOffer(offerId),
+    enabled: Boolean(offerId),
+  });
+
+  const joinMutation = useMutation({
+    mutationFn: async () => {
+      return apiClient.joinOffer(offerId, 'current-user');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['offer', offerId] });
+    },
+  });
+
+  const offer = offerQuery.data;
+
+  if (offerQuery.isLoading) {
+    return (
+      <div className="max-w-4xl mx-auto">
+        <div className="animate-pulse space-y-6">
+          <div className="h-8 bg-gray-200 rounded w-64" />
+          <div className="card">
+            <div className="h-6 bg-gray-200 rounded w-32 mb-4" />
+            <div className="h-10 bg-gray-200 rounded w-48 mb-3" />
+            <div className="h-4 bg-gray-200 rounded w-full" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (offerQuery.isError || !offer) {
+    return (
+      <div className="max-w-4xl mx-auto card text-center py-12">
+        <AlertCircle className="h-12 w-12 text-red-300 mx-auto mb-3" />
+        <p className="text-gray-700 font-medium mb-2">{t('offerNotFound')}</p>
+        <Link href="/offers" className="btn-primary inline-flex items-center gap-2 mt-4">
+          <ArrowRight className="h-4 w-4 rtl-flip" />
+          <span>{t('backToOffers')}</span>
+        </Link>
+      </div>
+    );
+  }
+
+  const currentTier = offer.tiers[offer.currentTier] ?? offer.tiers[0];
+  const discountPercent = currentTier ? Math.round(currentTier.discount * 100) : 0;
+  const daysLeft = Math.max(
+    0,
+    Math.ceil((new Date(offer.expiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+  );
+  const contractor = offer.contractor;
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-6">
+      {/* Breadcrumb */}
+      <nav className="flex items-center gap-2 text-sm text-gray-400">
+        <Link href="/offers" className="hover:text-primary-600 transition-colors">
+          {t('title')}
+        </Link>
+        <ChevronLeft className="h-3.5 w-3.5 rtl-flip" />
+        <span className="text-gray-700">{tCat(offer.category)}</span>
+      </nav>
+
+      {/* Main info card */}
+      <div className="card">
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <span className="badge-primary text-sm">{tCat(offer.category)}</span>
+            <h1 className="text-2xl font-bold text-gray-900 mt-3">
+              {tCat(offer.category)} - {t('groupOffer')}
+            </h1>
+          </div>
+          <button
+            type="button"
+            className="p-2 rounded-xl hover:bg-gray-100 transition-colors text-gray-500"
+            title={t('shareWithNeighbors')}
+          >
+            <Share2 className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Pricing highlight */}
+        <div className="bg-gradient-to-l from-primary-50 to-white rounded-xl p-6 mb-6">
+          <div className="flex items-end gap-4">
+            <div>
+              <p className="text-sm text-gray-500 mb-1">{t('currentPrice')}</p>
+              <p className="text-3xl font-bold text-gray-900">
+                {formatPrice(currentTier?.price ?? offer.basePrice)}
+              </p>
+            </div>
+            {discountPercent > 0 && (
+              <div className="pb-1">
+                <p className="text-sm text-gray-400 line-through mb-0.5">
+                  {t('basePrice')}: {formatPrice(offer.basePrice)}
+                </p>
+                <span className="badge-success">
+                  <TrendingDown className="h-3 w-3 me-1" />
+                  {t('discount', { percent: discountPercent })}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Stats row */}
+        <div className="grid grid-cols-3 gap-4 mb-6">
+          <div className="text-center p-3 bg-gray-50 rounded-xl">
+            <Users className="h-5 w-5 text-primary-500 mx-auto mb-1" />
+            <p className="text-lg font-bold text-gray-900">{offer.participants}</p>
+            <p className="text-xs text-gray-500">{t('participantsLabel')}</p>
+          </div>
+          <div className="text-center p-3 bg-gray-50 rounded-xl">
+            <Clock className="h-5 w-5 text-amber-500 mx-auto mb-1" />
+            <p className="text-lg font-bold text-gray-900">{daysLeft}</p>
+            <p className="text-xs text-gray-500">{t('daysRemaining')}</p>
+          </div>
+          <div className="text-center p-3 bg-gray-50 rounded-xl">
+            <TrendingDown className="h-5 w-5 text-emerald-500 mx-auto mb-1" />
+            <p className="text-lg font-bold text-gray-900">{discountPercent}%</p>
+            <p className="text-xs text-gray-500">{t('currentDiscount')}</p>
+          </div>
+        </div>
+
+        {/* Join button */}
+        <button
+          type="button"
+          onClick={() => joinMutation.mutate()}
+          disabled={joinMutation.isPending || offer.status !== 'active'}
+          className="btn-primary w-full flex items-center justify-center gap-2 text-lg py-3"
+        >
+          {joinMutation.isPending ? (
+            <>
+              <Loader2 className="h-5 w-5 animate-spin" />
+              <span>{t('joining')}</span>
+            </>
+          ) : joinMutation.isSuccess ? (
+            <>
+              <Check className="h-5 w-5" />
+              <span>{t('joined')}</span>
+            </>
+          ) : (
+            <span>{t('joinOffer')}</span>
+          )}
+        </button>
+
+        {joinMutation.isError && (
+          <p className="text-red-500 text-sm mt-2 text-center">{t('joinError')}</p>
+        )}
+      </div>
+
+      {/* Two-column layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Pricing tiers - takes 2 cols */}
+        <div className="lg:col-span-2">
+          <h2 className="text-lg font-bold text-gray-900 mb-4">{t('pricingTiers')}</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {offer.tiers.map((tier, idx) => (
+              <TierCard
+                key={idx}
+                tier={tier}
+                index={idx}
+                isCurrentTier={idx === offer.currentTier}
+                participants={offer.participants}
+              />
+            ))}
+          </div>
+
+          {/* Timeline */}
+          <h2 className="text-lg font-bold text-gray-900 mt-8 mb-4">{t('timeline')}</h2>
+          <div className="card">
+            <TimelineStep
+              label={t('offerCreated')}
+              date={formatDate(offer.createdAt)}
+              isComplete={true}
+              isCurrent={false}
+            />
+            <TimelineStep
+              label={t('collectingParticipants')}
+              isComplete={offer.status !== 'draft'}
+              isCurrent={offer.status === 'active'}
+            />
+            <TimelineStep
+              label={t('contractorConfirmation')}
+              isComplete={offer.status === 'completed'}
+              isCurrent={offer.status === 'pending'}
+            />
+            <TimelineStep
+              label={t('workBegins')}
+              isComplete={false}
+              isCurrent={offer.status === 'completed'}
+            />
+          </div>
+        </div>
+
+        {/* Contractor card - takes 1 col */}
+        <div>
+          <h2 className="text-lg font-bold text-gray-900 mb-4">{tContractors('title')}</h2>
+          {contractor && (
+            <div className="card">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-14 h-14 rounded-xl bg-primary-100 flex items-center justify-center text-xl font-bold text-primary-600">
+                  {contractor.businessName?.charAt(0) ?? '?'}
+                </div>
+                <div>
+                  <p className="font-bold text-gray-900">{contractor.businessName}</p>
+                  {contractor.verified && (
+                    <span className="flex items-center gap-1 text-sm text-emerald-600">
+                      <Shield className="h-3.5 w-3.5" />
+                      {tContractors('verified')}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-3 mb-4">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-500">{tContractors('rating')}</span>
+                  <span className="flex items-center gap-1 font-medium text-gray-900">
+                    <Star className="h-4 w-4 text-amber-400 fill-amber-400" />
+                    {contractor.rating?.toFixed(1)}
+                  </span>
+                </div>
+                {contractor.yearsInBusiness && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-500">{tContractors('experience', { years: '' })}</span>
+                    <span className="font-medium text-gray-900">
+                      {tContractors('experience', { years: contractor.yearsInBusiness })}
+                    </span>
+                  </div>
+                )}
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-500">{t('category')}</span>
+                  <div className="flex flex-wrap gap-1 justify-end">
+                    {contractor.categories?.slice(0, 3).map((cat) => (
+                      <span key={cat} className="badge-primary text-xs">
+                        {tCat(cat)}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {contractor.description && (
+                <p className="text-sm text-gray-600 mb-4 leading-relaxed">{contractor.description}</p>
+              )}
+
+              <div className="space-y-2">
+                {contractor.phone && (
+                  <a
+                    href={`tel:${contractor.phone}`}
+                    className="btn-secondary w-full flex items-center justify-center gap-2 text-sm"
+                  >
+                    <Phone className="h-4 w-4" />
+                    <span>{tContractors('contactContractor')}</span>
+                  </a>
+                )}
+                <Link
+                  href={`/contractors?id=${contractor.id}`}
+                  className="btn-secondary w-full flex items-center justify-center gap-2 text-sm"
+                >
+                  <span>{tContractors('viewProfile')}</span>
+                </Link>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
