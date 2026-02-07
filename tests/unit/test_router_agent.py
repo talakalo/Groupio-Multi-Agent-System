@@ -9,10 +9,13 @@ from src.agents.router import RouterAgent
 @pytest.fixture
 def router_agent():
     """Create a RouterAgent with mocked dependencies."""
-    with patch("src.agents.router.get_llm_client") as mock_llm, \
-         patch("src.agents.router.get_rag_pipeline"):
+    with patch("src.agents.base.get_llm_client") as mock_llm, \
+         patch("src.agents.base.get_rag_pipeline") as mock_rag:
+        mock_llm.return_value = AsyncMock()
+        mock_rag.return_value = AsyncMock()
+
         agent = RouterAgent()
-        agent.llm_client = mock_llm()
+        agent.llm_client = AsyncMock()
         yield agent
 
 

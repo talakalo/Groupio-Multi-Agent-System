@@ -9,13 +9,15 @@ from src.agents.pricing import PricingAgent, DEFAULT_TIERS
 @pytest.fixture
 def pricing_agent():
     """Create a PricingAgent with mocked dependencies."""
-    with patch("src.agents.pricing.get_llm_client") as mock_llm, \
-         patch("src.agents.pricing.get_rag_pipeline") as mock_rag, \
-         patch("src.agents.pricing.get_postgres_client") as mock_db:
+    with patch("src.agents.base.get_llm_client") as mock_llm, \
+         patch("src.agents.base.get_rag_pipeline") as mock_rag:
+        mock_llm.return_value = AsyncMock()
+        mock_rag.return_value = AsyncMock()
+
         agent = PricingAgent()
-        agent.llm_client = mock_llm()
-        agent.rag = mock_rag()
-        agent._db = mock_db()
+        agent.llm_client = AsyncMock()
+        agent.rag = AsyncMock()
+        agent._db = AsyncMock()
         yield agent
 
 

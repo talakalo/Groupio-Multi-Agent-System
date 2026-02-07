@@ -9,15 +9,16 @@ from src.agents.vetting import VettingAgent, THRESHOLDS, TRUST_WEIGHTS
 @pytest.fixture
 def vetting_agent():
     """Create a VettingAgent with mocked dependencies."""
-    with patch("src.agents.vetting.get_llm_client") as mock_llm, \
-         patch("src.agents.vetting.get_rag_pipeline") as mock_rag, \
-         patch("src.agents.vetting.get_postgres_client") as mock_db, \
-         patch("src.agents.vetting.get_graph_store") as mock_graph:
+    with patch("src.agents.base.get_llm_client") as mock_llm, \
+         patch("src.agents.base.get_rag_pipeline") as mock_rag:
+        mock_llm.return_value = AsyncMock()
+        mock_rag.return_value = AsyncMock()
+
         agent = VettingAgent()
-        agent.llm_client = mock_llm()
-        agent.rag = mock_rag()
-        agent._db = mock_db()
-        agent._graph_store = mock_graph()
+        agent.llm_client = AsyncMock()
+        agent.rag = AsyncMock()
+        agent._db = AsyncMock()
+        agent._graph_store = AsyncMock()
         yield agent
 
 

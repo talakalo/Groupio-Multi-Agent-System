@@ -9,13 +9,15 @@ from src.agents.matching import MatchingAgent, MATCH_WEIGHTS
 @pytest.fixture
 def matching_agent():
     """Create a MatchingAgent with mocked dependencies."""
-    with patch("src.agents.matching.get_llm_client") as mock_llm, \
-         patch("src.agents.matching.get_rag_pipeline") as mock_rag, \
-         patch("src.agents.matching.get_graph_store") as mock_graph:
+    with patch("src.agents.base.get_llm_client") as mock_llm, \
+         patch("src.agents.base.get_rag_pipeline") as mock_rag:
+        mock_llm.return_value = AsyncMock()
+        mock_rag.return_value = AsyncMock()
+
         agent = MatchingAgent()
-        agent.llm_client = mock_llm()
-        agent.rag = mock_rag()
-        agent._graph_store = mock_graph()
+        agent.llm_client = AsyncMock()
+        agent.rag = AsyncMock()
+        agent._graph_store = AsyncMock()
         yield agent
 
 

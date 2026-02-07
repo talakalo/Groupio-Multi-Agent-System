@@ -42,6 +42,18 @@ class PricingAgent(BaseAgent):
         )
         super().__init__(config)
         self._db = get_postgres_client()
+        # Store context for prompt building
+        self._current_market_data: dict[str, Any] = {}
+        self._current_category: str = ""
+
+    def _build_system_prompt(self, state: AgentState) -> str:
+        """Build the system prompt with pricing-specific context."""
+        return self.config.system_prompt.format(
+            market_data=self._current_market_data,
+            building_context=state.get("building_context", {}),
+            category=self._current_category,
+            rag_context=state.get("rag_results", []),
+        )
 
     @track_agent_execution("pricing")
     async def run(self, state: AgentState) -> AgentState:
@@ -70,6 +82,10 @@ class PricingAgent(BaseAgent):
 
         # Step 4: Apply seasonal adjustments
         tiers = self._apply_seasonal_adjustments(tiers, category)
+
+        # Store context for prompt building
+        self._current_market_data = market_data
+        self._current_category = category
 
         # Step 5: Generate pricing analysis via LLM
         response = await self._generate_pricing_response(

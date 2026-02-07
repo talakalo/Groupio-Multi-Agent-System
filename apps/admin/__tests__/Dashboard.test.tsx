@@ -1,9 +1,29 @@
 import { render, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import React from 'react';
 import DashboardPage from '../app/dashboard/page';
 
 // Mock fetch
 global.fetch = vi.fn();
+
+// Create a test wrapper with QueryClient
+function createTestWrapper() {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+    },
+  });
+  return function Wrapper({ children }: { children: React.ReactNode }) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        {children}
+      </QueryClientProvider>
+    );
+  };
+}
 
 // Mock Next.js router
 vi.mock('next/navigation', () => ({
@@ -49,7 +69,7 @@ describe('Admin Dashboard Page', () => {
   });
 
   it('renders dashboard title', async () => {
-    render(<DashboardPage />);
+    render(<DashboardPage />, { wrapper: createTestWrapper() });
 
     await waitFor(() => {
       expect(screen.getByText(/dashboard/i)).toBeInTheDocument();
@@ -57,7 +77,7 @@ describe('Admin Dashboard Page', () => {
   });
 
   it('displays system health metrics', async () => {
-    render(<DashboardPage />);
+    render(<DashboardPage />, { wrapper: createTestWrapper() });
 
     await waitFor(() => {
       expect(screen.getByText(/uptime/i)).toBeInTheDocument();
@@ -65,7 +85,7 @@ describe('Admin Dashboard Page', () => {
   });
 
   it('shows agent status cards', async () => {
-    render(<DashboardPage />);
+    render(<DashboardPage />, { wrapper: createTestWrapper() });
 
     await waitFor(() => {
       expect(screen.getByText(/router/i)).toBeInTheDocument();
@@ -75,7 +95,7 @@ describe('Admin Dashboard Page', () => {
   });
 
   it('displays offer statistics', async () => {
-    render(<DashboardPage />);
+    render(<DashboardPage />, { wrapper: createTestWrapper() });
 
     await waitFor(() => {
       expect(screen.getByText(/offers/i)).toBeInTheDocument();
@@ -87,7 +107,7 @@ describe('Admin Dashboard Page', () => {
       () => new Promise(() => {})
     );
 
-    render(<DashboardPage />);
+    render(<DashboardPage />, { wrapper: createTestWrapper() });
 
     expect(screen.getByRole('status')).toBeInTheDocument();
   });
@@ -97,7 +117,7 @@ describe('Admin Dashboard Page', () => {
       new Error('Network error')
     );
 
-    render(<DashboardPage />);
+    render(<DashboardPage />, { wrapper: createTestWrapper() });
 
     await waitFor(() => {
       expect(screen.getByText(/error/i)).toBeInTheDocument();
@@ -126,7 +146,7 @@ describe('Dashboard Refresh', () => {
   it('auto-refreshes data', async () => {
     vi.useFakeTimers();
 
-    render(<DashboardPage />);
+    render(<DashboardPage />, { wrapper: createTestWrapper() });
 
     // Fast-forward 30 seconds
     vi.advanceTimersByTime(30000);

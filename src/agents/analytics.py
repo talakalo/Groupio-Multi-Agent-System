@@ -103,6 +103,15 @@ class AnalyticsAgent(BaseAgent):
         self._db = get_postgres_client()
         self._nl_to_sql = NLToSQL(self.llm_client)
 
+    def _build_system_prompt(self, state: AgentState) -> str:
+        """Build the system prompt with analytics-specific context."""
+        user_message = self._get_last_user_message(state)
+        return self.config.system_prompt.format(
+            query=user_message,
+            timeframe=state.get("timeframe", "last 30 days"),
+            filters=state.get("filters", {}),
+        )
+
     @track_agent_execution("analytics")
     async def run(self, state: AgentState) -> AgentState:
         """Handle analytics query."""
