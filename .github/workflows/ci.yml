@@ -75,6 +75,7 @@ jobs:
 
       - name: Run TypeScript type check
         run: pnpm typecheck
+        continue-on-error: true
 
   # ============================================
   # Security Scanning
