@@ -32,6 +32,7 @@ structlog>=23.2.0
 
 # Auth
 python-jose[cryptography]>=3.3.0
+bcrypt>=4.0.0
 
 # Utilities
 numpy>=1.26.0
