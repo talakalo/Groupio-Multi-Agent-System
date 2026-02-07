@@ -83,6 +83,43 @@ function getSourceAgent(esc: Escalation): string {
 }
 
 // ---------------------------------------------------------------------------
+// SortHeader Component (defined outside to avoid recreating on each render)
+// ---------------------------------------------------------------------------
+
+interface SortHeaderProps {
+  field: SortField;
+  children: React.ReactNode;
+  currentSortField: SortField;
+  currentSortDir: SortDir;
+  onSort: (field: SortField) => void;
+}
+
+function SortHeader({
+  field,
+  children,
+  currentSortField,
+  currentSortDir,
+  onSort,
+}: SortHeaderProps) {
+  return (
+    <th
+      className="table-header cursor-pointer select-none"
+      onClick={() => onSort(field)}
+    >
+      <div className="flex items-center gap-1">
+        {children}
+        {currentSortField === field &&
+          (currentSortDir === "asc" ? (
+            <ChevronUp className="w-3.5 h-3.5" />
+          ) : (
+            <ChevronDown className="w-3.5 h-3.5" />
+          ))}
+      </div>
+    </th>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -178,32 +215,6 @@ export function EscalationsTable({
     onSelectionChange?.(Array.from(next));
   };
 
-  // ---- Column header helper ----
-  function SortHeader({
-    field,
-    children,
-  }: {
-    field: SortField;
-    children: React.ReactNode;
-  }) {
-    return (
-      <th
-        className="table-header cursor-pointer select-none"
-        onClick={() => toggleSort(field)}
-      >
-        <div className="flex items-center gap-1">
-          {children}
-          {sortField === field &&
-            (sortDir === "asc" ? (
-              <ChevronUp className="w-3.5 h-3.5" />
-            ) : (
-              <ChevronDown className="w-3.5 h-3.5" />
-            ))}
-        </div>
-      </th>
-    );
-  }
-
   return (
     <div className={clsx("table-container", className)}>
       <div className="overflow-x-auto">
@@ -219,12 +230,12 @@ export function EscalationsTable({
                   onChange={toggleSelectAll}
                 />
               </th>
-              <SortHeader field="id">ID</SortHeader>
-              <SortHeader field="priority">Priority</SortHeader>
+              <SortHeader field="id" currentSortField={sortField} currentSortDir={sortDir} onSort={toggleSort}>ID</SortHeader>
+              <SortHeader field="priority" currentSortField={sortField} currentSortDir={sortDir} onSort={toggleSort}>Priority</SortHeader>
               <th className="table-header">Source Agent</th>
               <th className="table-header">Reason</th>
-              <SortHeader field="createdAt">Created</SortHeader>
-              <SortHeader field="status">Status</SortHeader>
+              <SortHeader field="createdAt" currentSortField={sortField} currentSortDir={sortDir} onSort={toggleSort}>Created</SortHeader>
+              <SortHeader field="status" currentSortField={sortField} currentSortDir={sortDir} onSort={toggleSort}>Status</SortHeader>
               <th className="table-header">Actions</th>
             </tr>
           </thead>
