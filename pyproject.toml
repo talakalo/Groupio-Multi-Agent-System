@@ -1,6 +1,6 @@
 [build-system]
 requires = ["setuptools>=68.0", "wheel"]
-build-backend = "setuptools.backends._legacy:_Backend"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "groupio-agents"
@@ -38,6 +38,7 @@ dependencies = [
     "prometheus-client>=0.19.0",
     "python-jose[cryptography]>=3.3.0",
     "structlog>=23.2.0",
+    "bcrypt>=4.0.0",
 ]
 
 [project.optional-dependencies]
