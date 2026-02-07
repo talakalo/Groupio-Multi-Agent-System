@@ -70,6 +70,23 @@ class Settings(BaseSettings):
     WHATSAPP_PHONE_ID: str = ""
     WHATSAPP_WEBHOOK_SECRET: str = ""
 
+    # CORS Settings
+    CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://localhost:3001"]
+
+    # API Keys for service-to-service auth
+    API_KEYS: list[str] = []
+
+    # Email Settings (for verification emails)
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_EMAIL: str = "noreply@groupio.co.il"
+    SMTP_FROM_NAME: str = "Groupio"
+
+    # Environment
+    ENVIRONMENT: str = "development"
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 

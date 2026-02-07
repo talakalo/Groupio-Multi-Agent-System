@@ -4,11 +4,12 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from src.api.middleware.auth import verify_api_key
+from src.api.middleware.auth import get_admin_user, verify_api_key
+from src.models.user import UserInDB
 from src.api.middleware.logging import RequestLoggingMiddleware
 from src.config.settings import get_settings
 from src.databases.postgres import get_postgres_client
@@ -61,13 +62,14 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS middleware
+# CORS middleware - origins loaded from environment
+settings = get_settings()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Restrict in production
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-API-Key", "X-Request-ID"],
 )
 
 # Request logging middleware
@@ -227,20 +229,26 @@ async def health_check() -> dict[str, Any]:
 
 
 @app.post("/api/v1/admin/agents/{agent_name}/reload")
-async def reload_agent(agent_name: str) -> dict[str, str]:
-    """Reload an agent's configuration without restarting."""
+async def reload_agent(
+    agent_name: str,
+    current_user: UserInDB = Depends(get_admin_user),
+) -> dict[str, str]:
+    """Reload an agent's configuration without restarting. Requires admin access."""
     orchestrator = get_orchestrator()
     agent = orchestrator.agents.get(agent_name)
     if not agent:
         raise HTTPException(status_code=404, detail=f"Agent '{agent_name}' not found")
 
     await agent.reload_config()
+    logger.info("Agent %s reloaded by admin %s", agent_name, current_user.email)
     return {"status": "reloaded", "agent": agent_name}
 
 
 @app.get("/api/v1/admin/metrics")
-async def get_metrics() -> dict[str, Any]:
-    """Get system metrics for all agents and services."""
+async def get_metrics(
+    current_user: UserInDB = Depends(get_admin_user),
+) -> dict[str, Any]:
+    """Get system metrics for all agents and services. Requires admin access."""
     orchestrator = get_orchestrator()
 
     agent_metrics = {}
@@ -299,5 +307,39 @@ def _parse_whatsapp_message(payload: dict) -> dict[str, str] | None:
 
 
 async def _send_whatsapp_response(to: str, message: str) -> None:
-    """Send a WhatsApp message (stub for production integration)."""
-    logger.info("WhatsApp response to %s: %s", to, message[:100])
+    """Send a WhatsApp message using Meta WhatsApp Business API."""
+    settings = get_settings()
+
+    if not settings.WHATSAPP_API_TOKEN or not settings.WHATSAPP_PHONE_ID:
+        logger.warning("WhatsApp not configured - message not sent to %s", to)
+        return
+
+    try:
+        import httpx
+
+        url = f"https://graph.facebook.com/v18.0/{settings.WHATSAPP_PHONE_ID}/messages"
+        headers = {
+            "Authorization": f"Bearer {settings.WHATSAPP_API_TOKEN}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": to,
+            "type": "text",
+            "text": {"preview_url": False, "body": message},
+        }
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, headers=headers, json=payload, timeout=30.0)
+
+            if response.status_code == 200:
+                logger.info("WhatsApp message sent to %s", to)
+            else:
+                logger.error(
+                    "WhatsApp API error: %s - %s",
+                    response.status_code,
+                    response.text,
+                )
+    except Exception as e:
+        logger.error("Failed to send WhatsApp message to %s: %s", to, e)

@@ -19,6 +19,7 @@ from src.api.middleware.auth import (
 from src.config.settings import get_settings
 from src.databases.postgres import get_postgres_client
 from src.databases.redis_client import get_redis_client
+from src.services.email import get_email_service
 from src.models.user import (
     PasswordChange,
     PasswordReset,
@@ -65,7 +66,21 @@ async def register(request: UserCreate) -> UserResponse:
 
     logger.info("User registered: %s", user.email)
 
-    # In production, send verification email here
+    # Send verification email
+    verify_token = str(uuid4())
+    redis = get_redis_client()
+    await redis.set(
+        f"email_verify:{verify_token}",
+        user.id,
+        ex=24 * 60 * 60,  # 24 hour expiry
+    )
+
+    email_service = get_email_service()
+    await email_service.send_verification_email(
+        to_email=user.email,
+        user_name=user.full_name or user.email.split("@")[0],
+        verification_token=verify_token,
+    )
 
     return user
 
@@ -325,7 +340,6 @@ async def request_password_reset(request: PasswordReset) -> dict[str, str]:
 
     # Create reset token
     reset_token = str(uuid4())
-    settings = get_settings()
 
     redis = get_redis_client()
     await redis.set(
@@ -334,8 +348,15 @@ async def request_password_reset(request: PasswordReset) -> dict[str, str]:
         ex=60 * 60,  # 1 hour expiry
     )
 
-    # In production, send email here
-    logger.info("Password reset requested for: %s (token: %s)", user.email, reset_token)
+    # Send password reset email
+    email_service = get_email_service()
+    await email_service.send_password_reset_email(
+        to_email=user.email,
+        user_name=user.full_name or user.email.split("@")[0],
+        reset_token=reset_token,
+    )
+
+    logger.info("Password reset requested for: %s", user.email)
 
     return {"status": "reset_email_sent"}
 
@@ -406,7 +427,14 @@ async def resend_verification(
         ex=24 * 60 * 60,  # 24 hour expiry
     )
 
-    # In production, send email here
+    # Send verification email
+    email_service = get_email_service()
+    await email_service.send_verification_email(
+        to_email=current_user.email,
+        user_name=current_user.full_name or current_user.email.split("@")[0],
+        verification_token=verify_token,
+    )
+
     logger.info("Verification email resent to: %s", current_user.email)
 
     return {"status": "verification_email_sent"}

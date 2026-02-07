@@ -2,14 +2,20 @@
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from src.api.middleware.auth import get_admin_user
 from src.databases.vector_store import get_vector_store
+from src.models.user import UserInDB
 from src.orchestration.graph import get_orchestrator
 from src.rag.pipeline import get_rag_pipeline
 
-router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
+router = APIRouter(
+    prefix="/api/v1/admin",
+    tags=["admin"],
+    dependencies=[Depends(get_admin_user)],  # Require admin auth for all routes
+)
 
 
 class PromptUpdateRequest(BaseModel):

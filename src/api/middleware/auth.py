@@ -189,12 +189,13 @@ async def verify_api_key(
     settings = get_settings()
 
     # Validate against configured API keys
-    valid_keys = settings.API_KEYS if hasattr(settings, "API_KEYS") else []
+    if not settings.API_KEYS:
+        logger.warning("No API keys configured - rejecting request")
+        raise HTTPException(status_code=401, detail="API key validation not configured")
 
-    if api_key not in valid_keys and api_key.strip():
-        # For development, accept any non-empty key
-        # In production, strictly validate
-        pass
+    if api_key not in settings.API_KEYS:
+        logger.warning("Invalid API key attempted")
+        raise HTTPException(status_code=401, detail="Invalid API key")
 
     return api_key
 
