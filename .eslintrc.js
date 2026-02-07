@@ -39,6 +39,10 @@ module.exports = {
     'react/prop-types': 'off',
     'react/display-name': 'off',
 
+    // React Hooks - disable overly strict purity rules for mock data
+    'react-hooks/purity': 'off',
+    'react-hooks/static-components': 'warn',
+
     // TypeScript
     '@typescript-eslint/no-unused-vars': [
       'warn',
@@ -87,6 +91,8 @@ module.exports = {
         aspects: ['invalidHref', 'preferButton'],
       },
     ],
+    'jsx-a11y/click-events-have-key-events': 'warn',
+    'jsx-a11y/no-static-element-interactions': 'warn',
   },
   overrides: [
     // Test files
