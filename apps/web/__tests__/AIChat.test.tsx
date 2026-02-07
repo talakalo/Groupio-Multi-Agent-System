@@ -41,7 +41,9 @@ describe("AIChat", () => {
     renderWithProviders(
       <AIChat buildingId="bld_001" suggestions={[]} />
     );
-    expect(screen.getByText(/גרופיו/)).toBeDefined();
+    // Use getAllByText since the text appears in header and welcome message
+    const elements = screen.getAllByText(/גרופיו/);
+    expect(elements.length).toBeGreaterThan(0);
   });
 
   it("sends message on form submit", async () => {
