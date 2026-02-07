@@ -1,0 +1,165 @@
+name: Auto Merge
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  check_suite:
+    types: [completed]
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  # ============================================
+  # Auto-merge approved PRs when CI passes
+  # ============================================
+
+  auto-merge:
+    name: Auto Merge PR
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get PR for workflow run
+        id: get-pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Get the head SHA from the workflow run
+            const headSha = context.payload.workflow_run.head_sha;
+
+            // Find PRs with this head SHA
+            const { data: prs } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              head: `${context.repo.owner}:${context.payload.workflow_run.head_branch}`
+            });
+
+            if (prs.length === 0) {
+              console.log('No open PR found for this workflow run');
+              return;
+            }
+
+            const pr = prs[0];
+            console.log(`Found PR #${pr.number}: ${pr.title}`);
+
+            // Check if PR is targeting dev or main
+            const targetBranch = pr.base.ref;
+            const sourceBranch = pr.head.ref;
+
+            console.log(`Source: ${sourceBranch}, Target: ${targetBranch}`);
+
+            // Only auto-merge if:
+            // - PR to dev from feature branches
+            // - PR to main from dev
+            const shouldAutoMerge =
+              (targetBranch === 'dev' && sourceBranch !== 'main') ||
+              (targetBranch === 'main' && sourceBranch === 'dev');
+
+            if (!shouldAutoMerge) {
+              console.log('PR does not match auto-merge criteria');
+              return;
+            }
+
+            core.setOutput('pr_number', pr.number);
+            core.setOutput('should_merge', 'true');
+            core.setOutput('target_branch', targetBranch);
+
+      - name: Enable auto-merge
+        if: steps.get-pr.outputs.should_merge == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = ${{ steps.get-pr.outputs.pr_number }};
+            const targetBranch = '${{ steps.get-pr.outputs.target_branch }}';
+
+            try {
+              // Get PR details
+              const { data: pr } = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber
+              });
+
+              // Check if all status checks passed
+              const { data: checks } = await github.rest.checks.listForRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: pr.head.sha
+              });
+
+              const allPassed = checks.check_runs.every(
+                check => check.conclusion === 'success' || check.conclusion === 'skipped'
+              );
+
+              if (!allPassed) {
+                console.log('Not all checks passed, skipping auto-merge');
+                return;
+              }
+
+              // Merge the PR
+              await github.rest.pulls.merge({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber,
+                merge_method: 'squash',
+                commit_title: `${pr.title} (#${prNumber})`,
+                commit_message: pr.body || ''
+              });
+
+              console.log(`Successfully merged PR #${prNumber} into ${targetBranch}`);
+
+              // Add a comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: `✅ Auto-merged into \`${targetBranch}\` after all CI checks passed.`
+              });
+
+            } catch (error) {
+              console.log(`Error during auto-merge: ${error.message}`);
+              // Don't fail the workflow, just log the error
+            }
+
+  # ============================================
+  # Label PRs based on target branch
+  # ============================================
+
+  label-pr:
+    name: Label PR
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Add labels based on target branch
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const targetBranch = context.payload.pull_request.base.ref;
+            const labels = [];
+
+            if (targetBranch === 'dev') {
+              labels.push('staging');
+            } else if (targetBranch === 'main') {
+              labels.push('production');
+            }
+
+            if (labels.length > 0) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                labels: labels
+              });
+            }

@@ -4,7 +4,7 @@ This guide walks you through setting up and running the Groupio system locally f
 
 ## Prerequisites
 
-- **Node.js** 20+ and **pnpm** 8+
+- **Node.js** 20+ and **pnpm** 9+
 - **Python** 3.11+
 - **Docker** and **Docker Compose**
 - **Git**
@@ -313,6 +313,70 @@ WHATSAPP_PHONE_ID=your-phone-id
 ```bash
 SENTRY_DSN=https://xxx@sentry.io/xxx
 ```
+
+---
+
+## Git Workflow & Branching Strategy
+
+### Branch Structure
+
+```
+main (production)
+  ↑ PR with auto-merge
+dev (staging)
+  ↑ PR with auto-merge
+feature/your-feature
+```
+
+### Workflow
+
+1. **Create feature branch from `dev`**:
+   ```bash
+   git checkout dev
+   git pull origin dev
+   git checkout -b feature/your-feature
+   ```
+
+2. **Make changes and push**:
+   ```bash
+   git add .
+   git commit -m "feat: your feature description"
+   git push -u origin feature/your-feature
+   ```
+
+3. **Create PR to `dev`**:
+   - PRs to `dev` deploy to **staging** environment
+   - CI runs automatically (lint, type-check, tests, security scan)
+   - Auto-merges when all checks pass
+
+4. **Create PR from `dev` to `main`**:
+   - PRs to `main` deploy to **production** environment
+   - Same CI checks run
+   - Auto-merges when all checks pass
+
+### CI/CD Pipeline
+
+| Stage | What Runs |
+|-------|-----------|
+| Lint | ESLint, Ruff, TypeScript type-check |
+| Security | Trivy vulnerability scan, GitLeaks secret scan |
+| Tests | Backend unit tests, Frontend unit tests |
+| Build | Docker build, Next.js build |
+| Deploy | Vercel (web/admin), Docker (backend) |
+
+### Setting Up Branch Protection (Repository Admin)
+
+Go to GitHub → Settings → Branches → Add rule:
+
+**For `main` branch:**
+- Require pull request before merging
+- Require status checks: `CI Success`
+- Require branches to be up to date
+- Include administrators
+
+**For `dev` branch:**
+- Require pull request before merging
+- Require status checks: `CI Success`
 
 ---
 
