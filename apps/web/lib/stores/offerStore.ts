@@ -54,9 +54,9 @@ interface CreateOfferData {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-const getAuthHeader = () => {
+const getAuthHeader = (): Record<string, string> => {
   // Get token from auth store
-  const authData = localStorage.getItem('groupio-auth');
+  const authData = typeof window !== 'undefined' ? localStorage.getItem('groupio-auth') : null;
   if (authData) {
     const { state } = JSON.parse(authData);
     if (state?.accessToken) {
