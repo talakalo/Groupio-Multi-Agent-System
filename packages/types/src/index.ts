@@ -33,6 +33,9 @@ export interface Contractor {
   yearsInBusiness?: number;
   description?: string;
   avatar?: string;
+  trustScore?: number;
+  insuranceExpiry?: string;
+  certifications?: string[];
 }
 
 export interface Offer {
@@ -142,6 +145,46 @@ export interface ResponseMetadata {
   needsHuman: boolean;
 }
 
+// ---- Contractor Stats ----
+
+export interface ContractorStats {
+  activeOffers: number;
+  completedProjects: number;
+  totalRevenue: number;
+  averageRating: number;
+  trustScore: number;
+  offersTrend?: number;
+  projectsTrend?: number;
+  revenueTrend?: number;
+  trustBreakdown?: {
+    license: number;
+    insurance: number;
+    experience: number;
+    reputation: number;
+    completion: number;
+    response: number;
+  };
+}
+
+export interface ProjectWithStats {
+  id: string;
+  offerId: string;
+  status: OfferStatus;
+  buildingId: string;
+  buildingAddress?: string;
+  category: ServiceCategory;
+  contractorId: string;
+  participants: number;
+  totalPrice: number;
+  startDate?: string;
+  completedDate?: string;
+  createdAt: string;
+  title?: string;
+  building?: Building;
+  finalPrice?: number;
+  participantCount?: number;
+}
+
 // ---- Admin Types ----
 
 export interface AgentMetrics {
@@ -189,7 +232,8 @@ export type ServiceCategory =
   | "renovations"
   | "painting"
   | "flooring"
-  | "windows";
+  | "windows"
+  | "security";
 
 export type Region =
   | "center"
@@ -207,6 +251,7 @@ export type OfferStatus =
   | "draft"
   | "active"
   | "pending"
+  | "in_progress"
   | "completed"
   | "cancelled"
   | "expired";

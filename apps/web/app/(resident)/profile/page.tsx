@@ -60,7 +60,7 @@ function NotificationToggle({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <label className="flex items-start justify-between py-3 cursor-pointer group">
+    <div className="flex items-start justify-between py-3 cursor-pointer group">
       <div className="flex-1 pe-4">
         <p className="text-sm font-medium text-gray-900 group-hover:text-primary-600 transition-colors">
           {label}
@@ -71,6 +71,7 @@ function NotificationToggle({
         type="button"
         role="switch"
         aria-checked={checked}
+        aria-label={label}
         onClick={() => onChange(!checked)}
         className={cn(
           'relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0',
@@ -84,7 +85,7 @@ function NotificationToggle({
           )}
         />
       </button>
-    </label>
+    </div>
   );
 }
 

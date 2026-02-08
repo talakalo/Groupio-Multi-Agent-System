@@ -61,6 +61,7 @@ const STATUS_COLORS: Record<OfferStatus, string> = {
   draft: 'bg-gray-100 text-gray-600',
   active: 'bg-emerald-100 text-emerald-700',
   pending: 'bg-amber-100 text-amber-700',
+  in_progress: 'bg-blue-100 text-blue-700',
   completed: 'bg-primary-100 text-primary-700',
   cancelled: 'bg-red-100 text-red-700',
   expired: 'bg-gray-100 text-gray-500',
