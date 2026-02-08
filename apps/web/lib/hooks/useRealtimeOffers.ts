@@ -58,6 +58,7 @@ export function useRealtimeOffers({
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectAttempts = useRef(0);
+  const connectRef = useRef<() => void>();
   const reconnectTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ---- Update query cache based on realtime events ----
@@ -144,7 +145,7 @@ export function useRealtimeOffers({
           reconnectAttempts.current += 1;
 
           reconnectTimeout.current = setTimeout(() => {
-            connect();
+            connectRef.current?.();
           }, delay);
         }
       };
@@ -155,9 +156,15 @@ export function useRealtimeOffers({
 
   // ---- Lifecycle ----
   useEffect(() => {
-    connect();
+    // Store connect in ref for recursive reconnection
+    connectRef.current = connect;
+    // Use setTimeout to avoid synchronous setState during effect
+    const timeoutId = setTimeout(() => {
+      connect();
+    }, 0);
 
     return () => {
+      clearTimeout(timeoutId);
       if (reconnectTimeout.current) {
         clearTimeout(reconnectTimeout.current);
       }

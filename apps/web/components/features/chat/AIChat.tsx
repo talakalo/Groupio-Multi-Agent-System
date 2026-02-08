@@ -9,9 +9,11 @@ import { cn } from '@/lib/utils/cn';
 // Types
 // ---------------------------------------------------------------------------
 
-interface AIChatProps {
+export interface AIChatProps {
   /** Building context for scoped AI answers */
-  buildingId: string;
+  buildingId?: string;
+  /** Context type - determines the assistant's behavior */
+  context?: 'resident' | 'contractor' | 'admin';
   /** Quick-suggestion chips displayed above the input */
   suggestions?: string[];
   /** Optional active service category for contextual hints */
@@ -20,6 +22,8 @@ interface AIChatProps {
   userId?: string;
   /** Custom API base URL override */
   apiUrl?: string;
+  /** Custom placeholder text for input */
+  placeholder?: string;
   /** Additional CSS class names */
   className?: string;
 }
@@ -48,10 +52,12 @@ function generateId(): string {
 
 export function AIChat({
   buildingId,
+  context = 'resident',
   suggestions = [],
   category,
   userId = 'anonymous',
   apiUrl,
+  placeholder,
   className,
 }: AIChatProps) {
   const baseUrl = apiUrl ?? API_BASE;
@@ -114,8 +120,9 @@ export function AIChat({
           body: JSON.stringify({
             userId,
             message: text.trim(),
-            buildingId,
+            ...(buildingId ? { buildingId } : {}),
             channel: 'web',
+            context,
             ...(category ? { category } : {}),
           }),
         });
@@ -149,7 +156,7 @@ export function AIChat({
         setIsLoading(false);
       }
     },
-    [baseUrl, buildingId, category, isLoading, userId],
+    [baseUrl, buildingId, category, context, isLoading, userId],
   );
 
   const handleSubmit = (e: FormEvent) => {
@@ -263,7 +270,7 @@ export function AIChat({
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="הקלד הודעה..."
+          placeholder={placeholder ?? "הקלד הודעה..."}
           disabled={isLoading}
           className={cn(
             'flex-1 rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5',

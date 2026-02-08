@@ -9,9 +9,9 @@ import { cn } from '@/lib/utils/cn';
 // Types
 // ---------------------------------------------------------------------------
 
-interface PricingTiersProps {
-  /** Tier definitions (e.g., 5/10/15/20 units with increasing discounts) */
-  tiers: PricingTier[];
+export interface PricingTiersProps {
+  /** Tier definitions (e.g., 5/10/15/20 units with increasing discounts). If not provided, default tiers are generated. */
+  tiers?: PricingTier[];
   /** Base price before any group discount */
   basePrice: number;
   /** How many residents have already joined */
@@ -20,6 +20,16 @@ interface PricingTiersProps {
   unitLabel?: string;
   /** Additional CSS class names */
   className?: string;
+}
+
+/** Generate default pricing tiers based on base price */
+function generateDefaultTiers(basePrice: number): PricingTier[] {
+  return [
+    { min: 3, max: 5, discount: 5, price: basePrice * 0.95 },
+    { min: 6, max: 10, discount: 10, price: basePrice * 0.90 },
+    { min: 11, max: 15, discount: 15, price: basePrice * 0.85 },
+    { min: 16, max: null, discount: 20, price: basePrice * 0.80 },
+  ];
 }
 
 // ---------------------------------------------------------------------------
@@ -51,12 +61,18 @@ function getTierStatus(
 // ---------------------------------------------------------------------------
 
 export function PricingTiers({
-  tiers,
+  tiers: tiersProp,
   basePrice,
   currentParticipants,
   unitLabel = 'דירות',
   className,
 }: PricingTiersProps) {
+  // Use provided tiers or generate defaults
+  const tiers = useMemo(
+    () => tiersProp ?? generateDefaultTiers(basePrice),
+    [tiersProp, basePrice],
+  );
+
   const activeTierIdx = useMemo(
     () =>
       tiers.findIndex(

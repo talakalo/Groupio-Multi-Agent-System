@@ -2,11 +2,8 @@
 const nextConfig = {
   transpilePackages: ["@groupio/types", "@groupio/api-client", "@groupio/utils"],
 
-  i18n: {
-    locales: ["he", "en"],
-    defaultLocale: "he",
-    localeDetection: true,
-  },
+  // Note: i18n config removed - not supported with App Router
+  // For i18n in App Router, use [locale] dynamic segments or next-intl
 
   images: {
     remotePatterns: [

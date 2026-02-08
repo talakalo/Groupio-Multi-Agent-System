@@ -24,6 +24,7 @@ const CATEGORY_LABELS: Record<ServiceCategory, string> = {
   painting: "\u05E6\u05D1\u05D9\u05E2\u05D4",
   flooring: "\u05E8\u05D9\u05E6\u05D5\u05E3",
   windows: "\u05D7\u05DC\u05D5\u05E0\u05D5\u05EA",
+  security: "\u05D0\u05D1\u05D8\u05D7\u05D4",
 };
 
 // Category colors for badge backgrounds
@@ -38,6 +39,7 @@ const CATEGORY_COLORS: Record<ServiceCategory, string> = {
   painting: "#E8F5E9",
   flooring: "#EFEBE9",
   windows: "#E0F7FA",
+  security: "#E8EAF6",
 };
 
 interface MobileOfferCardProps {

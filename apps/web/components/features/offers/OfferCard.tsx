@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils/cn';
 // Types
 // ---------------------------------------------------------------------------
 
-interface OfferCardProps {
+export interface OfferCardProps {
   offer: Offer;
   /** Callback when the user clicks "Join Offer" */
   onJoin?: (offerId: string) => void;
@@ -24,6 +24,14 @@ interface OfferCardProps {
   onViewDetails?: (offerId: string) => void;
   /** Whether the current user already joined */
   joined?: boolean;
+  /** Card variant - different styling for different contexts */
+  variant?: 'resident' | 'contractor' | 'admin';
+  /** Show action buttons */
+  showActions?: boolean;
+  /** Show participant count prominently */
+  showParticipants?: boolean;
+  /** Compact mode for smaller cards */
+  compact?: boolean;
   /** Additional CSS class names */
   className?: string;
 }
@@ -61,6 +69,7 @@ const CATEGORY_LABELS: Record<ServiceCategory, string> = {
   painting: 'צביעה',
   flooring: 'ריצוף',
   windows: 'חלונות',
+  security: 'אבטחה',
 };
 
 function formatCurrency(amount: number): string {
@@ -95,6 +104,10 @@ export function OfferCard({
   onJoin,
   onViewDetails,
   joined = false,
+  variant = 'resident',
+  showActions = true,
+  showParticipants = true,
+  compact = false,
   className,
 }: OfferCardProps) {
   const currentTier = useMemo(() => getCurrentTier(offer), [offer]);

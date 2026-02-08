@@ -61,7 +61,7 @@ export function subscribeToTable<T extends keyof Database['public']['Tables']>(
   channel = channel.on(
     'postgres_changes',
     config,
-    (payload) => callback(payload as RealtimePayload<T>)
+    (payload) => callback(payload as unknown as RealtimePayload<T>)
   );
 
   channel.subscribe();

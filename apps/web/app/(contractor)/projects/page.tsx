@@ -7,6 +7,10 @@ import type { Offer } from '@groupio/types';
 type ProjectStatus = 'all' | 'in_progress' | 'completed' | 'cancelled';
 
 interface ProjectWithStats extends Offer {
+  title?: string;
+  building?: { id: string; name: string; address: string };
+  finalPrice?: number;
+  participantCount?: number;
   completedAt?: string;
   actualRevenue?: number;
   rating?: number;
@@ -197,7 +201,7 @@ export default function ContractorProjectsPage() {
 
               {project.review && (
                 <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                  <p className="text-gray-600 text-sm italic">"{project.review}"</p>
+                  <p className="text-gray-600 text-sm italic">&ldquo;{project.review}&rdquo;</p>
                 </div>
               )}
 

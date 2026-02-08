@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useMemo } from "react";
 import { StyleSheet, View, Animated, Easing } from "react-native";
 import { Text, useTheme } from "react-native-paper";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
@@ -10,9 +10,12 @@ interface ChatBubbleProps {
 }
 
 function LoadingDots() {
-  const dot1 = useRef(new Animated.Value(0)).current;
-  const dot2 = useRef(new Animated.Value(0)).current;
-  const dot3 = useRef(new Animated.Value(0)).current;
+  // Use useMemo to create stable Animated.Value instances
+  const dots = useMemo(() => ({
+    dot1: new Animated.Value(0),
+    dot2: new Animated.Value(0),
+    dot3: new Animated.Value(0),
+  }), []);
 
   useEffect(() => {
     const createAnimation = (dot: Animated.Value, delay: number) =>
@@ -36,9 +39,9 @@ function LoadingDots() {
       );
 
     const animation = Animated.parallel([
-      createAnimation(dot1, 0),
-      createAnimation(dot2, 200),
-      createAnimation(dot3, 400),
+      createAnimation(dots.dot1, 0),
+      createAnimation(dots.dot2, 200),
+      createAnimation(dots.dot3, 400),
     ]);
 
     animation.start();
@@ -46,7 +49,7 @@ function LoadingDots() {
     return () => {
       animation.stop();
     };
-  }, [dot1, dot2, dot3]);
+  }, [dots]);
 
   const dotStyle = (animValue: Animated.Value) => ({
     opacity: animValue.interpolate({
@@ -65,9 +68,9 @@ function LoadingDots() {
 
   return (
     <View style={styles.loadingDotsContainer}>
-      <Animated.View style={[styles.loadingDot, dotStyle(dot1)]} />
-      <Animated.View style={[styles.loadingDot, dotStyle(dot2)]} />
-      <Animated.View style={[styles.loadingDot, dotStyle(dot3)]} />
+      <Animated.View style={[styles.loadingDot, dotStyle(dots.dot1)]} />
+      <Animated.View style={[styles.loadingDot, dotStyle(dots.dot2)]} />
+      <Animated.View style={[styles.loadingDot, dotStyle(dots.dot3)]} />
     </View>
   );
 }

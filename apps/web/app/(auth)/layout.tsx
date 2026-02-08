@@ -47,7 +47,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
         {/* Testimonial */}
         <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6">
           <p className="text-white text-lg mb-4">
-            "חסכנו 35% על התקנת מזגנים לכל הבניין. התהליך היה פשוט ומהיר!"
+            &ldquo;חסכנו 35% על התקנת מזגנים לכל הבניין. התהליך היה פשוט ומהיר!&rdquo;
           </p>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-blue-400 rounded-full flex items-center justify-center">

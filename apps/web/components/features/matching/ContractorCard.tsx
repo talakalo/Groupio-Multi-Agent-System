@@ -50,6 +50,7 @@ const CATEGORY_LABELS: Record<ServiceCategory, string> = {
   painting: 'צביעה',
   flooring: 'ריצוף',
   windows: 'חלונות',
+  security: 'אבטחה',
 };
 
 function formatCurrency(amount: number): string {
