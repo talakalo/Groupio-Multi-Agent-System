@@ -290,7 +290,7 @@ export async function uploadAvatar(
     type,
   } as unknown as Blob);
 
-  const url = buildUrl("/profile/avatar");
+  const url = buildUrl("/auth/me/avatar");
   const headers: Record<string, string> = {
     Accept: "application/json",
   };
