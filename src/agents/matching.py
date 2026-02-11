@@ -159,16 +159,19 @@ class MatchingAgent(BaseAgent):
         # Process semantic results
         for result in semantic_results:
             cid = result.get("metadata", {}).get("contractor_id", result.get("id", ""))
-            contractor_scores.setdefault(cid, {
-                "semantic_similarity": 0,
-                "graph_score": 0,
-                "rating": 0,
-                "price_competitiveness": 0.5,
-                "availability": 0.5,
-                "response_time": 0.5,
-                "business_name": result.get("metadata", {}).get("business_name", ""),
-                "text": result.get("text", ""),
-            })
+            contractor_scores.setdefault(
+                cid,
+                {
+                    "semantic_similarity": 0,
+                    "graph_score": 0,
+                    "rating": 0,
+                    "price_competitiveness": 0.5,
+                    "availability": 0.5,
+                    "response_time": 0.5,
+                    "business_name": result.get("metadata", {}).get("business_name", ""),
+                    "text": result.get("text", ""),
+                },
+            )
             contractor_scores[cid]["semantic_similarity"] = result.get("score", 0)
             rating = result.get("metadata", {}).get("rating", 0)
             if rating:
@@ -191,9 +194,7 @@ class MatchingAgent(BaseAgent):
                 }
             avg_success = cdata.get("avg_success", 0)
             projects = cdata.get("projects", 0)
-            contractor_scores[cid]["graph_score"] = min(
-                avg_success * (1 + projects / 20), 1.0
-            )
+            contractor_scores[cid]["graph_score"] = min(avg_success * (1 + projects / 20), 1.0)
             if cdata.get("rating"):
                 contractor_scores[cid]["rating"] = min(cdata["rating"] / 5.0, 1.0)
 
@@ -201,18 +202,19 @@ class MatchingAgent(BaseAgent):
         results = []
         for cid, scores in contractor_scores.items():
             overall = sum(
-                scores.get(metric, 0) * weight
-                for metric, weight in MATCH_WEIGHTS.items()
+                scores.get(metric, 0) * weight for metric, weight in MATCH_WEIGHTS.items()
             )
-            results.append({
-                "contractor_id": cid,
-                "business_name": scores.get("business_name", ""),
-                "overall_score": round(overall, 3),
-                "semantic_similarity": round(scores.get("semantic_similarity", 0), 3),
-                "graph_score": round(scores.get("graph_score", 0), 3),
-                "rating": round(scores.get("rating", 0) * 5, 1),
-                "description": scores.get("text", "")[:200],
-            })
+            results.append(
+                {
+                    "contractor_id": cid,
+                    "business_name": scores.get("business_name", ""),
+                    "overall_score": round(overall, 3),
+                    "semantic_similarity": round(scores.get("semantic_similarity", 0), 3),
+                    "graph_score": round(scores.get("graph_score", 0), 3),
+                    "rating": round(scores.get("rating", 0) * 5, 1),
+                    "description": scores.get("text", "")[:200],
+                }
+            )
 
         results.sort(key=lambda x: x["overall_score"], reverse=True)
         return results

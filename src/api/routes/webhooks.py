@@ -71,9 +71,7 @@ async def contractor_update_webhook(
     if not contractor_id or not update_type:
         return {"status": "invalid"}
 
-    logger.info(
-        "Contractor update: %s type=%s", contractor_id, update_type
-    )
+    logger.info("Contractor update: %s type=%s", contractor_id, update_type)
 
     # Trigger re-vetting if needed
     if update_type in ("document_uploaded", "license_updated"):

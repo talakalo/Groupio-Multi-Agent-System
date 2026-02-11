@@ -172,9 +172,7 @@ class SupportAgent(BaseAgent):
 
         return all_results
 
-    async def _get_order_data(
-        self, user_id: str
-    ) -> list[dict[str, Any]] | None:
+    async def _get_order_data(self, user_id: str) -> list[dict[str, Any]] | None:
         """Fetch order data for order status inquiries."""
         try:
             return await self._db.get_user_orders(user_id, limit=5)
@@ -182,9 +180,7 @@ class SupportAgent(BaseAgent):
             logger.exception("Failed to get order data")
             return None
 
-    async def _should_escalate(
-        self, state: AgentState, user_message: str
-    ) -> bool:
+    async def _should_escalate(self, state: AgentState, user_message: str) -> bool:
         """Check if the conversation should be escalated to a human."""
         # Legal keywords
         if detect_legal_keywords(user_message):
@@ -192,10 +188,7 @@ class SupportAgent(BaseAgent):
 
         # High-value user with complaint
         user_profile = state.get("user_profile", {})
-        if (
-            state.get("intent") == "complaint"
-            and user_profile.get("user_value") == "high"
-        ):
+        if state.get("intent") == "complaint" and user_profile.get("user_value") == "high":
             return True
 
         # Sentiment check
@@ -208,17 +201,13 @@ class SupportAgent(BaseAgent):
 
         # Too many resolution attempts
         actions = state.get("actions_taken", [])
-        support_attempts = sum(
-            1 for a in actions if a.get("agent") == "support"
-        )
+        support_attempts = sum(1 for a in actions if a.get("agent") == "support")
         if support_attempts >= 3:
             return True
 
         return False
 
-    async def _escalate(
-        self, state: AgentState, user_message: str
-    ) -> AgentState:
+    async def _escalate(self, state: AgentState, user_message: str) -> AgentState:
         """Escalate conversation to human agent."""
         state["needs_human"] = True
 
@@ -237,8 +226,7 @@ class SupportAgent(BaseAgent):
         lang = detect_language(user_message)
         if lang == "he":
             msg = (
-                "אני מעביר אותך לנציג אנושי שיוכל לטפל בבקשתך. "
-                "אנא המתן ונציג יצור איתך קשר בהקדם."
+                "אני מעביר אותך לנציג אנושי שיוכל לטפל בבקשתך. אנא המתן ונציג יצור איתך קשר בהקדם."
             )
         else:
             msg = (

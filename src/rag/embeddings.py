@@ -62,9 +62,7 @@ class EmbeddingClient:
         """Generate embedding optimized for query/search use."""
         return await self.embed_text(query)
 
-    async def embed_documents(
-        self, documents: list[dict[str, Any]]
-    ) -> list[list[float]]:
+    async def embed_documents(self, documents: list[dict[str, Any]]) -> list[list[float]]:
         """Generate embeddings for a list of document dicts with 'text' key."""
         texts = [doc["text"] for doc in documents]
         return await self.embed_batch(texts)

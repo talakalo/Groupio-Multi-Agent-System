@@ -9,8 +9,10 @@ from src.agents.matching import MatchingAgent, MATCH_WEIGHTS
 @pytest.fixture
 def matching_agent():
     """Create a MatchingAgent with mocked dependencies."""
-    with patch("src.agents.base.get_llm_client") as mock_llm, \
-         patch("src.agents.base.get_rag_pipeline") as mock_rag:
+    with (
+        patch("src.agents.base.get_llm_client") as mock_llm,
+        patch("src.agents.base.get_rag_pipeline") as mock_rag,
+    ):
         mock_llm.return_value = AsyncMock()
         mock_rag.return_value = AsyncMock()
 
@@ -87,14 +89,10 @@ async def test_matching_finds_contractors(matching_agent, sample_agent_state):
 async def test_matching_handles_no_results(matching_agent, sample_agent_state):
     """Test matching agent handles no results gracefully."""
     sample_agent_state["intent"] = "contractor_search"
-    sample_agent_state["messages"] = [
-        {"role": "user", "content": "looking for a plumber"}
-    ]
+    sample_agent_state["messages"] = [{"role": "user", "content": "looking for a plumber"}]
 
     matching_agent.rag.retrieve = AsyncMock(return_value=[])
-    matching_agent._graph_store.find_matching_contractors = AsyncMock(
-        return_value=[]
-    )
+    matching_agent._graph_store.find_matching_contractors = AsyncMock(return_value=[])
 
     result = await matching_agent.run(sample_agent_state)
 

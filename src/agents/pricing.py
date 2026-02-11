@@ -118,9 +118,7 @@ class PricingAgent(BaseAgent):
         self._metrics["calls"] += 1
         return state
 
-    async def _get_market_data(
-        self, category: str, region: str
-    ) -> dict[str, Any]:
+    async def _get_market_data(self, category: str, region: str) -> dict[str, Any]:
         """Fetch market pricing data from the database."""
         try:
             return await self._db.get_market_data(category, region)
@@ -158,28 +156,26 @@ class PricingAgent(BaseAgent):
             # Quality check: don't go below 80% of market minimum
             if min_price > 0 and tier_price < min_price * 0.8:
                 flags.append(
-                    f"Tier {tier['min']}-{tier['max'] or '+'}: "
-                    f"price too low - quality risk"
+                    f"Tier {tier['min']}-{tier['max'] or '+'}: price too low - quality risk"
                 )
                 tier_price = min_price * 0.8
 
             # Market positioning check
             if avg_price > 0 and tier_price > avg_price * 1.3:
-                flags.append(
-                    f"Tier {tier['min']}-{tier['max'] or '+'}: "
-                    f"above market average"
-                )
+                flags.append(f"Tier {tier['min']}-{tier['max'] or '+'}: above market average")
 
             market_position = tier_price / avg_price if avg_price > 0 else 1.0
 
-            results.append({
-                "min_participants": tier["min"],
-                "max_participants": tier["max"],
-                "discount_percent": tier["discount"] * 100,
-                "price": round(tier_price, 2),
-                "market_position": round(market_position, 2),
-                "flags": flags,
-            })
+            results.append(
+                {
+                    "min_participants": tier["min"],
+                    "max_participants": tier["max"],
+                    "discount_percent": tier["discount"] * 100,
+                    "price": round(tier_price, 2),
+                    "market_position": round(market_position, 2),
+                    "flags": flags,
+                }
+            )
 
         return results
 
@@ -227,9 +223,7 @@ class PricingAgent(BaseAgent):
         pricing_context: list[dict[str, Any]],
     ) -> str:
         """Generate pricing analysis response via LLM."""
-        context_text = "\n".join(
-            doc.get("text", "")[:300] for doc in pricing_context[:3]
-        )
+        context_text = "\n".join(doc.get("text", "")[:300] for doc in pricing_context[:3])
 
         tiers_text = "\n".join(
             f"- {t['min_participants']}-{t.get('max_participants') or '+'} units: "

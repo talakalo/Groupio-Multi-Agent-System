@@ -97,9 +97,7 @@ def mock_orchestrator_deps():
             }
         )
         pg.get_user_orders = AsyncMock(return_value=[])
-        pg.create_support_ticket = AsyncMock(
-            return_value={"id": "ticket_001"}
-        )
+        pg.create_support_ticket = AsyncMock(return_value={"id": "ticket_001"})
         pg.health_check = AsyncMock(return_value=True)
         mock_pg.return_value = pg
         mock_pricing_pg.return_value = pg
@@ -117,9 +115,7 @@ def mock_orchestrator_deps():
                 "verified": True,
             }
         )
-        graph.detect_suspicious_patterns = AsyncMock(
-            return_value={"suspicious": False}
-        )
+        graph.detect_suspicious_patterns = AsyncMock(return_value={"suspicious": False})
         graph.health_check = AsyncMock(return_value=True)
         mock_graph.return_value = graph
         mock_vetting_graph.return_value = graph

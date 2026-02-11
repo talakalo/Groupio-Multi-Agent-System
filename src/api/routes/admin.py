@@ -28,15 +28,12 @@ async def get_analytics() -> dict[str, Any]:
         if isinstance(stats, dict):
             by_status = stats.get("by_status") or {}
             open_tickets = sum(
-                c for s, c in by_status.items()
-                if s and s != "resolved" and s != "closed"
+                c for s, c in by_status.items() if s and s != "resolved" and s != "closed"
             )
     except Exception:
         pass
     try:
-        _, total_contractors = await db.list_contractors(
-            filters={}, page=1, page_size=1
-        )
+        _, total_contractors = await db.list_contractors(filters={}, page=1, page_size=1)
     except Exception:
         pass
     return {
@@ -138,8 +135,7 @@ async def get_analytics() -> dict[str, Any]:
         stats = await db.get_escalation_stats()
         by_status = stats.get("by_status") or {}
         open_count = sum(
-            c for s, c in by_status.items()
-            if str(s).lower() not in ("resolved", "closed")
+            c for s, c in by_status.items() if str(s).lower() not in ("resolved", "closed")
         )
         return {
             "gmvToday": 0,

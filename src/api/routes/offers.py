@@ -63,16 +63,18 @@ async def create_offer(
         vs = get_vector_store()
         await vs.upsert(
             collection="offers",
-            points=[{
-                "id": offer_id,
-                "vector": embedding,
-                "payload": {
-                    "title": offer.title,
-                    "category": offer.category.value,
-                    "building_id": offer.building_id,
-                    "status": offer.status.value,
-                },
-            }],
+            points=[
+                {
+                    "id": offer_id,
+                    "vector": embedding,
+                    "payload": {
+                        "title": offer.title,
+                        "category": offer.category.value,
+                        "building_id": offer.building_id,
+                        "status": offer.status.value,
+                    },
+                }
+            ],
         )
     except Exception as e:
         logger.warning("Failed to index offer in vector DB: %s", e)
@@ -316,10 +318,13 @@ async def match_contractor(
     if not contractor:
         raise HTTPException(status_code=404, detail="Contractor not found")
 
-    updated = await db.update_offer(offer_id, {
-        "status": OfferStatus.MATCHED,
-        "matched_contractor_id": request.contractor_id,
-    })
+    updated = await db.update_offer(
+        offer_id,
+        {
+            "status": OfferStatus.MATCHED,
+            "matched_contractor_id": request.contractor_id,
+        },
+    )
 
     return updated
 

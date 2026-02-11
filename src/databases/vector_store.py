@@ -113,9 +113,7 @@ class VectorStore:
                 "id": str(hit.id),
                 "score": hit.score,
                 "text": hit.payload.get("text", ""),
-                "metadata": {
-                    k: v for k, v in hit.payload.items() if k != "text"
-                },
+                "metadata": {k: v for k, v in hit.payload.items() if k != "text"},
             }
             for hit in results
         ]
@@ -151,9 +149,7 @@ class VectorStore:
             keyword_matches = sum(1 for kw in keywords if kw in text_lower)
             keyword_score = keyword_matches / max(len(keywords), 1)
 
-            combined_score = (
-                result["score"] * semantic_weight + keyword_score * keyword_weight
-            )
+            combined_score = result["score"] * semantic_weight + keyword_score * keyword_weight
             result["score"] = combined_score
             result["keyword_score"] = keyword_score
             scored_results.append(result)

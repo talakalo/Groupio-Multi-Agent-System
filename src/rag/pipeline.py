@@ -139,9 +139,7 @@ class GroupioRAG:
         enriched_query = f"{query} {context_terms}"
 
         # Second hop: refined search with enriched query
-        second_results = await self._semantic_search(
-            enriched_query, namespace, filters, top_k
-        )
+        second_results = await self._semantic_search(enriched_query, namespace, filters, top_k)
 
         # Merge and deduplicate
         seen_ids: set[str] = set()
@@ -186,9 +184,7 @@ class GroupioRAG:
             score = doc.get("score", 0)
             metadata = doc.get("metadata", {})
             source = metadata.get("source", "unknown")
-            context_parts.append(
-                f"[Source {i} (relevance: {score:.2f}, source: {source})]\n{text}"
-            )
+            context_parts.append(f"[Source {i} (relevance: {score:.2f}, source: {source})]\n{text}")
 
         context_block = "\n\n".join(context_parts)
 

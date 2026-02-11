@@ -220,14 +220,8 @@ class GroupioOrchestrator:
             ticket_data = {
                 "user_id": state["user_id"],
                 "conversation_id": state["conversation_id"],
-                "reason": state.get(
-                    "escalation_reason", "Agent requested human review"
-                ),
-                "priority": (
-                    "high"
-                    if "complaint" in (state.get("intent") or "")
-                    else "normal"
-                ),
+                "reason": state.get("escalation_reason", "Agent requested human review"),
+                "priority": ("high" if "complaint" in (state.get("intent") or "") else "normal"),
                 "context": {
                     "intent": state.get("intent"),
                     "actions_taken": [
@@ -237,9 +231,7 @@ class GroupioOrchestrator:
                         }
                         for a in state.get("actions_taken", [])
                     ],
-                    "rag_summary": summarize_rag_results(
-                        state.get("rag_results", [])
-                    ),
+                    "rag_summary": summarize_rag_results(state.get("rag_results", [])),
                 },
             }
 
@@ -257,8 +249,7 @@ class GroupioOrchestrator:
                 "response": {
                     "type": "handoff",
                     "message": (
-                        "העברתי אותך לנציג אנושי שיטפל בבקשתך בהקדם. "
-                        f"מספר פנייה: {ticket_id}"
+                        f"העברתי אותך לנציג אנושי שיטפל בבקשתך בהקדם. מספר פנייה: {ticket_id}"
                     ),
                 },
                 "requires_followup": False,
@@ -272,18 +263,24 @@ class GroupioOrchestrator:
         if state.get("needs_human"):
             actions = state.get("actions_taken", [])
             last = actions[-1] if actions else {}
-            state["final_response"] = last.get("response", {
-                "type": "handoff",
-                "message": "מעביר אותך לנציג. אנא המתן.",
-            })
+            state["final_response"] = last.get(
+                "response",
+                {
+                    "type": "handoff",
+                    "message": "מעביר אותך לנציג. אנא המתן.",
+                },
+            )
         else:
             actions = state.get("actions_taken", [])
             if actions:
                 last = actions[-1]
-                state["final_response"] = last.get("response", {
-                    "type": "text",
-                    "message": "",
-                })
+                state["final_response"] = last.get(
+                    "response",
+                    {
+                        "type": "text",
+                        "message": "",
+                    },
+                )
             else:
                 state["final_response"] = {
                     "type": "text",
@@ -292,9 +289,7 @@ class GroupioOrchestrator:
 
         return state
 
-    async def _get_relevant_context(
-        self, query: str, intent: str
-    ) -> list[dict[str, Any]]:
+    async def _get_relevant_context(self, query: str, intent: str) -> list[dict[str, Any]]:
         """Pre-fetch RAG context based on intent."""
         namespace_map = {
             "contractor_search": "contractors",
@@ -344,21 +339,21 @@ class GroupioOrchestrator:
 
         return {
             "conversation_id": final_state["conversation_id"],
-            "response": final_state.get("final_response", {
-                "type": "error",
-                "message": "No response generated.",
-            }),
+            "response": final_state.get(
+                "final_response",
+                {
+                    "type": "error",
+                    "message": "No response generated.",
+                },
+            ),
             "metadata": {
                 "intent": final_state.get("intent"),
                 "confidence": final_state.get("confidence", 0),
                 "agents_used": [
-                    a.get("agent", "unknown")
-                    for a in final_state.get("actions_taken", [])
+                    a.get("agent", "unknown") for a in final_state.get("actions_taken", [])
                 ],
                 "tokens_used": final_state.get("tokens_used", 0),
-                "duration_ms": calculate_duration_ms(
-                    final_state["start_time"]
-                ),
+                "duration_ms": calculate_duration_ms(final_state["start_time"]),
                 "needs_human": final_state.get("needs_human", False),
             },
         }

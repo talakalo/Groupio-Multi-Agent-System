@@ -6,7 +6,7 @@ from typing import Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from src.api.middleware.auth import get_current_user
 from src.databases.postgres import get_postgres_client
@@ -30,8 +30,9 @@ router = APIRouter(tags=["escalations"])
 
 
 class ResolveEscalationBody(BaseModel):
-    """Optional body for resolve endpoint (prefer body for longer notes)."""
-    resolution_notes: Optional[str] = None
+    """Request body for resolving an escalation."""
+
+    resolution_notes: Optional[str] = Field(None, max_length=2000)
 
 
 @router.post("/", response_model=EscalationResponse)
@@ -223,7 +224,10 @@ async def update_escalation(
     update_data = request.model_dump(exclude_unset=True)
 
     # Track resolution time
-    if request.status == EscalationStatus.RESOLVED and escalation.status != EscalationStatus.RESOLVED:
+    if (
+        request.status == EscalationStatus.RESOLVED
+        and escalation.status != EscalationStatus.RESOLVED
+    ):
         update_data["resolved_at"] = datetime.utcnow()
 
     updated = await db.update_escalation(escalation_id, update_data)
@@ -254,10 +258,13 @@ async def assign_escalation(
     if not admin or admin.role not in ("admin", "super_admin"):
         raise HTTPException(status_code=400, detail="Invalid admin ID")
 
-    updated = await db.update_escalation(escalation_id, {
-        "assigned_to": admin_id,
-        "status": EscalationStatus.IN_PROGRESS,
-    })
+    updated = await db.update_escalation(
+        escalation_id,
+        {
+            "assigned_to": admin_id,
+            "status": EscalationStatus.IN_PROGRESS,
+        },
+    )
 
     logger.info("Escalation %s assigned to %s", escalation_id, admin_id)
 
@@ -304,12 +311,6 @@ async def reply_to_escalation(
     # Fetch updated escalation
     updated = await db.get_escalation(escalation_id)
     return updated
-
-
-class ResolveEscalationBody(BaseModel):
-    """Optional body for resolve escalation (preferred for longer text)."""
-
-    resolution_notes: Optional[str] = None
 
 
 @router.post("/{escalation_id}/resolve")
@@ -375,10 +376,13 @@ async def reopen_escalation(
         content=f"Escalation reopened: {reason}",
     )
 
-    updated = await db.update_escalation(escalation_id, {
-        "status": EscalationStatus.OPEN,
-        "resolved_at": None,
-    })
+    updated = await db.update_escalation(
+        escalation_id,
+        {
+            "status": EscalationStatus.OPEN,
+            "resolved_at": None,
+        },
+    )
 
     logger.info("Escalation %s reopened by %s: %s", escalation_id, current_user.id, reason)
 

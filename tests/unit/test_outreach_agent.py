@@ -9,10 +9,12 @@ from src.agents.outreach import OutreachAgent
 @pytest.fixture
 def outreach_agent():
     """Create outreach agent instance."""
-    with patch("src.agents.base.get_llm_client") as mock_llm, \
-         patch("src.agents.base.get_rag_pipeline") as mock_rag, \
-         patch("src.agents.outreach.get_postgres_client") as mock_db, \
-         patch("src.agents.outreach.get_redis_client") as mock_redis:
+    with (
+        patch("src.agents.base.get_llm_client") as mock_llm,
+        patch("src.agents.base.get_rag_pipeline") as mock_rag,
+        patch("src.agents.outreach.get_postgres_client") as mock_db,
+        patch("src.agents.outreach.get_redis_client") as mock_redis,
+    ):
         mock_llm.return_value = AsyncMock()
         mock_rag.return_value = AsyncMock()
         mock_db.return_value = AsyncMock()
@@ -20,10 +22,12 @@ def outreach_agent():
 
         agent = OutreachAgent()
         agent.llm_client = AsyncMock()
-        agent.llm_client.create_message = AsyncMock(return_value={
-            "content": [{"type": "text", "text": "Personalized message"}],
-            "usage": {"input_tokens": 100, "output_tokens": 50},
-        })
+        agent.llm_client.create_message = AsyncMock(
+            return_value={
+                "content": [{"type": "text", "text": "Personalized message"}],
+                "usage": {"input_tokens": 100, "output_tokens": 50},
+            }
+        )
         agent.rag = AsyncMock()
         agent._db = AsyncMock()
         agent._ab_test = MagicMock()

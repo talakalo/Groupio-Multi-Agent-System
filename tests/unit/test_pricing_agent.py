@@ -9,8 +9,10 @@ from src.agents.pricing import PricingAgent, DEFAULT_TIERS
 @pytest.fixture
 def pricing_agent():
     """Create a PricingAgent with mocked dependencies."""
-    with patch("src.agents.base.get_llm_client") as mock_llm, \
-         patch("src.agents.base.get_rag_pipeline") as mock_rag:
+    with (
+        patch("src.agents.base.get_llm_client") as mock_llm,
+        patch("src.agents.base.get_rag_pipeline") as mock_rag,
+    ):
         mock_llm.return_value = AsyncMock()
         mock_rag.return_value = AsyncMock()
 
@@ -67,8 +69,14 @@ def test_calculate_tiers_zero_base_price(pricing_agent):
 def test_seasonal_adjustment_summer(pricing_agent):
     """Test seasonal adjustment for AC in summer."""
     tiers = [
-        {"price": 4000, "min_participants": 3, "max_participants": 5,
-         "discount_percent": 5, "market_position": 1.0, "flags": []},
+        {
+            "price": 4000,
+            "min_participants": 3,
+            "max_participants": 5,
+            "discount_percent": 5,
+            "market_position": 1.0,
+            "flags": [],
+        },
     ]
 
     with patch.object(pricing_agent, "_get_current_season", return_value="summer"):
@@ -81,8 +89,14 @@ def test_seasonal_adjustment_summer(pricing_agent):
 def test_seasonal_adjustment_no_effect(pricing_agent):
     """Test that non-seasonal categories are unaffected."""
     tiers = [
-        {"price": 5000, "min_participants": 3, "max_participants": 5,
-         "discount_percent": 5, "market_position": 1.0, "flags": []},
+        {
+            "price": 5000,
+            "min_participants": 3,
+            "max_participants": 5,
+            "discount_percent": 5,
+            "market_position": 1.0,
+            "flags": [],
+        },
     ]
 
     adjusted = pricing_agent._apply_seasonal_adjustments(tiers, "electrical")
@@ -93,9 +107,7 @@ def test_seasonal_adjustment_no_effect(pricing_agent):
 async def test_pricing_agent_runs(pricing_agent, sample_agent_state):
     """Test full pricing agent run."""
     sample_agent_state["intent"] = "pricing_question"
-    sample_agent_state["messages"] = [
-        {"role": "user", "content": "כמה עולה מזגן?"}
-    ]
+    sample_agent_state["messages"] = [{"role": "user", "content": "כמה עולה מזגן?"}]
 
     pricing_agent.rag.retrieve = AsyncMock(return_value=[])
     pricing_agent._db.get_market_data = AsyncMock(

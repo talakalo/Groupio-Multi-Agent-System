@@ -67,9 +67,7 @@ class ToolRegistry:
             strategy=strategy,
         )
 
-    async def _graph_query(
-        self, query: str, params: dict | None = None
-    ) -> list[dict[str, Any]]:
+    async def _graph_query(self, query: str, params: dict | None = None) -> list[dict[str, Any]]:
         """Execute a Cypher query on the graph database."""
         graph = get_graph_store()
         return await graph.execute(query, params)
@@ -79,9 +77,7 @@ class ToolRegistry:
         db = get_postgres_client()
         return await db.execute_query(query, params)
 
-    async def _get_order_status(
-        self, user_id: str, limit: int = 5
-    ) -> list[dict[str, Any]]:
+    async def _get_order_status(self, user_id: str, limit: int = 5) -> list[dict[str, Any]]:
         """Get order status for a user."""
         db = get_postgres_client()
         return await db.get_user_orders(user_id, limit)
@@ -91,16 +87,12 @@ class ToolRegistry:
         db = get_postgres_client()
         return await db.get_active_offers(building_id)
 
-    async def _get_market_data(
-        self, category: str, region: str
-    ) -> dict[str, Any]:
+    async def _get_market_data(self, category: str, region: str) -> dict[str, Any]:
         """Get market pricing data."""
         db = get_postgres_client()
         return await db.get_market_data(category, region)
 
-    async def _calculate_match_score(
-        self, contractor: dict, request: dict
-    ) -> float:
+    async def _calculate_match_score(self, contractor: dict, request: dict) -> float:
         """Calculate contractor match score."""
         weights = {
             "semantic_similarity": 0.25,
@@ -110,9 +102,7 @@ class ToolRegistry:
             "availability": 0.10,
             "response_time": 0.05,
         }
-        return sum(
-            contractor.get(k, 0) * w for k, w in weights.items()
-        )
+        return sum(contractor.get(k, 0) * w for k, w in weights.items())
 
     async def _analyze_sentiment(self, text: str) -> float:
         """Analyze text sentiment."""

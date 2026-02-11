@@ -9,8 +9,10 @@ from src.agents.router import RouterAgent
 @pytest.fixture
 def router_agent():
     """Create a RouterAgent with mocked dependencies."""
-    with patch("src.agents.base.get_llm_client") as mock_llm, \
-         patch("src.agents.base.get_rag_pipeline") as mock_rag:
+    with (
+        patch("src.agents.base.get_llm_client") as mock_llm,
+        patch("src.agents.base.get_rag_pipeline") as mock_rag,
+    ):
         mock_llm.return_value = AsyncMock()
         mock_rag.return_value = AsyncMock()
 
@@ -42,9 +44,7 @@ async def test_router_classifies_contractor_search(router_agent, sample_agent_st
 @pytest.mark.asyncio
 async def test_router_classifies_pricing_question(router_agent, sample_agent_state):
     """Test that router correctly classifies pricing questions."""
-    sample_agent_state["messages"] = [
-        {"role": "user", "content": "כמה עולה להתקין מזגן?"}
-    ]
+    sample_agent_state["messages"] = [{"role": "user", "content": "כמה עולה להתקין מזגן?"}]
     router_agent.llm_client.create_structured_output = AsyncMock(
         return_value={
             "intent": "pricing_question",
@@ -64,9 +64,7 @@ async def test_router_classifies_pricing_question(router_agent, sample_agent_sta
 @pytest.mark.asyncio
 async def test_router_low_confidence_asks_clarification(router_agent, sample_agent_state):
     """Test that router asks for clarification when confidence is low."""
-    sample_agent_state["messages"] = [
-        {"role": "user", "content": "hi"}
-    ]
+    sample_agent_state["messages"] = [{"role": "user", "content": "hi"}]
     router_agent.llm_client.create_structured_output = AsyncMock(
         return_value={
             "intent": "general_info",
