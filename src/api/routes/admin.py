@@ -12,7 +12,6 @@ from src.orchestration.graph import get_orchestrator
 from src.rag.pipeline import get_rag_pipeline
 
 router = APIRouter(
-    prefix="/api/v1/admin",
     tags=["admin"],
     dependencies=[Depends(get_admin_user)],  # Require admin auth for all routes
 )
@@ -101,3 +100,16 @@ async def list_collections() -> dict[str, Any]:
         except Exception:
             collections[name] = {"status": "unavailable"}
     return {"collections": collections}
+
+
+@router.get("/analytics")
+async def get_analytics() -> dict[str, Any]:
+    """Dashboard analytics (stub). In production, aggregate from offers/contractors/metrics."""
+    return {
+        "label": "mock",
+        "gmv_today": 0,
+        "gmv_change_pct": 0,
+        "active_offers": 0,
+        "open_tickets": 0,
+        "message": "Use GET /admin/metrics and /escalations for live data.",
+    }

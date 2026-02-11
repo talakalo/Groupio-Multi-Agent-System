@@ -5,7 +5,8 @@ from datetime import datetime
 from typing import Optional
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
 
 from src.api.middleware.auth import get_current_user
 from src.databases.postgres import get_postgres_client
@@ -25,7 +26,13 @@ from src.models.user import UserInDB, UserRole
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1/escalations", tags=["escalations"])
+router = APIRouter(tags=["escalations"])
+
+
+class ResolveEscalationBody(BaseModel):
+    """Request body for resolving an escalation."""
+
+    resolution_notes: Optional[str] = Field(None, max_length=2000)
 
 
 @router.post("/", response_model=EscalationResponse)
@@ -303,10 +310,10 @@ async def reply_to_escalation(
 @router.post("/{escalation_id}/resolve")
 async def resolve_escalation(
     escalation_id: str,
-    resolution_notes: Optional[str] = None,
+    body: Optional[ResolveEscalationBody] = Body(None),
     current_user: UserInDB = Depends(get_current_user),
 ) -> EscalationResponse:
-    """Resolve an escalation (admin only)."""
+    """Resolve an escalation (admin only). resolution_notes in request body."""
     if current_user.role not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Admin access required")
 
@@ -323,6 +330,7 @@ async def resolve_escalation(
         "status": EscalationStatus.RESOLVED,
         "resolved_at": datetime.utcnow(),
     }
+    resolution_notes = body.resolution_notes if body else None
     if resolution_notes:
         update_data["resolution_notes"] = resolution_notes
 

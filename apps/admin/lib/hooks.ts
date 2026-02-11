@@ -218,9 +218,15 @@ export function useResolveEscalation() {
 
   return useMutation({
     mutationFn: async (escalationId: string) => {
+      const base = process.env.NEXT_PUBLIC_API_URL ?? "/api/v1";
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL ?? "/api/v1"}/admin/escalations/${escalationId}/resolve`,
-        { method: "POST", headers: { "Content-Type": "application/json" } }
+        `${base.replace(/\/+$/, "")}/escalations/${escalationId}/resolve`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ resolution_notes: null }),
+          credentials: "include",
+        }
       );
       if (!response.ok) throw new Error("Failed to resolve escalation");
       return response.json();
@@ -434,8 +440,26 @@ export function useContractors(filters?: {
   return useQuery<ContractorListItem[]>({
     queryKey: [...queryKeys.contractors, filters],
     queryFn: async (): Promise<ContractorListItem[]> => {
-      // In production, this would call /api/v1/admin/contractors with filters.
-      // Return sample data for development.
+      const client = getApiClient();
+      try {
+        const res = await client.getContractors({
+          category: filters?.category,
+          region: filters?.region,
+          page_size: 100,
+        });
+        return (res.items ?? []).map((c) => ({
+          id: c.id,
+          businessName: (c as { business_name?: string }).business_name ?? (c as Contractor).businessName ?? "",
+          verified: (c as { verification_status?: string }).verification_status === "verified",
+          rating: (c as { trust_score?: number }).trust_score ?? (c as Contractor).rating ?? 0,
+          categories: (c as Contractor).categories ?? [],
+          regions: (c as Contractor).regions ?? [],
+          phone: (c as Contractor).phone,
+          email: (c as Contractor).email,
+        }));
+      } catch {
+        // Fallback mock when API unavailable or unauthenticated (GET /api/v1/contractors requires auth)
+      }
       const contractors: ContractorListItem[] = [
         {
           id: "c-001",

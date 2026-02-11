@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from src.orchestration.graph import get_orchestrator
 
-router = APIRouter(prefix="/api/v1/agents", tags=["agents"])
+router = APIRouter(tags=["agents"])
 
 
 class AgentInvokeRequest(BaseModel):

@@ -81,6 +81,8 @@ Groupio-Multi-Agent-System/
 
 ## Quick Start
 
+For full setup steps (migrate, env, Docker, backend install), see **[LOCAL_SETUP.md](LOCAL_SETUP.md)**.
+
 ### Prerequisites
 
 - Python 3.11+
@@ -100,8 +102,9 @@ cd Groupio-Multi-Agent-System
 python -m venv venv
 source venv/bin/activate  # or `venv\Scripts\activate` on Windows
 
-# Install dependencies
-pip install -r requirements.txt
+# Install dependencies (prefer backend dev install for tests)
+pip install -e ".[dev]"
+# Or: pip install -r requirements.txt
 
 # Copy environment file
 cp docker/.env.example docker/.env

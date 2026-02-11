@@ -23,11 +23,11 @@ from src.models.contractor import (
 )
 from src.models.offer import ServiceCategory
 from src.models.user import UserInDB, UserRole
-from src.rag.embeddings import get_embeddings_client
+from src.rag.embeddings import get_embedding_client
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1/contractors", tags=["contractors"])
+router = APIRouter(tags=["contractors"])
 
 
 @router.post("/", response_model=ContractorResponse)
@@ -51,7 +51,7 @@ async def create_contractor(
 
     # Index in vector DB
     try:
-        embeddings = get_embeddings_client()
+        embeddings = get_embedding_client()
         text = f"{contractor.business_name} {contractor.description} {' '.join(c.value for c in contractor.categories)}"
         embedding = await embeddings.embed_text(text)
 
@@ -128,7 +128,7 @@ async def search_contractors(
 
     if request.query:
         # Use vector search
-        embeddings = get_embeddings_client()
+        embeddings = get_embedding_client()
         query_embedding = await embeddings.embed_text(request.query)
 
         vs = get_vector_store()
@@ -214,7 +214,7 @@ async def update_contractor(
 
     # Update vector DB
     try:
-        embeddings = get_embeddings_client()
+        embeddings = get_embedding_client()
         text = f"{updated.business_name} {updated.description} {' '.join(c.value for c in updated.categories)}"
         embedding = await embeddings.embed_text(text)
 

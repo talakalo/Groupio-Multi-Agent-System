@@ -151,11 +151,28 @@ export class GroupioApiClient {
   }
 
   async getEscalations(): Promise<EscalationsResponse> {
-    return this.get<EscalationsResponse>("/admin/escalations");
+    return this.get<EscalationsResponse>("/escalations");
   }
 
   async getSystemStatus(): Promise<SystemStatus> {
     return this.get<SystemStatus>("/admin/status");
+  }
+
+  async getContractors(params?: {
+    page?: number;
+    page_size?: number;
+    category?: string;
+    region?: string;
+  }): Promise<{ items: Contractor[]; total: number; page: number; page_size: number }> {
+    const search = new URLSearchParams();
+    if (params?.page != null) search.set("page", String(params.page));
+    if (params?.page_size != null) search.set("page_size", String(params.page_size));
+    if (params?.category) search.set("category", params.category);
+    if (params?.region) search.set("region", params.region);
+    const qs = search.toString();
+    return this.get<{ items: Contractor[]; total: number; page: number; page_size: number }>(
+      `/contractors${qs ? `?${qs}` : ""}`,
+    );
   }
 
   // ---- Internal HTTP Helpers ----
