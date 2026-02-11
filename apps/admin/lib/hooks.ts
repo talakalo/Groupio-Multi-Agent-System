@@ -536,6 +536,11 @@ const MOCK_CONTRACTORS: ContractorListItem[] = [
         },
       ];
 
+export function useContractors(filters?: {
+  verified?: boolean;
+  category?: string;
+  region?: string;
+}) {
   return useQuery<ContractorListItem[]>({
     queryKey: [...queryKeys.contractors, filters],
     queryFn: async (): Promise<ContractorListItem[]> => {
