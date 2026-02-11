@@ -12,7 +12,6 @@ from src.orchestration.graph import get_orchestrator
 from src.rag.pipeline import get_rag_pipeline
 
 router = APIRouter(
-    prefix="/api/v1/admin",
     tags=["admin"],
     dependencies=[Depends(get_admin_user)],  # Require admin auth for all routes
 )

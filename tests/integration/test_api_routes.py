@@ -177,7 +177,7 @@ class TestOffersAPI:
         mock_db.create_offer = AsyncMock(return_value=MagicMock(**mock_offer))
 
         with patch("src.api.middleware.auth.get_current_user") as mock_auth, \
-             patch("src.rag.embeddings.get_embeddings_client") as mock_embed, \
+             patch("src.rag.embeddings.get_embedding_client") as mock_embed, \
              patch("src.databases.vector_store.get_vector_store") as mock_vs:
 
             mock_auth.return_value = MagicMock(id="user-123", role="resident")

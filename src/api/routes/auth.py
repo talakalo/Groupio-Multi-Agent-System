@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.security import OAuth2PasswordRequestForm
 
 from src.api.middleware.auth import (
@@ -32,10 +32,85 @@ from src.models.user import (
     UserRole,
     UserUpdate,
 )
+from pydantic import BaseModel, EmailStr, Field
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
+router = APIRouter(tags=["auth"])
+
+
+class SignupRequest(BaseModel):
+    """Signup request (frontend format: name, buildingId)."""
+
+    name: str = Field(..., min_length=2, max_length=100)
+    email: EmailStr
+    phone: str = Field(..., pattern=r"^0\d{8,9}$")
+    password: str = Field(..., min_length=8)
+    role: UserRole = UserRole.RESIDENT
+    building_id: str | None = Field(None, alias="buildingId")
+
+    model_config = {"populate_by_name": True}
+
+
+class SignupResponse(BaseModel):
+    """Signup response with token and user (auto-login)."""
+
+    token: str
+    user: UserResponse
+
+
+@router.post("/signup", response_model=SignupResponse)
+async def signup(request: SignupRequest) -> SignupResponse:
+    """Register a new user and return token (auto-login)."""
+    db = get_postgres_client()
+
+    existing = await db.get_user_by_email(request.email)
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    existing_phone = await db.get_user_by_phone(request.phone)
+    if existing_phone:
+        raise HTTPException(status_code=400, detail="Phone number already registered")
+
+    user_id = str(uuid4())
+    hashed_password = hash_password(request.password)
+
+    user_data = {
+        "id": user_id,
+        "email": request.email,
+        "full_name": request.name,
+        "phone": request.phone,
+        "role": request.role,
+        "building_id": request.building_id,
+        "hashed_password": hashed_password,
+        "is_active": True,
+        "is_verified": False,
+    }
+
+    user = await db.create_user(user_data)
+
+    logger.info("User registered via signup: %s", user.email)
+
+    # Auto-login: create token
+    access_token = create_access_token(
+        user_id=user.id,
+        email=user.email,
+        role=user.role,
+    )
+    refresh_token = create_refresh_token(user_id=user.id)
+
+    settings = get_settings()
+    redis = get_redis_client()
+    await redis.set(
+        f"refresh_token:{user.id}",
+        refresh_token,
+        ex=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+    )
+
+    return SignupResponse(
+        token=access_token,
+        user=user,
+    )
 
 
 @router.post("/register", response_model=UserResponse)
@@ -200,10 +275,13 @@ async def login_json(
 
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh_token(
+    request: Request,
+    response: Response,
     refresh_token: Optional[str] = None,
-    response: Response = None,
 ) -> TokenResponse:
-    """Refresh access token."""
+    """Refresh access token. Accepts token in body or in cookie (refresh_token)."""
+    if not refresh_token:
+        refresh_token = request.cookies.get("refresh_token")
     if not refresh_token:
         raise HTTPException(status_code=401, detail="Refresh token required")
 
@@ -241,15 +319,14 @@ async def refresh_token(
         ex=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
     )
 
-    if response:
-        response.set_cookie(
-            key="refresh_token",
-            value=new_refresh_token,
-            httponly=True,
-            secure=True,
-            samesite="lax",
-            max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
-        )
+    response.set_cookie(
+        key="refresh_token",
+        value=new_refresh_token,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+    )
 
     return TokenResponse(
         access_token=new_access_token,
