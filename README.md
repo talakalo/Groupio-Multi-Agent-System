@@ -81,40 +81,24 @@ Groupio-Multi-Agent-System/
 
 ## Quick Start
 
-For full setup steps (migrations, env, Docker, seed data), see **[LOCAL_SETUP.md](LOCAL_SETUP.md)**.
+For full setup (env vars, migrations, Docker, all apps), see **[LOCAL_SETUP.md](LOCAL_SETUP.md)**.
 
-### Prerequisites
-
-- Python 3.11+
-- Node.js 20+
-- pnpm 8+
-- Docker & Docker Compose
-- Anthropic API key (Claude)
-- OpenAI API key (embeddings)
-
-### Backend (minimal)
+Minimal steps:
 
 ```bash
+git clone https://github.com/talakalo/Groupio-Multi-Agent-System.git
 cd Groupio-Multi-Agent-System
-python -m venv venv
-source venv/bin/activate  # or `venv\Scripts\activate` on Windows
-pip install -e ".[dev]"
-cp docker/.env.example docker/.env
-# Edit docker/.env with your API keys
-docker compose up -d
-alembic upgrade head
-uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000
-```
 
-### Frontend
-
-```bash
 pnpm install
-cp apps/web/.env.example apps/web/.env.local
-cp apps/admin/.env.example apps/admin/.env.local
-cp apps/mobile/.env.example apps/mobile/.env.local
-pnpm dev
-# Web: http://localhost:3000  |  Admin: http://localhost:3001  |  Mobile: pnpm --filter mobile start
+python -m venv venv && source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -e ".[dev]"
+
+docker compose up -d
+cp docker/.env.example .env   # edit with API keys
+alembic upgrade head
+
+uvicorn src.api.main:app --reload --port 8000
+# In another terminal: pnpm --filter @groupio/web dev
 ```
 
 ## AI Agents

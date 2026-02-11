@@ -168,8 +168,15 @@ jobs:
           pytest tests/unit/ -v --cov=src --cov-report=xml --cov-report=term-missing
 
       - name: Run integration tests
+        env:
+          REDIS_URL: redis://localhost:6379
+          TESTING: 'true'
+          ENVIRONMENT: 'testing'
+          ANTHROPIC_API_KEY: 'test-key'
+          OPENAI_API_KEY: 'test-key'
+          JWT_SECRET_KEY: 'test-secret-key-for-ci-testing-only'
         run: |
-          pytest tests/integration/ -v --tb=short
+          pytest tests/integration/ -v
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
@@ -319,6 +326,7 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: http://localhost:54321
           NEXT_PUBLIC_SUPABASE_ANON_KEY: test-key
 
+      # When E2E is stable, set continue-on-error: false so failures fail CI (see CODE_REVIEW_PLAN Phase 3.6).
       - name: Run E2E tests
         run: pnpm --filter @groupio/web exec playwright test --project=chromium
         env:

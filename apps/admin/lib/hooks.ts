@@ -232,14 +232,8 @@ export function useResolveEscalation() {
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (token) headers["Authorization"] = `Bearer ${token}`;
       const response = await fetch(
-        `${base}/escalations/${escalationId}/resolve`,
-        {
-          method: "POST",
-          headers,
-          body: JSON.stringify(
-            resolution_notes != null ? { resolution_notes } : {}
-          ),
-        }
+        `${process.env.NEXT_PUBLIC_API_URL ?? "/api/v1"}/escalations/${escalationId}/resolve`,
+        { method: "POST", headers: { "Content-Type": "application/json" } }
       );
       if (!response.ok) throw new Error("Failed to resolve escalation");
       return response.json();
@@ -447,31 +441,21 @@ export interface ContractorListItem {
 
 function mapContractorToListItem(c: {
   id: string;
-  business_name?: string;
-  businessName?: string;
-  average_rating?: number;
+  business_name: string;
   verification_status?: string;
-  verified?: boolean;
-  trust_score?: number;
-  rating?: number;
-  categories?: string[] | { value?: string }[];
-  regions?: string[] | { value?: string }[];
+  average_rating?: number;
+  categories?: string[];
+  regions?: string[];
   phone?: string;
   email?: string;
 }): ContractorListItem {
-  const categories = Array.isArray(c.categories)
-    ? c.categories.map((x) => (typeof x === "string" ? x : (x as { value?: string }).value ?? ""))
-    : [];
-  const regions = Array.isArray(c.regions)
-    ? c.regions.map((x) => (typeof x === "string" ? x : (x as { value?: string }).value ?? ""))
-    : [];
   return {
     id: c.id,
-    businessName: c.business_name ?? c.businessName ?? "",
-    verified: c.verified ?? c.verification_status === "verified",
-    rating: c.rating ?? c.average_rating ?? c.trust_score ?? 0,
-    categories,
-    regions,
+    businessName: c.business_name,
+    verified: c.verification_status === "verified",
+    rating: c.average_rating ?? 0,
+    categories: Array.isArray(c.categories) ? c.categories : [],
+    regions: Array.isArray(c.regions) ? c.regions : [],
     phone: c.phone,
     email: c.email,
   };
@@ -485,110 +469,15 @@ export function useContractors(filters?: {
   return useQuery<ContractorListItem[]>({
     queryKey: [...queryKeys.contractors, filters],
     queryFn: async (): Promise<ContractorListItem[]> => {
-      const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
-      try {
-        const client = getApiClient(token ?? undefined);
-        const res = await client.getContractors({
-          category: filters?.category,
-          region: filters?.region,
-          verification_status: filters?.verified === true ? "verified" : filters?.verified === false ? "pending" : undefined,
-        });
-        return (res.items ?? []).map(mapContractorToListItem);
-      } catch {
-        // Fallback mock data when API is unavailable or unauth
-      }
-      const contractors: ContractorListItem[] = [
-        {
-          id: "c-001",
-          businessName: "Aviv AC Solutions",
-          verified: true,
-          rating: 4.8,
-          categories: ["ac_installation", "ac_maintenance"],
-          regions: ["tel_aviv", "center"],
-          phone: "+972-50-123-4567",
-          email: "info@avivac.co.il",
-        },
-        {
-          id: "c-002",
-          businessName: "Haifa Plumbing Pro",
-          verified: true,
-          rating: 4.5,
-          categories: ["plumbing", "heating"],
-          regions: ["haifa", "north"],
-          phone: "+972-52-234-5678",
-          email: "service@haifaplumbing.co.il",
-        },
-        {
-          id: "c-003",
-          businessName: "Jerusalem Renovations",
-          verified: false,
-          rating: 4.2,
-          categories: ["renovations", "painting", "flooring"],
-          regions: ["jerusalem"],
-          email: "contact@jrenovations.co.il",
-        },
-        {
-          id: "c-004",
-          businessName: "Southern Electric",
-          verified: true,
-          rating: 4.9,
-          categories: ["electrical"],
-          regions: ["south", "shfela"],
-          phone: "+972-54-345-6789",
-          email: "electric@southern.co.il",
-        },
-        {
-          id: "c-005",
-          businessName: "Sharon Kitchen Design",
-          verified: true,
-          rating: 4.6,
-          categories: ["kitchen", "renovations"],
-          regions: ["sharon", "center"],
-          phone: "+972-53-456-7890",
-        },
-        {
-          id: "c-006",
-          businessName: "North Star Windows",
-          verified: false,
-          rating: 3.9,
-          categories: ["windows"],
-          regions: ["north", "haifa"],
-          email: "northstar@windows.co.il",
-        },
-        {
-          id: "c-007",
-          businessName: "Tel Aviv Flooring",
-          verified: true,
-          rating: 4.7,
-          categories: ["flooring"],
-          regions: ["tel_aviv"],
-          phone: "+972-50-567-8901",
-          email: "floors@taflooring.co.il",
-        },
-        {
-          id: "c-008",
-          businessName: "Central Painting Co",
-          verified: false,
-          rating: 4.0,
-          categories: ["painting"],
-          regions: ["center", "sharon", "shfela"],
-        },
-      ];
-      let filtered = contractors;
+      const client = getApiClient();
+      const params: { verification_status?: string; category?: string; region?: string } = {};
       if (filters?.verified !== undefined) {
-        filtered = filtered.filter((c) => c.verified === filters.verified);
+        params.verification_status = filters.verified ? "verified" : "pending";
       }
-      if (filters?.category) {
-        filtered = filtered.filter((c) =>
-          c.categories.includes(filters.category!)
-        );
-      }
-      if (filters?.region) {
-        filtered = filtered.filter((c) =>
-          c.regions.includes(filters.region!)
-        );
-      }
-      return filtered;
+      if (filters?.category) params.category = filters.category;
+      if (filters?.region) params.region = filters.region;
+      const res = await client.getContractors(params);
+      return res.items.map(mapContractorToListItem);
     },
   });
 }

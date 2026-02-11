@@ -9,9 +9,13 @@ interface RequestOptions {
   signal?: AbortSignal;
 }
 
+/** Callback that tries to refresh the access token; returns new token or null. */
+export type On401Retry = () => Promise<string | null>;
+
 class ApiClient {
   private baseUrl: string;
   private defaultHeaders: Record<string, string>;
+  private on401Retry: On401Retry | null = null;
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
@@ -20,14 +24,26 @@ class ApiClient {
     };
   }
 
+  /** Set handler for 401: refresh token and return new access token; client will retry the request once. */
+  setOn401Retry(fn: On401Retry | null): void {
+    this.on401Retry = fn;
+  }
+
   private getAuthToken(): string | null {
     if (typeof window === "undefined") return null;
     return localStorage.getItem("auth_token");
   }
 
+  private setAuthToken(token: string): void {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("auth_token", token);
+    }
+  }
+
   private async request<T>(
     endpoint: string,
-    options: RequestOptions = {}
+    options: RequestOptions = {},
+    isRetry = false
   ): Promise<T> {
     const { method = "GET", body, headers = {}, signal } = options;
 
@@ -47,6 +63,14 @@ class ApiClient {
       body: body ? JSON.stringify(body) : undefined,
       signal,
     });
+
+    if (response.status === 401 && this.on401Retry && !isRetry) {
+      const newToken = await this.on401Retry();
+      if (newToken) {
+        this.setAuthToken(newToken);
+        return this.request<T>(endpoint, options, true);
+      }
+    }
 
     if (!response.ok) {
       const errorBody = await response.json().catch(() => null);

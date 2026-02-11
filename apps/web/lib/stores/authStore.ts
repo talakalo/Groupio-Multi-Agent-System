@@ -60,20 +60,24 @@ export const useAuthStore = create<AuthState>()(
           isAuthenticated: !!user,
         }),
 
-      setTokens: (accessToken, refreshToken) =>
+      setTokens: (accessToken, refreshToken) => {
+        if (typeof window !== 'undefined') window.localStorage.setItem('auth_token', accessToken);
         set({
           accessToken,
           refreshToken,
           isAuthenticated: true,
-        }),
+        });
+      },
 
-      clearAuth: () =>
+      clearAuth: () => {
+        if (typeof window !== 'undefined') window.localStorage.removeItem('auth_token');
         set({
           user: null,
           accessToken: null,
           refreshToken: null,
           isAuthenticated: false,
-        }),
+        });
+      },
 
       setLoading: (isLoading) => set({ isLoading }),
 
@@ -93,6 +97,7 @@ export const useAuthStore = create<AuthState>()(
           }
 
           const data = await response.json();
+          if (typeof window !== 'undefined') window.localStorage.setItem('auth_token', data.access_token);
           set({
             accessToken: data.access_token,
             refreshToken: data.refresh_token,
@@ -159,13 +164,14 @@ export const useAuthStore = create<AuthState>()(
             return false;
           }
 
-          const data = await response.json();
-          set({
-            accessToken: data.access_token,
-            refreshToken: data.refresh_token,
-          });
+      const data = await response.json();
+      if (typeof window !== 'undefined') window.localStorage.setItem('auth_token', data.access_token);
+      set({
+        accessToken: data.access_token,
+        refreshToken: data.refresh_token,
+      });
 
-          return true;
+      return true;
         } catch {
           get().clearAuth();
           return false;

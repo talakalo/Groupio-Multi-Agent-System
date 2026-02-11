@@ -29,6 +29,11 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["escalations"])
 
 
+class ResolveEscalationBody(BaseModel):
+    """Optional body for resolve endpoint (prefer body for longer notes)."""
+    resolution_notes: Optional[str] = None
+
+
 @router.post("/", response_model=EscalationResponse)
 async def create_escalation(
     request: EscalationCreate,
@@ -310,11 +315,10 @@ class ResolveEscalationBody(BaseModel):
 @router.post("/{escalation_id}/resolve")
 async def resolve_escalation(
     escalation_id: str,
-    resolution_notes: Optional[str] = Query(None, description="Legacy: use body instead"),
-    body: Optional[ResolveEscalationBody] = Body(None),
+    body: ResolveEscalationBody | None = Body(None),
     current_user: UserInDB = Depends(get_current_user),
 ) -> EscalationResponse:
-    """Resolve an escalation (admin only). Prefer body.resolution_notes for longer text."""
+    """Resolve an escalation (admin only). Accepts resolution_notes in JSON body."""
     if current_user.role not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Admin access required")
 
@@ -327,7 +331,7 @@ async def resolve_escalation(
     if escalation.status == EscalationStatus.RESOLVED:
         raise HTTPException(status_code=400, detail="Escalation already resolved")
 
-    notes = (body and body.resolution_notes) or resolution_notes
+    resolution_notes = body.resolution_notes if body else None
     update_data = {
         "status": EscalationStatus.RESOLVED,
         "resolved_at": datetime.utcnow(),
