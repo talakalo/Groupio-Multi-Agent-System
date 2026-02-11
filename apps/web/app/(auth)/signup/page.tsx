@@ -90,6 +90,7 @@ export default function SignupPage() {
         name: data.name,
         email: data.email,
         phone: data.phone,
+        password: data.password,
         role: selectedRole,
         buildingId: data.buildingId || undefined,
       });

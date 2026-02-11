@@ -151,7 +151,7 @@ export class GroupioApiClient {
   }
 
   async getEscalations(): Promise<EscalationsResponse> {
-    return this.get<EscalationsResponse>("/admin/escalations");
+    return this.get<EscalationsResponse>("/escalations");
   }
 
   async getSystemStatus(): Promise<SystemStatus> {

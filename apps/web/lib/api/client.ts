@@ -50,11 +50,14 @@ class ApiClient {
 
     if (!response.ok) {
       const errorBody = await response.json().catch(() => null);
-      throw new ApiError(
-        response.status,
-        errorBody?.detail || response.statusText,
-        errorBody
-      );
+      const detail = errorBody?.detail;
+      const message =
+        typeof detail === "string"
+          ? detail
+          : Array.isArray(detail)
+            ? detail.map((e: { msg?: string }) => e?.msg).filter(Boolean).join(", ") || response.statusText
+            : response.statusText;
+      throw new ApiError(response.status, message, errorBody);
     }
 
     return response.json();
@@ -140,6 +143,7 @@ class ApiClient {
     name: string;
     email: string;
     phone: string;
+    password: string;
     role: "resident" | "contractor";
     buildingId?: string;
   }) {

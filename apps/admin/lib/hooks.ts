@@ -218,9 +218,13 @@ export function useResolveEscalation() {
 
   return useMutation({
     mutationFn: async (escalationId: string) => {
+      const base = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "") || "/api/v1";
+      const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL ?? "/api/v1"}/admin/escalations/${escalationId}/resolve`,
-        { method: "POST", headers: { "Content-Type": "application/json" } }
+        `${base}/escalations/${escalationId}/resolve`,
+        { method: "POST", headers }
       );
       if (!response.ok) throw new Error("Failed to resolve escalation");
       return response.json();

@@ -10,7 +10,7 @@ from src.orchestration.graph import get_orchestrator
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1/webhooks", tags=["webhooks"])
+router = APIRouter(tags=["webhooks"])
 
 
 @router.post("/whatsapp")

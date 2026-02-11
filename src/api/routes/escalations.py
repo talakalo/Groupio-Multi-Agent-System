@@ -25,7 +25,7 @@ from src.models.user import UserInDB, UserRole
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1/escalations", tags=["escalations"])
+router = APIRouter(tags=["escalations"])
 
 
 @router.post("/", response_model=EscalationResponse)

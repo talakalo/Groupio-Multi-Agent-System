@@ -21,11 +21,11 @@ from src.models.offer import (
 )
 from src.models.user import UserInDB
 from src.orchestration.graph import get_orchestrator
-from src.rag.embeddings import get_embeddings_client
+from src.rag.embeddings import get_embedding_client
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1/offers", tags=["offers"])
+router = APIRouter(tags=["offers"])
 
 
 @router.post("/", response_model=OfferResponse)
@@ -56,7 +56,7 @@ async def create_offer(
 
     # Generate embedding for vector search
     try:
-        embeddings = get_embeddings_client()
+        embeddings = get_embedding_client()
         text = f"{offer.title} {offer.description} {offer.category.value}"
         embedding = await embeddings.embed_text(text)
 
