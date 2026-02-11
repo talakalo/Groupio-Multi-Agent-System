@@ -306,6 +306,12 @@ async def reply_to_escalation(
     return updated
 
 
+class ResolveEscalationBody(BaseModel):
+    """Optional body for resolve escalation (preferred for longer text)."""
+
+    resolution_notes: Optional[str] = None
+
+
 @router.post("/{escalation_id}/resolve")
 async def resolve_escalation(
     escalation_id: str,
@@ -330,8 +336,8 @@ async def resolve_escalation(
         "status": EscalationStatus.RESOLVED,
         "resolved_at": datetime.utcnow(),
     }
-    if resolution_notes:
-        update_data["resolution_notes"] = resolution_notes
+    if notes:
+        update_data["resolution_notes"] = notes
 
     updated = await db.update_escalation(escalation_id, update_data)
 

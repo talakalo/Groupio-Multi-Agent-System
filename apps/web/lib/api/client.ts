@@ -154,13 +154,15 @@ class ApiClient {
   // ---- Auth endpoints ----
 
   async login(credentials: { email?: string; phone?: string; password: string }) {
-    return this.request<{ token: string; user: import("@groupio/types").Resident }>(
-      "/api/v1/auth/login",
-      {
-        method: "POST",
-        body: credentials,
-      }
-    );
+    const data = await this.request<{
+      access_token: string;
+      refresh_token?: string;
+      expires_in?: number;
+    }>("/api/v1/auth/login/json", {
+      method: "POST",
+      body: credentials,
+    });
+    return { token: data.access_token, ...data };
   }
 
   async signup(data: {

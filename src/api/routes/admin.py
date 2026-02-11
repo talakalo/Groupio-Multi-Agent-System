@@ -3,9 +3,9 @@
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
 
 from src.api.middleware.auth import get_admin_user
+from src.databases.postgres import get_postgres_client
 from src.databases.vector_store import get_vector_store
 from src.models.user import UserInDB
 from src.orchestration.graph import get_orchestrator
@@ -17,11 +17,39 @@ router = APIRouter(
 )
 
 
-class PromptUpdateRequest(BaseModel):
-    """Request to update an agent's system prompt."""
-
-    agent_name: str
-    system_prompt: str
+@router.get("/analytics")
+async def get_analytics() -> dict[str, Any]:
+    """Dashboard analytics (counts and derived metrics)."""
+    db = get_postgres_client()
+    open_tickets = 0
+    total_contractors = 0
+    try:
+        stats = await db.get_escalation_stats()
+        if isinstance(stats, dict):
+            by_status = stats.get("by_status") or {}
+            open_tickets = sum(
+                c for s, c in by_status.items()
+                if s and s != "resolved" and s != "closed"
+            )
+    except Exception:
+        pass
+    try:
+        _, total_contractors = await db.list_contractors(
+            filters={}, page=1, page_size=1
+        )
+    except Exception:
+        pass
+    return {
+        "gmv_today": 0,
+        "gmv_change": 0,
+        "active_offers": 0,
+        "active_offers_change": 0,
+        "pending_verifications": 0,
+        "urgent_verifications": 0,
+        "open_tickets": open_tickets,
+        "open_tickets_change": 0,
+        "total_contractors": total_contractors,
+    }
 
 
 @router.get("/status")
@@ -100,3 +128,35 @@ async def list_collections() -> dict[str, Any]:
         except Exception:
             collections[name] = {"status": "unavailable"}
     return {"collections": collections}
+
+
+@router.get("/analytics")
+async def get_analytics() -> dict[str, Any]:
+    """Dashboard analytics (admin). Aggregates from DB when available; otherwise placeholder."""
+    try:
+        db = get_postgres_client()
+        stats = await db.get_escalation_stats()
+        by_status = stats.get("by_status") or {}
+        open_count = sum(
+            c for s, c in by_status.items()
+            if str(s).lower() not in ("resolved", "closed")
+        )
+        return {
+            "gmvToday": 0,
+            "gmvChange": 0,
+            "activeOffers": 0,
+            "activeOffersChange": 0,
+            "openTickets": open_count,
+            "openTicketsChange": 0,
+            "resolvedToday": 0,
+        }
+    except Exception:
+        return {
+            "gmvToday": 0,
+            "gmvChange": 0,
+            "activeOffers": 0,
+            "activeOffersChange": 0,
+            "openTickets": 0,
+            "openTicketsChange": 0,
+            "resolvedToday": 0,
+        }

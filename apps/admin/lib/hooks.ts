@@ -12,17 +12,20 @@ import {
   type MetricsResponse,
   type EscalationsResponse,
   type HealthStatus,
+  type ContractorsListResponse,
 } from "@groupio/api-client";
 
 // ---- Client Singleton ----
 
 let apiClient: GroupioApiClient | undefined;
 
-function getApiClient(): GroupioApiClient {
+function getApiClient(authToken?: string | null): GroupioApiClient {
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? "/api/v1";
+  if (authToken != null) {
+    return new GroupioApiClient({ baseUrl, authToken });
+  }
   if (!apiClient) {
-    apiClient = new GroupioApiClient({
-      baseUrl: process.env.NEXT_PUBLIC_API_URL ?? "/api/v1",
-    });
+    apiClient = new GroupioApiClient({ baseUrl });
   }
   return apiClient;
 }
@@ -217,7 +220,17 @@ export function useResolveEscalation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (escalationId: string) => {
+    mutationFn: async ({
+      escalationId,
+      resolution_notes,
+    }: {
+      escalationId: string;
+      resolution_notes?: string;
+    }) => {
+      const base = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "") || "/api/v1";
+      const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL ?? "/api/v1"}/escalations/${escalationId}/resolve`,
         { method: "POST", headers: { "Content-Type": "application/json" } }
@@ -470,6 +483,27 @@ export function useContractors(filters?: {
 }
 
 // ---- Analytics ----
+
+export interface AdminAnalyticsDashboard {
+  gmvToday?: number;
+  gmvChange?: number;
+  activeOffers?: number;
+  activeOffersChange?: number;
+  openTickets?: number;
+  openTicketsChange?: number;
+  resolvedToday?: number;
+}
+
+export function useAdminAnalyticsDashboard() {
+  return useQuery<AdminAnalyticsDashboard>({
+    queryKey: ["admin", "analytics-dashboard"],
+    queryFn: async () => {
+      const client = getApiClient();
+      return client.getAnalytics();
+    },
+    refetchInterval: 60_000,
+  });
+}
 
 export function useAnalyticsQuery() {
   return useMutation({

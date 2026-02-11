@@ -290,7 +290,7 @@ export async function uploadAvatar(
     type,
   } as unknown as Blob);
 
-  const url = buildUrl("/profile/avatar");
+  const url = buildUrl("/auth/me/avatar");
   const headers: Record<string, string> = {
     Accept: "application/json",
   };
@@ -325,12 +325,13 @@ export async function sendMessage(
 /**
  * Send a chat message with streaming support.
  * Yields partial tokens as they arrive from the server (SSE).
+ * Note: Backend may not implement /message/stream; handle 404 or use sendMessage.
  */
 export async function* sendMessageStream(
   payload: MessageRequest,
   signal?: AbortSignal,
 ): AsyncGenerator<ChatStreamEvent> {
-  const url = buildUrl("/chat/stream");
+  const url = buildUrl("/message/stream");
 
   const response = await fetch(url, {
     method: "POST",
