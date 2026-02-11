@@ -281,8 +281,8 @@ async def login_json(
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh_token(
     request: Request,
+    response: Response,
     body: RefreshRequest | None = None,
-    response: Response | None = None,
 ) -> TokenResponse:
     """Refresh access token. Accepts token in JSON body (refresh_token) or in cookie (refresh_token)."""
     token = body.refresh_token if body else None
