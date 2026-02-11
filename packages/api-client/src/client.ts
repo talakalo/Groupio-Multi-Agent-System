@@ -138,6 +138,25 @@ export class GroupioApiClient {
     return this.get<Contractor>(`/contractors/${encodeURIComponent(id)}`);
   }
 
+  async getContractors(params?: {
+    category?: string;
+    region?: string;
+    verification_status?: string;
+    page?: number;
+    page_size?: number;
+  }): Promise<{ items: Contractor[]; total: number; page: number; page_size: number; has_more: boolean }> {
+    const search = new URLSearchParams();
+    if (params?.category) search.set("category", params.category);
+    if (params?.region) search.set("region", params.region);
+    if (params?.verification_status) search.set("verification_status", params.verification_status);
+    if (params?.page != null) search.set("page", String(params.page));
+    if (params?.page_size != null) search.set("page_size", String(params.page_size));
+    const q = search.toString();
+    return this.get<{ items: Contractor[]; total: number; page: number; page_size: number; has_more: boolean }>(
+      q ? `/contractors?${q}` : "/contractors"
+    );
+  }
+
   // ---- Building Methods ----
 
   async getBuilding(id: string): Promise<Building> {
@@ -156,6 +175,18 @@ export class GroupioApiClient {
 
   async getSystemStatus(): Promise<SystemStatus> {
     return this.get<SystemStatus>("/admin/status");
+  }
+
+  async getAnalytics(): Promise<{
+    gmvToday?: number;
+    gmvChange?: number;
+    activeOffers?: number;
+    activeOffersChange?: number;
+    openTickets?: number;
+    openTicketsChange?: number;
+    resolvedToday?: number;
+  }> {
+    return this.get("/admin/analytics");
   }
 
   // ---- Internal HTTP Helpers ----

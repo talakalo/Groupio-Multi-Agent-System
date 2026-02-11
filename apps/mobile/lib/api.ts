@@ -325,6 +325,7 @@ export async function sendMessage(
 /**
  * Send a chat message with streaming support.
  * Yields partial tokens as they arrive from the server (SSE).
+ * Note: Backend may not implement /message/stream; handle 404 or use sendMessage.
  */
 export async function* sendMessageStream(
   payload: MessageRequest,

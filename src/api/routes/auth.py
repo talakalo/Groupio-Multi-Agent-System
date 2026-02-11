@@ -279,7 +279,7 @@ async def refresh_token(
     response: Response,
     refresh_token: Optional[str] = None,
 ) -> TokenResponse:
-    """Refresh access token. Accepts token in body or in cookie (refresh_token)."""
+    """Refresh access token. Accepts refresh_token in body or in cookie (for browser flows)."""
     if not refresh_token:
         refresh_token = request.cookies.get("refresh_token")
     if not refresh_token:
