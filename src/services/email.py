@@ -4,7 +4,6 @@ import logging
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from typing import Optional
 
 from src.config.settings import get_settings
 
@@ -28,7 +27,7 @@ class EmailService:
         to_email: str,
         subject: str,
         html_content: str,
-        text_content: Optional[str] = None,
+        text_content: str | None = None,
     ) -> bool:
         """Send an email.
 
@@ -233,7 +232,7 @@ class EmailService:
 
 
 # Singleton instance
-_email_service: Optional[EmailService] = None
+_email_service: EmailService | None = None
 
 
 def get_email_service() -> EmailService:

@@ -5,9 +5,6 @@ from typing import Any
 
 from src.databases.graph_store import get_graph_store
 from src.databases.postgres import get_postgres_client
-from src.databases.redis_client import get_redis_client
-from src.databases.vector_store import get_vector_store
-from src.rag.embeddings import get_embedding_client
 from src.rag.pipeline import get_rag_pipeline
 
 logger = logging.getLogger(__name__)

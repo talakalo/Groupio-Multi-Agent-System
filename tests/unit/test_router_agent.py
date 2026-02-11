@@ -1,7 +1,8 @@
 """Unit tests for the Router Agent."""
 
-import pytest
 from unittest.mock import AsyncMock, patch
+
+import pytest
 
 from src.agents.router import RouterAgent
 
@@ -70,7 +71,10 @@ async def test_router_low_confidence_asks_clarification(router_agent, sample_age
             "intent": "general_info",
             "entities": {},
             "confidence": 0.4,
-            "clarifying_question": "היי! איך אוכל לעזור לך? האם אתה מחפש קבלן, מעוניין במידע על מחירים, או צריך עזרה בנושא אחר?",
+            "clarifying_question": (
+                "היי! איך אוכל לעזור לך? האם אתה מחפש קבלן, מעוניין במידע על מחירים, "
+                "או צריך עזרה בנושא אחר?"
+            ),
             "suggested_agent": "support",
         }
     )

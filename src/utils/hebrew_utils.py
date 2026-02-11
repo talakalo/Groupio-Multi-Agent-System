@@ -3,7 +3,6 @@
 import re
 import unicodedata
 
-
 # Hebrew character range
 _HEBREW_RANGE = re.compile(r"[\u0590-\u05FF]")
 

@@ -1,7 +1,5 @@
 """Unit tests for input validation utilities."""
 
-import pytest
-
 from src.utils.validators import (
     sanitize_input,
     validate_category,
@@ -12,7 +10,6 @@ from src.utils.validators import (
     validate_phone,
     validate_region,
     validate_sql_query,
-    validate_user_id,
 )
 
 

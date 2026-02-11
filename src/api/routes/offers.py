@@ -1,7 +1,6 @@
 """Offer API routes."""
 
 import logging
-from typing import Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -84,9 +83,9 @@ async def create_offer(
 
 @router.get("/", response_model=OfferListResponse)
 async def list_offers(
-    building_id: Optional[str] = None,
-    category: Optional[ServiceCategory] = None,
-    status: Optional[OfferStatus] = None,
+    building_id: str | None = None,
+    category: ServiceCategory | None = None,
+    status: OfferStatus | None = None,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     current_user: UserInDB = Depends(get_current_user),

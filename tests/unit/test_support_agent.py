@@ -1,7 +1,8 @@
 """Unit tests for the Support Agent."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from src.agents.support import SupportAgent
 

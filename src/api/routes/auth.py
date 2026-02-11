@@ -1,25 +1,24 @@
 """Authentication API routes."""
 
 import logging
-from datetime import datetime, timedelta
-from typing import Optional
+from datetime import datetime
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.security import OAuth2PasswordRequestForm
+from pydantic import BaseModel, EmailStr, Field
 
 from src.api.middleware.auth import (
     create_access_token,
     create_refresh_token,
     get_current_user,
-    verify_password,
     hash_password,
+    verify_password,
     verify_refresh_token,
 )
 from src.config.settings import get_settings
 from src.databases.postgres import get_postgres_client
 from src.databases.redis_client import get_redis_client
-from src.services.email import get_email_service
 from src.models.user import (
     PasswordChange,
     PasswordReset,
@@ -32,7 +31,7 @@ from src.models.user import (
     UserRole,
     UserUpdate,
 )
-from pydantic import BaseModel, EmailStr, Field
+from src.services.email import get_email_service
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +54,7 @@ class SignupRequest(BaseModel):
 class RefreshRequest(BaseModel):
     """Optional body for refresh endpoint (frontend may send refresh_token in JSON)."""
 
-    refresh_token: Optional[str] = None
+    refresh_token: str | None = None
 
 
 class SignupResponse(BaseModel):
@@ -282,8 +281,8 @@ async def login_json(
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh_token(
     request: Request,
+    response: Response,
     body: RefreshRequest | None = None,
-    response: Response | None = None,
 ) -> TokenResponse:
     """Refresh access token. Accepts token in JSON body (refresh_token) or in cookie (refresh_token)."""
     token = body.refresh_token if body else None
