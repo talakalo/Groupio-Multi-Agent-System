@@ -88,6 +88,16 @@ export interface EscalationsResponse {
   total: number;
 }
 
+// ---- Contractors List Response ----
+
+export interface ContractorsListResponse {
+  items: Contractor[];
+  total: number;
+  page: number;
+  page_size: number;
+  has_more: boolean;
+}
+
 // ---- Client Configuration ----
 
 export interface ApiClientConfig {
@@ -136,6 +146,23 @@ export class GroupioApiClient {
 
   async getContractor(id: string): Promise<Contractor> {
     return this.get<Contractor>(`/contractors/${encodeURIComponent(id)}`);
+  }
+
+  async getContractors(params?: {
+    category?: string;
+    region?: string;
+    page?: number;
+    page_size?: number;
+    verification_status?: string;
+  }): Promise<ContractorsListResponse> {
+    const search = new URLSearchParams();
+    if (params?.category) search.set("category", params.category);
+    if (params?.region) search.set("region", params.region);
+    if (params?.page != null) search.set("page", String(params.page));
+    if (params?.page_size != null) search.set("page_size", String(params.page_size));
+    if (params?.verification_status) search.set("verification_status", params.verification_status);
+    const qs = search.toString();
+    return this.get<ContractorsListResponse>(`/contractors${qs ? `?${qs}` : ""}`);
   }
 
   // ---- Building Methods ----

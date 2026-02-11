@@ -13,4 +13,5 @@ export type {
   HealthStatus,
   MetricsResponse,
   EscalationsResponse,
+  ContractorsListResponse,
 } from "./client";

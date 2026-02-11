@@ -8,10 +8,45 @@ http://localhost:8000/api/v1
 
 ## Authentication
 
-All endpoints require an `Authorization` header:
+Many endpoints require an `Authorization: Bearer <access_token>` header. The web app uses JSON login and stores the refresh token in an HTTP-only cookie.
 
+### Auth endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | /api/v1/auth/register | Register (JSON body: email, password, full_name, phone) |
+| POST | /api/v1/auth/login | Login with form body (username, password) |
+| POST | /api/v1/auth/login/json | **Login with JSON** (email, password). Use this from web/frontends. |
+| POST | /api/v1/auth/refresh | Refresh access token; token in body or cookie `refresh_token` |
+| POST | /api/v1/auth/logout | Logout (clears refresh cookie) |
+| GET | /api/v1/auth/me | Current user (requires Bearer token) |
+
+**Login JSON response** (200):
+```json
+{
+  "access_token": "eyJ...",
+  "refresh_token": "eyJ...",
+  "expires_in": 3600
+}
 ```
-Authorization: Bearer <api_key>
+
+---
+
+## Pagination
+
+List endpoints (e.g. offers, contractors, escalations) use query params:
+
+- `page` (default 1), `page_size` (default 20, max 100)
+
+Response shape:
+```json
+{
+  "items": [...],
+  "total": 42,
+  "page": 1,
+  "page_size": 20,
+  "has_more": true
+}
 ```
 
 ---
@@ -85,9 +120,13 @@ Handle incoming WhatsApp messages.
 
 ---
 
+### GET /api/v1/health/live
+
+Liveness probe (no DB). Returns `{"status": "ok"}`. Use for k8s liveness.
+
 ### GET /api/v1/health
 
-Health check for all services.
+Readiness: health check for all services (vector_db, graph_db, redis, postgres). Use for k8s readiness.
 
 **Response** (200):
 ```json
@@ -128,6 +167,10 @@ Detailed system status (admin only).
 
 Prometheus-compatible metrics.
 
+### GET /api/v1/admin/analytics
+
+Dashboard analytics (admin only). Returns counts: open_tickets, total_contractors, gmv_today, active_offers, etc.
+
 ---
 
 ### POST /api/v1/admin/agents/{agent_name}/reload
@@ -159,3 +202,10 @@ Hot-reload an agent's configuration.
   "detail": "Error description"
 }
 ```
+
+---
+
+## Operations
+
+- **CORS**: Configure allowed origins for production (e.g. web and admin domains). See backend CORS middleware in `src/api/main.py`.
+- **Feature flags**: Environment variables such as `ENABLE_WEB_SEARCH` control optional features; document in LOCAL_SETUP or env example.

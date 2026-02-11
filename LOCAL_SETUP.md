@@ -416,6 +416,28 @@ Go to GitHub → Settings → Branches → Add rule:
 
 ---
 
+## Mobile app
+
+### API base URL
+
+Set `EXPO_PUBLIC_API_URL` (or the default in `apps/mobile/lib/api.ts`) to the backend base URL **including** `/api/v1`, e.g. `https://api.groupio.co.il/api/v1` or `http://localhost:8000/api/v1`.
+
+### Auth token storage
+
+For production, store the auth token in **SecureStore** (or equivalent) instead of in-memory or AsyncStorage. This keeps tokens out of app backups and reduces exposure. Document in the mobile app README how to switch to SecureStore for token persistence.
+
+### Optional / not-yet-implemented endpoints
+
+The mobile client may call these; backend may return 404 until implemented. Handle 404 and show empty/offline state as appropriate:
+
+- `GET /activity` – user activity feed
+- `GET /contractors/matches` – contractor matches for user
+- `GET /buildings/:id/news` – building news/updates
+- `PUT /auth/me/avatar` – upload profile avatar
+- `POST /message/stream` – streaming chat response
+
+---
+
 ## Next Steps
 
 1. **Explore the API**: Visit http://localhost:8000/docs

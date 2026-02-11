@@ -215,9 +215,15 @@ async def whatsapp_webhook(
         return {"status": "error"}
 
 
+@app.get("/api/v1/health/live")
+async def health_live() -> dict[str, str]:
+    """Liveness probe: process is up. No DB or external calls."""
+    return {"status": "ok"}
+
+
 @app.get("/api/v1/health")
 async def health_check() -> dict[str, Any]:
-    """Health check endpoint for all services."""
+    """Readiness probe: all services (DB, Redis, vector, graph) checked."""
     services: dict[str, bool] = {}
 
     try:

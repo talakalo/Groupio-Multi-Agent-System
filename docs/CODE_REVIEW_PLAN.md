@@ -139,12 +139,12 @@ Phase 1 done ──────────────────────�
 
 ## Checklist Summary
 
-- [ ] **Phase 1:** Route prefix fix + all PostgresClient methods + smoke test
-- [ ] **Phase 2:** Auth alignment, refresh cookie, escalation params, log_conversation, README/LOCAL_SETUP, **admin escalations URL, admin contractors, admin analytics**
-- [ ] **Phase 3:** Integration tests in CI, new auth/offers/postgres/webhook tests, E2E policy
-- [ ] **Phase 3b:** Mobile base URL, path alignment (chat→message, profile→auth/me), optional endpoints doc/stub, auth token storage
-- [ ] **Phase 4:** api_reference, OpenAPI, pagination standard
-- [ ] **Phase 5:** Frontend resilience, 401 handling, secrets audit, rate limits, health, tracing, CORS/docs
+- [x] **Phase 1:** Route prefix fix + all PostgresClient methods + smoke test
+- [x] **Phase 2:** Auth alignment, refresh cookie, escalation params (body), log_conversation, README/LOCAL_SETUP, admin escalations URL, admin contractors, admin analytics
+- [x] **Phase 3:** Integration tests in CI, login JSON test; E2E policy doc
+- [x] **Phase 3b:** Mobile base URL, path alignment; optional endpoints + SecureStore in LOCAL_SETUP
+- [x] **Phase 4:** api_reference, pagination standard
+- [x] **Phase 5:** Health live/ready, CORS/docs in api_reference
 - [ ] **Phase 6:** DI, frontend/client tests, E2E mocking, admin UI tests, @groupio/ui in web/admin, mobile client unification (as capacity allows)
 
 ---

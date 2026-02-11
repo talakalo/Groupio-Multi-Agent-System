@@ -81,6 +81,8 @@ Groupio-Multi-Agent-System/
 
 ## Quick Start
 
+**For full setup steps** (database migrations, environment variables, scripts, mobile token storage), see **[LOCAL_SETUP.md](LOCAL_SETUP.md)**.
+
 ### Prerequisites
 
 - Python 3.11+
@@ -90,53 +92,27 @@ Groupio-Multi-Agent-System/
 - Anthropic API key (Claude)
 - OpenAI API key (embeddings)
 
-### Backend Setup
+### Backend
 
 ```bash
-# Clone and enter directory
-cd Groupio-Multi-Agent-System
-
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # or `venv\Scripts\activate` on Windows
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Copy environment file
-cp docker/.env.example docker/.env
-# Edit docker/.env with your API keys
-
-# Start infrastructure
-docker-compose -f docker/docker-compose.yml up -d
-
-# Setup databases
-python scripts/setup_vector_db.py
-python scripts/setup_graph_db.py
-python scripts/seed_data.py
-
-# Run the API
+git clone <repo-url> && cd Groupio-Multi-Agent-System
+python -m venv venv && source venv/bin/activate  # or `venv\Scripts\activate` on Windows
+pip install -e ".[dev]"
+cp docker/.env.example docker/.env   # Edit with your API keys
+docker compose -f docker/docker-compose.yml up -d
+# Run migrations and seed as described in LOCAL_SETUP.md
 uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### Frontend Setup
+### Frontend
 
 ```bash
-# Install dependencies
 pnpm install
-
-# Copy environment files
 cp apps/web/.env.example apps/web/.env.local
 cp apps/admin/.env.example apps/admin/.env.local
 cp apps/mobile/.env.example apps/mobile/.env.local
-
-# Run all apps in development
 pnpm dev
-
-# Or run individual apps
-pnpm --filter web dev      # http://localhost:3000
-pnpm --filter admin dev    # http://localhost:3001
-pnpm --filter mobile start # Expo DevTools
+# Web: http://localhost:3000  |  Admin: http://localhost:3001  |  Mobile: pnpm --filter mobile start
 ```
 
 ## AI Agents
