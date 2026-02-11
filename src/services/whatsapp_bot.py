@@ -14,10 +14,10 @@ from typing import Any
 import httpx
 from pydantic import BaseModel
 
-from src.config.settings import settings
+from src.config.settings import get_settings
 from src.databases.redis_client import RedisClient
 from src.orchestration.graph import GroupioOrchestrator
-from src.utils.hebrew_utils import is_hebrew, normalize_hebrew_text
+from src.utils.hebrew_utils import is_hebrew, normalize_hebrew
 
 logger = logging.getLogger(__name__)
 
@@ -75,10 +75,11 @@ class WhatsAppBotService:
     ) -> None:
         self.orchestrator = orchestrator
         self.redis = redis_client
-        self.api_url = f"https://graph.facebook.com/v18.0/{settings.whatsapp_phone_id}/messages"
+        settings = get_settings()
+        self.api_url = f"https://graph.facebook.com/v18.0/{settings.WHATSAPP_PHONE_ID}/messages"
         self.http_client = httpx.AsyncClient(
             headers={
-                "Authorization": f"Bearer {settings.whatsapp_api_token}",
+                "Authorization": f"Bearer {settings.WHATSAPP_API_TOKEN}",
                 "Content-Type": "application/json",
             },
             timeout=30.0,
@@ -95,12 +96,13 @@ class WhatsAppBotService:
         Returns:
             True if signature is valid
         """
-        if not settings.whatsapp_webhook_secret:
+        settings = get_settings()
+        if not settings.WHATSAPP_WEBHOOK_SECRET:
             logger.warning("WhatsApp webhook secret not configured")
             return False
 
         expected_signature = hmac.new(
-            settings.whatsapp_webhook_secret.encode(),
+            settings.WHATSAPP_WEBHOOK_SECRET.encode(),
             payload,
             hashlib.sha256,
         ).hexdigest()
@@ -196,7 +198,7 @@ class WhatsAppBotService:
         # Normalize Hebrew text if applicable
         user_message = message.text
         if is_hebrew(user_message):
-            user_message = normalize_hebrew_text(user_message)
+            user_message = normalize_hebrew(user_message)
 
         # Get or create conversation session
         session_id = f"whatsapp:{message.from_number}"

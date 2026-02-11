@@ -203,26 +203,20 @@ test.describe("Resident Login Flow", () => {
   });
 
   test("should login successfully and redirect to dashboard", async ({ page }) => {
-    await page.route("**/api/v1/auth/login", (route) =>
+    await page.route("**/api/v1/auth/login/json", (route) =>
       route.fulfill({
         status: 200,
         body: JSON.stringify({
-          user: {
-            id: "user_123",
-            email: TEST_RESIDENT.email,
-            name: TEST_RESIDENT.name,
-            role: "resident",
-            buildingId: TEST_RESIDENT.buildingId,
-          },
-          token: "jwt_token_here",
-          refreshToken: "refresh_token_here",
+          access_token: "jwt_token_here",
+          refresh_token: "refresh_token_here",
+          expires_in: 3600,
         }),
       })
     );
 
     await page.goto("/login");
 
-    await page.fill('input[name="email"]', TEST_RESIDENT.email);
+    await page.fill('input[name="identifier"]', TEST_RESIDENT.email);
     await page.fill('input[name="password"]', TEST_RESIDENT.password);
     await page.click('button[type="submit"]');
 
@@ -230,16 +224,16 @@ test.describe("Resident Login Flow", () => {
   });
 
   test("should show error for invalid credentials", async ({ page }) => {
-    await page.route("**/api/v1/auth/login", (route) =>
+    await page.route("**/api/v1/auth/login/json", (route) =>
       route.fulfill({
         status: 401,
-        body: JSON.stringify({ error: "Invalid credentials" }),
+        body: JSON.stringify({ detail: "Invalid credentials" }),
       })
     );
 
     await page.goto("/login");
 
-    await page.fill('input[name="email"]', TEST_RESIDENT.email);
+    await page.fill('input[name="identifier"]', TEST_RESIDENT.email);
     await page.fill('input[name="password"]', "wrongpassword");
     await page.click('button[type="submit"]');
 

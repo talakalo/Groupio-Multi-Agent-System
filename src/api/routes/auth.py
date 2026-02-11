@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 from uuid import uuid4
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.security import OAuth2PasswordRequestForm
 
 from src.api.middleware.auth import (
@@ -277,9 +277,9 @@ async def login_json(
 async def refresh_token(
     request: Request,
     response: Response,
-    refresh_token: Optional[str] = Body(None),
+    refresh_token: Optional[str] = None,
 ) -> TokenResponse:
-    """Refresh access token. Accepts refresh_token in JSON body or in cookie."""
+    """Refresh access token. Accepts refresh_token in body or in cookie (for browser flows)."""
     if not refresh_token:
         refresh_token = request.cookies.get("refresh_token")
     if not refresh_token:

@@ -12,17 +12,20 @@ import {
   type MetricsResponse,
   type EscalationsResponse,
   type HealthStatus,
+  type ContractorsListResponse,
 } from "@groupio/api-client";
 
 // ---- Client Singleton ----
 
 let apiClient: GroupioApiClient | undefined;
 
-function getApiClient(): GroupioApiClient {
+function getApiClient(authToken?: string | null): GroupioApiClient {
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? "/api/v1";
+  if (authToken != null) {
+    return new GroupioApiClient({ baseUrl, authToken });
+  }
   if (!apiClient) {
-    apiClient = new GroupioApiClient({
-      baseUrl: process.env.NEXT_PUBLIC_API_URL ?? "/api/v1",
-    });
+    apiClient = new GroupioApiClient({ baseUrl });
   }
   return apiClient;
 }
@@ -217,15 +220,25 @@ export function useResolveEscalation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (escalationId: string) => {
-      const base = process.env.NEXT_PUBLIC_API_URL ?? "/api/v1";
+    mutationFn: async ({
+      escalationId,
+      resolution_notes,
+    }: {
+      escalationId: string;
+      resolution_notes?: string;
+    }) => {
+      const base = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "") || "/api/v1";
+      const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
       const response = await fetch(
-        `${base.replace(/\/+$/, "")}/escalations/${escalationId}/resolve`,
+        `${base}/escalations/${escalationId}/resolve`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ resolution_notes: null }),
-          credentials: "include",
+          headers,
+          body: JSON.stringify(
+            resolution_notes != null ? { resolution_notes } : {}
+          ),
         }
       );
       if (!response.ok) throw new Error("Failed to resolve escalation");
@@ -432,6 +445,38 @@ export interface ContractorListItem {
   email?: string;
 }
 
+function mapContractorToListItem(c: {
+  id: string;
+  business_name?: string;
+  businessName?: string;
+  average_rating?: number;
+  verification_status?: string;
+  verified?: boolean;
+  trust_score?: number;
+  rating?: number;
+  categories?: string[] | { value?: string }[];
+  regions?: string[] | { value?: string }[];
+  phone?: string;
+  email?: string;
+}): ContractorListItem {
+  const categories = Array.isArray(c.categories)
+    ? c.categories.map((x) => (typeof x === "string" ? x : (x as { value?: string }).value ?? ""))
+    : [];
+  const regions = Array.isArray(c.regions)
+    ? c.regions.map((x) => (typeof x === "string" ? x : (x as { value?: string }).value ?? ""))
+    : [];
+  return {
+    id: c.id,
+    businessName: c.business_name ?? c.businessName ?? "",
+    verified: c.verified ?? c.verification_status === "verified",
+    rating: c.rating ?? c.average_rating ?? c.trust_score ?? 0,
+    categories,
+    regions,
+    phone: c.phone,
+    email: c.email,
+  };
+}
+
 export function useContractors(filters?: {
   verified?: boolean;
   category?: string;
@@ -440,25 +485,17 @@ export function useContractors(filters?: {
   return useQuery<ContractorListItem[]>({
     queryKey: [...queryKeys.contractors, filters],
     queryFn: async (): Promise<ContractorListItem[]> => {
-      const client = getApiClient();
+      const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
       try {
+        const client = getApiClient(token ?? undefined);
         const res = await client.getContractors({
           category: filters?.category,
           region: filters?.region,
-          page_size: 100,
+          verification_status: filters?.verified === true ? "verified" : filters?.verified === false ? "pending" : undefined,
         });
-        return (res.items ?? []).map((c) => ({
-          id: c.id,
-          businessName: (c as { business_name?: string }).business_name ?? (c as Contractor).businessName ?? "",
-          verified: (c as { verification_status?: string }).verification_status === "verified",
-          rating: (c as { trust_score?: number }).trust_score ?? (c as Contractor).rating ?? 0,
-          categories: (c as Contractor).categories ?? [],
-          regions: (c as Contractor).regions ?? [],
-          phone: (c as Contractor).phone,
-          email: (c as Contractor).email,
-        }));
+        return (res.items ?? []).map(mapContractorToListItem);
       } catch {
-        // Fallback mock when API unavailable or unauthenticated (GET /api/v1/contractors requires auth)
+        // Fallback mock data when API is unavailable or unauth
       }
       const contractors: ContractorListItem[] = [
         {
@@ -537,9 +574,7 @@ export function useContractors(filters?: {
           regions: ["center", "sharon", "shfela"],
         },
       ];
-
       let filtered = contractors;
-
       if (filters?.verified !== undefined) {
         filtered = filtered.filter((c) => c.verified === filters.verified);
       }
@@ -553,13 +588,33 @@ export function useContractors(filters?: {
           c.regions.includes(filters.region!)
         );
       }
-
       return filtered;
     },
   });
 }
 
 // ---- Analytics ----
+
+export interface AdminAnalyticsDashboard {
+  gmvToday?: number;
+  gmvChange?: number;
+  activeOffers?: number;
+  activeOffersChange?: number;
+  openTickets?: number;
+  openTicketsChange?: number;
+  resolvedToday?: number;
+}
+
+export function useAdminAnalyticsDashboard() {
+  return useQuery<AdminAnalyticsDashboard>({
+    queryKey: ["admin", "analytics-dashboard"],
+    queryFn: async () => {
+      const client = getApiClient();
+      return client.getAnalytics();
+    },
+    refetchInterval: 60_000,
+  });
+}
 
 export function useAnalyticsQuery() {
   return useMutation({

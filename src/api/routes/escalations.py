@@ -310,10 +310,11 @@ async def reply_to_escalation(
 @router.post("/{escalation_id}/resolve")
 async def resolve_escalation(
     escalation_id: str,
+    resolution_notes: Optional[str] = Query(None, description="Legacy: use body instead"),
     body: Optional[ResolveEscalationBody] = Body(None),
     current_user: UserInDB = Depends(get_current_user),
 ) -> EscalationResponse:
-    """Resolve an escalation (admin only). resolution_notes in request body."""
+    """Resolve an escalation (admin only). Prefer body.resolution_notes for longer text."""
     if current_user.role not in ("admin", "super_admin"):
         raise HTTPException(status_code=403, detail="Admin access required")
 
@@ -326,13 +327,13 @@ async def resolve_escalation(
     if escalation.status == EscalationStatus.RESOLVED:
         raise HTTPException(status_code=400, detail="Escalation already resolved")
 
+    notes = (body and body.resolution_notes) or resolution_notes
     update_data = {
         "status": EscalationStatus.RESOLVED,
         "resolved_at": datetime.utcnow(),
     }
-    resolution_notes = body.resolution_notes if body else None
-    if resolution_notes:
-        update_data["resolution_notes"] = resolution_notes
+    if notes:
+        update_data["resolution_notes"] = notes
 
     updated = await db.update_escalation(escalation_id, update_data)
 

@@ -88,6 +88,16 @@ export interface EscalationsResponse {
   total: number;
 }
 
+// ---- Contractors List Response ----
+
+export interface ContractorsListResponse {
+  items: Contractor[];
+  total: number;
+  page: number;
+  page_size: number;
+  has_more: boolean;
+}
+
 // ---- Client Configuration ----
 
 export interface ApiClientConfig {
@@ -138,6 +148,23 @@ export class GroupioApiClient {
     return this.get<Contractor>(`/contractors/${encodeURIComponent(id)}`);
   }
 
+  async getContractors(params?: {
+    category?: string;
+    region?: string;
+    verification_status?: string;
+    page?: number;
+    page_size?: number;
+  }): Promise<ContractorsListResponse> {
+    const search = new URLSearchParams();
+    if (params?.category) search.set("category", params.category);
+    if (params?.region) search.set("region", params.region);
+    if (params?.verification_status) search.set("verification_status", params.verification_status);
+    if (params?.page != null) search.set("page", String(params.page));
+    if (params?.page_size != null) search.set("page_size", String(params.page_size));
+    const qs = search.toString();
+    return this.get<ContractorsListResponse>(`/contractors${qs ? `?${qs}` : ""}`);
+  }
+
   // ---- Building Methods ----
 
   async getBuilding(id: string): Promise<Building> {
@@ -158,21 +185,16 @@ export class GroupioApiClient {
     return this.get<SystemStatus>("/admin/status");
   }
 
-  async getContractors(params?: {
-    page?: number;
-    page_size?: number;
-    category?: string;
-    region?: string;
-  }): Promise<{ items: Contractor[]; total: number; page: number; page_size: number }> {
-    const search = new URLSearchParams();
-    if (params?.page != null) search.set("page", String(params.page));
-    if (params?.page_size != null) search.set("page_size", String(params.page_size));
-    if (params?.category) search.set("category", params.category);
-    if (params?.region) search.set("region", params.region);
-    const qs = search.toString();
-    return this.get<{ items: Contractor[]; total: number; page: number; page_size: number }>(
-      `/contractors${qs ? `?${qs}` : ""}`,
-    );
+  async getAnalytics(): Promise<{
+    gmvToday?: number;
+    gmvChange?: number;
+    activeOffers?: number;
+    activeOffersChange?: number;
+    openTickets?: number;
+    openTicketsChange?: number;
+    resolvedToday?: number;
+  }> {
+    return this.get("/admin/analytics");
   }
 
   // ---- Internal HTTP Helpers ----

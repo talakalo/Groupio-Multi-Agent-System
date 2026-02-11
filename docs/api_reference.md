@@ -2,17 +2,82 @@
 
 ## Base URL
 
+All routes are under:
+
 ```
 http://localhost:8000/api/v1
 ```
 
 ## Authentication
 
-All endpoints require an `Authorization` header:
+- **JWT (web/mobile):** `Authorization: Bearer <access_token>`. Obtain via `POST /auth/login` (form) or `POST /auth/login/json` (JSON).
+- **Refresh:** `POST /auth/refresh` accepts `refresh_token` in body or in `refresh_token` HTTP-only cookie. Returns new `access_token` and sets cookie.
+- **Admin:** Same JWT; require `role` in `admin` or `super_admin` for `/admin/*` and some list/update routes.
 
-```
-Authorization: Bearer <api_key>
-```
+---
+
+## Route groups
+
+| Prefix | Description |
+|--------|-------------|
+| `/auth` | Signup, login (form + JSON), refresh, logout, me, password reset, verify email |
+| `/offers` | List, create, get, update, join, leave; match (admin) |
+| `/contractors` | List, create, get, update, stats, verify (admin), reviews |
+| `/buildings` | List, create, get, update, delete, residents, invite |
+| `/escalations` | Create, list, get, update, resolve, reopen, messages |
+| `/agents` | Invoke agent (testing) |
+| `/admin` | Status, metrics, collections, analytics; agent reload |
+| `/webhooks` | WhatsApp incoming |
+
+---
+
+## Pagination
+
+List endpoints (e.g. offers, contractors, escalations) use query params: `page` (default 1), `page_size` (default 20, max 100). Response shape: `{ "items", "total", "page", "page_size", "has_more" }`.
+
+---
+
+## Auth endpoints
+
+### POST /api/v1/auth/signup
+
+Register a new user (resident or contractor). Returns token for auto-login.
+
+**Body:** `{ "name", "email", "phone", "password", "role": "resident" | "contractor", "buildingId?" }`
+
+**Response (200):** `{ "token", "user" }`
+
+### POST /api/v1/auth/login
+
+Form login (OAuth2 form: `username`=email, `password`).
+
+**Response (200):** `{ "access_token", "refresh_token", "expires_in" }`; sets `refresh_token` cookie.
+
+### POST /api/v1/auth/login/json
+
+JSON login (for SPA).
+
+**Body:** `{ "email", "password" }`
+
+**Response (200):** `{ "access_token", "refresh_token", "expires_in" }`; sets `refresh_token` cookie.
+
+### POST /api/v1/auth/refresh
+
+Refresh access token. Body: `{ "refresh_token"? }` or use cookie.
+
+**Response (200):** `{ "access_token", "refresh_token", "expires_in" }`; sets cookie.
+
+### POST /api/v1/auth/logout
+
+Invalidate refresh token. Requires Bearer token.
+
+### GET /api/v1/auth/me
+
+Current user profile. Requires Bearer token.
+
+### GET /api/v1/admin/analytics
+
+Dashboard analytics (admin). Returns `gmvToday`, `activeOffers`, `openTickets`, `resolvedToday`, etc.
 
 ---
 
@@ -85,9 +150,13 @@ Handle incoming WhatsApp messages.
 
 ---
 
+### GET /api/v1/health/live
+
+Liveness probe (no DB). Returns `{"status": "ok"}`. Use for k8s liveness.
+
 ### GET /api/v1/health
 
-Health check for all services.
+Readiness: health check for all services (vector_db, graph_db, redis, postgres). Use for k8s readiness.
 
 **Response** (200):
 ```json
@@ -128,11 +197,15 @@ Detailed system status (admin only).
 
 Prometheus-compatible metrics.
 
+### GET /api/v1/admin/analytics
+
+Dashboard analytics (admin only). Returns counts: open_tickets, total_contractors, gmv_today, active_offers, etc.
+
 ---
 
 ### POST /api/v1/admin/agents/{agent_name}/reload
 
-Hot-reload an agent's configuration.
+Hot-reload an agent's configuration (admin).
 
 **Response** (200):
 ```json
@@ -141,6 +214,33 @@ Hot-reload an agent's configuration.
   "agent": "matching"
 }
 ```
+
+---
+
+### Escalations
+
+- **POST /api/v1/escalations** – Create (body: source, priority, subject, description, etc.).
+- **GET /api/v1/escalations** – List (admin); query: priority, status, page, page_size.
+- **GET /api/v1/escalations/{id}** – Get one (admin).
+- **POST /api/v1/escalations/{id}/resolve** – Resolve (admin). Body: `{ "resolution_notes"? }` or query `resolution_notes`.
+
+### Offers
+
+- **GET /api/v1/offers** – List; query: building_id, category, status, page, page_size.
+- **POST /api/v1/offers** – Create (auth; resident in building).
+- **GET /api/v1/offers/{id}** – Get one.
+- **POST /api/v1/offers/{id}/join** – Join offer (auth).
+
+### Contractors
+
+- **GET /api/v1/contractors** – List; query: category, region, verification_status, page, page_size.
+- **POST /api/v1/contractors** – Register contractor.
+- **GET /api/v1/contractors/{id}** – Get one.
+
+### Buildings
+
+- **GET /api/v1/buildings** – List (auth).
+- **GET /api/v1/buildings/{id}** – Get one (auth; resident or admin).
 
 ---
 
@@ -159,3 +259,10 @@ Hot-reload an agent's configuration.
   "detail": "Error description"
 }
 ```
+
+---
+
+## Operations
+
+- **CORS**: Configure allowed origins for production (e.g. web and admin domains). See backend CORS middleware in `src/api/main.py`.
+- **Feature flags**: Environment variables such as `ENABLE_WEB_SEARCH` control optional features; document in LOCAL_SETUP or env example.
