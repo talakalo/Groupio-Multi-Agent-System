@@ -1,18 +1,73 @@
 # API Reference
 
-## Base URL
+## Base URL and versioning
 
-```
-http://localhost:8000/api/v1
-```
+All routes are under `/api/v1`. Base URL example: `http://localhost:8000/api/v1`.
+
+**OpenAPI:** The schema is available at `GET /openapi.json`; interactive docs at `GET /docs` (Swagger UI). The schema reflects the mounted routes under `/api/v1`. A future v2 can be introduced under `/api/v2` or by versioning the OpenAPI document.
 
 ## Authentication
 
-All endpoints require an `Authorization` header:
+Most endpoints require an `Authorization` header:
 
 ```
-Authorization: Bearer <api_key>
+Authorization: Bearer <access_token>
 ```
+
+Auth routes (signup, login, refresh, logout) use or set tokens; see **Auth** below. Refresh accepts the refresh token in the JSON body (`refresh_token`) or in a cookie (`refresh_token`); the response may set a new refresh token in a cookie.
+
+---
+
+## Pagination
+
+List endpoints use a consistent shape:
+
+- **Query:** `page` (default 1), `page_size` (default 20, max often 100).
+- **Response:** `{ "items": [...], "total": number, "page": number, "page_size": number, "has_more": boolean }`.
+
+Examples: `GET /offers`, `GET /contractors`, `GET /escalations`, `GET /buildings`.
+
+---
+
+## Route groups
+
+- **Auth:** `/api/v1/auth/*` — signup, register, login, refresh, logout, me, password, verify.
+- **Offers:** `/api/v1/offers` — CRUD, join, leave, participants, match.
+- **Contractors:** `/api/v1/contractors` — CRUD, search, reviews, stats, verify.
+- **Buildings:** `/api/v1/buildings` — CRUD, residents, stats, offers, invite.
+- **Escalations:** `/api/v1/escalations` — create, list, filter, stats, assign, reply, resolve, reopen, messages.
+- **Agents:** `/api/v1/agents` — invoke, list, metrics.
+- **Admin:** `/api/v1/admin/*` — status, metrics, agents reload, collections.
+- **Webhooks:** `/api/v1/webhooks/*` — WhatsApp, contractor-update.
+
+---
+
+## Auth (`/api/v1/auth`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/signup` | Sign up (name, email, phone, password, role, buildingId). Returns token + user. |
+| POST | `/register` | Register (legacy). Returns user. |
+| POST | `/login` | Login (form or JSON: email, password). Returns `{ access_token, refresh_token, expires_in }`. |
+| POST | `/login/json` | Login with JSON body only. |
+| POST | `/refresh` | Refresh access token. Body: optional `refresh_token`; or cookie `refresh_token`. Returns new tokens; may set refresh cookie. |
+| POST | `/logout` | Logout (invalidate refresh token when provided). |
+| GET | `/me` | Current user (requires auth). |
+| PUT | `/me` | Update current user (requires auth). |
+| POST | `/password/change` | Change password (requires auth). |
+| POST | `/password/reset` | Request password reset. |
+| POST | `/password/reset/confirm` | Confirm reset with token. |
+| POST | `/verify-email/{token}` | Verify email. |
+| POST | `/resend-verification` | Resend verification email. |
+
+---
+
+## Offers, Contractors, Buildings, Escalations (summary)
+
+- **Offers** `GET /offers` — List with filters; response uses pagination shape (`items`, `total`, `page`, `page_size`, `has_more`). `POST /offers`, `GET/PUT/DELETE /offers/{id}`, `POST /offers/{id}/join`, `POST /offers/{id}/leave`, etc.
+- **Contractors** `GET /contractors` — List with `category`, `region`, `min_trust_score`, `verification_status`, `page`, `page_size`. Same pagination shape. `POST /contractors/search` for semantic search.
+- **Buildings** `GET /buildings` — List; `GET/PUT/DELETE /buildings/{id}`, residents, stats, invites.
+- **Escalations** `GET /escalations` — List; `POST /escalations/{id}/resolve` accepts JSON body `{ "resolution_notes": "..." }`. Stats, assign, reply, reopen, messages.
 
 ---
 

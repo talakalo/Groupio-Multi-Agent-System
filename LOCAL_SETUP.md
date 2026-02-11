@@ -18,7 +18,11 @@ cd Groupio-Multi-Agent-System
 
 # 2. Install dependencies
 pnpm install              # Frontend dependencies
-pip install -e ".[dev]"   # Backend dependencies
+
+# Backend: create venv first, then install
+python -m venv venv
+source venv/bin/activate   # On Windows: venv\Scripts\activate
+pip install -e ".[dev]"    # Backend + alembic
 
 # 3. Start infrastructure services
 docker compose up -d
@@ -27,7 +31,7 @@ docker compose up -d
 cp docker/.env.example .env
 # Edit .env with your API keys (see Configuration section)
 
-# 5. Run database migrations
+# 5. Run database migrations (with venv activated)
 alembic upgrade head
 
 # 6. Start the backend API
@@ -54,13 +58,17 @@ pnpm install
 
 #### Backend (Python)
 ```bash
-# Create virtual environment (recommended)
+# Create virtual environment (required - run from project root)
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-# Install backend with dev dependencies
+# Activate it (required before pip/alembic)
+source venv/bin/activate   # On Windows: venv\Scripts\activate
+
+# Install backend with dev dependencies (includes alembic)
 pip install -e ".[dev]"
 ```
+
+**If venv already exists** but `alembic` is not found: activate the venv first, then run `pip install -e ".[dev]"` again.
 
 ### 2. Start Infrastructure Services
 
@@ -120,8 +128,36 @@ ENVIRONMENT=development
 
 ### 4. Run Database Migrations
 
+**Option A: Local PostgreSQL** (default `postgresql://postgres:postgres@localhost:5432/groupio`)
+
+Create the database first if it doesn't exist:
 ```bash
-# Ensure PostgreSQL/Supabase is running
+# Using the provided script (recommended)
+./scripts/create-db.sh
+
+# Or manually:
+createdb -U postgres groupio
+# Or: psql -U postgres -c "CREATE DATABASE groupio;"
+```
+
+**Option B: Local PostgreSQL with Supabase URL set**
+
+If `docker/.env` has `SUPABASE_URL` but you want to use local PostgreSQL (e.g. when Supabase has connection issues), set:
+```
+USE_LOCAL_POSTGRES=1
+```
+This forces the API to use `DATABASE_URL` (local PostgreSQL) instead of Supabase. Requires `pip install asyncpg` (included in project deps).
+
+**Option C: Supabase** (hosted PostgreSQL)
+
+Set `DATABASE_URL` in `.env` to your Supabase connection string:
+```
+DATABASE_URL=postgresql://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:5432/postgres
+```
+Get this from Supabase Dashboard → Project Settings → Database → Connection string.
+
+Then run migrations:
+```bash
 alembic upgrade head
 ```
 
@@ -161,6 +197,8 @@ cd apps/mobile
 pnpm start
 # Scan QR code with Expo Go app
 ```
+
+Set `EXPO_PUBLIC_API_URL` (e.g. `http://localhost:8000/api/v1`) in `apps/mobile/.env` so the app talks to your backend. For production, store the auth token in **Expo SecureStore** (or equivalent) instead of in-memory; see [docs/MOBILE_API_ALIGNMENT.md](docs/MOBILE_API_ALIGNMENT.md).
 
 ---
 
