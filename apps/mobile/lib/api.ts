@@ -19,7 +19,7 @@ import type {
 const API_BASE_URL: string =
   Constants.expoConfig?.extra?.apiUrl ??
   process.env.EXPO_PUBLIC_API_URL ??
-  "https://api.groupio.co.il/v1";
+  "https://api.groupio.co.il/api/v1";
 
 // ---------------------------------------------------------------------------
 // Auth token storage (in-memory; swap for SecureStore in production)
@@ -265,14 +265,14 @@ export async function getContractorMatches(
 export async function getProfile(
   signal?: AbortSignal,
 ): Promise<ProfileResponse> {
-  return request<ProfileResponse>("GET", "/profile", { signal });
+  return request<ProfileResponse>("GET", "/auth/me", { signal });
 }
 
 /** Update the current user's profile. */
 export async function updateProfile(
   payload: UpdateProfilePayload,
 ): Promise<ProfileResponse> {
-  return request<ProfileResponse>("PATCH", "/profile", { body: payload });
+  return request<ProfileResponse>("PUT", "/auth/me", { body: payload });
 }
 
 /** Upload a profile avatar (multipart). */
@@ -316,7 +316,7 @@ export async function sendMessage(
   payload: MessageRequest,
   signal?: AbortSignal,
 ): Promise<MessageResponse> {
-  return request<MessageResponse>("POST", "/chat", {
+  return request<MessageResponse>("POST", "/message", {
     body: payload,
     signal,
   });
@@ -325,12 +325,13 @@ export async function sendMessage(
 /**
  * Send a chat message with streaming support.
  * Yields partial tokens as they arrive from the server (SSE).
+ * Note: Backend may not implement /message/stream; handle 404 or use sendMessage.
  */
 export async function* sendMessageStream(
   payload: MessageRequest,
   signal?: AbortSignal,
 ): AsyncGenerator<ChatStreamEvent> {
-  const url = buildUrl("/chat/stream");
+  const url = buildUrl("/message/stream");
 
   const response = await fetch(url, {
     method: "POST",

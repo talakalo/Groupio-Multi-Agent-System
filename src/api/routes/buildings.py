@@ -21,7 +21,7 @@ from src.models.user import UserInDB, UserRole
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1/buildings", tags=["buildings"])
+router = APIRouter(tags=["buildings"])
 
 
 @router.post("/", response_model=BuildingResponse)

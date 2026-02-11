@@ -219,7 +219,7 @@ export function useResolveEscalation() {
   return useMutation({
     mutationFn: async (escalationId: string) => {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL ?? "/api/v1"}/admin/escalations/${escalationId}/resolve`,
+        `${process.env.NEXT_PUBLIC_API_URL ?? "/api/v1"}/escalations/${escalationId}/resolve`,
         { method: "POST", headers: { "Content-Type": "application/json" } }
       );
       if (!response.ok) throw new Error("Failed to resolve escalation");
@@ -426,17 +426,35 @@ export interface ContractorListItem {
   email?: string;
 }
 
-export function useContractors(filters?: {
-  verified?: boolean;
-  category?: string;
-  region?: string;
-}) {
-  return useQuery<ContractorListItem[]>({
-    queryKey: [...queryKeys.contractors, filters],
-    queryFn: async (): Promise<ContractorListItem[]> => {
-      // In production, this would call /api/v1/admin/contractors with filters.
-      // Return sample data for development.
-      const contractors: ContractorListItem[] = [
+function mapContractorToListItem(c: {
+  id: string;
+  business_name?: string;
+  average_rating?: number;
+  verification_status?: string;
+  categories?: string[] | { value?: string }[];
+  regions?: string[] | { value?: string }[];
+  email?: string;
+  phone?: string;
+}): ContractorListItem {
+  const categories = Array.isArray(c.categories)
+    ? c.categories.map((x) => (typeof x === "string" ? x : (x as { value?: string }).value ?? ""))
+    : [];
+  const regions = Array.isArray(c.regions)
+    ? c.regions.map((x) => (typeof x === "string" ? x : (x as { value?: string }).value ?? ""))
+    : [];
+  return {
+    id: c.id,
+    businessName: c.business_name ?? "",
+    verified: c.verification_status === "verified",
+    rating: c.average_rating ?? 0,
+    categories,
+    regions,
+    phone: c.phone,
+    email: c.email,
+  };
+}
+
+const MOCK_CONTRACTORS: ContractorListItem[] = [
         {
           id: "c-001",
           businessName: "Aviv AC Solutions",
@@ -514,7 +532,21 @@ export function useContractors(filters?: {
         },
       ];
 
-      let filtered = contractors;
+  return useQuery<ContractorListItem[]>({
+    queryKey: [...queryKeys.contractors, filters],
+    queryFn: async (): Promise<ContractorListItem[]> => {
+      const client = getApiClient();
+      try {
+        const res = await client.getContractors({
+          verification_status: filters?.verified === true ? "verified" : filters?.verified === false ? "pending" : undefined,
+          category: filters?.category,
+          region: filters?.region,
+        });
+        return res.items.map(mapContractorToListItem);
+      } catch {
+        // Fallback to mock when API is unavailable
+      }
+      let filtered = MOCK_CONTRACTORS;
 
       if (filters?.verified !== undefined) {
         filtered = filtered.filter((c) => c.verified === filters.verified);
@@ -529,13 +561,33 @@ export function useContractors(filters?: {
           c.regions.includes(filters.region!)
         );
       }
-
       return filtered;
     },
   });
 }
 
 // ---- Analytics ----
+
+export interface AdminAnalyticsDashboard {
+  gmvToday?: number;
+  gmvChange?: number;
+  activeOffers?: number;
+  activeOffersChange?: number;
+  openTickets?: number;
+  openTicketsChange?: number;
+  resolvedToday?: number;
+}
+
+export function useAdminAnalyticsDashboard() {
+  return useQuery<AdminAnalyticsDashboard>({
+    queryKey: ["admin", "analytics-dashboard"],
+    queryFn: async () => {
+      const client = getApiClient();
+      return client.getAnalytics();
+    },
+    refetchInterval: 60_000,
+  });
+}
 
 export function useAnalyticsQuery() {
   return useMutation({
