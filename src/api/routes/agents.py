@@ -69,11 +69,13 @@ async def list_agents() -> dict[str, list[dict[str, str]]]:
     orchestrator = get_orchestrator()
     agents = []
     for name, agent in orchestrator.agents.items():
-        agents.append({
-            "name": name,
-            "description": agent.config.description,
-            "model": agent.config.model,
-        })
+        agents.append(
+            {
+                "name": name,
+                "description": agent.config.description,
+                "model": agent.config.model,
+            }
+        )
     return {"agents": agents}
 
 

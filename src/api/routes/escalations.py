@@ -224,7 +224,10 @@ async def update_escalation(
     update_data = request.model_dump(exclude_unset=True)
 
     # Track resolution time
-    if request.status == EscalationStatus.RESOLVED and escalation.status != EscalationStatus.RESOLVED:
+    if (
+        request.status == EscalationStatus.RESOLVED
+        and escalation.status != EscalationStatus.RESOLVED
+    ):
         update_data["resolved_at"] = datetime.utcnow()
 
     updated = await db.update_escalation(escalation_id, update_data)
@@ -255,10 +258,13 @@ async def assign_escalation(
     if not admin or admin.role not in ("admin", "super_admin"):
         raise HTTPException(status_code=400, detail="Invalid admin ID")
 
-    updated = await db.update_escalation(escalation_id, {
-        "assigned_to": admin_id,
-        "status": EscalationStatus.IN_PROGRESS,
-    })
+    updated = await db.update_escalation(
+        escalation_id,
+        {
+            "assigned_to": admin_id,
+            "status": EscalationStatus.IN_PROGRESS,
+        },
+    )
 
     logger.info("Escalation %s assigned to %s", escalation_id, admin_id)
 
@@ -371,10 +377,13 @@ async def reopen_escalation(
         content=f"Escalation reopened: {reason}",
     )
 
-    updated = await db.update_escalation(escalation_id, {
-        "status": EscalationStatus.OPEN,
-        "resolved_at": None,
-    })
+    updated = await db.update_escalation(
+        escalation_id,
+        {
+            "status": EscalationStatus.OPEN,
+            "resolved_at": None,
+        },
+    )
 
     logger.info("Escalation %s reopened by %s: %s", escalation_id, current_user.id, reason)
 

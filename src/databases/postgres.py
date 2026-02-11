@@ -48,9 +48,7 @@ class PostgresClient:
             settings = get_settings()
             force_local = (settings.USE_LOCAL_POSTGRES or "").lower() in ("1", "true", "yes")
             self._use_supabase = bool(
-                settings.SUPABASE_URL
-                and settings.SUPABASE_KEY
-                and not force_local
+                settings.SUPABASE_URL and settings.SUPABASE_KEY and not force_local
             )
         return self._use_supabase
 
@@ -111,7 +109,9 @@ class PostgresClient:
         """Execute a raw SQL query."""
         if self._use_supabase_client():
             client = await self._get_client()
-            result = await client.rpc("execute_sql", {"query": query, "params": params or {}}).execute()
+            result = await client.rpc(
+                "execute_sql", {"query": query, "params": params or {}}
+            ).execute()
             return result.data if result.data else []
         # Local: not supported for generic RPC
         return []
@@ -122,18 +122,14 @@ class PostgresClient:
             client = await self._get_client()
             result = await client.table("users").select("*").eq("id", user_id).execute()
             return result.data[0] if result.data else None
-        row = await self._pg_fetch_one(
-            "SELECT * FROM users WHERE id = $1", user_id
-        )
+        row = await self._pg_fetch_one("SELECT * FROM users WHERE id = $1", user_id)
         return row
 
     async def get_user_by_email(self, email: str) -> UserInDB | None:
         """Get user by email."""
         if self._use_supabase_client():
             client = await self._get_client()
-            result = (
-                await client.table("users").select("*").eq("email", email).limit(1).execute()
-            )
+            result = await client.table("users").select("*").eq("email", email).limit(1).execute()
             row = result.data[0] if result.data else None
         else:
             row = await self._pg_fetch_one("SELECT * FROM users WHERE email = $1", email)
@@ -143,9 +139,7 @@ class PostgresClient:
         """Get user by phone."""
         if self._use_supabase_client():
             client = await self._get_client()
-            result = (
-                await client.table("users").select("*").eq("phone", phone).limit(1).execute()
-            )
+            result = await client.table("users").select("*").eq("phone", phone).limit(1).execute()
             row = result.data[0] if result.data else None
         else:
             row = await self._pg_fetch_one("SELECT * FROM users WHERE phone = $1", phone)
@@ -155,9 +149,7 @@ class PostgresClient:
         """Get user by ID."""
         if self._use_supabase_client():
             client = await self._get_client()
-            result = (
-                await client.table("users").select("*").eq("id", user_id).limit(1).execute()
-            )
+            result = await client.table("users").select("*").eq("id", user_id).limit(1).execute()
             row = result.data[0] if result.data else None
         else:
             row = await self._pg_fetch_one("SELECT * FROM users WHERE id = $1", user_id)
@@ -220,13 +212,17 @@ class PostgresClient:
             raise RuntimeError("Failed to create user")
         return UserInDB(**_row_to_user(row))
 
-    async def update_user(
-        self, user_id: str, update_data: dict[str, Any]
-    ) -> UserInDB:
+    async def update_user(self, user_id: str, update_data: dict[str, Any]) -> UserInDB:
         """Update user by ID."""
         allowed = {
-            "full_name", "phone", "preferred_language", "avatar_url",
-            "building_id", "contractor_id", "is_active", "is_verified",
+            "full_name",
+            "phone",
+            "preferred_language",
+            "avatar_url",
+            "building_id",
+            "contractor_id",
+            "is_active",
+            "is_verified",
             "last_login",
         }
         filtered = {k: v for k, v in update_data.items() if k in allowed}
@@ -238,12 +234,7 @@ class PostgresClient:
 
         if self._use_supabase_client():
             client = await self._get_client()
-            result = (
-                await client.table("users")
-                .update(filtered)
-                .eq("id", user_id)
-                .execute()
-            )
+            result = await client.table("users").update(filtered).eq("id", user_id).execute()
             row = result.data[0] if result.data else None
         else:
             # Build SET clause for asyncpg
@@ -271,9 +262,12 @@ class PostgresClient:
         """Update user password by ID."""
         if self._use_supabase_client():
             client = await self._get_client()
-            await client.table("users").update(
-                {"hashed_password": hashed_password}
-            ).eq("id", user_id).execute()
+            await (
+                client.table("users")
+                .update({"hashed_password": hashed_password})
+                .eq("id", user_id)
+                .execute()
+            )
         else:
             await self._pg_execute(
                 "UPDATE users SET hashed_password = $1 WHERE id = $2",
@@ -302,9 +296,7 @@ class PostgresClient:
             )
             row = result.data[0] if result.data else None
         else:
-            row = await self._pg_fetch_one(
-                "SELECT building_id FROM users WHERE phone = $1", phone
-            )
+            row = await self._pg_fetch_one("SELECT building_id FROM users WHERE phone = $1", phone)
         return row["building_id"] if row and row.get("building_id") else None
 
     async def get_active_offers(self, building_id: str) -> list[dict[str, Any]]:
@@ -328,9 +320,7 @@ class PostgresClient:
         )
         return rows or []
 
-    async def get_user_orders(
-        self, user_id: str, limit: int = 5
-    ) -> list[dict[str, Any]]:
+    async def get_user_orders(self, user_id: str, limit: int = 5) -> list[dict[str, Any]]:
         """Get recent orders for a user."""
         if self._use_supabase_client():
             client = await self._get_client()
@@ -345,9 +335,7 @@ class PostgresClient:
             return result.data or []
         return []
 
-    async def get_market_data(
-        self, category: str, region: str, months: int = 6
-    ) -> dict[str, Any]:
+    async def get_market_data(self, category: str, region: str, months: int = 6) -> dict[str, Any]:
         """Get market pricing data for a category and region."""
         if self._use_supabase_client():
             client = await self._get_client()
@@ -367,15 +355,11 @@ class PostgresClient:
             "sample_size": 0,
         }
 
-    async def create_support_ticket(
-        self, ticket_data: dict[str, Any]
-    ) -> dict[str, Any]:
+    async def create_support_ticket(self, ticket_data: dict[str, Any]) -> dict[str, Any]:
         """Create a support ticket for human escalation."""
         if self._use_supabase_client():
             client = await self._get_client()
-            result = (
-                await client.table("support_tickets").insert(ticket_data).execute()
-            )
+            result = await client.table("support_tickets").insert(ticket_data).execute()
             return result.data[0] if result.data else ticket_data
         return ticket_data
 
@@ -389,9 +373,18 @@ class PostgresClient:
         """Log a conversation exchange."""
         if self._use_supabase_client():
             client = await self._get_client()
-            await client.table("conversation_logs").insert(
-                {"user_id": user_id, "message": message, "response": response, "metadata": metadata}
-            ).execute()
+            await (
+                client.table("conversation_logs")
+                .insert(
+                    {
+                        "user_id": user_id,
+                        "message": message,
+                        "response": response,
+                        "metadata": metadata,
+                    }
+                )
+                .execute()
+            )
         else:
             conv_id = str(uuid4())
             meta_json = json.dumps(metadata or {})
@@ -399,17 +392,23 @@ class PostgresClient:
             await self._pg_execute(
                 """INSERT INTO chat_messages (id, conversation_id, user_id, sender_type, content, metadata)
                    VALUES ($1, $2, $3, 'user', $4, $5::jsonb)""",
-                str(uuid4()), conv_id, user_id, message, meta_json,
+                str(uuid4()),
+                conv_id,
+                user_id,
+                message,
+                meta_json,
             )
             await self._pg_execute(
                 """INSERT INTO chat_messages (id, conversation_id, user_id, sender_type, content, metadata)
                    VALUES ($1, $2, $3, 'assistant', $4, $5::jsonb)""",
-                str(uuid4()), conv_id, user_id, resp_content, meta_json,
+                str(uuid4()),
+                conv_id,
+                user_id,
+                resp_content,
+                meta_json,
             )
 
-    async def get_contractor_documents(
-        self, contractor_id: str
-    ) -> list[dict[str, Any]]:
+    async def get_contractor_documents(self, contractor_id: str) -> list[dict[str, Any]]:
         """Get uploaded documents for a contractor."""
         if self._use_supabase_client():
             client = await self._get_client()

@@ -58,6 +58,7 @@ escalations_total = Counter(
 
 # -- Sentry Initialization --
 
+
 def init_monitoring() -> None:
     """Initialize monitoring services (Sentry, logging)."""
     settings = get_settings()
@@ -86,6 +87,7 @@ def init_monitoring() -> None:
 
 
 # -- Decorators --
+
 
 def track_agent_execution(agent_name: str) -> Callable:
     """Decorator to track agent execution metrics."""

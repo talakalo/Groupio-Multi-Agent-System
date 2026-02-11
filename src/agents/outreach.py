@@ -78,9 +78,7 @@ class ABTestManager:
         if not variants:
             return "control"
 
-        hash_val = int(
-            hashlib.md5(f"{campaign_id}:{user_id}".encode()).hexdigest(), 16
-        )
+        hash_val = int(hashlib.md5(f"{campaign_id}:{user_id}".encode()).hexdigest(), 16)
         variant_num = hash_val % 100
 
         cumulative = 0
@@ -100,9 +98,7 @@ class ABTestManager:
         """Track campaign conversion."""
         await self._redis.ab_test_track(campaign_id, variant, outcome)
 
-    async def get_results(
-        self, campaign_id: str, variant: str
-    ) -> dict[str, int]:
+    async def get_results(self, campaign_id: str, variant: str) -> dict[str, int]:
         """Get A/B test results."""
         return await self._redis.ab_test_get_results(campaign_id, variant)
 

@@ -61,9 +61,7 @@ def mock_rag_pipeline():
             },
         ]
     )
-    rag.augment_prompt = AsyncMock(
-        return_value="Augmented system prompt with context"
-    )
+    rag.augment_prompt = AsyncMock(return_value="Augmented system prompt with context")
     rag.get_metrics = AsyncMock(return_value={})
     return rag
 
@@ -95,9 +93,7 @@ def mock_graph_store():
             "avg_review_rating": 4.5,
         }
     )
-    store.detect_suspicious_patterns = AsyncMock(
-        return_value={"suspicious": False}
-    )
+    store.detect_suspicious_patterns = AsyncMock(return_value={"suspicious": False})
     store.health_check = AsyncMock(return_value=True)
     return store
 
@@ -158,9 +154,7 @@ def sample_agent_state() -> AgentState:
         user_id="user_123",
         building_id="bld_001",
         conversation_id="conv_test_001",
-        messages=[
-            {"role": "user", "content": "מחפש קבלן מזגנים"}
-        ],
+        messages=[{"role": "user", "content": "מחפש קבלן מזגנים"}],
         current_agent="router",
         intent=None,
         confidence=0.0,

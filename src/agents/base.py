@@ -86,9 +86,7 @@ class BaseAgent(ABC):
 
         # Track token usage
         usage = response.get("usage", {})
-        self._metrics["tokens"] += usage.get("input_tokens", 0) + usage.get(
-            "output_tokens", 0
-        )
+        self._metrics["tokens"] += usage.get("input_tokens", 0) + usage.get("output_tokens", 0)
 
         return response
 

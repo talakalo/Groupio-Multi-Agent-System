@@ -99,9 +99,7 @@ def chunk_document(
     elif doc_type == "pricing_guide":
         return chunk_by_sections(text, chunk_size=1024, overlap=100, metadata=metadata)
     else:
-        return chunk_by_tokens(
-            text, chunk_size=chunk_size, overlap=overlap, metadata=metadata
-        )
+        return chunk_by_tokens(text, chunk_size=chunk_size, overlap=overlap, metadata=metadata)
 
 
 def chunk_faq(

@@ -9,10 +9,12 @@ from src.agents.support import SupportAgent
 @pytest.fixture
 def support_agent():
     """Create a SupportAgent with mocked dependencies."""
-    with patch("src.agents.base.get_llm_client") as mock_llm, \
-         patch("src.agents.base.get_rag_pipeline") as mock_rag, \
-         patch("src.agents.support.get_postgres_client") as mock_db, \
-         patch("src.agents.support.get_redis_client") as mock_redis:
+    with (
+        patch("src.agents.base.get_llm_client") as mock_llm,
+        patch("src.agents.base.get_rag_pipeline") as mock_rag,
+        patch("src.agents.support.get_postgres_client") as mock_db,
+        patch("src.agents.support.get_redis_client") as mock_redis,
+    ):
         mock_llm.return_value = AsyncMock()
         mock_rag.return_value = AsyncMock()
         mock_db.return_value = AsyncMock()
@@ -20,10 +22,12 @@ def support_agent():
 
         agent = SupportAgent()
         agent.llm_client = AsyncMock()
-        agent.llm_client.create_message = AsyncMock(return_value={
-            "content": [{"type": "text", "text": "Support response"}],
-            "usage": {"input_tokens": 100, "output_tokens": 50},
-        })
+        agent.llm_client.create_message = AsyncMock(
+            return_value={
+                "content": [{"type": "text", "text": "Support response"}],
+                "usage": {"input_tokens": 100, "output_tokens": 50},
+            }
+        )
         agent.rag = AsyncMock()
         agent.rag.retrieve = AsyncMock(return_value=[])
         agent._db = AsyncMock()
@@ -37,9 +41,7 @@ def support_agent():
 async def test_support_handles_general_query(support_agent, sample_agent_state):
     """Test support agent handles general info queries."""
     sample_agent_state["intent"] = "general_info"
-    sample_agent_state["messages"] = [
-        {"role": "user", "content": "מה השירותים שלכם?"}
-    ]
+    sample_agent_state["messages"] = [{"role": "user", "content": "מה השירותים שלכם?"}]
 
     result = await support_agent.run(sample_agent_state)
 
@@ -82,9 +84,7 @@ async def test_support_escalates_negative_sentiment(support_agent, sample_agent_
 async def test_support_escalates_after_3_attempts(support_agent, sample_agent_state):
     """Test escalation after 3 failed resolution attempts."""
     sample_agent_state["intent"] = "complaint"
-    sample_agent_state["messages"] = [
-        {"role": "user", "content": "Still not resolved"}
-    ]
+    sample_agent_state["messages"] = [{"role": "user", "content": "Still not resolved"}]
     sample_agent_state["actions_taken"] = [
         {"agent": "support", "action": "support_response"},
         {"agent": "support", "action": "support_response"},

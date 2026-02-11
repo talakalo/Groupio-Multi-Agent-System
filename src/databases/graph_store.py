@@ -76,9 +76,7 @@ class GraphStore:
 
         return await self.execute(query, params)
 
-    async def get_building_neighbors_on_offer(
-        self, offer_id: str
-    ) -> list[dict[str, Any]]:
+    async def get_building_neighbors_on_offer(self, offer_id: str) -> list[dict[str, Any]]:
         """Get residents who joined a specific offer."""
         query = """
         MATCH (r:Resident)-[j:JOINED]->(o:Offer {id: $offer_id})
@@ -89,9 +87,7 @@ class GraphStore:
         """
         return await self.execute(query, {"offer_id": offer_id})
 
-    async def get_contractor_reputation(
-        self, contractor_id: str
-    ) -> dict[str, Any]:
+    async def get_contractor_reputation(self, contractor_id: str) -> dict[str, Any]:
         """Calculate contractor reputation from graph patterns."""
         query = """
         MATCH (c:Contractor {id: $contractor_id})
@@ -116,9 +112,7 @@ class GraphStore:
         results = await self.execute(query, {"contractor_id": contractor_id})
         return results[0]["reputation"] if results else {}
 
-    async def detect_suspicious_patterns(
-        self, contractor_id: str
-    ) -> list[dict[str, Any]]:
+    async def detect_suspicious_patterns(self, contractor_id: str) -> list[dict[str, Any]]:
         """Detect suspicious patterns for fraud detection."""
         query = """
         MATCH (c:Contractor {id: $contractor_id})
@@ -159,9 +153,7 @@ class GraphStore:
         ORDER BY comp.completion_date DESC
         LIMIT $limit
         """
-        return await self.execute(
-            query, {"contractor_id": contractor_id, "limit": limit}
-        )
+        return await self.execute(query, {"contractor_id": contractor_id, "limit": limit})
 
     async def recommend_contractors_by_network(
         self, building_id: str, category: str, limit: int = 5
@@ -197,23 +189,17 @@ class GraphStore:
     async def create_schema(self) -> None:
         """Create constraints and indexes for the graph schema."""
         constraints = [
-            "CREATE CONSTRAINT resident_id IF NOT EXISTS "
-            "FOR (r:Resident) REQUIRE r.id IS UNIQUE",
-            "CREATE CONSTRAINT building_id IF NOT EXISTS "
-            "FOR (b:Building) REQUIRE b.id IS UNIQUE",
+            "CREATE CONSTRAINT resident_id IF NOT EXISTS FOR (r:Resident) REQUIRE r.id IS UNIQUE",
+            "CREATE CONSTRAINT building_id IF NOT EXISTS FOR (b:Building) REQUIRE b.id IS UNIQUE",
             "CREATE CONSTRAINT contractor_id IF NOT EXISTS "
             "FOR (c:Contractor) REQUIRE c.id IS UNIQUE",
-            "CREATE CONSTRAINT offer_id IF NOT EXISTS "
-            "FOR (o:Offer) REQUIRE o.id IS UNIQUE",
+            "CREATE CONSTRAINT offer_id IF NOT EXISTS FOR (o:Offer) REQUIRE o.id IS UNIQUE",
         ]
 
         indexes = [
-            "CREATE INDEX contractor_region IF NOT EXISTS "
-            "FOR (c:Contractor) ON (c.regions)",
-            "CREATE INDEX building_region IF NOT EXISTS "
-            "FOR (b:Building) ON (b.region)",
-            "CREATE INDEX offer_status IF NOT EXISTS "
-            "FOR (o:Offer) ON (o.status)",
+            "CREATE INDEX contractor_region IF NOT EXISTS FOR (c:Contractor) ON (c.regions)",
+            "CREATE INDEX building_region IF NOT EXISTS FOR (b:Building) ON (b.region)",
+            "CREATE INDEX offer_status IF NOT EXISTS FOR (o:Offer) ON (o.status)",
         ]
 
         for stmt in constraints + indexes:

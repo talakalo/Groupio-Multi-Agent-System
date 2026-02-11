@@ -9,8 +9,10 @@ from src.agents.vetting import VettingAgent, THRESHOLDS, TRUST_WEIGHTS
 @pytest.fixture
 def vetting_agent():
     """Create a VettingAgent with mocked dependencies."""
-    with patch("src.agents.base.get_llm_client") as mock_llm, \
-         patch("src.agents.base.get_rag_pipeline") as mock_rag:
+    with (
+        patch("src.agents.base.get_llm_client") as mock_llm,
+        patch("src.agents.base.get_rag_pipeline") as mock_rag,
+    ):
         mock_llm.return_value = AsyncMock()
         mock_rag.return_value = AsyncMock()
 
@@ -104,9 +106,7 @@ async def test_vetting_agent_missing_contractor_id(vetting_agent, sample_agent_s
 async def test_vetting_agent_manual_review_escalates(vetting_agent, sample_agent_state):
     """Test that manual review triggers human escalation."""
     # Add contractor ID to state
-    sample_agent_state["actions_taken"] = [
-        {"details": {"entities": {"contractor_id": "con_004"}}}
-    ]
+    sample_agent_state["actions_taken"] = [{"details": {"entities": {"contractor_id": "con_004"}}}]
 
     vetting_agent._db.get_contractor_documents = AsyncMock(return_value=[])
     vetting_agent.llm_client.create_structured_output = AsyncMock(
@@ -124,9 +124,7 @@ async def test_vetting_agent_manual_review_escalates(vetting_agent, sample_agent
     vetting_agent._graph_store.detect_suspicious_patterns = AsyncMock(
         return_value={"suspicious": False}
     )
-    vetting_agent._graph_store.get_contractor_building_history = AsyncMock(
-        return_value=[]
-    )
+    vetting_agent._graph_store.get_contractor_building_history = AsyncMock(return_value=[])
     vetting_agent.rag.retrieve = AsyncMock(return_value=[])
     vetting_agent.llm_client.create_message = AsyncMock(
         return_value={

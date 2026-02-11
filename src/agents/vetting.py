@@ -142,16 +142,13 @@ class VettingAgent(BaseAgent):
         if decision == "manual_review":
             state["needs_human"] = True
             state["escalation_reason"] = (
-                f"Contractor {contractor_id} requires manual review "
-                f"(trust score: {trust_score})"
+                f"Contractor {contractor_id} requires manual review (trust score: {trust_score})"
             )
 
         self._metrics["calls"] += 1
         return state
 
-    async def _get_documents(
-        self, contractor_id: str
-    ) -> list[dict[str, Any]]:
+    async def _get_documents(self, contractor_id: str) -> list[dict[str, Any]]:
         """Retrieve contractor documents from database."""
         try:
             return await self._db.get_contractor_documents(contractor_id)
@@ -210,24 +207,18 @@ class VettingAgent(BaseAgent):
 
         return result
 
-    async def _analyze_reputation(
-        self, contractor_id: str
-    ) -> dict[str, Any]:
+    async def _analyze_reputation(self, contractor_id: str) -> dict[str, Any]:
         """Analyze contractor reputation from graph and vector data."""
         # Graph-based reputation
         try:
-            graph_rep = await self._graph_store.get_contractor_reputation(
-                contractor_id
-            )
+            graph_rep = await self._graph_store.get_contractor_reputation(contractor_id)
         except Exception:
             logger.exception("Graph reputation query failed")
             graph_rep = {}
 
         # Check for suspicious patterns
         try:
-            suspicious = await self._graph_store.detect_suspicious_patterns(
-                contractor_id
-            )
+            suspicious = await self._graph_store.detect_suspicious_patterns(contractor_id)
         except Exception:
             suspicious = {}
 
@@ -248,19 +239,12 @@ class VettingAgent(BaseAgent):
             else 0.5,
         }
 
-    async def _get_performance_history(
-        self, contractor_id: str
-    ) -> dict[str, Any]:
+    async def _get_performance_history(self, contractor_id: str) -> dict[str, Any]:
         """Get contractor performance history from graph."""
         try:
-            history = await self._graph_store.get_contractor_building_history(
-                contractor_id
-            )
+            history = await self._graph_store.get_contractor_building_history(contractor_id)
             total = len(history)
-            successful = sum(
-                1 for h in history
-                if h.get("success_rate", 0) >= 0.8
-            )
+            successful = sum(1 for h in history if h.get("success_rate", 0) >= 0.8)
             return {
                 "total_projects": total,
                 "completion_rate": successful / total if total > 0 else 0,
@@ -284,9 +268,7 @@ class VettingAgent(BaseAgent):
         scores["insurance_valid"] = 1.0 if validations.get("insurance_valid") else 0.0
 
         # Reputation (0-1)
-        scores["online_reputation_score"] = reputation.get(
-            "online_reputation_score", 0.5
-        )
+        scores["online_reputation_score"] = reputation.get("online_reputation_score", 0.5)
 
         # History (0-1)
         scores["completion_rate"] = history.get("completion_rate", 0.5)
@@ -297,10 +279,7 @@ class VettingAgent(BaseAgent):
         scores["years_in_business"] = min(years / 10, 1.0)
 
         # Weighted sum
-        total = sum(
-            scores.get(key, 0.5) * weight
-            for key, weight in TRUST_WEIGHTS.items()
-        )
+        total = sum(scores.get(key, 0.5) * weight for key, weight in TRUST_WEIGHTS.items())
 
         # Penalties for suspicious patterns
         suspicious = reputation.get("suspicious_patterns", {})

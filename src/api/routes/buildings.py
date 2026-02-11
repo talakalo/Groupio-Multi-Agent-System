@@ -122,7 +122,10 @@ async def update_building(
         raise HTTPException(status_code=404, detail="Building not found")
 
     # Only admin of building or system admin can update
-    if building.get("admin_user_id") != current_user.id and current_user.role not in ("admin", "super_admin"):
+    if building.get("admin_user_id") != current_user.id and current_user.role not in (
+        "admin",
+        "super_admin",
+    ):
         raise HTTPException(status_code=403, detail="Not authorized")
 
     update_data = request.model_dump(exclude_unset=True)
@@ -174,7 +177,10 @@ async def get_building_residents(
         raise HTTPException(status_code=404, detail="Building not found")
 
     # Only building admin or system admin can see all residents
-    if building.get("admin_user_id") != current_user.id and current_user.role not in ("admin", "super_admin"):
+    if building.get("admin_user_id") != current_user.id and current_user.role not in (
+        "admin",
+        "super_admin",
+    ):
         is_resident = await db.is_user_in_building(current_user.id, building_id)
         if not is_resident:
             raise HTTPException(status_code=403, detail="Not authorized")
@@ -240,7 +246,10 @@ async def remove_resident(
 
     # Can remove self or building admin can remove others
     if user_id != current_user.id:
-        if building.get("admin_user_id") != current_user.id and current_user.role not in ("admin", "super_admin"):
+        if building.get("admin_user_id") != current_user.id and current_user.role not in (
+            "admin",
+            "super_admin",
+        ):
             raise HTTPException(status_code=403, detail="Not authorized")
 
     # Cannot remove building admin
@@ -326,7 +335,10 @@ async def invite_residents(
     if not building:
         raise HTTPException(status_code=404, detail="Building not found")
 
-    if building.get("admin_user_id") != current_user.id and current_user.role not in ("admin", "super_admin"):
+    if building.get("admin_user_id") != current_user.id and current_user.role not in (
+        "admin",
+        "super_admin",
+    ):
         raise HTTPException(status_code=403, detail="Not authorized")
 
     # In production, send invitation emails

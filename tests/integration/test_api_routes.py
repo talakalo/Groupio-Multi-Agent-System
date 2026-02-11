@@ -42,11 +42,12 @@ class TestHealthEndpoint:
 
     def test_health_check_all_healthy(self, client):
         """Test health check when all services are healthy."""
-        with patch("src.databases.vector_store.get_vector_store") as mock_vs, \
-             patch("src.databases.graph_store.get_graph_store") as mock_gs, \
-             patch("src.databases.redis_client.get_redis_client") as mock_redis, \
-             patch("src.databases.postgres.get_postgres_client") as mock_db:
-
+        with (
+            patch("src.databases.vector_store.get_vector_store") as mock_vs,
+            patch("src.databases.graph_store.get_graph_store") as mock_gs,
+            patch("src.databases.redis_client.get_redis_client") as mock_redis,
+            patch("src.databases.postgres.get_postgres_client") as mock_db,
+        ):
             mock_vs.return_value.health_check = AsyncMock(return_value=True)
             mock_gs.return_value.health_check = AsyncMock(return_value=True)
             mock_redis.return_value.health_check = AsyncMock(return_value=True)
@@ -60,11 +61,12 @@ class TestHealthEndpoint:
 
     def test_health_check_degraded(self, client):
         """Test health check when some services are unhealthy."""
-        with patch("src.databases.vector_store.get_vector_store") as mock_vs, \
-             patch("src.databases.graph_store.get_graph_store") as mock_gs, \
-             patch("src.databases.redis_client.get_redis_client") as mock_redis, \
-             patch("src.databases.postgres.get_postgres_client") as mock_db:
-
+        with (
+            patch("src.databases.vector_store.get_vector_store") as mock_vs,
+            patch("src.databases.graph_store.get_graph_store") as mock_gs,
+            patch("src.databases.redis_client.get_redis_client") as mock_redis,
+            patch("src.databases.postgres.get_postgres_client") as mock_db,
+        ):
             mock_vs.return_value.health_check = AsyncMock(return_value=True)
             mock_gs.return_value.health_check = AsyncMock(return_value=False)
             mock_redis.return_value.health_check = AsyncMock(return_value=True)
@@ -82,15 +84,18 @@ class TestMessageEndpoint:
 
     def test_send_message_success(self, client, mock_db):
         """Test successful message processing."""
-        with patch("src.databases.redis_client.get_redis_client") as mock_redis, \
-             patch("src.orchestration.graph.get_orchestrator") as mock_orch:
-
+        with (
+            patch("src.databases.redis_client.get_redis_client") as mock_redis,
+            patch("src.orchestration.graph.get_orchestrator") as mock_orch,
+        ):
             mock_redis.return_value.check_rate_limit = AsyncMock(return_value=True)
-            mock_orch.return_value.run = AsyncMock(return_value={
-                "conversation_id": "conv-123",
-                "response": {"message": "Hello!"},
-                "metadata": {"agent": "support"},
-            })
+            mock_orch.return_value.run = AsyncMock(
+                return_value={
+                    "conversation_id": "conv-123",
+                    "response": {"message": "Hello!"},
+                    "metadata": {"agent": "support"},
+                }
+            )
             mock_db.log_conversation = AsyncMock()
 
             response = client.post(
@@ -176,10 +181,11 @@ class TestOffersAPI:
         mock_db.is_user_in_building = AsyncMock(return_value=True)
         mock_db.create_offer = AsyncMock(return_value=MagicMock(**mock_offer))
 
-        with patch("src.api.middleware.auth.get_current_user") as mock_auth, \
-             patch("src.rag.embeddings.get_embedding_client") as mock_embed, \
-             patch("src.databases.vector_store.get_vector_store") as mock_vs:
-
+        with (
+            patch("src.api.middleware.auth.get_current_user") as mock_auth,
+            patch("src.rag.embeddings.get_embedding_client") as mock_embed,
+            patch("src.databases.vector_store.get_vector_store") as mock_vs,
+        ):
             mock_auth.return_value = MagicMock(id="user-123", role="resident")
             mock_embed.return_value.embed_text = AsyncMock(return_value=[0.1] * 1536)
             mock_vs.return_value.upsert = AsyncMock()
@@ -258,15 +264,17 @@ class TestAuthAPI:
         """Test successful registration."""
         mock_db.get_user_by_email = AsyncMock(return_value=None)
         mock_db.get_user_by_phone = AsyncMock(return_value=None)
-        mock_db.create_user = AsyncMock(return_value=MagicMock(
-            id="user-123",
-            email="test@example.com",
-            full_name="Test User",
-            phone="0501234567",
-            role="resident",
-            is_active=True,
-            is_verified=False,
-        ))
+        mock_db.create_user = AsyncMock(
+            return_value=MagicMock(
+                id="user-123",
+                email="test@example.com",
+                full_name="Test User",
+                phone="0501234567",
+                role="resident",
+                is_active=True,
+                is_verified=False,
+            )
+        )
 
         response = client.post(
             "/api/v1/auth/register",
@@ -300,12 +308,14 @@ class TestAuthAPI:
 
     def test_login_success(self, client, mock_db):
         """Test successful login."""
-        mock_db.get_user_by_email = AsyncMock(return_value=MagicMock(
-            id="user-123",
-            email="test@example.com",
-            role="resident",
-            is_active=True,
-        ))
+        mock_db.get_user_by_email = AsyncMock(
+            return_value=MagicMock(
+                id="user-123",
+                email="test@example.com",
+                role="resident",
+                is_active=True,
+            )
+        )
 
         with patch("src.api.middleware.auth.verify_password") as mock_verify:
             mock_verify.return_value = True
@@ -343,12 +353,14 @@ class TestAuthAPI:
 
     def test_login_json_success(self, client, mock_db):
         """Test successful login with JSON body (web app uses this)."""
-        mock_db.get_user_by_email = AsyncMock(return_value=MagicMock(
-            id="user-123",
-            email="test@example.com",
-            role="resident",
-            is_active=True,
-        ))
+        mock_db.get_user_by_email = AsyncMock(
+            return_value=MagicMock(
+                id="user-123",
+                email="test@example.com",
+                role="resident",
+                is_active=True,
+            )
+        )
         with patch("src.api.middleware.auth.verify_password") as mock_verify:
             mock_verify.return_value = True
             mock_db.get_user_password_hash = AsyncMock(return_value="hashed")
@@ -416,10 +428,12 @@ class TestEscalationsAPI:
     def test_resolve_escalation(self, client, mock_db, mock_escalation):
         """Test resolving an escalation."""
         mock_db.get_escalation = AsyncMock(return_value=mock_escalation)
-        mock_db.update_escalation = AsyncMock(return_value={
-            **mock_escalation,
-            "status": "resolved",
-        })
+        mock_db.update_escalation = AsyncMock(
+            return_value={
+                **mock_escalation,
+                "status": "resolved",
+            }
+        )
 
         with patch("src.api.middleware.auth.get_current_user") as mock_auth:
             mock_auth.return_value = MagicMock(id="admin-123", role="admin")

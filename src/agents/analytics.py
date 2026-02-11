@@ -144,9 +144,7 @@ class AnalyticsAgent(BaseAgent):
         self._metrics["calls"] += 1
         return state
 
-    async def _handle_sql_query(
-        self, question: str, state: AgentState
-    ) -> dict[str, Any]:
+    async def _handle_sql_query(self, question: str, state: AgentState) -> dict[str, Any]:
         """Convert NL to SQL, execute, and explain results."""
         try:
             sql = await self._nl_to_sql.generate_sql(question)
@@ -179,9 +177,7 @@ class AnalyticsAgent(BaseAgent):
                 "details": {"error": str(e)},
             }
 
-    async def _handle_trend_analysis(
-        self, topic: str, state: AgentState
-    ) -> dict[str, Any]:
+    async def _handle_trend_analysis(self, topic: str, state: AgentState) -> dict[str, Any]:
         """Analyze trends using RAG on conversation data."""
         # Search for relevant conversations
         conversations = await self._retrieve_context(
@@ -222,9 +218,7 @@ class AnalyticsAgent(BaseAgent):
             "details": {"topic": topic},
         }
 
-    async def _handle_general_analytics(
-        self, question: str, state: AgentState
-    ) -> dict[str, Any]:
+    async def _handle_general_analytics(self, question: str, state: AgentState) -> dict[str, Any]:
         """Handle general analytics questions."""
         response = await self._call_llm(
             messages=[
@@ -241,9 +235,7 @@ class AnalyticsAgent(BaseAgent):
             "details": {},
         }
 
-    async def _explain_results(
-        self, question: str, sql: str, results: list[dict]
-    ) -> str:
+    async def _explain_results(self, question: str, sql: str, results: list[dict]) -> str:
         """Generate a natural language explanation of query results."""
         response = await self._call_llm(
             messages=[
@@ -270,14 +262,34 @@ class AnalyticsAgent(BaseAgent):
         msg_lower = message.lower()
 
         sql_indicators = [
-            "how many", "what is", "average", "total", "count",
-            "list", "show", "top", "bottom", "highest", "lowest",
-            "כמה", "מה", "ממוצע", "סך", "רשימה", "הכי",
+            "how many",
+            "what is",
+            "average",
+            "total",
+            "count",
+            "list",
+            "show",
+            "top",
+            "bottom",
+            "highest",
+            "lowest",
+            "כמה",
+            "מה",
+            "ממוצע",
+            "סך",
+            "רשימה",
+            "הכי",
         ]
 
         trend_indicators = [
-            "trend", "pattern", "over time", "changing",
-            "מגמה", "דפוס", "שינוי", "לאורך",
+            "trend",
+            "pattern",
+            "over time",
+            "changing",
+            "מגמה",
+            "דפוס",
+            "שינוי",
+            "לאורך",
         ]
 
         if any(kw in msg_lower for kw in trend_indicators):

@@ -79,11 +79,17 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
         response.headers["Access-Control-Allow-Credentials"] = "true"
     return response
 
+
 # CORS middleware - origins loaded from environment
 settings = get_settings()
 # Ensure localhost is always allowed for local development
 cors_origins = list(settings.CORS_ORIGINS)
-_dev_origins = ["http://localhost:3000", "http://localhost:3001", "http://127.0.0.1:3000", "http://127.0.0.1:3001"]
+_dev_origins = [
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:3001",
+]
 for origin in _dev_origins:
     if origin not in cors_origins:
         cors_origins.append(origin)

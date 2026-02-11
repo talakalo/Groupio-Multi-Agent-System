@@ -58,16 +58,18 @@ async def create_contractor(
         vs = get_vector_store()
         await vs.upsert(
             collection="contractors",
-            points=[{
-                "id": contractor_id,
-                "vector": embedding,
-                "payload": {
-                    "business_name": contractor.business_name,
-                    "categories": [c.value for c in contractor.categories],
-                    "regions": [r.value for r in contractor.regions],
-                    "trust_score": contractor.trust_score,
-                },
-            }],
+            points=[
+                {
+                    "id": contractor_id,
+                    "vector": embedding,
+                    "payload": {
+                        "business_name": contractor.business_name,
+                        "categories": [c.value for c in contractor.categories],
+                        "regions": [r.value for r in contractor.regions],
+                        "trust_score": contractor.trust_score,
+                    },
+                }
+            ],
         )
     except Exception as e:
         logger.warning("Failed to index contractor in vector DB: %s", e)
@@ -206,7 +208,10 @@ async def update_contractor(
         raise HTTPException(status_code=404, detail="Contractor not found")
 
     # Only the contractor or admin can update
-    if current_user.contractor_id != contractor_id and current_user.role not in ("admin", "super_admin"):
+    if current_user.contractor_id != contractor_id and current_user.role not in (
+        "admin",
+        "super_admin",
+    ):
         raise HTTPException(status_code=403, detail="Not authorized")
 
     update_data = request.model_dump(exclude_unset=True)
@@ -221,16 +226,18 @@ async def update_contractor(
         vs = get_vector_store()
         await vs.upsert(
             collection="contractors",
-            points=[{
-                "id": contractor_id,
-                "vector": embedding,
-                "payload": {
-                    "business_name": updated.business_name,
-                    "categories": [c.value for c in updated.categories],
-                    "regions": [r.value for r in updated.regions],
-                    "trust_score": updated.trust_score,
-                },
-            }],
+            points=[
+                {
+                    "id": contractor_id,
+                    "vector": embedding,
+                    "payload": {
+                        "business_name": updated.business_name,
+                        "categories": [c.value for c in updated.categories],
+                        "regions": [r.value for r in updated.regions],
+                        "trust_score": updated.trust_score,
+                    },
+                }
+            ],
         )
     except Exception as e:
         logger.warning("Failed to update contractor in vector DB: %s", e)
@@ -304,7 +311,10 @@ async def get_contractor_stats(
     current_user: UserInDB = Depends(get_current_user),
 ) -> ContractorStats:
     """Get contractor statistics (contractor or admin only)."""
-    if current_user.contractor_id != contractor_id and current_user.role not in ("admin", "super_admin"):
+    if current_user.contractor_id != contractor_id and current_user.role not in (
+        "admin",
+        "super_admin",
+    ):
         raise HTTPException(status_code=403, detail="Not authorized")
 
     db = get_postgres_client()
@@ -318,6 +328,7 @@ async def get_contractor_stats(
 
 
 # Admin routes
+
 
 @router.post("/{contractor_id}/verify")
 async def verify_contractor(
@@ -335,9 +346,12 @@ async def verify_contractor(
     if not contractor:
         raise HTTPException(status_code=404, detail="Contractor not found")
 
-    updated = await db.update_contractor(contractor_id, {
-        "verification_status": status,
-    })
+    updated = await db.update_contractor(
+        contractor_id,
+        {
+            "verification_status": status,
+        },
+    )
 
     return updated
 
@@ -369,9 +383,7 @@ async def recalculate_trust_score(
             user_message=f"Recalculate trust score for {contractor_id}",
             user_id="system",
         )
-        state["actions_taken"] = [{
-            "details": {"entities": {"contractor_id": contractor_id}}
-        }]
+        state["actions_taken"] = [{"details": {"entities": {"contractor_id": contractor_id}}}]
         result = await vetting_agent.run(state)
         new_score = result.get("trust_score", contractor.trust_score)
 

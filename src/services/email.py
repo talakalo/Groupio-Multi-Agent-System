@@ -20,9 +20,7 @@ class EmailService:
     def _is_configured(self) -> bool:
         """Check if email service is properly configured."""
         return bool(
-            self.settings.SMTP_HOST
-            and self.settings.SMTP_USER
-            and self.settings.SMTP_PASSWORD
+            self.settings.SMTP_HOST and self.settings.SMTP_USER and self.settings.SMTP_PASSWORD
         )
 
     async def send_email(

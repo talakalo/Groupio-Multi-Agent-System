@@ -30,17 +30,13 @@ class RedisClient:
 
     # -- Conversation Memory --
 
-    async def get_conversation_context(
-        self, user_id: str
-    ) -> list[dict[str, Any]]:
+    async def get_conversation_context(self, user_id: str) -> list[dict[str, Any]]:
         """Get recent conversation history for a user."""
         key = f"conv:{user_id}"
         messages = await self._redis.lrange(key, 0, self._context_window - 1)
         return [json.loads(msg) for msg in messages]
 
-    async def add_conversation_message(
-        self, user_id: str, message: dict[str, Any]
-    ) -> None:
+    async def add_conversation_message(self, user_id: str, message: dict[str, Any]) -> None:
         """Add a message to conversation history."""
         key = f"conv:{user_id}"
         await self._redis.lpush(key, json.dumps(message, default=str))
@@ -62,9 +58,7 @@ class RedisClient:
         value = await self._redis.get(f"cache:{key}")
         return json.loads(value) if value else None
 
-    async def cache_set(
-        self, key: str, value: Any, ttl: int = 3600
-    ) -> None:
+    async def cache_set(self, key: str, value: Any, ttl: int = 3600) -> None:
         """Set a cached value with TTL."""
         await self._redis.set(
             f"cache:{key}",
@@ -78,9 +72,7 @@ class RedisClient:
 
     # -- Rate Limiting --
 
-    async def check_rate_limit(
-        self, user_id: str, limit: int = 60, window: int = 60
-    ) -> bool:
+    async def check_rate_limit(self, user_id: str, limit: int = 60, window: int = 60) -> bool:
         """Check if a user has exceeded their rate limit.
 
         Returns True if the request is allowed, False if rate limited.
@@ -110,9 +102,7 @@ class RedisClient:
         key = f"ab_test:{campaign_id}:{variant}"
         await self._redis.hincrby(key, outcome, 1)
 
-    async def ab_test_get_results(
-        self, campaign_id: str, variant: str
-    ) -> dict[str, int]:
+    async def ab_test_get_results(self, campaign_id: str, variant: str) -> dict[str, int]:
         """Get A/B test results for a variant."""
         key = f"ab_test:{campaign_id}:{variant}"
         results = await self._redis.hgetall(key)
@@ -131,9 +121,7 @@ class RedisClient:
             ex=ttl,
         )
 
-    async def get_agent_state(
-        self, conversation_id: str
-    ) -> dict[str, Any] | None:
+    async def get_agent_state(self, conversation_id: str) -> dict[str, Any] | None:
         """Get agent state for a conversation."""
         key = f"agent_state:{conversation_id}"
         value = await self._redis.get(key)
@@ -141,9 +129,7 @@ class RedisClient:
 
     # -- Raw key-value (for auth tokens, etc.) --
 
-    async def set(
-        self, key: str, value: str, ex: int | None = None
-    ) -> None:
+    async def set(self, key: str, value: str, ex: int | None = None) -> None:
         """Set a key-value pair with optional TTL."""
         if ex is not None:
             await self._redis.set(key, value, ex=ex)
