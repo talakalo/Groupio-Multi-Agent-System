@@ -1,7 +1,6 @@
 """Router Agent for intent classification and routing."""
 
 import logging
-from typing import Any
 
 from src.agents.base import AgentConfig, BaseAgent
 from src.config.prompts.router import ROUTER_SYSTEM_PROMPT

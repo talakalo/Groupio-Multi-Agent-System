@@ -9,7 +9,6 @@ from pydantic import BaseModel, Field
 from src.models.agent_state import AgentState
 from src.rag.pipeline import get_rag_pipeline
 from src.utils.llm_client import get_llm_client
-from src.utils.monitoring import track_agent_execution
 
 logger = logging.getLogger(__name__)
 

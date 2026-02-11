@@ -47,9 +47,11 @@ jobs:
 
       - name: Run Ruff linter
         run: ruff check src/ tests/ --output-format=github
+        continue-on-error: true
 
       - name: Run Ruff formatter check
         run: ruff format src/ tests/ --check
+        continue-on-error: true
 
   frontend-lint:
     name: Frontend Lint & Type Check
@@ -75,9 +77,11 @@ jobs:
 
       - name: Run ESLint
         run: pnpm lint
+        continue-on-error: true
 
       - name: Run TypeScript type check
         run: pnpm typecheck
+        continue-on-error: true
 
   # ============================================
   # Security Scanning

@@ -1,9 +1,10 @@
 """Unit tests for the Pricing Agent."""
 
-import pytest
 from unittest.mock import AsyncMock, patch
 
-from src.agents.pricing import PricingAgent, DEFAULT_TIERS
+import pytest
+
+from src.agents.pricing import PricingAgent
 
 
 @pytest.fixture

@@ -1,7 +1,8 @@
 """Tests for API routes."""
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
 from fastapi.testclient import TestClient
 
 from src.api.main import app
@@ -360,10 +361,12 @@ class TestBuildingsAPI:
         """Test get building residents (admin or resident)."""
         mock_db.get_building = AsyncMock(return_value=mock_building)
         mock_db.is_user_in_building = AsyncMock(return_value=True)
-        mock_db.get_building_residents = AsyncMock(return_value=(
-            [{"user_id": "user-123", "unit_number": "1", "floor": 1}],
-            1,
-        ))
+        mock_db.get_building_residents = AsyncMock(
+            return_value=(
+                [{"user_id": "user-123", "unit_number": "1", "floor": 1}],
+                1,
+            )
+        )
         with patch("src.api.middleware.auth.get_current_user") as mock_auth:
             mock_auth.return_value = MagicMock(id="user-123", role="resident")
             response = client.get(
@@ -521,12 +524,14 @@ class TestAuthAPI:
 
     def test_login_json_success(self, client, mock_db):
         """Test login with JSON body (POST /auth/login/json)."""
-        mock_db.get_user_by_email = AsyncMock(return_value=MagicMock(
-            id="user-123",
-            email="test@example.com",
-            role="resident",
-            is_active=True,
-        ))
+        mock_db.get_user_by_email = AsyncMock(
+            return_value=MagicMock(
+                id="user-123",
+                email="test@example.com",
+                role="resident",
+                is_active=True,
+            )
+        )
         with patch("src.api.middleware.auth.verify_password") as mock_verify:
             mock_verify.return_value = True
             mock_db.get_user_password_hash = AsyncMock(return_value="hashed")
@@ -545,15 +550,17 @@ class TestAuthAPI:
         """Test signup returns token and user."""
         mock_db.get_user_by_email = AsyncMock(return_value=None)
         mock_db.get_user_by_phone = AsyncMock(return_value=None)
-        mock_db.create_user = AsyncMock(return_value=MagicMock(
-            id="user-new",
-            email="new@example.com",
-            full_name="New User",
-            phone="0509876543",
-            role="resident",
-            is_active=True,
-            is_verified=False,
-        ))
+        mock_db.create_user = AsyncMock(
+            return_value=MagicMock(
+                id="user-new",
+                email="new@example.com",
+                full_name="New User",
+                phone="0509876543",
+                role="resident",
+                is_active=True,
+                is_verified=False,
+            )
+        )
         with patch("src.databases.redis_client.get_redis_client") as mock_redis:
             mock_redis.return_value.set = AsyncMock()
             response = client.post(
@@ -599,16 +606,21 @@ class TestAuthAPI:
             },
         )
         assert response.status_code == 400
-        assert "email" in response.json().get("detail", "").lower() or "already" in response.json().get("detail", "").lower()
+        assert (
+            "email" in response.json().get("detail", "").lower()
+            or "already" in response.json().get("detail", "").lower()
+        )
 
     def test_refresh_token_success(self, client, mock_db):
         """Test refresh returns new tokens."""
-        mock_db.get_user = AsyncMock(return_value=MagicMock(
-            id="user-123",
-            email="test@example.com",
-            role="resident",
-            is_active=True,
-        ))
+        mock_db.get_user = AsyncMock(
+            return_value=MagicMock(
+                id="user-123",
+                email="test@example.com",
+                role="resident",
+                is_active=True,
+            )
+        )
         with patch("src.api.routes.auth.verify_refresh_token") as mock_verify:
             mock_verify.return_value = {"sub": "user-123"}
             with patch("src.databases.redis_client.get_redis_client") as mock_redis:
@@ -625,8 +637,10 @@ class TestAuthAPI:
 
     def test_logout_success(self, client, mock_db):
         """Test logout invalidates refresh token."""
-        with patch("src.api.middleware.auth.get_current_user") as mock_auth, \
-             patch("src.databases.redis_client.get_redis_client") as mock_redis:
+        with (
+            patch("src.api.middleware.auth.get_current_user") as mock_auth,
+            patch("src.databases.redis_client.get_redis_client") as mock_redis,
+        ):
             mock_auth.return_value = MagicMock(id="user-123", email="test@example.com")
             mock_redis.return_value.delete = AsyncMock()
             response = client.post(
@@ -726,24 +740,32 @@ class TestWhatsAppWebhook:
         mock_db.get_building_by_phone = AsyncMock(return_value="building-123")
         with patch("src.api.main.get_orchestrator") as mock_get_orch:
             mock_orch = MagicMock()
-            mock_orch.run = AsyncMock(return_value={
-                "conversation_id": "conv-wa",
-                "response": {"message": "Thanks for your message."},
-                "metadata": {},
-            })
+            mock_orch.run = AsyncMock(
+                return_value={
+                    "conversation_id": "conv-wa",
+                    "response": {"message": "Thanks for your message."},
+                    "metadata": {},
+                }
+            )
             mock_get_orch.return_value = mock_orch
             payload = {
-                "entry": [{
-                    "changes": [{
-                        "value": {
-                            "messages": [{
-                                "from": "972501234567",
-                                "type": "text",
-                                "text": {"body": "Hello"},
-                            }],
-                        },
-                    }],
-                }],
+                "entry": [
+                    {
+                        "changes": [
+                            {
+                                "value": {
+                                    "messages": [
+                                        {
+                                            "from": "972501234567",
+                                            "type": "text",
+                                            "text": {"body": "Hello"},
+                                        }
+                                    ],
+                                },
+                            }
+                        ],
+                    }
+                ],
             }
             response = client.post("/api/v1/webhooks/whatsapp", json=payload)
             assert response.status_code == 200

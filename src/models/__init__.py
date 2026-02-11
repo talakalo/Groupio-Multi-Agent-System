@@ -1,6 +1,31 @@
 """Data models for the Groupio Multi-Agent System."""
 
 from src.models.agent_state import AgentState
+
+# API models - Building
+from src.models.building import (
+    BuildingBase,
+    BuildingCreate,
+    BuildingResident,
+    BuildingResponse,
+    BuildingStats,
+    BuildingUpdate,
+)
+
+# API models - Contractor
+from src.models.contractor import (
+    ContractorBase,
+    ContractorResponse,
+    ContractorReview,
+    ContractorSearchRequest,
+    ContractorUpdate,
+    Region,
+    TrustScoreBreakdown,
+    VerificationStatus,
+)
+from src.models.contractor import (
+    ContractorCreate as ApiContractorCreate,
+)
 from src.models.contractors import (
     Contractor,
     ContractorCreate,
@@ -8,6 +33,19 @@ from src.models.contractors import (
     ContractorMatch,
     ContractorProfile,
     VettingResult,
+)
+
+# API models - Escalation
+from src.models.escalation import (
+    EscalationBase,
+    EscalationCreate,
+    EscalationPriority,
+    EscalationReason,
+    EscalationResponse,
+    EscalationSource,
+    EscalationStats,
+    EscalationStatus,
+    EscalationUpdate,
 )
 from src.models.messages import (
     AgentAction,
@@ -17,6 +55,23 @@ from src.models.messages import (
     Message,
     RouterResult,
     SupportTicket,
+)
+
+# API models - Offer
+from src.models.offer import (
+    OfferBase,
+    OfferInDB,
+    OfferListResponse,
+    OfferResponse,
+    OfferStatus,
+    OfferUpdate,
+    ServiceCategory,
+)
+from src.models.offer import (
+    OfferCreate as ApiOfferCreate,
+)
+from src.models.offer import (
+    PricingTier as ApiPricingTier,
 )
 from src.models.offers import (
     CompletedOffer,
@@ -35,63 +90,14 @@ from src.models.residents import (
 
 # API models - User
 from src.models.user import (
+    TokenPayload,
+    TokenResponse,
     UserBase,
     UserCreate,
-    UserUpdate,
     UserInDB,
     UserResponse,
     UserRole,
-    TokenResponse,
-    TokenPayload,
-)
-
-# API models - Offer
-from src.models.offer import (
-    OfferStatus,
-    ServiceCategory,
-    PricingTier as ApiPricingTier,
-    OfferBase,
-    OfferCreate as ApiOfferCreate,
-    OfferUpdate,
-    OfferResponse,
-    OfferListResponse,
-    OfferInDB,
-)
-
-# API models - Contractor
-from src.models.contractor import (
-    Region,
-    VerificationStatus,
-    TrustScoreBreakdown,
-    ContractorBase,
-    ContractorCreate as ApiContractorCreate,
-    ContractorUpdate,
-    ContractorResponse,
-    ContractorReview,
-    ContractorSearchRequest,
-)
-
-# API models - Building
-from src.models.building import (
-    BuildingBase,
-    BuildingCreate,
-    BuildingUpdate,
-    BuildingResponse,
-    BuildingResident,
-    BuildingStats,
-)
-
-# API models - Escalation
-from src.models.escalation import (
-    EscalationPriority,
-    EscalationStatus,
-    EscalationSource,
-    EscalationReason,
-    EscalationBase,
-    EscalationCreate,
-    EscalationUpdate,
-    EscalationResponse,
-    EscalationStats,
+    UserUpdate,
 )
 
 # Aliases for convenience

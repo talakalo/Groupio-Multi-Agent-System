@@ -1,7 +1,6 @@
 """Building API routes."""
 
 import logging
-from typing import Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -17,7 +16,7 @@ from src.models.building import (
     BuildingUpdate,
 )
 from src.models.contractor import Region
-from src.models.user import UserInDB, UserRole
+from src.models.user import UserInDB
 
 logger = logging.getLogger(__name__)
 
@@ -53,8 +52,8 @@ async def create_building(
 
 @router.get("/", response_model=BuildingListResponse)
 async def list_buildings(
-    city: Optional[str] = None,
-    region: Optional[Region] = None,
+    city: str | None = None,
+    region: Region | None = None,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     current_user: UserInDB = Depends(get_current_user),
@@ -286,7 +285,7 @@ async def get_building_stats(
 @router.get("/{building_id}/offers")
 async def get_building_offers(
     building_id: str,
-    status: Optional[str] = None,
+    status: str | None = None,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     current_user: UserInDB = Depends(get_current_user),

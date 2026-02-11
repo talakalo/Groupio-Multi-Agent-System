@@ -1,7 +1,6 @@
 """Contractor API routes."""
 
 import logging
-from typing import Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -22,7 +21,7 @@ from src.models.contractor import (
     VerificationStatus,
 )
 from src.models.offer import ServiceCategory
-from src.models.user import UserInDB, UserRole
+from src.models.user import UserInDB
 from src.rag.embeddings import get_embedding_client
 
 logger = logging.getLogger(__name__)
@@ -86,10 +85,10 @@ async def create_contractor(
 
 @router.get("/", response_model=ContractorListResponse)
 async def list_contractors(
-    category: Optional[ServiceCategory] = None,
-    region: Optional[Region] = None,
-    min_trust_score: Optional[float] = Query(None, ge=0, le=100),
-    verification_status: Optional[VerificationStatus] = None,
+    category: ServiceCategory | None = None,
+    region: Region | None = None,
+    min_trust_score: float | None = Query(None, ge=0, le=100),
+    verification_status: VerificationStatus | None = None,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
 ) -> ContractorListResponse:
@@ -372,8 +371,8 @@ async def recalculate_trust_score(
         raise HTTPException(status_code=404, detail="Contractor not found")
 
     # Trigger vetting agent
-    from src.orchestration.graph import get_orchestrator
     from src.models.agent_state import create_initial_state
+    from src.orchestration.graph import get_orchestrator
 
     orchestrator = get_orchestrator()
     vetting_agent = orchestrator.agents.get("vetting")

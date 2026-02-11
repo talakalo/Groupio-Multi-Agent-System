@@ -2,7 +2,6 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -35,10 +34,10 @@ class UserCreate(UserBase):
 class UserUpdate(BaseModel):
     """Update user request."""
 
-    full_name: Optional[str] = Field(None, min_length=2, max_length=100)
-    phone: Optional[str] = Field(None, pattern=r"^0\d{8,9}$")
-    preferred_language: Optional[str] = Field(None, pattern=r"^(he|en)$")
-    avatar_url: Optional[str] = None
+    full_name: str | None = Field(None, min_length=2, max_length=100)
+    phone: str | None = Field(None, pattern=r"^0\d{8,9}$")
+    preferred_language: str | None = Field(None, pattern=r"^(he|en)$")
+    avatar_url: str | None = None
 
 
 class UserInDB(UserBase):
@@ -48,10 +47,10 @@ class UserInDB(UserBase):
     role: UserRole
     is_active: bool = True
     is_verified: bool = False
-    avatar_url: Optional[str] = None
-    building_id: Optional[str] = None
-    contractor_id: Optional[str] = None
-    last_login: Optional[datetime] = None
+    avatar_url: str | None = None
+    building_id: str | None = None
+    contractor_id: str | None = None
+    last_login: datetime | None = None
     created_at: datetime
     updated_at: datetime
 

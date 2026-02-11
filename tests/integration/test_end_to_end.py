@@ -1,9 +1,8 @@
 """Integration test for the end-to-end message flow."""
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
-from src.models.agent_state import AgentState
+import pytest
 
 
 @pytest.fixture

@@ -1,9 +1,10 @@
 """Unit tests for the Matching Agent."""
 
-import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, patch
 
-from src.agents.matching import MatchingAgent, MATCH_WEIGHTS
+import pytest
+
+from src.agents.matching import MATCH_WEIGHTS, MatchingAgent
 
 
 @pytest.fixture

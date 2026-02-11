@@ -1,7 +1,6 @@
 """Building Pydantic models."""
 
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -17,7 +16,7 @@ class BuildingBase(BaseModel):
     region: Region
     total_units: int = Field(..., ge=1)
     floors: int = Field(..., ge=1)
-    year_built: Optional[int] = Field(None, ge=1900, le=2030)
+    year_built: int | None = Field(None, ge=1900, le=2030)
 
 
 class BuildingCreate(BuildingBase):
@@ -29,10 +28,10 @@ class BuildingCreate(BuildingBase):
 class BuildingUpdate(BaseModel):
     """Update building request."""
 
-    name: Optional[str] = Field(None, min_length=2, max_length=200)
-    address: Optional[str] = Field(None, min_length=5, max_length=500)
-    total_units: Optional[int] = Field(None, ge=1)
-    floors: Optional[int] = Field(None, ge=1)
+    name: str | None = Field(None, min_length=2, max_length=200)
+    address: str | None = Field(None, min_length=5, max_length=500)
+    total_units: int | None = Field(None, ge=1)
+    floors: int | None = Field(None, ge=1)
 
 
 class BuildingInDB(BuildingBase):
@@ -44,7 +43,7 @@ class BuildingInDB(BuildingBase):
     active_offers: int = 0
     completed_offers: int = 0
     total_savings: float = 0
-    whatsapp_group_id: Optional[str] = None
+    whatsapp_group_id: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -55,7 +54,7 @@ class BuildingInDB(BuildingBase):
 class BuildingResponse(BuildingInDB):
     """Building response model."""
 
-    admin_name: Optional[str] = None
+    admin_name: str | None = None
 
 
 class BuildingListResponse(BaseModel):
@@ -90,4 +89,4 @@ class BuildingStats(BaseModel):
     completed_offers: int = 0
     total_savings: float = 0
     average_discount: float = 0
-    most_popular_category: Optional[str] = None
+    most_popular_category: str | None = None
