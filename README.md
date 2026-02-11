@@ -106,24 +106,15 @@ alembic upgrade head
 uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### Frontend Setup
+### Frontend
 
 ```bash
-# Install dependencies
 pnpm install
-
-# Copy environment files
 cp apps/web/.env.example apps/web/.env.local
 cp apps/admin/.env.example apps/admin/.env.local
 cp apps/mobile/.env.example apps/mobile/.env.local
-
-# Run all apps in development
 pnpm dev
-
-# Or run individual apps
-pnpm --filter web dev      # http://localhost:3000
-pnpm --filter admin dev    # http://localhost:3001
-pnpm --filter mobile start # Expo DevTools
+# Web: http://localhost:3000  |  Admin: http://localhost:3001  |  Mobile: pnpm --filter mobile start
 ```
 
 ## AI Agents

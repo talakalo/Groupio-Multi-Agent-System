@@ -12,17 +12,20 @@ import {
   type MetricsResponse,
   type EscalationsResponse,
   type HealthStatus,
+  type ContractorsListResponse,
 } from "@groupio/api-client";
 
 // ---- Client Singleton ----
 
 let apiClient: GroupioApiClient | undefined;
 
-function getApiClient(): GroupioApiClient {
+function getApiClient(authToken?: string | null): GroupioApiClient {
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? "/api/v1";
+  if (authToken != null) {
+    return new GroupioApiClient({ baseUrl, authToken });
+  }
   if (!apiClient) {
-    apiClient = new GroupioApiClient({
-      baseUrl: process.env.NEXT_PUBLIC_API_URL ?? "/api/v1",
-    });
+    apiClient = new GroupioApiClient({ baseUrl });
   }
   return apiClient;
 }
@@ -217,14 +220,26 @@ export function useResolveEscalation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (escalationId: string) => {
+    mutationFn: async ({
+      escalationId,
+      resolution_notes,
+    }: {
+      escalationId: string;
+      resolution_notes?: string;
+    }) => {
       const base = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "") || "/api/v1";
       const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (token) headers["Authorization"] = `Bearer ${token}`;
       const response = await fetch(
         `${base}/escalations/${escalationId}/resolve`,
-        { method: "POST", headers }
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify(
+            resolution_notes != null ? { resolution_notes } : {}
+          ),
+        }
       );
       if (!response.ok) throw new Error("Failed to resolve escalation");
       return response.json();
@@ -433,12 +448,16 @@ export interface ContractorListItem {
 function mapContractorToListItem(c: {
   id: string;
   business_name?: string;
+  businessName?: string;
   average_rating?: number;
   verification_status?: string;
+  verified?: boolean;
+  trust_score?: number;
+  rating?: number;
   categories?: string[] | { value?: string }[];
   regions?: string[] | { value?: string }[];
-  email?: string;
   phone?: string;
+  email?: string;
 }): ContractorListItem {
   const categories = Array.isArray(c.categories)
     ? c.categories.map((x) => (typeof x === "string" ? x : (x as { value?: string }).value ?? ""))
@@ -448,9 +467,9 @@ function mapContractorToListItem(c: {
     : [];
   return {
     id: c.id,
-    businessName: c.business_name ?? "",
-    verified: c.verification_status === "verified",
-    rating: c.average_rating ?? 0,
+    businessName: c.business_name ?? c.businessName ?? "",
+    verified: c.verified ?? c.verification_status === "verified",
+    rating: c.rating ?? c.average_rating ?? c.trust_score ?? 0,
     categories,
     regions,
     phone: c.phone,
@@ -458,7 +477,27 @@ function mapContractorToListItem(c: {
   };
 }
 
-const MOCK_CONTRACTORS: ContractorListItem[] = [
+export function useContractors(filters?: {
+  verified?: boolean;
+  category?: string;
+  region?: string;
+}) {
+  return useQuery<ContractorListItem[]>({
+    queryKey: [...queryKeys.contractors, filters],
+    queryFn: async (): Promise<ContractorListItem[]> => {
+      const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
+      try {
+        const client = getApiClient(token ?? undefined);
+        const res = await client.getContractors({
+          category: filters?.category,
+          region: filters?.region,
+          verification_status: filters?.verified === true ? "verified" : filters?.verified === false ? "pending" : undefined,
+        });
+        return (res.items ?? []).map(mapContractorToListItem);
+      } catch {
+        // Fallback mock data when API is unavailable or unauth
+      }
+      const contractors: ContractorListItem[] = [
         {
           id: "c-001",
           businessName: "Aviv AC Solutions",
@@ -535,23 +574,7 @@ const MOCK_CONTRACTORS: ContractorListItem[] = [
           regions: ["center", "sharon", "shfela"],
         },
       ];
-
-  return useQuery<ContractorListItem[]>({
-    queryKey: [...queryKeys.contractors, filters],
-    queryFn: async (): Promise<ContractorListItem[]> => {
-      const client = getApiClient();
-      try {
-        const res = await client.getContractors({
-          verification_status: filters?.verified === true ? "verified" : filters?.verified === false ? "pending" : undefined,
-          category: filters?.category,
-          region: filters?.region,
-        });
-        return res.items.map(mapContractorToListItem);
-      } catch {
-        // Fallback to mock when API is unavailable
-      }
-      let filtered = MOCK_CONTRACTORS;
-
+      let filtered = contractors;
       if (filters?.verified !== undefined) {
         filtered = filtered.filter((c) => c.verified === filters.verified);
       }

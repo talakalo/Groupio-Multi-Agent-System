@@ -31,6 +31,12 @@ http://localhost:8000/api/v1
 
 ---
 
+## Pagination
+
+List endpoints (e.g. offers, contractors, escalations) use query params: `page` (default 1), `page_size` (default 20, max 100). Response shape: `{ "items", "total", "page", "page_size", "has_more" }`.
+
+---
+
 ## Auth endpoints
 
 ### POST /api/v1/auth/signup
@@ -144,9 +150,13 @@ Handle incoming WhatsApp messages.
 
 ---
 
+### GET /api/v1/health/live
+
+Liveness probe (no DB). Returns `{"status": "ok"}`. Use for k8s liveness.
+
 ### GET /api/v1/health
 
-Health check for all services.
+Readiness: health check for all services (vector_db, graph_db, redis, postgres). Use for k8s readiness.
 
 **Response** (200):
 ```json
@@ -186,6 +196,10 @@ Detailed system status (admin only).
 ### GET /api/v1/admin/metrics
 
 Prometheus-compatible metrics.
+
+### GET /api/v1/admin/analytics
+
+Dashboard analytics (admin only). Returns counts: open_tickets, total_contractors, gmv_today, active_offers, etc.
 
 ---
 
@@ -245,3 +259,10 @@ Hot-reload an agent's configuration (admin).
   "detail": "Error description"
 }
 ```
+
+---
+
+## Operations
+
+- **CORS**: Configure allowed origins for production (e.g. web and admin domains). See backend CORS middleware in `src/api/main.py`.
+- **Feature flags**: Environment variables such as `ENABLE_WEB_SEARCH` control optional features; document in LOCAL_SETUP or env example.

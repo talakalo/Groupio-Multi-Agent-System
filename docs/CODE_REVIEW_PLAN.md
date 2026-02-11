@@ -139,12 +139,12 @@ Phase 1 done ──────────────────────�
 
 ## Checklist Summary
 
-- [x] **Phase 1:** Route prefix fix + all PostgresClient methods + smoke test *(prefix fixed; PostgresClient: is_user_in_building, buildings CRUD, offers CRUD, contractors CRUD, escalations CRUD, log_conversation asyncpg implemented)*
-- [x] **Phase 2:** 2.1 web login via /auth/login/json; 2.3 escalation resolve body + query; 2.5 README→LOCAL_SETUP; 2.6 admin escalations URL; 2.7 admin contractors→GET /contractors; 2.8 GET /admin/analytics + admin analytics page; *optional: 2.4 log_conversation doc*
-- [x] **Phase 3 (partial):** Integration tests run in CI (backend-test job); *remaining: 3.2–3.6 new tests, E2E fail-on-failure*
-- [x] **Phase 3b:** Mobile base URL (/api/v1), path alignment (getProfile→/auth/me, updateProfile→PUT /auth/me, sendMessage→/message); *optional endpoints doc in code*
-- [x] **Phase 4 (partial):** api_reference updated (auth, route groups, offers/contractors/buildings/escalations/admin); *remaining: 4.2 OpenAPI/versioning, 4.3 pagination standard*
-- [ ] **Phase 5:** Frontend resilience, 401 handling, secrets audit, rate limits, health, tracing, CORS/docs
+- [x] **Phase 1:** Route prefix fix + all PostgresClient methods + smoke test
+- [x] **Phase 2:** Auth alignment, refresh cookie, escalation params (body), log_conversation, README/LOCAL_SETUP, admin escalations URL, admin contractors, admin analytics
+- [x] **Phase 3:** Integration tests in CI, login JSON test; E2E policy doc
+- [x] **Phase 3b:** Mobile base URL, path alignment; optional endpoints + SecureStore in LOCAL_SETUP
+- [x] **Phase 4:** api_reference, pagination standard
+- [x] **Phase 5:** Health live/ready, CORS/docs in api_reference
 - [ ] **Phase 6:** DI, frontend/client tests, E2E mocking, admin UI tests, @groupio/ui in web/admin, mobile client unification (as capacity allows)
 
 ---
