@@ -139,6 +139,25 @@ class RedisClient:
         value = await self._redis.get(key)
         return json.loads(value) if value else None
 
+    # -- Raw key-value (for auth tokens, etc.) --
+
+    async def set(
+        self, key: str, value: str, ex: int | None = None
+    ) -> None:
+        """Set a key-value pair with optional TTL."""
+        if ex is not None:
+            await self._redis.set(key, value, ex=ex)
+        else:
+            await self._redis.set(key, value)
+
+    async def get(self, key: str) -> str | None:
+        """Get a value by key."""
+        return await self._redis.get(key)
+
+    async def delete(self, key: str) -> None:
+        """Delete a key."""
+        await self._redis.delete(key)
+
     # -- Health --
 
     async def health_check(self) -> bool:

@@ -134,7 +134,7 @@ export default function EscalationsPage() {
   // ---- Action handlers ----
   const handleResolve = useCallback(
     (id: string) => {
-      resolveMutation.mutate(id);
+      resolveMutation.mutate({ escalationId: id });
     },
     [resolveMutation]
   );

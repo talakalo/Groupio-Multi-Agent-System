@@ -50,11 +50,14 @@ class ApiClient {
 
     if (!response.ok) {
       const errorBody = await response.json().catch(() => null);
-      throw new ApiError(
-        response.status,
-        errorBody?.detail || response.statusText,
-        errorBody
-      );
+      const detail = errorBody?.detail;
+      const message =
+        typeof detail === "string"
+          ? detail
+          : Array.isArray(detail)
+            ? detail.map((e: { msg?: string }) => e?.msg).filter(Boolean).join(", ") || response.statusText
+            : response.statusText;
+      throw new ApiError(response.status, message, errorBody);
     }
 
     return response.json();
@@ -127,19 +130,22 @@ class ApiClient {
   // ---- Auth endpoints ----
 
   async login(credentials: { email?: string; phone?: string; password: string }) {
-    return this.request<{ token: string; user: import("@groupio/types").Resident }>(
-      "/api/v1/auth/login",
-      {
-        method: "POST",
-        body: credentials,
-      }
-    );
+    const data = await this.request<{
+      access_token: string;
+      refresh_token?: string;
+      expires_in?: number;
+    }>("/api/v1/auth/login/json", {
+      method: "POST",
+      body: credentials,
+    });
+    return { token: data.access_token, ...data };
   }
 
   async signup(data: {
     name: string;
     email: string;
     phone: string;
+    password: string;
     role: "resident" | "contractor";
     buildingId?: string;
   }) {

@@ -87,14 +87,14 @@ export default function manifest(): MetadataRoute.Manifest {
         short_name: "הצעות",
         description: "צפייה בהצעות קבוצתיות פעילות",
         url: "/offers?status=active",
-        icons: [{ src: "/icons/offers.png", sizes: "96x96" }],
+        icons: [{ src: "/icons/icon-96x96.png", sizes: "96x96" }],
       },
       {
         name: "הבניין שלי",
         short_name: "בניין",
         description: "ניהול הבניין והדיירים",
         url: "/building",
-        icons: [{ src: "/icons/building.png", sizes: "96x96" }],
+        icons: [{ src: "/icons/icon-96x96.png", sizes: "96x96" }],
       },
     ],
     related_applications: [

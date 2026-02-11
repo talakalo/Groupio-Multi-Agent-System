@@ -4,8 +4,9 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from src.api.middleware.auth import get_admin_user, verify_api_key
@@ -18,6 +19,7 @@ from src.databases.vector_store import get_vector_store
 from src.databases.graph_store import get_graph_store
 from src.orchestration.graph import get_orchestrator
 from src.rag.pipeline import get_rag_pipeline
+from src.api.routes import api_router
 from src.utils.monitoring import init_monitoring
 from src.utils.validators import sanitize_input, validate_message_request
 
@@ -62,18 +64,43 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Ensure CORS headers on error responses so browser shows real error, not CORS."""
+    logger.exception("Unhandled exception: %s", exc)
+    show_detail = get_settings().ENVIRONMENT == "development"
+    content = {"detail": str(exc) if show_detail else "Internal server error"}
+    response = JSONResponse(status_code=500, content=content)
+    # Add CORS headers so browser doesn't mask 500 as CORS error
+    origin = request.headers.get("origin")
+    if origin:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+    return response
+
 # CORS middleware - origins loaded from environment
 settings = get_settings()
+# Ensure localhost is always allowed for local development
+cors_origins = list(settings.CORS_ORIGINS)
+_dev_origins = ["http://localhost:3000", "http://localhost:3001", "http://127.0.0.1:3000", "http://127.0.0.1:3001"]
+for origin in _dev_origins:
+    if origin not in cors_origins:
+        cors_origins.append(origin)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-API-Key", "X-Request-ID"],
+    expose_headers=["Authorization"],
 )
 
 # Request logging middleware
 app.add_middleware(RequestLoggingMiddleware)
+
+# Include API routes (auth, offers, contractors, buildings, etc.)
+app.include_router(api_router, prefix="/api/v1")
 
 
 # -- Request/Response Models --
@@ -188,9 +215,15 @@ async def whatsapp_webhook(
         return {"status": "error"}
 
 
+@app.get("/api/v1/health/live")
+async def health_live() -> dict[str, str]:
+    """Liveness probe: process is up. No DB or external calls."""
+    return {"status": "ok"}
+
+
 @app.get("/api/v1/health")
 async def health_check() -> dict[str, Any]:
-    """Health check endpoint for all services."""
+    """Readiness probe: all services (DB, Redis, vector, graph) checked."""
     services: dict[str, bool] = {}
 
     try:

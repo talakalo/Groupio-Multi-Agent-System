@@ -341,6 +341,34 @@ class TestAuthAPI:
 
         assert response.status_code == 401
 
+    def test_login_json_success(self, client, mock_db):
+        """Test successful login with JSON body (web app uses this)."""
+        mock_db.get_user_by_email = AsyncMock(return_value=MagicMock(
+            id="user-123",
+            email="test@example.com",
+            role="resident",
+            is_active=True,
+        ))
+        with patch("src.api.middleware.auth.verify_password") as mock_verify:
+            mock_verify.return_value = True
+            mock_db.get_user_password_hash = AsyncMock(return_value="hashed")
+            mock_db.update_user = AsyncMock()
+            with patch("src.databases.redis_client.get_redis_client") as mock_redis:
+                mock_redis.return_value.set = AsyncMock()
+
+                response = client.post(
+                    "/api/v1/auth/login/json",
+                    json={
+                        "email": "test@example.com",
+                        "password": "password123",
+                    },
+                )
+
+                assert response.status_code == 200
+                data = response.json()
+                assert "access_token" in data
+                assert data.get("expires_in") is not None
+
 
 class TestEscalationsAPI:
     """Tests for escalations API routes."""

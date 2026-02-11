@@ -1,7 +1,10 @@
+# Deploy: Backend (Docker), Web/Admin (Vercel), Mobile (EAS). Runs after CI succeeds or via manual dispatch.
 name: Deploy
 
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main, dev]
   workflow_dispatch:
     inputs:
@@ -23,6 +26,10 @@ env:
   PYTHON_VERSION: '3.11'
   PNPM_VERSION: '9'
 
+permissions:
+  contents: read
+  deployments: write
+
 jobs:
   # ============================================
   # Determine deployment environment
@@ -42,12 +49,23 @@ jobs:
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
             echo "should_deploy=true" >> $GITHUB_OUTPUT
-          elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            echo "environment=production" >> $GITHUB_OUTPUT
-            echo "should_deploy=true" >> $GITHUB_OUTPUT
-          elif [[ "${{ github.ref }}" == "refs/heads/dev" ]]; then
-            echo "environment=staging" >> $GITHUB_OUTPUT
-            echo "should_deploy=true" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event_name }}" == "workflow_run" ]]; then
+            if [[ "${{ github.event.workflow_run.conclusion }}" != "success" ]]; then
+              echo "environment=none" >> $GITHUB_OUTPUT
+              echo "should_deploy=false" >> $GITHUB_OUTPUT
+            else
+              ref="${{ github.event.workflow_run.head_branch }}"
+              if [[ "$ref" == "main" ]]; then
+                echo "environment=production" >> $GITHUB_OUTPUT
+                echo "should_deploy=true" >> $GITHUB_OUTPUT
+              elif [[ "$ref" == "dev" ]]; then
+                echo "environment=staging" >> $GITHUB_OUTPUT
+                echo "should_deploy=true" >> $GITHUB_OUTPUT
+              else
+                echo "environment=none" >> $GITHUB_OUTPUT
+                echo "should_deploy=false" >> $GITHUB_OUTPUT
+              fi
+            fi
           else
             echo "environment=none" >> $GITHUB_OUTPUT
             echo "should_deploy=false" >> $GITHUB_OUTPUT
@@ -77,6 +95,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
       - name: Check required secrets
         id: check-secrets
@@ -157,6 +177,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
       - name: Check Vercel token
         id: check-vercel
@@ -230,6 +252,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
       - name: Check Vercel token
         id: check-vercel
@@ -303,6 +327,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
       - name: Check Expo token
         id: check-expo
@@ -368,6 +394,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
       - name: Check database URL
         id: check-db

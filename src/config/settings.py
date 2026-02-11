@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     # Supabase / PostgreSQL
     SUPABASE_URL: str = ""
     SUPABASE_KEY: str = ""
+    # Local PostgreSQL (used when SUPABASE_URL is empty or USE_LOCAL_POSTGRES=1)
+    DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/groupio"
+    # Set to "1" or "true" to force local PostgreSQL (useful when Supabase has connection issues)
+    USE_LOCAL_POSTGRES: str = ""
 
     # Redis
     REDIS_URL: str = "redis://localhost:6379"
@@ -87,7 +91,11 @@ class Settings(BaseSettings):
     # Environment
     ENVIRONMENT: str = "development"
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    model_config = {
+        "env_file": [".env", "docker/.env"],
+        "env_file_encoding": "utf-8",
+        "extra": "ignore",
+    }
 
 
 @lru_cache()
