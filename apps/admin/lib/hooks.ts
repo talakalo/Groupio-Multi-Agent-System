@@ -449,6 +449,7 @@ function mapContractorToListItem(c: {
   id: string;
   business_name?: string;
   businessName?: string;
+  average_rating?: number;
   verification_status?: string;
   verified?: boolean;
   trust_score?: number;
@@ -468,7 +469,7 @@ function mapContractorToListItem(c: {
     id: c.id,
     businessName: c.business_name ?? c.businessName ?? "",
     verified: c.verified ?? c.verification_status === "verified",
-    rating: c.rating ?? c.trust_score ?? 0,
+    rating: c.rating ?? c.average_rating ?? c.trust_score ?? 0,
     categories,
     regions,
     phone: c.phone,
@@ -573,9 +574,7 @@ export function useContractors(filters?: {
           regions: ["center", "sharon", "shfela"],
         },
       ];
-
       let filtered = contractors;
-
       if (filters?.verified !== undefined) {
         filtered = filtered.filter((c) => c.verified === filters.verified);
       }
@@ -589,13 +588,33 @@ export function useContractors(filters?: {
           c.regions.includes(filters.region!)
         );
       }
-
       return filtered;
     },
   });
 }
 
 // ---- Analytics ----
+
+export interface AdminAnalyticsDashboard {
+  gmvToday?: number;
+  gmvChange?: number;
+  activeOffers?: number;
+  activeOffersChange?: number;
+  openTickets?: number;
+  openTicketsChange?: number;
+  resolvedToday?: number;
+}
+
+export function useAdminAnalyticsDashboard() {
+  return useQuery<AdminAnalyticsDashboard>({
+    queryKey: ["admin", "analytics-dashboard"],
+    queryFn: async () => {
+      const client = getApiClient();
+      return client.getAnalytics();
+    },
+    refetchInterval: 60_000,
+  });
+}
 
 export function useAnalyticsQuery() {
   return useMutation({

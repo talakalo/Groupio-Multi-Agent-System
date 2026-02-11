@@ -2,52 +2,82 @@
 
 ## Base URL
 
+All routes are under:
+
 ```
 http://localhost:8000/api/v1
 ```
 
 ## Authentication
 
-Many endpoints require an `Authorization: Bearer <access_token>` header. The web app uses JSON login and stores the refresh token in an HTTP-only cookie.
+- **JWT (web/mobile):** `Authorization: Bearer <access_token>`. Obtain via `POST /auth/login` (form) or `POST /auth/login/json` (JSON).
+- **Refresh:** `POST /auth/refresh` accepts `refresh_token` in body or in `refresh_token` HTTP-only cookie. Returns new `access_token` and sets cookie.
+- **Admin:** Same JWT; require `role` in `admin` or `super_admin` for `/admin/*` and some list/update routes.
 
-### Auth endpoints
+---
 
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | /api/v1/auth/register | Register (JSON body: email, password, full_name, phone) |
-| POST | /api/v1/auth/login | Login with form body (username, password) |
-| POST | /api/v1/auth/login/json | **Login with JSON** (email, password). Use this from web/frontends. |
-| POST | /api/v1/auth/refresh | Refresh access token; token in body or cookie `refresh_token` |
-| POST | /api/v1/auth/logout | Logout (clears refresh cookie) |
-| GET | /api/v1/auth/me | Current user (requires Bearer token) |
+## Route groups
 
-**Login JSON response** (200):
-```json
-{
-  "access_token": "eyJ...",
-  "refresh_token": "eyJ...",
-  "expires_in": 3600
-}
-```
+| Prefix | Description |
+|--------|-------------|
+| `/auth` | Signup, login (form + JSON), refresh, logout, me, password reset, verify email |
+| `/offers` | List, create, get, update, join, leave; match (admin) |
+| `/contractors` | List, create, get, update, stats, verify (admin), reviews |
+| `/buildings` | List, create, get, update, delete, residents, invite |
+| `/escalations` | Create, list, get, update, resolve, reopen, messages |
+| `/agents` | Invoke agent (testing) |
+| `/admin` | Status, metrics, collections, analytics; agent reload |
+| `/webhooks` | WhatsApp incoming |
 
 ---
 
 ## Pagination
 
-List endpoints (e.g. offers, contractors, escalations) use query params:
+List endpoints (e.g. offers, contractors, escalations) use query params: `page` (default 1), `page_size` (default 20, max 100). Response shape: `{ "items", "total", "page", "page_size", "has_more" }`.
 
-- `page` (default 1), `page_size` (default 20, max 100)
+---
 
-Response shape:
-```json
-{
-  "items": [...],
-  "total": 42,
-  "page": 1,
-  "page_size": 20,
-  "has_more": true
-}
-```
+## Auth endpoints
+
+### POST /api/v1/auth/signup
+
+Register a new user (resident or contractor). Returns token for auto-login.
+
+**Body:** `{ "name", "email", "phone", "password", "role": "resident" | "contractor", "buildingId?" }`
+
+**Response (200):** `{ "token", "user" }`
+
+### POST /api/v1/auth/login
+
+Form login (OAuth2 form: `username`=email, `password`).
+
+**Response (200):** `{ "access_token", "refresh_token", "expires_in" }`; sets `refresh_token` cookie.
+
+### POST /api/v1/auth/login/json
+
+JSON login (for SPA).
+
+**Body:** `{ "email", "password" }`
+
+**Response (200):** `{ "access_token", "refresh_token", "expires_in" }`; sets `refresh_token` cookie.
+
+### POST /api/v1/auth/refresh
+
+Refresh access token. Body: `{ "refresh_token"? }` or use cookie.
+
+**Response (200):** `{ "access_token", "refresh_token", "expires_in" }`; sets cookie.
+
+### POST /api/v1/auth/logout
+
+Invalidate refresh token. Requires Bearer token.
+
+### GET /api/v1/auth/me
+
+Current user profile. Requires Bearer token.
+
+### GET /api/v1/admin/analytics
+
+Dashboard analytics (admin). Returns `gmvToday`, `activeOffers`, `openTickets`, `resolvedToday`, etc.
 
 ---
 
@@ -175,7 +205,7 @@ Dashboard analytics (admin only). Returns counts: open_tickets, total_contractor
 
 ### POST /api/v1/admin/agents/{agent_name}/reload
 
-Hot-reload an agent's configuration.
+Hot-reload an agent's configuration (admin).
 
 **Response** (200):
 ```json
@@ -184,6 +214,33 @@ Hot-reload an agent's configuration.
   "agent": "matching"
 }
 ```
+
+---
+
+### Escalations
+
+- **POST /api/v1/escalations** – Create (body: source, priority, subject, description, etc.).
+- **GET /api/v1/escalations** – List (admin); query: priority, status, page, page_size.
+- **GET /api/v1/escalations/{id}** – Get one (admin).
+- **POST /api/v1/escalations/{id}/resolve** – Resolve (admin). Body: `{ "resolution_notes"? }` or query `resolution_notes`.
+
+### Offers
+
+- **GET /api/v1/offers** – List; query: building_id, category, status, page, page_size.
+- **POST /api/v1/offers** – Create (auth; resident in building).
+- **GET /api/v1/offers/{id}** – Get one.
+- **POST /api/v1/offers/{id}/join** – Join offer (auth).
+
+### Contractors
+
+- **GET /api/v1/contractors** – List; query: category, region, verification_status, page, page_size.
+- **POST /api/v1/contractors** – Register contractor.
+- **GET /api/v1/contractors/{id}** – Get one.
+
+### Buildings
+
+- **GET /api/v1/buildings** – List (auth).
+- **GET /api/v1/buildings/{id}** – Get one (auth; resident or admin).
 
 ---
 

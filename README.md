@@ -81,7 +81,7 @@ Groupio-Multi-Agent-System/
 
 ## Quick Start
 
-**For full setup steps** (database migrations, environment variables, scripts, mobile token storage), see **[LOCAL_SETUP.md](LOCAL_SETUP.md)**.
+For full setup steps (migrations, env, Docker, seed data), see **[LOCAL_SETUP.md](LOCAL_SETUP.md)**.
 
 ### Prerequisites
 
@@ -92,15 +92,17 @@ Groupio-Multi-Agent-System/
 - Anthropic API key (Claude)
 - OpenAI API key (embeddings)
 
-### Backend
+### Backend (minimal)
 
 ```bash
-git clone <repo-url> && cd Groupio-Multi-Agent-System
-python -m venv venv && source venv/bin/activate  # or `venv\Scripts\activate` on Windows
+cd Groupio-Multi-Agent-System
+python -m venv venv
+source venv/bin/activate  # or `venv\Scripts\activate` on Windows
 pip install -e ".[dev]"
-cp docker/.env.example docker/.env   # Edit with your API keys
-docker compose -f docker/docker-compose.yml up -d
-# Run migrations and seed as described in LOCAL_SETUP.md
+cp docker/.env.example docker/.env
+# Edit docker/.env with your API keys
+docker compose up -d
+alembic upgrade head
 uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000
 ```
 

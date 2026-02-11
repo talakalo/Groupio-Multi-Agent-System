@@ -128,3 +128,35 @@ async def list_collections() -> dict[str, Any]:
         except Exception:
             collections[name] = {"status": "unavailable"}
     return {"collections": collections}
+
+
+@router.get("/analytics")
+async def get_analytics() -> dict[str, Any]:
+    """Dashboard analytics (admin). Aggregates from DB when available; otherwise placeholder."""
+    try:
+        db = get_postgres_client()
+        stats = await db.get_escalation_stats()
+        by_status = stats.get("by_status") or {}
+        open_count = sum(
+            c for s, c in by_status.items()
+            if str(s).lower() not in ("resolved", "closed")
+        )
+        return {
+            "gmvToday": 0,
+            "gmvChange": 0,
+            "activeOffers": 0,
+            "activeOffersChange": 0,
+            "openTickets": open_count,
+            "openTicketsChange": 0,
+            "resolvedToday": 0,
+        }
+    except Exception:
+        return {
+            "gmvToday": 0,
+            "gmvChange": 0,
+            "activeOffers": 0,
+            "activeOffersChange": 0,
+            "openTickets": 0,
+            "openTicketsChange": 0,
+            "resolvedToday": 0,
+        }
