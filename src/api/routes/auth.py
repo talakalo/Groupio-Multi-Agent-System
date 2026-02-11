@@ -52,6 +52,12 @@ class SignupRequest(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class RefreshRequest(BaseModel):
+    """Optional body for refresh endpoint (frontend may send refresh_token in JSON)."""
+
+    refresh_token: Optional[str] = None
+
+
 class SignupResponse(BaseModel):
     """Signup response with token and user (auto-login)."""
 
@@ -276,16 +282,17 @@ async def login_json(
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh_token(
     request: Request,
-    response: Response,
-    refresh_token: Optional[str] = None,
+    body: RefreshRequest | None = None,
+    response: Response | None = None,
 ) -> TokenResponse:
-    """Refresh access token. Accepts refresh_token in body or in cookie (for browser flows)."""
-    if not refresh_token:
-        refresh_token = request.cookies.get("refresh_token")
-    if not refresh_token:
+    """Refresh access token. Accepts token in JSON body (refresh_token) or in cookie (refresh_token)."""
+    token = body.refresh_token if body else None
+    if not token and request.cookies:
+        token = request.cookies.get("refresh_token")
+    if not token:
         raise HTTPException(status_code=401, detail="Refresh token required")
 
-    payload = verify_refresh_token(refresh_token)
+    payload = verify_refresh_token(token)
     if not payload:
         raise HTTPException(status_code=401, detail="Invalid refresh token")
 
@@ -294,7 +301,7 @@ async def refresh_token(
     # Verify token in Redis
     redis = get_redis_client()
     stored_token = await redis.get(f"refresh_token:{user_id}")
-    if stored_token != refresh_token:
+    if stored_token != token:
         raise HTTPException(status_code=401, detail="Refresh token revoked")
 
     db = get_postgres_client()

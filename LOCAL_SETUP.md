@@ -198,6 +198,8 @@ pnpm start
 # Scan QR code with Expo Go app
 ```
 
+Set `EXPO_PUBLIC_API_URL` (e.g. `http://localhost:8000/api/v1`) in `apps/mobile/.env` so the app talks to your backend. For production, store the auth token in **Expo SecureStore** (or equivalent) instead of in-memory; see [docs/MOBILE_API_ALIGNMENT.md](docs/MOBILE_API_ALIGNMENT.md).
+
 ---
 
 ## Running Tests
