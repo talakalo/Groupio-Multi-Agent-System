@@ -226,7 +226,7 @@ export default function ResidentDashboardPage() {
   });
 
   const stats = statsQuery.data;
-  const offers = offersQuery.data?.offers ?? [];
+  const offers = offersQuery.data?.items ?? [];
   const activities = activityQuery.data?.activities ?? [];
 
   return (

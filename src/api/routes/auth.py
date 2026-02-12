@@ -283,7 +283,7 @@ async def login_json(
 async def refresh_token(
     request: Request,
     body: RefreshRequest | None = None,
-    response: Response | None = None,
+    response: Response = None,  # type: ignore[assignment]
 ) -> TokenResponse:
     """Refresh access token. Accepts token in JSON body (refresh_token) or in cookie (refresh_token)."""
     token = body.refresh_token if body else None

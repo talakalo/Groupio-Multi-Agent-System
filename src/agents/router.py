@@ -20,6 +20,8 @@ INTENT_AGENT_MAP = {
     "analytics_query": "analytics",
     "general_info": "support",
     "technical_support": "support",
+    "architecture_analysis": "architecture",
+    "payment_query": "payment",
 }
 
 

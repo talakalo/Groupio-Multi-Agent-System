@@ -108,6 +108,10 @@ app.add_middleware(RequestLoggingMiddleware)
 # Include API routes (auth, offers, contractors, buildings, etc.)
 app.include_router(api_router, prefix="/api/v1")
 
+# WebSocket routes (mounted separately – no prefix collision with REST routes)
+from src.api.routes.websocket import router as ws_router
+app.include_router(ws_router, prefix="/api/v1")
+
 
 # -- Request/Response Models --
 

@@ -151,39 +151,20 @@ export class GroupioApiClient {
     verification_status?: string;
     page?: number;
     page_size?: number;
-  }): Promise<{ items: Contractor[]; total: number; page: number; page_size: number; has_more: boolean }> {
-    const searchParams = new URLSearchParams();
-    if (params?.category) searchParams.set("category", params.category);
-    if (params?.region) searchParams.set("region", params.region);
-    if (params?.min_trust_score != null) searchParams.set("min_trust_score", String(params.min_trust_score));
-    if (params?.verification_status) searchParams.set("verification_status", params.verification_status);
-    if (params?.page != null) searchParams.set("page", String(params.page));
-    if (params?.page_size != null) searchParams.set("page_size", String(params.page_size));
-    const qs = searchParams.toString();
-    return this.get<{ items: Contractor[]; total: number; page: number; page_size: number; has_more: boolean }>(
-      `/contractors${qs ? `?${qs}` : ""}`,
-    );
-  }
-
-  async getContractor(id: string): Promise<Contractor> {
-    return this.get<Contractor>(`/contractors/${encodeURIComponent(id)}`);
-  }
-
-  async getContractors(params?: {
-    category?: string;
-    region?: string;
-    verification_status?: string;
-    page?: number;
-    page_size?: number;
   }): Promise<ContractorsListResponse> {
     const search = new URLSearchParams();
     if (params?.category) search.set("category", params.category);
     if (params?.region) search.set("region", params.region);
+    if (params?.min_trust_score != null) search.set("min_trust_score", String(params.min_trust_score));
     if (params?.verification_status) search.set("verification_status", params.verification_status);
     if (params?.page != null) search.set("page", String(params.page));
     if (params?.page_size != null) search.set("page_size", String(params.page_size));
     const qs = search.toString();
     return this.get<ContractorsListResponse>(`/contractors${qs ? `?${qs}` : ""}`);
+  }
+
+  async getContractor(id: string): Promise<Contractor> {
+    return this.get<Contractor>(`/contractors/${encodeURIComponent(id)}`);
   }
 
   // ---- Building Methods ----

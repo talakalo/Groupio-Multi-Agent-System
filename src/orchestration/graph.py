@@ -7,6 +7,7 @@ from typing import Any
 from langgraph.graph import END, StateGraph
 
 from src.agents.analytics import AnalyticsAgent
+from src.agents.architecture import ArchitectureAgent
 from src.agents.matching import MatchingAgent
 from src.agents.outreach import OutreachAgent
 from src.agents.pricing import PricingAgent
@@ -35,6 +36,8 @@ INTENT_AGENT_MAP = {
     "analytics_query": "analytics",
     "general_info": "support",
     "technical_support": "support",
+    "architecture_analysis": "architecture",
+    "payment_query": "payment",
 }
 
 
@@ -48,7 +51,7 @@ class GroupioOrchestrator:
     """
 
     def __init__(self) -> None:
-        self.agents = {
+        self.agents: dict[str, Any] = {
             "router": RouterAgent(),
             "support": SupportAgent(),
             "matching": MatchingAgent(),
@@ -56,7 +59,14 @@ class GroupioOrchestrator:
             "vetting": VettingAgent(),
             "outreach": OutreachAgent(),
             "analytics": AnalyticsAgent(),
+            "architecture": ArchitectureAgent(),
         }
+        # Payment agent imported lazily to avoid circular imports during Phase 3
+        try:
+            from src.agents.payment import PaymentAgent
+            self.agents["payment"] = PaymentAgent()
+        except ImportError:
+            pass
         self._db = get_postgres_client()
         self._rag = get_rag_pipeline()
         self.graph = self._build_graph()
@@ -73,6 +83,9 @@ class GroupioOrchestrator:
         workflow.add_node("vetting", self.agents["vetting"].run)
         workflow.add_node("outreach", self.agents["outreach"].run)
         workflow.add_node("analytics", self.agents["analytics"].run)
+        workflow.add_node("architecture", self.agents["architecture"].run)
+        if "payment" in self.agents:
+            workflow.add_node("payment", self.agents["payment"].run)
         workflow.add_node("human_handoff", self._handoff_to_human)
         workflow.add_node("final_response", self._format_final_response)
 
@@ -80,30 +93,38 @@ class GroupioOrchestrator:
         workflow.set_entry_point("router")
 
         # Router conditional edges
+        edge_map: dict[str, str] = {
+            "support": "support",
+            "matching": "matching",
+            "pricing": "pricing",
+            "vetting": "vetting",
+            "outreach": "outreach",
+            "analytics": "analytics",
+            "architecture": "architecture",
+            "human": "human_handoff",
+            "end": "final_response",
+        }
+        if "payment" in self.agents:
+            edge_map["payment"] = "payment"
         workflow.add_conditional_edges(
             "router",
             self._determine_next_agent,
-            {
-                "support": "support",
-                "matching": "matching",
-                "pricing": "pricing",
-                "vetting": "vetting",
-                "outreach": "outreach",
-                "analytics": "analytics",
-                "human": "human_handoff",
-                "end": "final_response",
-            },
+            edge_map,
         )
 
         # Each specialist agent can continue, end, or escalate
-        for agent_name in [
+        specialist_agents = [
             "support",
             "matching",
             "pricing",
             "vetting",
             "outreach",
             "analytics",
-        ]:
+            "architecture",
+        ]
+        if "payment" in self.agents:
+            specialist_agents.append("payment")
+        for agent_name in specialist_agents:
             workflow.add_conditional_edges(
                 agent_name,
                 self._should_continue,

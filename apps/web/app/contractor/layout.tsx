@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
+import { useAuthStore } from '@/lib/stores/authStore';
 import {
   LayoutDashboard,
   Tag,
@@ -36,8 +37,15 @@ const NAV_ITEMS: NavItem[] = [
 
 export default function ContractorLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const t = useTranslations('contractorNav');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const logout = useAuthStore((s) => s.logout);
+
+  const handleLogout = async () => {
+    await logout();
+    router.push('/login');
+  };
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
@@ -89,7 +97,9 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
       <div className="border-t border-gray-100 px-4 py-4">
         <button
           type="button"
+          onClick={handleLogout}
           className="flex items-center gap-3 w-full text-start text-sm text-gray-600 hover:text-gray-900 transition-colors"
+          aria-label={t('logout')}
         >
           <div className="w-8 h-8 rounded-full bg-accent-100 flex items-center justify-center">
             <UserCircle className="h-5 w-5 text-accent-600" />
