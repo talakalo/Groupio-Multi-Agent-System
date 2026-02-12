@@ -784,7 +784,7 @@ class TestWhatsAppWebhook:
     def test_whatsapp_webhook_processed(self, client, mock_db):
         """Test WhatsApp webhook with valid payload returns processed."""
         mock_db.get_building_by_phone = AsyncMock(return_value="building-123")
-        with patch("src.api.main.get_orchestrator") as mock_get_orch:
+        with patch("src.api.routes.webhooks.get_orchestrator") as mock_get_orch:
             mock_orch = MagicMock()
             mock_orch.run = AsyncMock(
                 return_value={
