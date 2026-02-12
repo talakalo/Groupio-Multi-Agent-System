@@ -204,7 +204,7 @@ describe('OffersPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Total Offers')).toBeInTheDocument();
       expect(screen.getByText('Flagged')).toBeInTheDocument();
-      expect(screen.getByText('Completed')).toBeInTheDocument();
+      expect(screen.getAllByText('Completed').length).toBeGreaterThanOrEqual(1);
     });
   });
 
