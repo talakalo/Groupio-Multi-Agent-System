@@ -117,6 +117,43 @@ vi.mock('@testing-library/react-native', () => {
   return { render, fireEvent };
 });
 
+// Mock react-native-paper (tokens/themes fail to load in Node)
+vi.mock('react-native-paper', () => {
+  const MockText = 'Text';
+  const MockCard = Object.assign('Card', {
+    Content: 'CardContent',
+    Title: 'CardTitle',
+    Cover: 'CardCover',
+    Actions: 'CardActions',
+  });
+  return {
+    Card: MockCard,
+    Text: MockText,
+    Button: 'Button',
+    Chip: 'Chip',
+    Avatar: { Icon: 'AvatarIcon', Image: 'AvatarImage', Text: 'AvatarText' },
+    ProgressBar: 'ProgressBar',
+    useTheme: () => ({
+      colors: {
+        primary: '#6200ee',
+        background: '#ffffff',
+        surface: '#ffffff',
+        error: '#B00020',
+        text: '#000000',
+        onSurface: '#000000',
+        onBackground: '#000000',
+      },
+      dark: false,
+    }),
+    Provider: 'PaperProvider',
+    DefaultTheme: { colors: {} },
+    MD3LightTheme: { colors: {} },
+  };
+});
+
+// Mock react-native-vector-icons
+vi.mock('react-native-vector-icons/MaterialCommunityIcons', () => 'Icon');
+
 // Mock React Native modules
 vi.mock('react-native', () => ({
   Platform: {
