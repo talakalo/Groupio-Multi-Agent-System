@@ -3,115 +3,87 @@ import React from 'react';
 
 // Mock @testing-library/react-native (it fails to load RN host components in Node)
 vi.mock('@testing-library/react-native', () => {
-  /* Lightweight render that returns query helpers over a simple component tree */
-  const findAllByProp = (tree: any, prop: string, match: string | RegExp): any[] => {
-    const results: any[] = [];
-    const walk = (node: any) => {
-      if (!node) return;
-      const val = node.props?.[prop];
-      if (val && (typeof match === 'string' ? val === match : match.test(String(val)))) results.push(node);
-      if (node.props?.testID && prop === 'testID' && (typeof match === 'string' ? node.props.testID === match : match.test(node.props.testID))) results.push(node);
-      const children = node.props?.children;
-      if (Array.isArray(children)) children.forEach(walk);
-      else if (children && typeof children === 'object') walk(children);
-    };
-    walk(tree);
-    return results;
+  const { create, act } = require('react-test-renderer');
+
+  /** Collect all text strings from a test-instance subtree. */
+  const collectText = (instance: any): string => {
+    if (typeof instance === 'string' || typeof instance === 'number') return String(instance);
+    if (!instance) return '';
+    if (instance.children) {
+      return instance.children.map(collectText).join('');
+    }
+    return '';
   };
 
-  const getTextNodes = (tree: any): string[] => {
-    const texts: string[] = [];
-    const walk = (node: any) => {
-      if (typeof node === 'string' || typeof node === 'number') { texts.push(String(node)); return; }
-      if (!node?.props) return;
-      const ch = node.props.children;
-      if (Array.isArray(ch)) ch.forEach(walk);
-      else walk(ch);
-    };
-    walk(tree);
-    return texts;
+  /** Walk all instances depth-first. */
+  const walkAll = (instance: any, cb: (node: any) => void) => {
+    if (!instance || typeof instance !== 'object') return;
+    cb(instance);
+    if (instance.children) {
+      for (const child of instance.children) walkAll(child, cb);
+    }
   };
 
-  const render = (element: React.ReactElement) => {
-    // Use react-test-renderer to create a JSON tree
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { create } = require('react-test-renderer');
-    const root = create(element);
-    const tree = root.toJSON();
+  const render = (element: any) => {
+    let renderer: any;
+    act(() => { renderer = create(element); });
+    const rootInstance = renderer.root;
 
     const getByText = (match: string | RegExp) => {
-      const walk = (node: any): any => {
-        if (!node) return null;
-        const texts = getTextNodes(node);
-        const joined = texts.join('');
-        if (typeof match === 'string' ? joined.includes(match) : match.test(joined)) return node;
-        const children = node.props?.children;
-        if (Array.isArray(children)) {
-          for (const c of children) { const r = walk(c); if (r) return r; }
-        } else if (children && typeof children === 'object') { return walk(children); }
-        return null;
-      };
-      const found = walk(tree);
-      if (!found) throw new Error(`Unable to find text: ${match}`);
-      return found;
-    };
-
-    const getByTestId = (id: string) => {
-      const walk = (node: any): any => {
-        if (!node || typeof node !== 'object') return null;
-        if (node.props?.testID === id) return node;
-        const ch = node.props?.children;
-        if (Array.isArray(ch)) {
-          for (const c of ch) { const r = walk(c); if (r) return r; }
-        } else if (ch && typeof ch === 'object') { return walk(ch); }
-        return null;
-      };
-      const found = walk(tree);
-      if (!found) throw new Error(`Unable to find testID: ${id}`);
-      return found;
+      const nodes: any[] = [];
+      walkAll(rootInstance, (node: any) => {
+        if (typeof node === 'string' || typeof node === 'number') return;
+        const text = collectText(node);
+        if (text && (typeof match === 'string' ? text.includes(match) : match.test(text))) {
+          nodes.push(node);
+        }
+      });
+      if (!nodes.length) throw new Error(`Unable to find text: ${match}`);
+      // Return the deepest (most specific) match
+      return { props: nodes[nodes.length - 1].props || {} };
     };
 
     const queryByText = (match: string | RegExp) => {
       try { return getByText(match); } catch { return null; }
     };
 
+    const getByTestId = (id: string) => {
+      try {
+        return rootInstance.findByProps({ testID: id });
+      } catch {
+        throw new Error(`Unable to find testID: ${id}`);
+      }
+    };
+
     const getByLabelText = (match: string | RegExp) => {
-      const walk = (node: any): any => {
-        if (!node || typeof node !== 'object') return null;
+      const nodes: any[] = [];
+      walkAll(rootInstance, (node: any) => {
         const label = node.props?.accessibilityLabel || node.props?.['aria-label'] || '';
-        if (typeof match === 'string' ? label.includes(match) : match.test(label)) return node;
-        const ch = node.props?.children;
-        if (Array.isArray(ch)) {
-          for (const c of ch) { const r = walk(c); if (r) return r; }
-        } else if (ch && typeof ch === 'object') { return walk(ch); }
-        return null;
-      };
-      const found = walk(tree);
-      if (!found) throw new Error(`Unable to find accessibilityLabel: ${match}`);
-      return found;
+        if (label && (typeof match === 'string' ? label.includes(match) : match.test(label))) {
+          nodes.push(node);
+        }
+      });
+      if (!nodes.length) throw new Error(`Unable to find accessibilityLabel: ${match}`);
+      return { props: nodes[0].props };
     };
 
     const getByRole = (role: string) => {
-      const walk = (node: any): any => {
-        if (!node || typeof node !== 'object') return null;
-        if (node.props?.accessibilityRole === role || node.props?.role === role) return node;
-        const ch = node.props?.children;
-        if (Array.isArray(ch)) {
-          for (const c of ch) { const r = walk(c); if (r) return r; }
-        } else if (ch && typeof ch === 'object') { return walk(ch); }
-        return null;
-      };
-      const found = walk(tree);
-      if (!found) throw new Error(`Unable to find role: ${role}`);
-      return found;
+      const nodes: any[] = [];
+      walkAll(rootInstance, (node: any) => {
+        if (node.props?.accessibilityRole === role || node.props?.role === role) {
+          nodes.push(node);
+        }
+      });
+      if (!nodes.length) throw new Error(`Unable to find role: ${role}`);
+      return { props: nodes[0].props };
     };
 
-    return { getByText, getByTestId, queryByText, getByLabelText, getByRole, unmount: () => root.unmount(), root };
+    return { getByText, queryByText, getByTestId, getByLabelText, getByRole, unmount: () => renderer.unmount() };
   };
 
   const fireEvent = {
-    press: (node: any) => { node?.props?.onPress?.(); },
-    changeText: (node: any, text: string) => { node?.props?.onChangeText?.(text); },
+    press: (node: any) => { if (node.props?.onPress) node.props.onPress(); },
+    changeText: (node: any, text: string) => { if (node.props?.onChangeText) node.props.onChangeText(text); },
   };
 
   return { render, fireEvent };
@@ -119,40 +91,60 @@ vi.mock('@testing-library/react-native', () => {
 
 // Mock react-native-paper (tokens/themes fail to load in Node)
 vi.mock('react-native-paper', () => {
-  const MockText = 'Text';
-  const MockCard = Object.assign('Card', {
-    Content: 'CardContent',
-    Title: 'CardTitle',
-    Cover: 'CardCover',
-    Actions: 'CardActions',
+  const { createElement } = require('react');
+  const wrap = (name: string) => {
+    const Comp = (props: any) => createElement(name, props, props.children);
+    Comp.displayName = name;
+    return Comp;
+  };
+  const MockCard = Object.assign(wrap('Card'), {
+    Content: wrap('CardContent'),
+    Title: wrap('CardTitle'),
+    Cover: wrap('CardCover'),
+    Actions: wrap('CardActions'),
   });
+  const MockAvatar = {
+    Icon: wrap('AvatarIcon'),
+    Image: wrap('AvatarImage'),
+    Text: wrap('AvatarText'),
+  };
   return {
     Card: MockCard,
-    Text: MockText,
-    Button: 'Button',
-    Chip: 'Chip',
-    Avatar: { Icon: 'AvatarIcon', Image: 'AvatarImage', Text: 'AvatarText' },
-    ProgressBar: 'ProgressBar',
+    Text: wrap('Text'),
+    Button: wrap('Button'),
+    Chip: wrap('Chip'),
+    Avatar: MockAvatar,
+    ProgressBar: wrap('ProgressBar'),
     useTheme: () => ({
       colors: {
         primary: '#6200ee',
+        secondary: '#03DAC6',
         background: '#ffffff',
         surface: '#ffffff',
+        surfaceVariant: '#f5f5f5',
         error: '#B00020',
         text: '#000000',
         onSurface: '#000000',
         onBackground: '#000000',
+        onPrimary: '#ffffff',
+        outline: '#cccccc',
+        elevation: { level0: '#fff', level1: '#fff', level2: '#fff', level3: '#fff' },
       },
       dark: false,
     }),
-    Provider: 'PaperProvider',
+    Provider: wrap('PaperProvider'),
     DefaultTheme: { colors: {} },
     MD3LightTheme: { colors: {} },
   };
 });
 
 // Mock react-native-vector-icons
-vi.mock('react-native-vector-icons/MaterialCommunityIcons', () => 'Icon');
+vi.mock('react-native-vector-icons/MaterialCommunityIcons', () => {
+  const { createElement } = require('react');
+  const Icon = (props: any) => createElement('Icon', props);
+  Icon.displayName = 'Icon';
+  return { default: Icon };
+});
 
 // Mock React Native modules
 vi.mock('react-native', () => ({

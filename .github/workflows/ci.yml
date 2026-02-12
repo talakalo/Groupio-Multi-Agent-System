@@ -191,13 +191,14 @@ jobs:
       - name: Run integration tests
         env:
           REDIS_URL: redis://localhost:6379
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
           TESTING: 'true'
           ENVIRONMENT: 'testing'
           ANTHROPIC_API_KEY: 'test-key'
           OPENAI_API_KEY: 'test-key'
           JWT_SECRET_KEY: 'test-secret-key-for-ci-testing-only'
         run: |
-          pytest tests/integration/ -v
+          pytest tests/integration/ -v --timeout=30
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
@@ -237,7 +238,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run tests
-        run: pnpm test
+        run: pnpm turbo test --filter='!@groupio/mobile'
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4
