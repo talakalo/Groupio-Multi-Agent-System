@@ -113,8 +113,13 @@ class PostgresClient:
                 "execute_sql", {"query": query, "params": params or {}}
             ).execute()
             return result.data if result.data else []
-        # Local: not supported for generic RPC
-        return []
+        # Local PostgreSQL: execute with positional params
+        # Convert $1-style placeholders - the query already uses them
+        if params:
+            # params dict values as positional args in order
+            args = list(params.values())
+            return await self._pg_fetch_all(query, *args)
+        return await self._pg_fetch_all(query)
 
     async def get_user_profile(self, user_id: str) -> dict[str, Any] | None:
         """Get a user profile by ID."""
@@ -226,6 +231,7 @@ class PostgresClient:
             "is_active",
             "is_verified",
             "last_login",
+            "role",
         }
         filtered = {k: v for k, v in update_data.items() if k in allowed}
         if not filtered:
@@ -1591,6 +1597,602 @@ class PostgresClient:
             )
             return result.data or []
         return []
+
+    # ------------------------------------------------------------------
+    # File Uploads
+    # ------------------------------------------------------------------
+
+    async def create_file_upload(self, data: dict[str, Any]) -> dict[str, Any]:
+        """Insert a file_uploads record."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            result = await client.table("file_uploads").insert(data).execute()
+            return result.data[0] if result.data else data
+        await self._pg_execute(
+            """INSERT INTO file_uploads
+               (id, user_id, bucket, file_name, file_type, file_size,
+                storage_path, thumbnail_path, analysis_status, analysis_result,
+                building_id, metadata)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)""",
+            data["id"],
+            data["user_id"],
+            data["bucket"],
+            data["file_name"],
+            data["file_type"],
+            data["file_size"],
+            data["storage_path"],
+            data.get("thumbnail_path"),
+            data.get("analysis_status", "pending"),
+            json.dumps(data.get("analysis_result")) if data.get("analysis_result") else None,
+            data.get("building_id"),
+            json.dumps(data.get("metadata", {})),
+        )
+        return data
+
+    async def get_file_upload(self, file_id: str) -> dict[str, Any] | None:
+        if self._use_supabase_client():
+            client = await self._get_client()
+            result = await client.table("file_uploads").select("*").eq("id", file_id).limit(1).execute()
+            return result.data[0] if result.data else None
+        return await self._pg_fetch_one("SELECT * FROM file_uploads WHERE id = $1", file_id)
+
+    async def update_file_upload(self, file_id: str, update_data: dict[str, Any]) -> dict[str, Any]:
+        if self._use_supabase_client():
+            client = await self._get_client()
+            await client.table("file_uploads").update(update_data).eq("id", file_id).execute()
+        else:
+            allowed = {"analysis_status", "analysis_result", "thumbnail_path", "metadata"}
+            filtered = {k: v for k, v in update_data.items() if k in allowed}
+            if not filtered:
+                return await self.get_file_upload(file_id) or {}
+            set_parts = []
+            args: list[Any] = []
+            for k, v in filtered.items():
+                args.append(json.dumps(v) if isinstance(v, (dict, list)) else v)
+                set_parts.append(f"{k} = ${len(args)}")
+            args.append(file_id)
+            await self._pg_execute(
+                f"UPDATE file_uploads SET {', '.join(set_parts)} WHERE id = ${len(args)}",
+                *args,
+            )
+        return await self.get_file_upload(file_id) or {}
+
+    async def delete_file_upload(self, file_id: str) -> None:
+        if self._use_supabase_client():
+            client = await self._get_client()
+            await client.table("file_uploads").delete().eq("id", file_id).execute()
+        else:
+            await self._pg_execute("DELETE FROM file_uploads WHERE id = $1", file_id)
+
+    async def list_file_uploads(
+        self,
+        user_id: str,
+        bucket: str | None = None,
+        building_id: str | None = None,
+    ) -> list[dict[str, Any]]:
+        if self._use_supabase_client():
+            client = await self._get_client()
+            q = client.table("file_uploads").select("*").eq("user_id", user_id)
+            if bucket:
+                q = q.eq("bucket", bucket)
+            if building_id:
+                q = q.eq("building_id", building_id)
+            result = await q.order("created_at", desc=True).execute()
+            return result.data or []
+        where_parts = ["user_id = $1"]
+        args: list[Any] = [user_id]
+        if bucket:
+            args.append(bucket)
+            where_parts.append(f"bucket = ${len(args)}")
+        if building_id:
+            args.append(building_id)
+            where_parts.append(f"building_id = ${len(args)}")
+        return await self._pg_fetch_all(
+            "SELECT * FROM file_uploads WHERE " + " AND ".join(where_parts) + " ORDER BY created_at DESC",
+            *args,
+        )
+
+    # ------------------------------------------------------------------
+    # Admin: Users, Offers, Settings, Audit Logs
+    # ------------------------------------------------------------------
+
+    async def get_admin_users(
+        self,
+        page: int = 1,
+        page_size: int = 20,
+        role: str | None = None,
+        is_active: bool | None = None,
+    ) -> tuple[list[dict[str, Any]], int]:
+        """Paginated user list for admin panel."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            q = client.table("users").select("*", count="exact")
+            if role:
+                q = q.eq("role", role)
+            if is_active is not None:
+                q = q.eq("is_active", is_active)
+            result = await q.order("created_at", desc=True).range(
+                (page - 1) * page_size, page * page_size - 1
+            ).execute()
+            total = result.count if hasattr(result, "count") and result.count is not None else len(result.data or [])
+            return (result.data or [], total)
+
+        where_parts: list[str] = []
+        args: list[Any] = []
+        if role:
+            args.append(role)
+            where_parts.append("role = $%d" % len(args))
+        if is_active is not None:
+            args.append(is_active)
+            where_parts.append("is_active = $%d" % len(args))
+        where_sql = " AND ".join(where_parts) if where_parts else "1=1"
+        count_row = await self._pg_fetch_one(
+            "SELECT COUNT(*) AS c FROM users WHERE " + where_sql, *args
+        )
+        total = count_row["c"] if count_row else 0
+        args.extend([page_size, (page - 1) * page_size])
+        n1, n2 = len(args) - 1, len(args)
+        rows = await self._pg_fetch_all(
+            "SELECT * FROM users WHERE "
+            + where_sql
+            + " ORDER BY created_at DESC LIMIT $%d OFFSET $%d" % (n1, n2),
+            *args,
+        )
+        return (rows or [], total)
+
+    async def get_all_offers_admin(
+        self,
+        page: int = 1,
+        page_size: int = 20,
+        status: str | None = None,
+        category: str | None = None,
+        flagged: bool | None = None,
+    ) -> tuple[list[dict[str, Any]], int]:
+        """Admin offer list with optional filters. Returns (items, total)."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            q = client.table("offers").select("*", count="exact")
+            if status:
+                q = q.eq("status", status)
+            if category:
+                q = q.eq("category", category)
+            if flagged is True:
+                q = q.eq("status", "flagged")
+            result = await q.order("created_at", desc=True).range(
+                (page - 1) * page_size, page * page_size - 1
+            ).execute()
+            total = result.count if hasattr(result, "count") and result.count is not None else len(result.data or [])
+            return (result.data or [], total)
+
+        where_parts: list[str] = []
+        args: list[Any] = []
+        if status:
+            args.append(status)
+            where_parts.append("status = $%d" % len(args))
+        if category:
+            args.append(category)
+            where_parts.append("category = $%d" % len(args))
+        if flagged is True:
+            where_parts.append("status = 'flagged'")
+        where_sql = " AND ".join(where_parts) if where_parts else "1=1"
+        count_row = await self._pg_fetch_one(
+            "SELECT COUNT(*) AS c FROM offers WHERE " + where_sql, *args
+        )
+        total = count_row["c"] if count_row else 0
+        args.extend([page_size, (page - 1) * page_size])
+        n1, n2 = len(args) - 1, len(args)
+        rows = await self._pg_fetch_all(
+            "SELECT * FROM offers WHERE "
+            + where_sql
+            + " ORDER BY created_at DESC LIMIT $%d OFFSET $%d" % (n1, n2),
+            *args,
+        )
+        return (rows or [], total)
+
+    async def get_system_settings(self) -> list[dict[str, Any]]:
+        """Return all system settings rows."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            result = await client.table("system_settings").select("*").execute()
+            return result.data or []
+        return await self._pg_fetch_all(
+            "SELECT * FROM system_settings ORDER BY key"
+        )
+
+    async def upsert_system_setting(
+        self,
+        key: str,
+        value: Any,
+        description: str | None = None,
+        updated_by: str | None = None,
+    ) -> dict[str, Any]:
+        """Insert or update a system setting by key."""
+        setting_id = str(uuid4())
+        if self._use_supabase_client():
+            client = await self._get_client()
+            result = await client.table("system_settings").select("*").eq("key", key).limit(1).execute()
+            if result.data:
+                row = result.data[0]
+                update_payload: dict[str, Any] = {"value": value}
+                if description is not None:
+                    update_payload["description"] = description
+                if updated_by:
+                    update_payload["updated_by"] = updated_by
+                await client.table("system_settings").update(update_payload).eq("id", row["id"]).execute()
+                return {**row, **update_payload}
+            insert_payload = {
+                "id": setting_id,
+                "key": key,
+                "value": value,
+                "description": description,
+                "updated_by": updated_by,
+            }
+            res = await client.table("system_settings").insert(insert_payload).execute()
+            return res.data[0] if res.data else insert_payload
+
+        existing = await self._pg_fetch_one(
+            "SELECT * FROM system_settings WHERE key = $1", key
+        )
+        if existing:
+            set_parts = ['"value" = $1']
+            args: list[Any] = [json.dumps(value)]
+            if description is not None:
+                args.append(description)
+                set_parts.append('"description" = $%d' % len(args))
+            if updated_by:
+                args.append(updated_by)
+                set_parts.append('"updated_by" = $%d' % len(args))
+            args.append(existing["id"])
+            await self._pg_execute(
+                "UPDATE system_settings SET "
+                + ", ".join(set_parts)
+                + " WHERE id = $%d" % len(args),
+                *args,
+            )
+            return await self._pg_fetch_one(
+                "SELECT * FROM system_settings WHERE id = $1", existing["id"]
+            ) or existing
+        await self._pg_execute(
+            """INSERT INTO system_settings (id, key, value, description, updated_by)
+               VALUES ($1, $2, $3::jsonb, $4, $5)""",
+            setting_id,
+            key,
+            json.dumps(value),
+            description,
+            updated_by,
+        )
+        return await self._pg_fetch_one(
+            "SELECT * FROM system_settings WHERE id = $1", setting_id
+        ) or {"id": setting_id, "key": key, "value": value}
+
+    async def create_audit_log(self, data: dict[str, Any]) -> dict[str, Any]:
+        """Insert an audit log entry."""
+        log_id = data.get("id") or str(uuid4())
+        if self._use_supabase_client():
+            client = await self._get_client()
+            result = await client.table("audit_logs").insert({**data, "id": log_id}).execute()
+            return result.data[0] if result.data else {**data, "id": log_id}
+        await self._pg_execute(
+            """INSERT INTO audit_logs (id, user_id, action, resource_type, resource_id, details, ip_address)
+               VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)""",
+            log_id,
+            data["user_id"],
+            data["action"],
+            data.get("resource_type"),
+            data.get("resource_id"),
+            json.dumps(data.get("details", {})),
+            data.get("ip_address"),
+        )
+        return {**data, "id": log_id}
+
+    async def list_audit_logs(
+        self,
+        page: int = 1,
+        page_size: int = 20,
+        action: str | None = None,
+        resource_type: str | None = None,
+    ) -> tuple[list[dict[str, Any]], int]:
+        """Paginated audit logs with optional filters."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            q = client.table("audit_logs").select("*", count="exact")
+            if action:
+                q = q.eq("action", action)
+            if resource_type:
+                q = q.eq("resource_type", resource_type)
+            result = await q.order("created_at", desc=True).range(
+                (page - 1) * page_size, page * page_size - 1
+            ).execute()
+            total = result.count if hasattr(result, "count") and result.count is not None else len(result.data or [])
+            return (result.data or [], total)
+
+        where_parts: list[str] = []
+        args: list[Any] = []
+        if action:
+            args.append(action)
+            where_parts.append("action = $%d" % len(args))
+        if resource_type:
+            args.append(resource_type)
+            where_parts.append("resource_type = $%d" % len(args))
+        where_sql = " AND ".join(where_parts) if where_parts else "1=1"
+        count_row = await self._pg_fetch_one(
+            "SELECT COUNT(*) AS c FROM audit_logs WHERE " + where_sql, *args
+        )
+        total = count_row["c"] if count_row else 0
+        args.extend([page_size, (page - 1) * page_size])
+        n1, n2 = len(args) - 1, len(args)
+        rows = await self._pg_fetch_all(
+            "SELECT * FROM audit_logs WHERE "
+            + where_sql
+            + " ORDER BY created_at DESC LIMIT $%d OFFSET $%d" % (n1, n2),
+            *args,
+        )
+        return (rows or [], total)
+
+    # ------------------------------------------------------------------
+    # Invoices
+    # ------------------------------------------------------------------
+
+    async def create_invoice(self, data: dict[str, Any]) -> dict[str, Any]:
+        """Insert an invoice record."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            result = await client.table("invoices").insert(data).execute()
+            return result.data[0] if result.data else data
+        await self._pg_execute(
+            """INSERT INTO invoices
+               (id, invoice_number, offer_id, contractor_id, subtotal,
+                tax_rate, tax, platform_fee_rate, platform_fee, total,
+                status, paid_at, transaction_id, payment_method, created_at)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)""",
+            data["id"],
+            data["invoice_number"],
+            data["offer_id"],
+            data["contractor_id"],
+            data["subtotal"],
+            data.get("tax_rate", 0.17),
+            data.get("tax", 0),
+            data.get("platform_fee_rate", 0.05),
+            data.get("platform_fee", 0),
+            data["total"],
+            data.get("status", "pending"),
+            data.get("paid_at"),
+            data.get("transaction_id"),
+            data.get("payment_method"),
+            data.get("created_at"),
+        )
+        return await self.get_invoice(data["id"]) or data
+
+    async def get_invoice(self, invoice_id: str) -> dict[str, Any] | None:
+        """Get an invoice by ID."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            result = await client.table("invoices").select("*").eq("id", invoice_id).limit(1).execute()
+            return result.data[0] if result.data else None
+        return await self._pg_fetch_one("SELECT * FROM invoices WHERE id = $1", invoice_id)
+
+    async def update_invoice(self, invoice_id: str, update_data: dict[str, Any]) -> dict[str, Any]:
+        """Update an invoice."""
+        allowed = {"status", "paid_at", "transaction_id", "payment_method"}
+        filtered = {k: v for k, v in update_data.items() if k in allowed}
+        if not filtered:
+            return await self.get_invoice(invoice_id) or {}
+        if self._use_supabase_client():
+            client = await self._get_client()
+            await client.table("invoices").update(filtered).eq("id", invoice_id).execute()
+        else:
+            set_parts: list[str] = []
+            args: list[Any] = []
+            for i, (k, v) in enumerate(filtered.items(), 1):
+                set_parts.append(f'"{k}" = ${i}')
+                args.append(v)
+            args.append(invoice_id)
+            await self._pg_execute(
+                "UPDATE invoices SET " + ", ".join(set_parts) + " WHERE id = $%d" % len(args),
+                *args,
+            )
+        return await self.get_invoice(invoice_id) or {}
+
+    async def list_invoices_for_user(self, user_id: str) -> list[dict[str, Any]]:
+        """Get invoices where the user is a participant (via payment_splits)."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            # Get invoice IDs from payment_splits for this user
+            splits = await client.table("payment_splits").select("invoice_id").eq("user_id", user_id).execute()
+            if not splits.data:
+                return []
+            invoice_ids = list({s["invoice_id"] for s in splits.data})
+            result = await client.table("invoices").select("*").in_("id", invoice_ids).order("created_at", desc=True).execute()
+            return result.data or []
+        return await self._pg_fetch_all(
+            """SELECT DISTINCT i.* FROM invoices i
+               JOIN payment_splits ps ON ps.invoice_id = i.id
+               WHERE ps.user_id = $1
+               ORDER BY i.created_at DESC""",
+            user_id,
+        ) or []
+
+    async def get_invoice_by_offer(self, offer_id: str) -> dict[str, Any] | None:
+        """Get the invoice for a specific offer."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            result = await client.table("invoices").select("*").eq("offer_id", offer_id).limit(1).execute()
+            return result.data[0] if result.data else None
+        return await self._pg_fetch_one("SELECT * FROM invoices WHERE offer_id = $1", offer_id)
+
+    async def get_invoice_for_offer(self, user_id: str, offer_id: str) -> dict[str, Any] | None:
+        """Get the invoice for a specific offer and user (via payment_splits)."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            # First find the invoice for this offer
+            invoice_result = await client.table("invoices").select("*").eq("offer_id", offer_id).limit(1).execute()
+            if not invoice_result.data:
+                return None
+            invoice = invoice_result.data[0]
+            # Verify this user is a participant via payment_splits
+            splits = await client.table("payment_splits").select("id").eq("invoice_id", invoice["id"]).eq("user_id", user_id).limit(1).execute()
+            if splits.data:
+                return invoice
+            # Also return if user initiated the payment directly
+            payments = await client.table("payments").select("id").eq("invoice_id", invoice["id"]).eq("user_id", user_id).limit(1).execute()
+            return invoice if payments.data else None
+        return await self._pg_fetch_one(
+            """SELECT i.* FROM invoices i
+               LEFT JOIN payment_splits ps ON ps.invoice_id = i.id AND ps.user_id = $1
+               LEFT JOIN payments p ON p.invoice_id = i.id AND p.user_id = $1
+               WHERE i.offer_id = $2 AND (ps.id IS NOT NULL OR p.id IS NOT NULL)
+               LIMIT 1""",
+            user_id,
+            offer_id,
+        )
+
+    # ------------------------------------------------------------------
+    # Payments
+    # ------------------------------------------------------------------
+
+    async def create_payment(self, data: dict[str, Any]) -> dict[str, Any]:
+        """Insert a payment record."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            # Filter to only columns that exist in the payments table
+            insert_data = {k: v for k, v in data.items() if k in {
+                "id", "invoice_id", "user_id", "offer_id", "amount", "currency",
+                "status", "transaction_id", "payment_method", "payment_method_id",
+                "provider_data", "created_at",
+            }}
+            result = await client.table("payments").insert(insert_data).execute()
+            return result.data[0] if result.data else data
+        await self._pg_execute(
+            """INSERT INTO payments
+               (id, invoice_id, user_id, offer_id, amount, currency, status,
+                transaction_id, payment_method, provider_data, created_at)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)""",
+            data["id"],
+            data.get("invoice_id"),
+            data["user_id"],
+            data.get("offer_id"),
+            data["amount"],
+            data.get("currency", "ILS"),
+            data.get("status", "pending"),
+            data.get("transaction_id"),
+            data.get("payment_method"),
+            json.dumps(data.get("provider_data", {})),
+            data.get("created_at"),
+        )
+        return await self.get_payment(data["id"]) or data
+
+    async def get_payment(self, payment_id: str) -> dict[str, Any] | None:
+        """Get a payment by ID."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            result = await client.table("payments").select("*").eq("id", payment_id).limit(1).execute()
+            return result.data[0] if result.data else None
+        return await self._pg_fetch_one("SELECT * FROM payments WHERE id = $1", payment_id)
+
+    async def update_payment(self, payment_id: str, update_data: dict[str, Any]) -> dict[str, Any]:
+        """Update a payment record."""
+        allowed = {"status", "transaction_id", "payment_method", "provider_data"}
+        filtered = {k: v for k, v in update_data.items() if k in allowed}
+        if not filtered:
+            return await self.get_payment(payment_id) or {}
+        if self._use_supabase_client():
+            client = await self._get_client()
+            await client.table("payments").update(filtered).eq("id", payment_id).execute()
+        else:
+            set_parts: list[str] = []
+            args: list[Any] = []
+            for i, (k, v) in enumerate(filtered.items(), 1):
+                val = json.dumps(v) if isinstance(v, (dict, list)) else v
+                set_parts.append(f'"{k}" = ${i}')
+                args.append(val)
+            args.append(payment_id)
+            await self._pg_execute(
+                "UPDATE payments SET " + ", ".join(set_parts) + " WHERE id = $%d" % len(args),
+                *args,
+            )
+        return await self.get_payment(payment_id) or {}
+
+    async def list_payments_for_user(self, user_id: str) -> list[dict[str, Any]]:
+        """Get all payments for a user."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            result = await client.table("payments").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
+            return result.data or []
+        return await self._pg_fetch_all(
+            "SELECT * FROM payments WHERE user_id = $1 ORDER BY created_at DESC",
+            user_id,
+        ) or []
+
+    async def get_payment_by_transaction(self, transaction_id: str) -> dict[str, Any] | None:
+        """Look up a payment by its provider transaction ID."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            result = await client.table("payments").select("*").eq("transaction_id", transaction_id).limit(1).execute()
+            return result.data[0] if result.data else None
+        return await self._pg_fetch_one(
+            "SELECT * FROM payments WHERE transaction_id = $1", transaction_id
+        )
+
+    # ------------------------------------------------------------------
+    # Payment Splits
+    # ------------------------------------------------------------------
+
+    async def create_payment_split(self, data: dict[str, Any]) -> dict[str, Any]:
+        """Insert a payment split record."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            result = await client.table("payment_splits").insert(data).execute()
+            return result.data[0] if result.data else data
+        await self._pg_execute(
+            """INSERT INTO payment_splits
+               (id, invoice_id, user_id, amount, unit_count, status, created_at)
+               VALUES ($1,$2,$3,$4,$5,$6,$7)""",
+            data["id"],
+            data["invoice_id"],
+            data["user_id"],
+            data["amount"],
+            data.get("unit_count", 1),
+            data.get("status", "pending"),
+            data.get("created_at"),
+        )
+        return data
+
+    async def list_payment_splits(self, payment_id: str) -> list[dict[str, Any]]:
+        """Get all splits for a payment/invoice."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            result = await client.table("payment_splits").select("*").eq("invoice_id", payment_id).execute()
+            return result.data or []
+        return await self._pg_fetch_all(
+            "SELECT * FROM payment_splits WHERE invoice_id = $1",
+            payment_id,
+        ) or []
+
+    async def get_next_invoice_number(self) -> str:
+        """Query max invoice_number and return the next sequential value (zero-padded 5 digits)."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            result = await client.table("invoices").select("invoice_number").order("created_at", desc=True).limit(1).execute()
+            if result.data:
+                last = result.data[0]["invoice_number"]  # e.g. "INV-2026-00003"
+                try:
+                    seq = int(last.rsplit("-", 1)[-1]) + 1
+                except (ValueError, IndexError):
+                    seq = 1
+            else:
+                seq = 1
+        else:
+            row = await self._pg_fetch_one(
+                "SELECT invoice_number FROM invoices ORDER BY created_at DESC LIMIT 1"
+            )
+            if row:
+                try:
+                    seq = int(row["invoice_number"].rsplit("-", 1)[-1]) + 1
+                except (ValueError, IndexError):
+                    seq = 1
+            else:
+                seq = 1
+        return f"{seq:05d}"
 
     async def health_check(self) -> bool:
         """Check if PostgreSQL is accessible."""

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import {
   AlertTriangle,
@@ -35,12 +36,31 @@ export default function EscalationsPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
+  const queryClient = useQueryClient();
+
   const { data: escalationsData, isLoading } = useEscalations({
     priority: priorityFilter !== "all" ? priorityFilter : undefined,
     status: statusFilter !== "all" ? statusFilter : undefined,
   });
 
   const resolveMutation = useResolveEscalation();
+
+  // ---- API helpers ----
+  const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "") || "/api/v1";
+
+  function getAuthHeaders(): Record<string, string> {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    return headers;
+  }
+
+  const PRIORITY_ESCALATION_MAP: Record<string, string> = {
+    low: "normal",
+    normal: "high",
+    high: "urgent",
+    urgent: "urgent", // already max
+  };
 
   const allEscalations = escalationsData?.escalations ?? [];
 
@@ -139,14 +159,61 @@ export default function EscalationsPage() {
     [resolveMutation]
   );
 
-  const handleReassign = useCallback((_id: string) => {
-    // In production this would open a reassignment modal
-    // For now, we simply log
-  }, []);
+  const handleReassign = useCallback(
+    async (id: string) => {
+      try {
+        // Use the current admin user id from localStorage (or fallback to "admin")
+        const adminUserId =
+          typeof window !== "undefined"
+            ? localStorage.getItem("admin_user_id") ?? "admin"
+            : "admin";
 
-  const handleEscalate = useCallback((_id: string) => {
-    // In production this would trigger an escalation workflow
-  }, []);
+        const res = await fetch(
+          `${API_URL}/api/v1/escalations/${encodeURIComponent(id)}/assign`,
+          {
+            method: "POST",
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ assigned_to: adminUserId }),
+          }
+        );
+        if (!res.ok) throw new Error(`Failed to reassign escalation ${id}: ${res.status}`);
+        await queryClient.invalidateQueries({ queryKey: ["admin", "escalations"] });
+      } catch (err) {
+        alert(err instanceof Error ? err.message : "Failed to reassign escalation");
+      }
+    },
+    [API_URL, queryClient]
+  );
+
+  const handleEscalate = useCallback(
+    async (id: string) => {
+      try {
+        // Find the current escalation to determine its priority
+        const escalation = allEscalations.find((e) => e.id === id);
+        const currentPriority = escalation?.priority ?? "normal";
+        const newPriority = PRIORITY_ESCALATION_MAP[currentPriority] ?? "urgent";
+
+        if (currentPriority === "urgent") {
+          alert("This escalation is already at the highest priority level (urgent).");
+          return;
+        }
+
+        const res = await fetch(
+          `${API_URL}/api/v1/escalations/${encodeURIComponent(id)}`,
+          {
+            method: "PUT",
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ priority: newPriority }),
+          }
+        );
+        if (!res.ok) throw new Error(`Failed to escalate ${id}: ${res.status}`);
+        await queryClient.invalidateQueries({ queryKey: ["admin", "escalations"] });
+      } catch (err) {
+        alert(err instanceof Error ? err.message : "Failed to escalate further");
+      }
+    },
+    [API_URL, allEscalations, queryClient]
+  );
 
   const handleExport = useCallback(() => {
     const headers = [

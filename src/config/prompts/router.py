@@ -17,6 +17,8 @@ Available intent categories:
 - analytics_query: Business intelligence or reporting request
 - general_info: General questions about Groupio services
 - technical_support: Technical questions about installations or services
+- architecture_analysis: User uploaded a floor plan or asks about renovation suggestions based on their home layout
+- payment_query: User asks about payments, invoices, billing, refunds, or how much they owe
 
 If confidence < 0.7, formulate a clarifying question in Hebrew.
 
