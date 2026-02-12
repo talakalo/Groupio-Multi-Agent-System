@@ -168,14 +168,24 @@ class ArchitectureAgent(BaseAgent):
                 content = content.split("```json")[1].split("```")[0]
             elif "```" in content:
                 content = content.split("```")[1].split("```")[0]
-            return json.loads(content)
+            parsed = json.loads(content)
+            if not isinstance(parsed, dict):
+                raise json.JSONDecodeError("Expected a JSON object", content, 0)
+            # Ensure required keys exist
+            parsed.setdefault("rooms_detected", [])
+            parsed.setdefault("total_area_sqm", None)
+            parsed.setdefault("suggestions", [])
+            parsed.setdefault("summary_he", "")
+            parsed.setdefault("summary_en", "")
+            return parsed
         except (json.JSONDecodeError, IndexError):
-            # Return a basic structure with the raw text
+            logger.warning("Architecture analysis: failed to parse JSON from LLM response")
+            safe_summary = (content or "")[:500]
             return {
                 "rooms_detected": [],
                 "total_area_sqm": None,
                 "suggestions": [],
-                "summary_he": content[:500],
+                "summary_he": safe_summary if safe_summary else "הניתוח הושלם אך לא ניתן לפרסר את התוצאות.",
                 "summary_en": "",
             }
 
