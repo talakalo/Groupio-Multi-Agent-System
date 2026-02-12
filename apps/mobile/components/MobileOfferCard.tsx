@@ -109,6 +109,7 @@ export function MobileOfferCard({ offer, onJoin, onPress }: MobileOfferCardProps
       style={[styles.card, { backgroundColor: theme.colors.surface }]}
       mode="elevated"
       onPress={handlePress}
+      testID="offer-card"
     >
       <Card.Content style={styles.cardContent}>
         {/* Header: Contractor info + Category badge */}
@@ -223,6 +224,7 @@ export function MobileOfferCard({ offer, onJoin, onPress }: MobileOfferCardProps
           labelStyle={styles.joinButtonLabel}
           icon="account-plus"
           contentStyle={styles.joinButtonContent}
+          testID="join-button"
         >
           {isActive
             ? "\u05D4\u05E6\u05D8\u05E8\u05E3 \u05DC\u05D4\u05E6\u05E2\u05D4"

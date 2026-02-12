@@ -3,7 +3,7 @@
 from datetime import datetime
 from enum import Enum
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class UserRole(str, Enum):
@@ -43,6 +43,8 @@ class UserUpdate(BaseModel):
 class UserInDB(UserBase):
     """User stored in database."""
 
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     role: UserRole
     is_active: bool = True
@@ -53,9 +55,6 @@ class UserInDB(UserBase):
     last_login: datetime | None = None
     created_at: datetime
     updated_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class UserResponse(UserInDB):
