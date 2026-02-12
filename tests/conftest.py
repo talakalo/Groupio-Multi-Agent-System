@@ -1,7 +1,8 @@
 """Shared test fixtures for the Groupio test suite."""
 
+from unittest.mock import AsyncMock
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock
 
 from src.models.agent_state import AgentState
 

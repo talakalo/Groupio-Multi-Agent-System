@@ -2,9 +2,9 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class EscalationPriority(str, Enum):
@@ -68,16 +68,16 @@ class EscalationCreate(EscalationBase):
     """Create escalation request."""
 
     context: dict[str, Any] = {}
-    agent_reasoning: Optional[str] = None
+    agent_reasoning: str | None = None
 
 
 class EscalationUpdate(BaseModel):
     """Update escalation request."""
 
-    status: Optional[EscalationStatus] = None
-    priority: Optional[EscalationPriority] = None
-    assigned_to: Optional[str] = None
-    resolution_notes: Optional[str] = Field(None, max_length=2000)
+    status: EscalationStatus | None = None
+    priority: EscalationPriority | None = None
+    assigned_to: str | None = None
+    resolution_notes: str | None = Field(None, max_length=2000)
 
 
 class EscalationMessage(BaseModel):
@@ -94,27 +94,26 @@ class EscalationMessage(BaseModel):
 class EscalationInDB(EscalationBase):
     """Escalation stored in database."""
 
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     status: EscalationStatus = EscalationStatus.OPEN
-    assigned_to: Optional[str] = None
+    assigned_to: str | None = None
     context: dict[str, Any] = {}
-    agent_reasoning: Optional[str] = None
-    resolution_notes: Optional[str] = None
+    agent_reasoning: str | None = None
+    resolution_notes: str | None = None
     messages: list[EscalationMessage] = []
     created_at: datetime
     updated_at: datetime
-    resolved_at: Optional[datetime] = None
-
-    class Config:
-        from_attributes = True
+    resolved_at: datetime | None = None
 
 
 class EscalationResponse(EscalationInDB):
     """Escalation response model."""
 
-    user_name: Optional[str] = None
-    user_email: Optional[str] = None
-    assigned_to_name: Optional[str] = None
+    user_name: str | None = None
+    user_email: str | None = None
+    assigned_to_name: str | None = None
 
 
 class EscalationListResponse(BaseModel):
@@ -130,13 +129,13 @@ class EscalationListResponse(BaseModel):
 class EscalationFilterRequest(BaseModel):
     """Escalation filter request."""
 
-    status: Optional[list[EscalationStatus]] = None
-    priority: Optional[list[EscalationPriority]] = None
-    source_agent: Optional[list[EscalationSource]] = None
-    reason: Optional[list[EscalationReason]] = None
-    assigned_to: Optional[str] = None
-    date_from: Optional[datetime] = None
-    date_to: Optional[datetime] = None
+    status: list[EscalationStatus] | None = None
+    priority: list[EscalationPriority] | None = None
+    source_agent: list[EscalationSource] | None = None
+    reason: list[EscalationReason] | None = None
+    assigned_to: str | None = None
+    date_from: datetime | None = None
+    date_to: datetime | None = None
     page: int = Field(default=1, ge=1)
     page_size: int = Field(default=20, ge=1, le=100)
 
@@ -158,4 +157,4 @@ class EscalationReplyRequest(BaseModel):
 
     content: str = Field(..., min_length=1, max_length=2000)
     resolve: bool = False
-    resolution_notes: Optional[str] = None
+    resolution_notes: str | None = None

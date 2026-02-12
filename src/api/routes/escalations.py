@@ -2,7 +2,6 @@
 
 import logging
 from datetime import datetime
-from typing import Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
@@ -22,7 +21,7 @@ from src.models.escalation import (
     EscalationStatus,
     EscalationUpdate,
 )
-from src.models.user import UserInDB, UserRole
+from src.models.user import UserInDB
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +31,7 @@ router = APIRouter(tags=["escalations"])
 class ResolveEscalationBody(BaseModel):
     """Request body for resolving an escalation."""
 
-    resolution_notes: Optional[str] = Field(None, max_length=2000)
+    resolution_notes: str | None = Field(None, max_length=2000)
 
 
 @router.post("/", response_model=EscalationResponse)
@@ -61,10 +60,10 @@ async def create_escalation(
 
 @router.get("/", response_model=EscalationListResponse)
 async def list_escalations(
-    status: Optional[EscalationStatus] = None,
-    priority: Optional[EscalationPriority] = None,
-    source_agent: Optional[EscalationSource] = None,
-    assigned_to: Optional[str] = None,
+    status: EscalationStatus | None = None,
+    priority: EscalationPriority | None = None,
+    source_agent: EscalationSource | None = None,
+    assigned_to: str | None = None,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     current_user: UserInDB = Depends(get_current_user),
@@ -157,7 +156,7 @@ async def get_escalation_stats(
 
 @router.get("/my")
 async def get_my_escalations(
-    status: Optional[EscalationStatus] = None,
+    status: EscalationStatus | None = None,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
     current_user: UserInDB = Depends(get_current_user),
@@ -332,7 +331,7 @@ async def resolve_escalation(
     if escalation.status == EscalationStatus.RESOLVED:
         raise HTTPException(status_code=400, detail="Escalation already resolved")
 
-    resolution_notes = body.resolution_notes if body else None
+    notes = body.resolution_notes if body else None
     update_data = {
         "status": EscalationStatus.RESOLVED,
         "resolved_at": datetime.utcnow(),

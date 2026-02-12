@@ -246,8 +246,12 @@ export function useResolveEscalation() {
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (token) headers["Authorization"] = `Bearer ${token}`;
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL ?? "/api/v1"}/escalations/${escalationId}/resolve`,
-        { method: "POST", headers: { "Content-Type": "application/json" } }
+        `${base}/escalations/${escalationId}/resolve`,
+        {
+          method: "POST",
+          headers,
+          body: resolution_notes ? JSON.stringify({ resolution_notes }) : undefined,
+        }
       );
       if (!response.ok) throw new Error("Failed to resolve escalation");
       return response.json();
@@ -453,21 +457,12 @@ export interface ContractorListItem {
   email?: string;
 }
 
-function mapContractorToListItem(c: {
-  id: string;
-  business_name: string;
-  verification_status?: string;
-  average_rating?: number;
-  categories?: string[];
-  regions?: string[];
-  phone?: string;
-  email?: string;
-}): ContractorListItem {
+function mapContractorToListItem(c: Contractor): ContractorListItem {
   return {
     id: c.id,
-    businessName: c.business_name,
-    verified: c.verification_status === "verified",
-    rating: c.average_rating ?? 0,
+    businessName: c.businessName ?? "",
+    verified: c.verified ?? false,
+    rating: c.rating ?? 0,
     categories: Array.isArray(c.categories) ? c.categories : [],
     regions: Array.isArray(c.regions) ? c.regions : [],
     phone: c.phone,

@@ -1,7 +1,8 @@
 """Tests for the Outreach Agent."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from src.agents.outreach import OutreachAgent
 

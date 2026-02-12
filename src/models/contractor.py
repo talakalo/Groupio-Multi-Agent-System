@@ -2,9 +2,8 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from src.models.offer import ServiceCategory
 
@@ -43,28 +42,28 @@ class ContractorBase(BaseModel):
     regions: list[Region] = Field(..., min_length=1)
     years_experience: int = Field(..., ge=0)
     employee_count: int = Field(..., ge=1)
-    website: Optional[str] = None
+    website: str | None = None
 
 
 class ContractorCreate(ContractorBase):
     """Create contractor request."""
 
     password: str = Field(..., min_length=8)
-    license_number: Optional[str] = None
+    license_number: str | None = None
 
 
 class ContractorUpdate(BaseModel):
     """Update contractor request."""
 
-    business_name: Optional[str] = Field(None, min_length=2, max_length=200)
-    contact_name: Optional[str] = Field(None, min_length=2, max_length=100)
-    phone: Optional[str] = Field(None, pattern=r"^0\d{8,9}$")
-    description: Optional[str] = Field(None, min_length=50, max_length=2000)
-    categories: Optional[list[ServiceCategory]] = None
-    regions: Optional[list[Region]] = None
-    years_experience: Optional[int] = Field(None, ge=0)
-    employee_count: Optional[int] = Field(None, ge=1)
-    website: Optional[str] = None
+    business_name: str | None = Field(None, min_length=2, max_length=200)
+    contact_name: str | None = Field(None, min_length=2, max_length=100)
+    phone: str | None = Field(None, pattern=r"^0\d{8,9}$")
+    description: str | None = Field(None, min_length=50, max_length=2000)
+    categories: list[ServiceCategory] | None = None
+    regions: list[Region] | None = None
+    years_experience: int | None = Field(None, ge=0)
+    employee_count: int | None = Field(None, ge=1)
+    website: str | None = None
 
 
 class TrustScoreBreakdown(BaseModel):
@@ -82,13 +81,15 @@ class TrustScoreBreakdown(BaseModel):
 class ContractorInDB(ContractorBase):
     """Contractor stored in database."""
 
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     verification_status: VerificationStatus = VerificationStatus.PENDING
     trust_score: float = 0
-    trust_score_breakdown: Optional[TrustScoreBreakdown] = None
-    license_number: Optional[str] = None
+    trust_score_breakdown: TrustScoreBreakdown | None = None
+    license_number: str | None = None
     license_verified: bool = False
-    insurance_expiry: Optional[datetime] = None
+    insurance_expiry: datetime | None = None
     insurance_verified: bool = False
     certifications: list[str] = []
     average_rating: float = 0
@@ -98,9 +99,6 @@ class ContractorInDB(ContractorBase):
     average_response_time_hours: float = 0
     created_at: datetime
     updated_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class ContractorResponse(ContractorInDB):
@@ -122,12 +120,12 @@ class ContractorListResponse(BaseModel):
 class ContractorSearchRequest(BaseModel):
     """Contractor search request."""
 
-    query: Optional[str] = None
-    categories: Optional[list[ServiceCategory]] = None
-    regions: Optional[list[Region]] = None
-    min_trust_score: Optional[float] = Field(None, ge=0, le=100)
-    min_rating: Optional[float] = Field(None, ge=0, le=5)
-    verification_status: Optional[VerificationStatus] = None
+    query: str | None = None
+    categories: list[ServiceCategory] | None = None
+    regions: list[Region] | None = None
+    min_trust_score: float | None = Field(None, ge=0, le=100)
+    min_rating: float | None = Field(None, ge=0, le=5)
+    verification_status: VerificationStatus | None = None
     page: int = Field(default=1, ge=1)
     page_size: int = Field(default=20, ge=1, le=100)
 
@@ -140,7 +138,7 @@ class ContractorReview(BaseModel):
     user_id: str
     offer_id: str
     rating: float = Field(..., ge=1, le=5)
-    comment: Optional[str] = Field(None, max_length=1000)
+    comment: str | None = Field(None, max_length=1000)
     created_at: datetime
 
 

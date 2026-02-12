@@ -1,7 +1,5 @@
 """Unit tests for document chunking strategies."""
 
-import pytest
-
 from src.rag.chunking import (
     chunk_by_tokens,
     chunk_document,

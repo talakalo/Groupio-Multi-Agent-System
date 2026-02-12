@@ -1,9 +1,10 @@
 """Unit tests for the Vetting Agent."""
 
-import pytest
 from unittest.mock import AsyncMock, patch
 
-from src.agents.vetting import VettingAgent, THRESHOLDS, TRUST_WEIGHTS
+import pytest
+
+from src.agents.vetting import THRESHOLDS, TRUST_WEIGHTS, VettingAgent
 
 
 @pytest.fixture

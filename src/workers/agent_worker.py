@@ -14,8 +14,8 @@ from typing import Any
 import redis.asyncio as redis
 import structlog
 
-from src.config.settings import get_settings
 from src.agents.router import RouterAgent
+from src.config.settings import get_settings
 
 logger = structlog.get_logger(__name__)
 

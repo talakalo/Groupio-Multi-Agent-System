@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, Fragment, useRef } from "react";
+import React, { useState, useMemo, useCallback, Fragment, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import {
@@ -59,6 +59,38 @@ const REGION_LABELS: Record<string, string> = {
 type VerificationFilter = "all" | "verified" | "pending" | "suspended";
 type SortField = "businessName" | "rating" | "verified";
 type SortDir = "asc" | "desc";
+
+// ---- Sort header helper (declared outside render) ----
+function SortTh({
+  field,
+  sortField,
+  sortDir,
+  toggleSort,
+  children,
+}: {
+  field: SortField;
+  sortField: SortField;
+  sortDir: SortDir;
+  toggleSort: (f: SortField) => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <th
+      className="table-header cursor-pointer select-none"
+      onClick={() => toggleSort(field)}
+    >
+      <div className="flex items-center gap-1">
+        {children}
+        {sortField === field &&
+          (sortDir === "asc" ? (
+            <ChevronUp className="w-3.5 h-3.5" />
+          ) : (
+            <ChevronDown className="w-3.5 h-3.5" />
+          ))}
+      </div>
+    </th>
+  );
+}
 
 // Simulated trust score breakdown
 interface TrustScoreBreakdown {
@@ -345,32 +377,6 @@ export default function ContractorsPage() {
     }
   };
 
-  // ---- Sort header helper ----
-  function SortTh({
-    field,
-    children,
-  }: {
-    field: SortField;
-    children: React.ReactNode;
-  }) {
-    return (
-      <th
-        className="table-header cursor-pointer select-none"
-        onClick={() => toggleSort(field)}
-      >
-        <div className="flex items-center gap-1">
-          {children}
-          {sortField === field &&
-            (sortDir === "asc" ? (
-              <ChevronUp className="w-3.5 h-3.5" />
-            ) : (
-              <ChevronDown className="w-3.5 h-3.5" />
-            ))}
-        </div>
-      </th>
-    );
-  }
-
   return (
     <div className="space-y-6">
       {/* ---- Page header ---- */}
@@ -567,9 +573,9 @@ export default function ContractorsPage() {
                   onChange={toggleSelectAll}
                 />
               </th>
-              <SortTh field="businessName">Business Name</SortTh>
-              <SortTh field="verified">Status</SortTh>
-              <SortTh field="rating">Rating</SortTh>
+              <SortTh field="businessName" sortField={sortField} sortDir={sortDir} toggleSort={toggleSort}>Business Name</SortTh>
+              <SortTh field="verified" sortField={sortField} sortDir={sortDir} toggleSort={toggleSort}>Status</SortTh>
+              <SortTh field="rating" sortField={sortField} sortDir={sortDir} toggleSort={toggleSort}>Rating</SortTh>
               <th className="table-header">Categories</th>
               <th className="table-header">Regions</th>
               <th className="table-header">Trust Score</th>

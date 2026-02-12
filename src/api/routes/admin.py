@@ -9,7 +9,6 @@ from pydantic import BaseModel, EmailStr
 from src.api.middleware.auth import get_admin_user, hash_password
 from src.databases.postgres import get_postgres_client
 from src.databases.vector_store import get_vector_store
-from src.models.user import UserInDB
 from src.orchestration.graph import get_orchestrator
 from src.rag.pipeline import get_rag_pipeline
 

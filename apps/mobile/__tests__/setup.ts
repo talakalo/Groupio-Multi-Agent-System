@@ -1,4 +1,156 @@
 import { vi, afterEach } from 'vitest';
+import React from 'react';
+
+// Mock @testing-library/react-native (it fails to load RN host components in Node)
+vi.mock('@testing-library/react-native', () => {
+  const { create, act } = require('react-test-renderer');
+
+  /** Collect all text strings from a test-instance subtree. */
+  const collectText = (instance: any): string => {
+    if (typeof instance === 'string' || typeof instance === 'number') return String(instance);
+    if (!instance) return '';
+    if (instance.children) {
+      return instance.children.map(collectText).join('');
+    }
+    return '';
+  };
+
+  /** Walk all instances depth-first. */
+  const walkAll = (instance: any, cb: (node: any) => void) => {
+    if (!instance || typeof instance !== 'object') return;
+    cb(instance);
+    if (instance.children) {
+      for (const child of instance.children) walkAll(child, cb);
+    }
+  };
+
+  const render = (element: any) => {
+    let renderer: any;
+    act(() => { renderer = create(element); });
+    const rootInstance = renderer.root;
+
+    const getByText = (match: string | RegExp) => {
+      const nodes: any[] = [];
+      walkAll(rootInstance, (node: any) => {
+        if (typeof node === 'string' || typeof node === 'number') return;
+        const text = collectText(node);
+        if (text && (typeof match === 'string' ? text.includes(match) : match.test(text))) {
+          nodes.push(node);
+        }
+      });
+      if (!nodes.length) throw new Error(`Unable to find text: ${match}`);
+      // Return the deepest (most specific) match
+      return { props: nodes[nodes.length - 1].props || {} };
+    };
+
+    const queryByText = (match: string | RegExp) => {
+      try { return getByText(match); } catch { return null; }
+    };
+
+    const getByTestId = (id: string) => {
+      try {
+        return rootInstance.findByProps({ testID: id });
+      } catch {
+        throw new Error(`Unable to find testID: ${id}`);
+      }
+    };
+
+    const getByLabelText = (match: string | RegExp) => {
+      const nodes: any[] = [];
+      walkAll(rootInstance, (node: any) => {
+        const label = node.props?.accessibilityLabel || node.props?.['aria-label'] || '';
+        if (label && (typeof match === 'string' ? label.includes(match) : match.test(label))) {
+          nodes.push(node);
+        }
+      });
+      if (!nodes.length) throw new Error(`Unable to find accessibilityLabel: ${match}`);
+      return { props: nodes[0].props };
+    };
+
+    const getByRole = (role: string) => {
+      const nodes: any[] = [];
+      walkAll(rootInstance, (node: any) => {
+        if (node.props?.accessibilityRole === role || node.props?.role === role) {
+          nodes.push(node);
+        }
+      });
+      if (!nodes.length) throw new Error(`Unable to find role: ${role}`);
+      return { props: nodes[0].props };
+    };
+
+    return { getByText, queryByText, getByTestId, getByLabelText, getByRole, unmount: () => renderer.unmount() };
+  };
+
+  const fireEvent = {
+    press: (node: any) => { if (node.props?.onPress) node.props.onPress(); },
+    changeText: (node: any, text: string) => { if (node.props?.onChangeText) node.props.onChangeText(text); },
+  };
+
+  return { render, fireEvent };
+});
+
+// Mock react-native-paper (tokens/themes fail to load in Node)
+vi.mock('react-native-paper', () => {
+  const { createElement } = require('react');
+  const wrap = (name: string) => {
+    const Comp = (props: any) => createElement(name, props, props.children);
+    Comp.displayName = name;
+    return Comp;
+  };
+  const MockCard = Object.assign(wrap('Card'), {
+    Content: wrap('CardContent'),
+    Title: wrap('CardTitle'),
+    Cover: wrap('CardCover'),
+    Actions: wrap('CardActions'),
+  });
+  const MockAvatar = {
+    Icon: wrap('AvatarIcon'),
+    Image: wrap('AvatarImage'),
+    Text: wrap('AvatarText'),
+  };
+  return {
+    Card: MockCard,
+    Text: wrap('Text'),
+    Button: wrap('Button'),
+    Chip: wrap('Chip'),
+    Avatar: MockAvatar,
+    ProgressBar: wrap('ProgressBar'),
+    useTheme: () => ({
+      colors: {
+        primary: '#6200ee',
+        primaryContainer: '#bb86fc',
+        onPrimaryContainer: '#21005e',
+        secondary: '#03DAC6',
+        background: '#ffffff',
+        surface: '#ffffff',
+        surfaceVariant: '#f5f5f5',
+        onSurfaceVariant: '#666666',
+        error: '#B00020',
+        text: '#000000',
+        onSurface: '#000000',
+        onBackground: '#000000',
+        onPrimary: '#ffffff',
+        outline: '#cccccc',
+        outlineVariant: '#dddddd',
+        tertiary: '#7d5260',
+        tertiaryContainer: '#ffd8e4',
+        elevation: { level0: '#fff', level1: '#fff', level2: '#fff', level3: '#fff' },
+      },
+      dark: false,
+    }),
+    Provider: wrap('PaperProvider'),
+    DefaultTheme: { colors: {} },
+    MD3LightTheme: { colors: {} },
+  };
+});
+
+// Mock react-native-vector-icons
+vi.mock('react-native-vector-icons/MaterialCommunityIcons', () => {
+  const { createElement } = require('react');
+  const Icon = (props: any) => createElement('Icon', props);
+  Icon.displayName = 'Icon';
+  return { default: Icon };
+});
 
 // Mock React Native modules
 vi.mock('react-native', () => ({
@@ -14,6 +166,7 @@ vi.mock('react-native', () => ({
   StyleSheet: {
     create: (styles: Record<string, object>) => styles,
     flatten: (style: object) => style,
+    hairlineWidth: 1,
   },
   View: 'View',
   Text: 'Text',

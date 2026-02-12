@@ -1,7 +1,5 @@
 """Unit tests for Hebrew text processing utilities."""
 
-import pytest
-
 from src.utils.hebrew_utils import (
     detect_language,
     detect_legal_keywords,

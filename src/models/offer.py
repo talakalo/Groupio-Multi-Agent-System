@@ -2,9 +2,8 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class OfferStatus(str, Enum):
@@ -52,7 +51,7 @@ class OfferBase(BaseModel):
     base_price: float = Field(..., gt=0)
     min_participants: int = Field(default=5, ge=1)
     max_participants: int = Field(default=50, ge=1)
-    deadline: Optional[datetime] = None
+    deadline: datetime | None = None
 
 
 class OfferCreate(OfferBase):
@@ -65,39 +64,38 @@ class OfferCreate(OfferBase):
 class OfferUpdate(BaseModel):
     """Update offer request."""
 
-    title: Optional[str] = Field(None, min_length=3, max_length=200)
-    description: Optional[str] = Field(None, min_length=10, max_length=2000)
-    base_price: Optional[float] = Field(None, gt=0)
-    min_participants: Optional[int] = Field(None, ge=1)
-    max_participants: Optional[int] = Field(None, ge=1)
-    deadline: Optional[datetime] = None
-    status: Optional[OfferStatus] = None
+    title: str | None = Field(None, min_length=3, max_length=200)
+    description: str | None = Field(None, min_length=10, max_length=2000)
+    base_price: float | None = Field(None, gt=0)
+    min_participants: int | None = Field(None, ge=1)
+    max_participants: int | None = Field(None, ge=1)
+    deadline: datetime | None = None
+    status: OfferStatus | None = None
 
 
 class OfferInDB(OfferBase):
     """Offer stored in database."""
+
+    model_config = ConfigDict(from_attributes=True)
 
     id: str
     building_id: str
     created_by: str
     status: OfferStatus = OfferStatus.DRAFT
     current_participants: int = 0
-    matched_contractor_id: Optional[str] = None
+    matched_contractor_id: str | None = None
     pricing_tiers: list[PricingTier] = []
     created_at: datetime
     updated_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class OfferResponse(OfferInDB):
     """Offer response model."""
 
-    contractor_name: Optional[str] = None
-    building_name: Optional[str] = None
-    current_price: Optional[float] = None
-    current_discount: Optional[float] = None
+    contractor_name: str | None = None
+    building_name: str | None = None
+    current_price: float | None = None
+    current_discount: float | None = None
 
 
 class OfferListResponse(BaseModel):
@@ -122,4 +120,4 @@ class OfferMatchRequest(BaseModel):
 
     contractor_id: str
     final_price: float
-    notes: Optional[str] = None
+    notes: str | None = None

@@ -33,7 +33,7 @@ def create_access_token(
     user_id: str,
     email: str,
     role: UserRole,
-    expires_delta: Optional[timedelta] = None,
+    expires_delta: timedelta | None = None,
 ) -> str:
     """Create a JWT access token."""
     settings = get_settings()
@@ -72,7 +72,7 @@ def create_refresh_token(user_id: str) -> str:
     return jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
 
 
-def verify_access_token(token: str) -> Optional[TokenPayload]:
+def verify_access_token(token: str) -> TokenPayload | None:
     """Verify and decode an access token."""
     settings = get_settings()
 
@@ -101,7 +101,7 @@ def verify_access_token(token: str) -> Optional[TokenPayload]:
         return None
 
 
-def verify_refresh_token(token: str) -> Optional[dict]:
+def verify_refresh_token(token: str) -> dict | None:
     """Verify and decode a refresh token."""
     settings = get_settings()
 
@@ -125,7 +125,7 @@ def verify_refresh_token(token: str) -> Optional[dict]:
 
 
 async def get_current_user(
-    token: Optional[str] = Depends(oauth2_scheme),
+    token: str | None = Depends(oauth2_scheme),
 ) -> UserInDB:
     """Get the current authenticated user from the token."""
     if not token:

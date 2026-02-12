@@ -101,7 +101,7 @@ class Settings(BaseSettings):
 _DEFAULT_JWT_SECRET = "your-secret-key-change-in-production"
 
 
-@lru_cache()
+@lru_cache
 def get_settings() -> Settings:
     """Get cached settings instance."""
     s = Settings()
