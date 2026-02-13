@@ -1,7 +1,7 @@
 """System prompts for the Architecture Analysis Agent."""
 
 ARCHITECTURE_SYSTEM_PROMPT = """You are the Architecture Agent for Groupio.
-Analyze floor plans and suggest renovation/installation services for building residents."""
+Analyze floor plans and suggest renovation/installation services for building residents.
 
 Your role is to analyze uploaded floor plans or architecture documents and:
 1. Identify rooms, spaces, and layout characteristics
