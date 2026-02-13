@@ -50,6 +50,7 @@ class ArchitectureAgent(BaseAgent):
                         "message": "לא נמצא הקובץ שהועלה. אנא העלה מחדש.",
                     },
                     "requires_followup": False,
+                    "summary_for_next_agent": "Architecture file not found; asked user to re-upload.",
                 }
             ]
             return state
@@ -71,6 +72,7 @@ class ArchitectureAgent(BaseAgent):
                         "message": "הניתוח נכשל. אנא נסה להעלות תמונה ברורה יותר.",
                     },
                     "requires_followup": False,
+                    "summary_for_next_agent": "Architecture analysis failed; asked user for clearer image.",
                 }
             ]
             return state
@@ -107,6 +109,7 @@ class ArchitectureAgent(BaseAgent):
                     ),
                 },
                 "requires_followup": False,
+                "summary_for_next_agent": "Floor plan analysis completed; recommendations and matching offers provided.",
             }
         ]
         return state
@@ -201,6 +204,7 @@ class ArchitectureAgent(BaseAgent):
                     ),
                 },
                 "requires_followup": False,
+                "summary_for_next_agent": "Text-based renovation analysis completed; recommendations provided.",
             }
         ]
         return state

@@ -120,6 +120,7 @@ class PaymentAgent(BaseAgent):
                     "payments": payments,
                 },
                 "requires_followup": False,
+                "summary_for_next_agent": f"Reported payment status; {len(payments)} payment(s) found.",
             }
         ]
         return state
@@ -179,6 +180,10 @@ class PaymentAgent(BaseAgent):
                     "invoice": invoice,
                 },
                 "requires_followup": False,
+                "summary_for_next_agent": (
+                    f"Invoice {'found' if invoice else 'not found'} for offer {offer_id or 'N/A'}."
+                ),
+                "entities_to_pass": {"offer_id": offer_id} if offer_id else {},
             }
         ]
         return state
@@ -219,6 +224,8 @@ class PaymentAgent(BaseAgent):
                     "message": response_text,
                 },
                 "requires_followup": True,
+                "summary_for_next_agent": "Refund request escalated to human support.",
+                "suggested_next_agent": "support",
             }
         ]
         return state
@@ -245,6 +252,7 @@ class PaymentAgent(BaseAgent):
                     "message": response_text,
                 },
                 "requires_followup": False,
+                "summary_for_next_agent": "Provided general payment information.",
             }
         ]
         return state

@@ -59,9 +59,15 @@ class PricingAgent(BaseAgent):
     async def run(self, state: AgentState) -> AgentState:
         """Analyze pricing and generate tier recommendations."""
         user_message = self._get_last_user_message(state)
+        context_next = state.get("context_for_next_agent") or {}
+        entities = state.get("entities") or {}
         building_context = state.get("building_context", {})
         region = building_context.get("region", "center")
-        category = self._extract_category(state)
+        category = (
+            context_next.get("category")
+            or entities.get("category")
+            or self._extract_category(state)
+        )
 
         # Step 1: Retrieve pricing guides from knowledge base
         pricing_context = await self._retrieve_context(
@@ -97,6 +103,19 @@ class PricingAgent(BaseAgent):
             pricing_context=pricing_context,
         )
 
+        offer_id = entities.get("offer_id") or context_next.get("offer_id")
+        # Merge pricing entities into state for downstream agents
+        state["entities"] = {**(state.get("entities") or {}), "category": category, "offer_id": offer_id}
+        state["context_for_next_agent"] = {
+            "category": category,
+            "region": region,
+            "offer_id": offer_id,
+            "base_price": base_price,
+            "tiers_summary": [
+                {"min": t.get("min_participants"), "max": t.get("max_participants"), "discount": t.get("discount_percent")}
+                for t in tiers
+            ],
+        }
         state["actions_taken"] = [
             {
                 "agent": "pricing",
@@ -111,7 +130,17 @@ class PricingAgent(BaseAgent):
                     "type": "pricing_analysis",
                     "message": response,
                 },
-                "requires_followup": False,
+                "requires_followup": True,
+                "summary_for_next_agent": (
+                    f"Provided tiered pricing for {translate_category(category, 'en')} in {region}; "
+                    f"base price {base_price}, {len(tiers)} tiers."
+                ),
+                "entities_to_pass": {
+                    "category": category,
+                    "offer_id": offer_id,
+                },
+                "suggested_next_intent": "payment_query",
+                "suggested_next_agent": "payment",
             }
         ]
 
@@ -258,9 +287,9 @@ class PricingAgent(BaseAgent):
         return content[0].get("text", "") if content else ""
 
     def _extract_category(self, state: AgentState) -> str:
-        """Extract category from state."""
+        """Extract category from state (context_for_next_agent, entities, actions_taken, building_context)."""
         for action in state.get("actions_taken", []):
-            cat = action.get("details", {}).get("category")
+            cat = action.get("details", {}).get("category") or action.get("entities_to_pass", {}).get("category")
             if cat:
                 return cat
         return state.get("building_context", {}).get("category", "general")
