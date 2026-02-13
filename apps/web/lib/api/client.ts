@@ -239,6 +239,35 @@ class ApiClient {
       }
     );
   }
+
+  // ---- Payment endpoints ----
+
+  async getMyPayments() {
+    return this.request<import("@groupio/types").Payment[]>("/api/v1/payments/my");
+  }
+
+  async initiatePayment(offerId: string, paymentMethodId?: string) {
+    return this.request<import("@groupio/types").Payment>("/api/v1/payments/initiate", {
+      method: "POST",
+      body: { offer_id: offerId, payment_method_id: paymentMethodId },
+    });
+  }
+
+  async getPayment(paymentId: string) {
+    return this.request<import("@groupio/types").Payment>(
+      `/api/v1/payments/${paymentId}`
+    );
+  }
+
+  async getInvoice(invoiceId: string) {
+    return this.request<import("@groupio/types").Invoice>(
+      `/api/v1/payments/invoices/${invoiceId}`
+    );
+  }
+
+  async getMyInvoices() {
+    return this.request<import("@groupio/types").Invoice[]>("/api/v1/payments/invoices/my");
+  }
 }
 
 export class ApiError extends Error {
