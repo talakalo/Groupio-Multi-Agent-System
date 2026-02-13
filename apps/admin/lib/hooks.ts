@@ -493,8 +493,9 @@ export function useAdminAnalyticsDashboard() {
   return useQuery<AdminAnalyticsDashboard>({
     queryKey: ["admin", "analytics-dashboard"],
     queryFn: async () => {
-      const client = getApiClient();
-      return client.getAnalytics();
+      const res = await fetch("/api/admin/analytics");
+      if (!res.ok) throw new Error("Failed to fetch analytics");
+      return res.json();
     },
     refetchInterval: 60_000,
   });

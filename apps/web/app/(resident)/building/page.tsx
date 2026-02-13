@@ -308,7 +308,7 @@ export default function BuildingPage() {
           </div>
           {building?.activeOffers && building.activeOffers.length > 0 ? (
             <div className="space-y-3">
-              {building.activeOffers.map((offer) => (
+              {building.activeOffers.map((offer: Offer) => (
                 <GroupOfferCard key={offer.id} offer={offer} />
               ))}
             </div>

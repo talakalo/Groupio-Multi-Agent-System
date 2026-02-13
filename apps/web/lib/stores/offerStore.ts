@@ -81,14 +81,14 @@ export const useOfferStore = create<OfferState>((set, get) => ({
 
   setOffers: (offers) => set({ offers }),
 
-  addOffer: (offer) =>
+  addOffer: (offer: Offer) =>
     set((state) => ({
       offers: [offer, ...state.offers],
     })),
 
   updateOffer: (id, updates) =>
     set((state) => ({
-      offers: state.offers.map((o) =>
+      offers: state.offers.map((o: Offer) =>
         o.id === id ? { ...o, ...updates } : o
       ),
       currentOffer:
@@ -157,15 +157,23 @@ export const useOfferStore = create<OfferState>((set, get) => ({
         throw new Error('Failed to fetch offers');
       }
 
-      const data = await response.json();
+      const data = (await response.json()) as {
+        offers?: Offer[];
+        items?: Offer[];
+        page?: number;
+        page_size?: number;
+        total?: number;
+        has_more?: boolean;
+      };
+      const list = data.offers ?? data.items ?? [];
 
       set({
-        offers: page === 1 ? data.items : [...get().offers, ...data.items],
+        offers: page === 1 ? list : [...get().offers, ...list],
         pagination: {
-          page: data.page,
-          pageSize: data.page_size,
-          total: data.total,
-          hasMore: data.has_more,
+          page: data.page ?? page,
+          pageSize: data.page_size ?? get().pagination.pageSize,
+          total: data.total ?? list.length,
+          hasMore: data.has_more ?? false,
         },
       });
     } catch (error) {
@@ -229,7 +237,7 @@ export const useOfferStore = create<OfferState>((set, get) => ({
         throw new Error(error.detail || 'Failed to create offer');
       }
 
-      const offer = await response.json();
+      const offer = (await response.json()) as Offer;
       get().addOffer(offer);
       return offer;
     } catch (error) {

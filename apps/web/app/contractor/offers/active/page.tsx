@@ -155,7 +155,7 @@ export default function ContractorActiveOffersPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          {offers.map((offer) => (
+          {offers.map((offer: Offer) => (
             <OfferCard
               key={offer.id}
               offer={offer}
