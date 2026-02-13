@@ -138,6 +138,7 @@ class AnalyticsAgent(BaseAgent):
                     "data": result.get("data"),
                 },
                 "requires_followup": False,
+                "summary_for_next_agent": f"Analytics query ({query_type}) completed; explanation and data returned.",
             }
         ]
 

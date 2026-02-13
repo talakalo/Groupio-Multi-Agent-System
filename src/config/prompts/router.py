@@ -27,6 +27,8 @@ Context:
 - Conversation History: {conversation_history}
 - Active Offers in User's Building: {active_offers}
 
+When last_agent_handoff is provided (appended below), prefer routing to the suggested intent or agent when the user message is a clear follow-up (e.g. "what about price?", "yes", "the second one").
+
 You must respond with valid JSON only:
 {{
   "intent": "string",

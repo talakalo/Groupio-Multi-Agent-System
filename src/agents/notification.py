@@ -244,34 +244,22 @@ class NotificationAgent(BaseAgent):
     ) -> None:
         """Dispatch a notification via the specified channel.
 
-        Email: delegates to EmailService for actual delivery.
-        WhatsApp/Push/In-app: logged for now (requires infra setup).
+        Currently logs the notification. The actual sending infrastructure
+        is available in:
+        - Email: src/services/email.py (EmailService)
+        - WhatsApp: src/services/whatsapp_bot.py (WhatsAppBotService)
         """
         user_email = user_profile.get("email", "unknown")
         user_name = user_profile.get("full_name", "User")
         body_preview = (message.get("body", ""))[:80]
 
         if channel == "email":
-            from src.services.email import get_email_service
-
-            email_svc = get_email_service()
-            subject = message.get("subject", "Groupio Notification")
-            body = message.get("body", "")
-            sent = await email_svc.send_email(
-                to_email=user_email,
-                subject=subject,
-                html_content=f"<div dir='rtl'>{body}</div>",
-                text_content=body,
+            logger.info(
+                "NOTIFICATION [email] to=%s subject='%s' body='%s...'",
+                user_email,
+                message.get("subject", ""),
+                body_preview,
             )
-            if sent:
-                logger.info("NOTIFICATION [email] sent to=%s subject='%s'", user_email, subject)
-            else:
-                logger.info(
-                    "NOTIFICATION [email] not configured, logged: to=%s subject='%s' body='%s...'",
-                    user_email,
-                    subject,
-                    body_preview,
-                )
         elif channel == "whatsapp":
             phone = user_profile.get("phone", "unknown")
             logger.info(

@@ -113,13 +113,8 @@ class PostgresClient:
                 "execute_sql", {"query": query, "params": params or {}}
             ).execute()
             return result.data if result.data else []
-        # Local PostgreSQL: execute with positional params
-        # Convert $1-style placeholders - the query already uses them
-        if params:
-            # params dict values as positional args in order
-            args = list(params.values())
-            return await self._pg_fetch_all(query, *args)
-        return await self._pg_fetch_all(query)
+        # Local: not supported for generic RPC
+        return []
 
     async def get_user_profile(self, user_id: str) -> dict[str, Any] | None:
         """Get a user profile by ID."""
@@ -2020,32 +2015,6 @@ class PostgresClient:
             return result.data[0] if result.data else None
         return await self._pg_fetch_one("SELECT * FROM invoices WHERE offer_id = $1", offer_id)
 
-    async def get_invoice_for_offer(self, user_id: str, offer_id: str) -> dict[str, Any] | None:
-        """Get the invoice for a specific offer and user (via payment_splits)."""
-        if self._use_supabase_client():
-            client = await self._get_client()
-            # First find the invoice for this offer
-            invoice_result = await client.table("invoices").select("*").eq("offer_id", offer_id).limit(1).execute()
-            if not invoice_result.data:
-                return None
-            invoice = invoice_result.data[0]
-            # Verify this user is a participant via payment_splits
-            splits = await client.table("payment_splits").select("id").eq("invoice_id", invoice["id"]).eq("user_id", user_id).limit(1).execute()
-            if splits.data:
-                return invoice
-            # Also return if user initiated the payment directly
-            payments = await client.table("payments").select("id").eq("invoice_id", invoice["id"]).eq("user_id", user_id).limit(1).execute()
-            return invoice if payments.data else None
-        return await self._pg_fetch_one(
-            """SELECT i.* FROM invoices i
-               LEFT JOIN payment_splits ps ON ps.invoice_id = i.id AND ps.user_id = $1
-               LEFT JOIN payments p ON p.invoice_id = i.id AND p.user_id = $1
-               WHERE i.offer_id = $2 AND (ps.id IS NOT NULL OR p.id IS NOT NULL)
-               LIMIT 1""",
-            user_id,
-            offer_id,
-        )
-
     # ------------------------------------------------------------------
     # Payments
     # ------------------------------------------------------------------
@@ -2054,23 +2023,16 @@ class PostgresClient:
         """Insert a payment record."""
         if self._use_supabase_client():
             client = await self._get_client()
-            # Filter to only columns that exist in the payments table
-            insert_data = {k: v for k, v in data.items() if k in {
-                "id", "invoice_id", "user_id", "offer_id", "amount", "currency",
-                "status", "transaction_id", "payment_method", "payment_method_id",
-                "provider_data", "created_at",
-            }}
-            result = await client.table("payments").insert(insert_data).execute()
+            result = await client.table("payments").insert(data).execute()
             return result.data[0] if result.data else data
         await self._pg_execute(
             """INSERT INTO payments
-               (id, invoice_id, user_id, offer_id, amount, currency, status,
+               (id, invoice_id, user_id, amount, currency, status,
                 transaction_id, payment_method, provider_data, created_at)
-               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)""",
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)""",
             data["id"],
-            data.get("invoice_id"),
+            data["invoice_id"],
             data["user_id"],
-            data.get("offer_id"),
             data["amount"],
             data.get("currency", "ILS"),
             data.get("status", "pending"),
@@ -2122,16 +2084,6 @@ class PostgresClient:
             "SELECT * FROM payments WHERE user_id = $1 ORDER BY created_at DESC",
             user_id,
         ) or []
-
-    async def get_payment_by_transaction(self, transaction_id: str) -> dict[str, Any] | None:
-        """Look up a payment by its provider transaction ID."""
-        if self._use_supabase_client():
-            client = await self._get_client()
-            result = await client.table("payments").select("*").eq("transaction_id", transaction_id).limit(1).execute()
-            return result.data[0] if result.data else None
-        return await self._pg_fetch_one(
-            "SELECT * FROM payments WHERE transaction_id = $1", transaction_id
-        )
 
     # ------------------------------------------------------------------
     # Payment Splits

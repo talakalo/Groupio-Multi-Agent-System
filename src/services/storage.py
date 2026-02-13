@@ -64,12 +64,6 @@ class StorageService:
         if not content_type:
             content_type, _ = mimetypes.guess_type(file_name)
 
-        if not content_type:
-            raise StorageError(
-                f"Cannot determine file type for '{file_name}'. "
-                f"Allowed: {', '.join(sorted(ALLOWED_TYPES[bucket]))}"
-            )
-
         allowed = ALLOWED_TYPES[bucket]
         if content_type not in allowed:
             raise StorageError(

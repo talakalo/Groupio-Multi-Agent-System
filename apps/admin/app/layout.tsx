@@ -20,7 +20,6 @@ import {
   Shield,
   Users,
   Tag,
-  Banknote,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -58,11 +57,6 @@ const NAV_ITEMS = [
     label: "Offers",
     href: "/offers",
     icon: Tag,
-  },
-  {
-    label: "Payments",
-    href: "/payments",
-    icon: Banknote,
   },
   {
     label: "Settings",

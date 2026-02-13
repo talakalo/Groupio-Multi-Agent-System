@@ -59,7 +59,7 @@ class OfferLifecycleManager:
             if participants:
                 per_person = invoice["total"] / len(participants)
                 splits = [
-                    {"user_id": p["user_id"], "amount": round(per_person, 2)}
+                    {"participant_user_id": p["user_id"], "amount": round(per_person, 2)}
                     for p in participants
                 ]
                 await invoice_svc.split_payment(invoice["id"], splits)

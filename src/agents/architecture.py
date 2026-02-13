@@ -50,6 +50,7 @@ class ArchitectureAgent(BaseAgent):
                         "message": "לא נמצא הקובץ שהועלה. אנא העלה מחדש.",
                     },
                     "requires_followup": False,
+                    "summary_for_next_agent": "Architecture file not found; asked user to re-upload.",
                 }
             ]
             return state
@@ -71,6 +72,7 @@ class ArchitectureAgent(BaseAgent):
                         "message": "הניתוח נכשל. אנא נסה להעלות תמונה ברורה יותר.",
                     },
                     "requires_followup": False,
+                    "summary_for_next_agent": "Architecture analysis failed; asked user for clearer image.",
                 }
             ]
             return state
@@ -107,6 +109,7 @@ class ArchitectureAgent(BaseAgent):
                     ),
                 },
                 "requires_followup": False,
+                "summary_for_next_agent": "Floor plan analysis completed; recommendations and matching offers provided.",
             }
         ]
         return state
@@ -168,24 +171,14 @@ class ArchitectureAgent(BaseAgent):
                 content = content.split("```json")[1].split("```")[0]
             elif "```" in content:
                 content = content.split("```")[1].split("```")[0]
-            parsed = json.loads(content)
-            if not isinstance(parsed, dict):
-                raise json.JSONDecodeError("Expected a JSON object", content, 0)
-            # Ensure required keys exist
-            parsed.setdefault("rooms_detected", [])
-            parsed.setdefault("total_area_sqm", None)
-            parsed.setdefault("suggestions", [])
-            parsed.setdefault("summary_he", "")
-            parsed.setdefault("summary_en", "")
-            return parsed
+            return json.loads(content)
         except (json.JSONDecodeError, IndexError):
-            logger.warning("Architecture analysis: failed to parse JSON from LLM response")
-            safe_summary = (content or "")[:500]
+            # Return a basic structure with the raw text
             return {
                 "rooms_detected": [],
                 "total_area_sqm": None,
                 "suggestions": [],
-                "summary_he": safe_summary if safe_summary else "הניתוח הושלם אך לא ניתן לפרסר את התוצאות.",
+                "summary_he": content[:500],
                 "summary_en": "",
             }
 
@@ -211,6 +204,7 @@ class ArchitectureAgent(BaseAgent):
                     ),
                 },
                 "requires_followup": False,
+                "summary_for_next_agent": "Text-based renovation analysis completed; recommendations provided.",
             }
         ]
         return state

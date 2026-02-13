@@ -84,6 +84,10 @@ async def test_matching_finds_contractors(matching_agent, sample_agent_state):
     action = result["actions_taken"][-1]
     assert action["action"] == "contractors_found"
     assert len(action["contractors"]) > 0
+    assert "summary_for_next_agent" in action
+    assert "entities_to_pass" in action
+    assert action["entities_to_pass"].get("contractor_ids")
+    assert "category" in result.get("context_for_next_agent", {})
 
 
 @pytest.mark.asyncio

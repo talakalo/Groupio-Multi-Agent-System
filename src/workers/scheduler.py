@@ -92,9 +92,9 @@ async def check_expired_offers():
     now = datetime.now(timezone.utc)
     expired_offers = await db.execute_query(
         "SELECT id FROM offers WHERE deadline < $1 AND status IN ('pending', 'matching', 'draft')",
-        {"deadline": now.isoformat()},
-    )
-
+        {"deadline": now.isoformat()}
+    ) if hasattr(db, 'execute_query') else []
+    
     for offer in expired_offers:
         try:
             await db.update_offer(offer["id"], {"status": "cancelled"})

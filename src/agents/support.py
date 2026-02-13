@@ -142,6 +142,7 @@ class SupportAgent(BaseAgent):
                     "message": response,
                 },
                 "requires_followup": False,
+                "summary_for_next_agent": f"Answered support request (intent: {intent}).",
             }
         ]
 
@@ -244,6 +245,7 @@ class SupportAgent(BaseAgent):
                     "message": msg,
                 },
                 "requires_followup": False,
+                "summary_for_next_agent": f"Escalated to human: {reason}.",
             }
         ]
 
