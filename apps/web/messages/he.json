@@ -130,7 +130,9 @@
     "contractors": "קבלנים",
     "architecture": "תוכנית הדירה",
     "building": "בניין",
-    "profile": "פרופיל"
+    "profile": "פרופיל",
+    "aiAssistant": "עוזר AI",
+    "myAccount": "החשבון שלי"
   },
   "architecture": {
     "title": "תוכנית הדירה שלי",

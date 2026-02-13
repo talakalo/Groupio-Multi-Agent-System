@@ -130,7 +130,9 @@
     "contractors": "Contractors",
     "architecture": "My Home Plan",
     "building": "Building",
-    "profile": "Profile"
+    "profile": "Profile",
+    "aiAssistant": "AI Assistant",
+    "myAccount": "My Account"
   },
   "architecture": {
     "title": "My Home Plan",
