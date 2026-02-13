@@ -363,6 +363,14 @@ jobs:
           path: apps/web/playwright-report/
           retention-days: 7
 
+      - name: Publish E2E test results
+        if: always()
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        with:
+          files: apps/web/playwright-report/junit-e2e.xml
+          check_name: E2E Test Results
+          comment_mode: "off"
+
   # ============================================
   # Status Check (for branch protection)
   # ============================================
