@@ -103,3 +103,13 @@ Any agent can trigger escalation via `needs_human=True` in state. Triggers:
 - 3+ failed resolution attempts
 
 Creates a support ticket with full context for the human agent.
+
+## Inter-agent communication
+
+Agents do not call each other directly. They share a single **state** object and use a **structured handoff** when the workflow returns to the router after a specialist (e.g. when the user asks a follow-up like "what about price?" after seeing contractor matches).
+
+- **State:** All agents read and write `state` (e.g. `entities`, `context_for_next_agent`, `actions_taken`). The router writes extracted entities to `state["entities"]`; specialists can set `state["context_for_next_agent"]` for the next agent.
+- **Handoff:** When a specialist finishes, it appends an action to `actions_taken` with optional `summary_for_next_agent`, `suggested_next_intent`, and `entities_to_pass`. If `requires_followup` is true, the graph goes back to the router; the orchestrator copies the last action into `state["last_agent_handoff"]` so the router can route the follow-up correctly.
+- **Flow:** On "continue", the next node is the router. The orchestrator sets `last_agent_handoff` from the last `actions_taken` entry before running the router. The router sees this context and (optionally the user's follow-up message) and routes to the appropriate next agent (e.g. matching → pricing for "what about price?").
+
+See [Agent handoff contract](agent_handoff_contract.md) for the full action shape and state fields.

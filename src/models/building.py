@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from src.models.contractor import Region
 
@@ -37,6 +37,8 @@ class BuildingUpdate(BaseModel):
 class BuildingInDB(BuildingBase):
     """Building stored in database."""
 
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     admin_user_id: str
     resident_count: int = 0
@@ -46,9 +48,6 @@ class BuildingInDB(BuildingBase):
     whatsapp_group_id: str | None = None
     created_at: datetime
     updated_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class BuildingResponse(BuildingInDB):

@@ -81,6 +81,7 @@ class VettingAgent(BaseAgent):
                         "message": "לא הצלחנו לזהות את הקבלן. אנא ספק מזהה קבלן.",
                     },
                     "requires_followup": False,
+                    "summary_for_next_agent": "Contractor ID missing; asked user to provide it.",
                 }
             ]
             return state
@@ -136,8 +137,15 @@ class VettingAgent(BaseAgent):
                     "decision": decision,
                 },
                 "requires_followup": decision == "manual_review",
+                "summary_for_next_agent": (
+                    f"Vetting complete for contractor {contractor_id}: trust_score={trust_score}, decision={decision}."
+                ),
+                "entities_to_pass": {"contractor_id": contractor_id},
+                "suggested_next_agent": "support" if decision == "manual_review" else "",
             }
         ]
+        # Merge contractor_id into state entities for downstream agents
+        state["entities"] = {**(state.get("entities") or {}), "contractor_id": contractor_id}
 
         if decision == "manual_review":
             state["needs_human"] = True
@@ -330,9 +338,12 @@ class VettingAgent(BaseAgent):
         return content[0].get("text", "") if content else ""
 
     def _extract_contractor_id(self, state: AgentState) -> str | None:
-        """Extract contractor ID from state."""
+        """Extract contractor ID from state (entities, then actions_taken)."""
+        entities = state.get("entities") or {}
+        if entities.get("contractor_id"):
+            return entities["contractor_id"]
         for action in state.get("actions_taken", []):
-            entities = action.get("details", {}).get("entities", {})
-            if entities.get("contractor_id"):
-                return entities["contractor_id"]
+            e = action.get("entities_to_pass") or action.get("details", {}).get("entities", {})
+            if e.get("contractor_id"):
+                return e["contractor_id"]
         return None

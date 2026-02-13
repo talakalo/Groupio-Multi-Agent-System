@@ -16,6 +16,7 @@ import {
   MessageSquare,
   Bell,
   ChevronDown,
+  FileImage,
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 
@@ -29,6 +30,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', labelKey: 'dashboard', icon: LayoutDashboard },
   { href: '/offers', labelKey: 'offers', icon: Tag },
   { href: '/contractors', labelKey: 'contractors', icon: Wrench },
+  { href: '/architecture', labelKey: 'architecture', icon: FileImage },
   { href: '/building', labelKey: 'building', icon: Building2 },
   { href: '/profile', labelKey: 'profile', icon: UserCircle },
 ];
