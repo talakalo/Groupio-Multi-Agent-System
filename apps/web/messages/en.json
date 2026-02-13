@@ -119,8 +119,12 @@
   "contractor": {
     "offers": {
       "create": {
-        "fields": { "buildingId": "Building ID" },
-        "placeholders": { "buildingId": "Enter building ID" }
+        "fields": {
+          "buildingId": "Building ID"
+        },
+        "placeholders": {
+          "buildingId": "Enter building ID"
+        }
       }
     }
   },
