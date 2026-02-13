@@ -1,5 +1,6 @@
 """Base agent class for all Groupio agents."""
 
+import json
 import logging
 from abc import ABC, abstractmethod
 from typing import Any
@@ -109,15 +110,38 @@ class BaseAgent(ABC):
                 return msg.get("content", "")
         return ""
 
+    def _safe_format_value(self, value: Any) -> str:
+        """Convert a state value to a string for prompt insertion. Never raises."""
+        if value is None:
+            return "N/A"
+        if isinstance(value, str):
+            return value
+        if isinstance(value, (list, dict)):
+            try:
+                return json.dumps(value, ensure_ascii=False, default=str)
+            except (TypeError, ValueError):
+                return str(value)
+        return str(value)
+
     def _build_system_prompt(self, state: AgentState) -> str:
-        """Build the system prompt with state context."""
-        return self.config.system_prompt.format(
-            user_profile=state.get("user_profile", {}),
-            building_context=state.get("building_context", {}),
-            active_offers=state.get("active_offers", []),
-            rag_context=state.get("rag_results", []),
-            conversation_history=state.get("messages", []),
-        )
+        """Build the system prompt with state context. All placeholders have safe defaults."""
+        safe = {
+            "user_profile": self._safe_format_value(state.get("user_profile") or {}),
+            "building_context": self._safe_format_value(state.get("building_context") or {}),
+            "active_offers": self._safe_format_value(state.get("active_offers") or []),
+            "rag_context": self._safe_format_value(state.get("rag_results") or []),
+            "conversation_history": self._safe_format_value(state.get("messages") or []),
+        }
+        try:
+            return self.config.system_prompt.format(**safe)
+        except KeyError as e:
+            logger.warning("System prompt uses unknown placeholder %s; substituting N/A", e)
+
+            class SafeDict(dict):
+                def __missing__(self, k: str) -> str:
+                    return "N/A"
+
+            return self.config.system_prompt.format_map(SafeDict(safe))
 
     async def reload_config(self) -> None:
         """Reload agent configuration (for hot-reloading prompts)."""

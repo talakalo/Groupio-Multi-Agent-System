@@ -17,6 +17,8 @@ Available intent categories:
 - analytics_query: Business intelligence or reporting request
 - general_info: General questions about Groupio services
 - technical_support: Technical questions about installations or services
+- architecture_analysis: User uploaded a floor plan or asks about renovation suggestions based on their home layout
+- payment_query: User asks about payments, invoices, billing, refunds, or how much they owe
 
 If confidence < 0.7, formulate a clarifying question in Hebrew.
 
@@ -24,6 +26,8 @@ Context:
 - User Profile: {user_profile}
 - Conversation History: {conversation_history}
 - Active Offers in User's Building: {active_offers}
+
+When last_agent_handoff is provided (appended below), prefer routing to the suggested intent or agent when the user message is a clear follow-up (e.g. "what about price?", "yes", "the second one").
 
 You must respond with valid JSON only:
 {{

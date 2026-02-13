@@ -192,7 +192,7 @@ export default function OffersListPage() {
   });
 
   const filteredOffers = useMemo(() => {
-    let results = offersQuery.data?.offers ?? [];
+    let results = offersQuery.data?.items ?? [];
 
     if (filters.search.trim()) {
       const q = filters.search.toLowerCase();

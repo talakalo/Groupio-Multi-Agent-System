@@ -186,6 +186,7 @@ jobs:
 
       - name: Run unit tests
         run: |
+          # All tests under tests/unit/ (router, matching, pricing, support, etc.)
           pytest tests/unit/ -v --cov=src --cov-report=xml --cov-report=term-missing
 
       - name: Run integration tests
@@ -198,6 +199,7 @@ jobs:
           OPENAI_API_KEY: 'test-key'
           JWT_SECRET_KEY: 'test-secret-key-for-ci-testing-only'
         run: |
+          # All tests under tests/integration/ (orchestrator handoff, payment, upload, websocket, api, e2e)
           pytest tests/integration/ -v --timeout=30
 
       - name: Upload coverage to Codecov

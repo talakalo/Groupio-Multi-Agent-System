@@ -67,6 +67,24 @@ const AGENT_DEFS = [
     description:
       "Generates insights, reports, and answers natural-language analytics queries.",
   },
+  {
+    key: "architecture",
+    name: "Architecture Agent",
+    description:
+      "Analyzes uploaded floor plans via Vision AI and suggests renovation services.",
+  },
+  {
+    key: "payment",
+    name: "Payment Agent",
+    description:
+      "Handles payment queries, invoice generation, and refund processing.",
+  },
+  {
+    key: "notification",
+    name: "Notification Agent",
+    description:
+      "Central hub for multi-channel notifications (email, WhatsApp, push, in-app).",
+  },
 ] as const;
 
 const CHART_COLORS = [
@@ -77,6 +95,9 @@ const CHART_COLORS = [
   "#8b5cf6",
   "#06b6d4",
   "#ec4899",
+  "#14b8a6",
+  "#f97316",
+  "#a855f7",
 ];
 
 // ---------------------------------------------------------------------------
@@ -385,7 +406,7 @@ export default function AgentsPage() {
             </div>
             <div className="text-surface-300 text-lg">&rarr;</div>
             <div className="flex flex-col gap-2">
-              {["Matching", "Pricing", "Vetting", "Support", "Outreach"].map(
+              {["Matching", "Pricing", "Vetting", "Support", "Outreach", "Architecture", "Payment", "Notification"].map(
                 (name) => (
                   <div
                     key={name}
@@ -397,17 +418,88 @@ export default function AgentsPage() {
               )}
             </div>
             <div className="text-surface-300 text-lg">&rarr;</div>
-            <div className="flex flex-col items-center gap-1">
+            <div className="flex flex-col items-center gap-2">
               <div className="w-16 h-16 rounded-xl bg-success-50 text-success-700 flex items-center justify-center font-semibold text-xs">
                 Analytics
+              </div>
+              <div className="w-16 h-12 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center font-semibold text-[10px]">
+                Human
               </div>
             </div>
           </div>
           <p className="text-xs text-surface-400 mt-4">
             <Layers className="w-3.5 h-3.5 inline mr-1" />
-            Full interactive graph visualization coming soon
+            10 agents in orchestration pipeline &mdash; interactive graph coming soon
           </p>
         </div>
+      </div>
+
+      {/* ================================================================== */}
+      {/* Agent Decision Queue (actions needing admin review)                 */}
+      {/* ================================================================== */}
+      <div className="card p-6">
+        <h2 className="text-sm font-semibold text-surface-900 mb-3 flex items-center gap-2">
+          <Layers className="w-4 h-4 text-amber-500" />
+          Pending Agent Decisions
+        </h2>
+        <p className="text-xs text-surface-400 mb-4">
+          Agent actions that require admin review or override
+        </p>
+        <div className="divide-y divide-surface-100">
+          {[
+            {
+              id: "d1",
+              agent: "Vetting",
+              action: "Manual review required",
+              detail: 'Contractor "Haifa Electric" scored 72 (threshold: 85 for auto-approve)',
+              priority: "medium",
+            },
+            {
+              id: "d2",
+              agent: "Matching",
+              action: "Low-confidence match",
+              detail: "Best match score 0.45 for plumbing in South region (threshold: 0.6)",
+              priority: "low",
+            },
+            {
+              id: "d3",
+              agent: "Support",
+              action: "Escalation review",
+              detail: "User reported legal issue in conversation conv-445",
+              priority: "high",
+            },
+          ].map((decision) => (
+            <div key={decision.id} className="flex items-center gap-3 py-3">
+              <span
+                className={clsx(
+                  "w-2 h-2 rounded-full flex-shrink-0",
+                  decision.priority === "high" && "bg-red-500",
+                  decision.priority === "medium" && "bg-amber-500",
+                  decision.priority === "low" && "bg-green-500"
+                )}
+              />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-surface-700">
+                  <span className="font-medium text-surface-900">{decision.agent}</span>
+                  {" \u2014 "}
+                  {decision.action}
+                </p>
+                <p className="text-xs text-surface-400 mt-0.5">{decision.detail}</p>
+              </div>
+              <div className="flex gap-2 flex-shrink-0">
+                <button className="px-3 py-1.5 text-xs font-medium rounded-lg bg-primary-50 text-primary-700 hover:bg-primary-100 transition-colors">
+                  Approve
+                </button>
+                <button className="px-3 py-1.5 text-xs font-medium rounded-lg bg-surface-100 text-surface-600 hover:bg-surface-200 transition-colors">
+                  Override
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+        <p className="text-xs text-surface-400 mt-3 text-center">
+          Decision queue updates in real-time via WebSocket
+        </p>
       </div>
 
       {/* ================================================================== */}

@@ -18,6 +18,8 @@ import {
   Menu,
   LogOut,
   Shield,
+  Users,
+  Tag,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -45,6 +47,21 @@ const NAV_ITEMS = [
     label: "Analytics",
     href: "/analytics",
     icon: BarChart3,
+  },
+  {
+    label: "Users",
+    href: "/users",
+    icon: Users,
+  },
+  {
+    label: "Offers",
+    href: "/offers",
+    icon: Tag,
+  },
+  {
+    label: "Settings",
+    href: "/settings",
+    icon: Settings,
   },
 ] as const;
 

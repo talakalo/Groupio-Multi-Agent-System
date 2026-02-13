@@ -149,6 +149,7 @@ class OutreachAgent(BaseAgent):
                         "message": "No active campaign for this context.",
                     },
                     "requires_followup": False,
+                    "summary_for_next_agent": "No active outreach campaign for this context.",
                 }
             ]
             return state
@@ -186,6 +187,7 @@ class OutreachAgent(BaseAgent):
                     "variant": variant,
                 },
                 "requires_followup": False,
+                "summary_for_next_agent": f"Outreach campaign ({campaign_type}) message generated and dispatched.",
             }
         ]
 
