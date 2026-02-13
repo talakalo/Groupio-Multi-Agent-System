@@ -28,16 +28,21 @@ Tables:
 
 EXAMPLE_QUERIES = """
 Q: What is the average offer price by category?
-SQL: SELECT category, AVG(base_price) as avg_price, COUNT(*) as total_offers FROM offers GROUP BY category ORDER BY avg_price DESC
+SQL: SELECT category, AVG(base_price) as avg_price, COUNT(*) as total_offers
+     FROM offers GROUP BY category ORDER BY avg_price DESC
 
 Q: Which contractors have the highest ratings?
-SQL: SELECT business_name, rating, verified FROM contractors WHERE verified = true ORDER BY rating DESC LIMIT 10
+SQL: SELECT business_name, rating, verified FROM contractors
+     WHERE verified = true ORDER BY rating DESC LIMIT 10
 
 Q: How many offers were completed this month?
-SQL: SELECT COUNT(*) as completed FROM completed_offers WHERE completed_at >= DATE_TRUNC('month', CURRENT_DATE)
+SQL: SELECT COUNT(*) as completed FROM completed_offers
+     WHERE completed_at >= DATE_TRUNC('month', CURRENT_DATE)
 
 Q: What is the average satisfaction by region?
-SQL: SELECT b.region, AVG(co.satisfaction_score) as avg_satisfaction, COUNT(*) as total FROM completed_offers co JOIN offers o ON co.offer_id = o.id JOIN buildings b ON o.building_id = b.id GROUP BY b.region ORDER BY avg_satisfaction DESC
+SQL: SELECT b.region, AVG(co.satisfaction_score) as avg_satisfaction, COUNT(*) as total
+     FROM completed_offers co JOIN offers o ON co.offer_id = o.id
+     JOIN buildings b ON o.building_id = b.id GROUP BY b.region ORDER BY avg_satisfaction DESC
 """
 
 
@@ -138,7 +143,10 @@ class AnalyticsAgent(BaseAgent):
                     "data": result.get("data"),
                 },
                 "requires_followup": False,
-                "summary_for_next_agent": f"Analytics query ({query_type}) completed; explanation and data returned.",
+                "summary_for_next_agent": (
+                    f"Analytics query ({query_type}) completed; "
+                    "explanation and data returned."
+                ),
             }
         ]
 

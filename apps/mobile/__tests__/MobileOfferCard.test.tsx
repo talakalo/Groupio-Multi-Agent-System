@@ -1,14 +1,23 @@
-import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
+import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
+
 import MobileOfferCard from '../components/MobileOfferCard';
+
 import type { Offer } from '@groupio/types';
 
 const mockOffer = {
   id: 'offer-123',
   category: 'ac_installation',
   basePrice: 5000,
-  status: 'active',
+  currentParticipants: 10,
+  minParticipants: 5,
+  maxParticipants: 20,
+  status: 'pending',
+  discount: 15,
+  deadline: '2024-12-31',
+  buildingId: 'building-1',
+  contractorId: 'contractor-1',
   contractor: {
     id: 'contractor-1',
     businessName: 'AC Pro',
@@ -19,17 +28,15 @@ const mockOffer = {
     regions: ['center'],
   },
   participants: 10,
-  currentTier: 0,
-  tiers: [
-    { min: 5, max: 10, discount: 15, price: 4250 },
-    { min: 11, max: 20, discount: 20, price: 4000 },
-  ],
-  expiresAt: '2027-12-31',
   createdAt: '2024-01-01',
   updatedAt: '2024-01-01',
   createdBy: 'user-1',
+  pricingTiers: [],
+  currentTier: 0,
+  tiers: [{ min: 5, max: 20, discount: 15, price: 4250 }],
+  expiresAt: '2025-12-31',
   buildingId: 'building-1',
-  contractorId: 'contractor-1',
+  contractorId: 'contractor-1'
 } as unknown as Offer;
 
 describe('MobileOfferCard', () => {

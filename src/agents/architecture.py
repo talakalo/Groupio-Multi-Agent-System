@@ -50,7 +50,9 @@ class ArchitectureAgent(BaseAgent):
                         "message": "לא נמצא הקובץ שהועלה. אנא העלה מחדש.",
                     },
                     "requires_followup": False,
-                    "summary_for_next_agent": "Architecture file not found; asked user to re-upload.",
+                    "summary_for_next_agent": (
+                        "Architecture file not found; asked user to re-upload."
+                    ),
                 }
             ]
             return state
@@ -72,7 +74,9 @@ class ArchitectureAgent(BaseAgent):
                         "message": "הניתוח נכשל. אנא נסה להעלות תמונה ברורה יותר.",
                     },
                     "requires_followup": False,
-                    "summary_for_next_agent": "Architecture analysis failed; asked user for clearer image.",
+                    "summary_for_next_agent": (
+                        "Architecture analysis failed; asked user for clearer image."
+                    ),
                 }
             ]
             return state
@@ -109,7 +113,10 @@ class ArchitectureAgent(BaseAgent):
                     ),
                 },
                 "requires_followup": False,
-                "summary_for_next_agent": "Floor plan analysis completed; recommendations and matching offers provided.",
+                "summary_for_next_agent": (
+                    "Floor plan analysis completed; "
+                    "recommendations and matching offers provided."
+                ),
             }
         ]
         return state
@@ -130,6 +137,13 @@ class ArchitectureAgent(BaseAgent):
         system_prompt = self._build_system_prompt(state)
 
         # Build a multimodal message with the image URL
+        prompt_text = (
+            "אנא נתח את תוכנית הדירה הזו. "
+            "זהה חדרים, שטחים, ותן המלצות לשיפוצים והתקנות "
+            "שיכולות להתאים לדיירי הבניין שלנו. "
+            "Analyze this floor plan. Identify rooms, areas, "
+            "and suggest relevant home-improvement services."
+        )
         messages = [
             {
                 "role": "user",
@@ -138,16 +152,7 @@ class ArchitectureAgent(BaseAgent):
                         "type": "image",
                         "source": {"type": "url", "url": signed_url},
                     },
-                    {
-                        "type": "text",
-                        "text": (
-                            "אנא נתח את תוכנית הדירה הזו. "
-                            "זהה חדרים, שטחים, ותן המלצות לשיפוצים והתקנות "
-                            "שיכולות להתאים לדיירי הבניין שלנו. "
-                            "Analyze this floor plan. Identify rooms, areas, "
-                            "and suggest relevant home-improvement services."
-                        ),
-                    },
+                    {"type": "text", "text": prompt_text},
                 ],
             }
         ]
@@ -162,7 +167,9 @@ class ArchitectureAgent(BaseAgent):
         content = result.get("content", "")
         if isinstance(content, list):
             content = " ".join(
-                block.get("text", "") for block in content if block.get("type") == "text"
+                block.get("text", "")
+                for block in content
+                if block.get("type") == "text"
             )
 
         try:
@@ -204,7 +211,10 @@ class ArchitectureAgent(BaseAgent):
                     ),
                 },
                 "requires_followup": False,
-                "summary_for_next_agent": "Text-based renovation analysis completed; recommendations provided.",
+                "summary_for_next_agent": (
+                    "Text-based renovation analysis completed; "
+                    "recommendations provided."
+                ),
             }
         ]
         return state

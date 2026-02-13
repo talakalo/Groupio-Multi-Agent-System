@@ -59,6 +59,7 @@ def create_access_token(
 def create_refresh_token(user_id: str) -> str:
     """Create a JWT refresh token."""
     settings = get_settings()
+
     now = datetime.now(timezone.utc)
     expire = now + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
 
