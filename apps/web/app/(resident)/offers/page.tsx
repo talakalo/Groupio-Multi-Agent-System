@@ -417,7 +417,7 @@ export default function OffersListPage() {
         </div>
       ) : filteredOffers.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {filteredOffers.map((offer) => (
+          {filteredOffers.map((offer: Offer) => (
             <OfferCard key={offer.id} offer={offer} />
           ))}
         </div>
