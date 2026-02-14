@@ -36,10 +36,11 @@ test.describe('Architecture Upload Flow', () => {
   test('should display upload page with dropzone', async ({ page }) => {
     await page.goto('/architecture');
 
-    // The page should show an upload area
+    // The page renders Hebrew text from i18n: "העלה את תוכנית הדירה שלך"
+    // Also check for file input and the upload button
     await expect(
-      page.getByText(/upload|floor plan|architecture|dropzone/i)
-    ).toBeVisible();
+      page.getByText(/תוכנית|העלה|floor plan|upload/i)
+    ).toBeVisible({ timeout: 10000 });
   });
 
   test('should upload and analyze a floor plan', async ({ page }) => {
@@ -111,9 +112,10 @@ test.describe('Architecture Upload Flow', () => {
       buffer: Buffer.from('fake-png-data'),
     });
 
-    // Wait for the analysis results to appear
+    // Wait for the analysis results – use .first() to avoid strict mode violation
+    // since each room name is rendered as a separate element
     await expect(
-      page.getByText(/living room|bedroom|kitchen/i)
+      page.getByText('Living Room').first()
     ).toBeVisible({ timeout: 15000 });
   });
 
@@ -137,9 +139,9 @@ test.describe('Architecture Upload Flow', () => {
       buffer: Buffer.from('fake-png-data'),
     });
 
-    // Should show an error message
+    // Should show an error message (Hebrew: "ההעלאה נכשלה" or "נסה שוב")
     await expect(
-      page.getByText(/error|failed|try again/i)
+      page.getByText(/נכשל|error|failed|נסה שוב|try again/i)
     ).toBeVisible({ timeout: 10000 });
   });
 
@@ -178,9 +180,9 @@ test.describe('Architecture Upload Flow', () => {
       buffer: Buffer.from('fake-pdf-data'),
     });
 
-    // Should show analyzing/loading state
+    // Should show analyzing/loading state (Hebrew: "מנתח" or spinner)
     await expect(
-      page.getByText(/analyz|processing|loading/i)
+      page.getByText(/מנתח|analyz|processing|מעלה|uploading/i)
     ).toBeVisible({ timeout: 10000 });
   });
 });
