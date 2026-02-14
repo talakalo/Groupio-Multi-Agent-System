@@ -11,6 +11,7 @@ from pydantic import BaseModel
 
 from src.api.middleware.auth import get_admin_user
 from src.api.middleware.logging import RequestLoggingMiddleware
+from src.api.middleware.security import SecurityHeadersMiddleware
 from src.api.routes import api_router
 from src.config.settings import get_settings
 from src.databases.graph_store import get_graph_store
@@ -102,7 +103,10 @@ app.add_middleware(
     expose_headers=["Authorization"],
 )
 
-# Request logging middleware
+# Security headers middleware (HSTS, CSP, X-Frame-Options, etc.)
+app.add_middleware(SecurityHeadersMiddleware, environment=settings.ENVIRONMENT)
+
+# Request logging middleware (with PII redaction)
 app.add_middleware(RequestLoggingMiddleware)
 
 # Include API routes (auth, offers, contractors, buildings, etc.)
