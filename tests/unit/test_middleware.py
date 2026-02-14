@@ -27,6 +27,8 @@ def mock_request():
         request = MagicMock()
         request.method = method
         request.url.path = path
+        # str(request.url) is used by PII-redacting logging middleware
+        request.url.__str__ = MagicMock(return_value=f"http://localhost{path}")
         request.state = MagicMock()
 
         headers = {}

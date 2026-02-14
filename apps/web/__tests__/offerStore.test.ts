@@ -73,7 +73,6 @@ describe('Offer Store', () => {
     // Set a default auth token
     useAuthStore.setState({
       accessToken: 'test-access-token',
-      refreshToken: null,
       user: null,
       isAuthenticated: true,
       isLoading: false,
