@@ -1,6 +1,6 @@
 """Unit tests for monitoring utilities."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -12,7 +12,6 @@ from src.utils.monitoring import (
     track_llm_usage,
     track_rag_retrieval,
 )
-
 
 # ------------------------------------------------------------------
 # track_agent_execution decorator

@@ -23,9 +23,10 @@ const localStorageMock = createLocalStorageMock();
 Object.defineProperty(global, 'localStorage', { value: localStorageMock });
 
 // Helper to create a mock Offer
-const createMockOffer = (overrides: Partial<Offer> & { id: string }): Offer =>
-  ({
-    id: overrides.id,
+const createMockOffer = (overrides: Partial<Offer> & { id: string }): Offer => {
+  const { id, ...rest } = overrides;
+  return {
+    id,
     category: 'ac_installation',
     basePrice: 5000,
     status: 'active',
@@ -45,8 +46,9 @@ const createMockOffer = (overrides: Partial<Offer> & { id: string }): Offer =>
     tiers: [{ min: 5, max: 20, discount: 15, price: 4250 }],
     createdAt: '2024-01-01',
     expiresAt: '2025-12-31',
-    ...overrides,
-  }) as unknown as Offer;
+    ...rest,
+  } as unknown as Offer;
+};
 
 describe('Offer Store', () => {
   beforeEach(() => {

@@ -7,7 +7,6 @@ import pytest
 
 from src.api.middleware.logging import RequestLoggingMiddleware
 
-
 # ------------------------------------------------------------------
 # Fixtures
 # ------------------------------------------------------------------
