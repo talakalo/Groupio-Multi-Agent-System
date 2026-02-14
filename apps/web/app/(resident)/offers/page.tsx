@@ -192,24 +192,24 @@ export default function OffersListPage() {
   });
 
   const filteredOffers = useMemo(() => {
-    let results = offersQuery.data?.items ?? [];
+    let results = offersQuery.data?.offers ?? [];
 
     if (filters.search.trim()) {
       const q = filters.search.toLowerCase();
       results = results.filter(
-        (o) =>
+        (o: Offer) =>
           o.contractor?.businessName?.toLowerCase().includes(q) ||
           o.category.toLowerCase().includes(q)
       );
     }
     if (filters.priceMin !== null) {
-      results = results.filter((o) => {
+      results = results.filter((o: Offer) => {
         const price = o.tiers[o.currentTier]?.price ?? o.basePrice;
         return price >= (filters.priceMin ?? 0);
       });
     }
     if (filters.priceMax !== null) {
-      results = results.filter((o) => {
+      results = results.filter((o: Offer) => {
         const price = o.tiers[o.currentTier]?.price ?? o.basePrice;
         return price <= (filters.priceMax ?? Infinity);
       });
