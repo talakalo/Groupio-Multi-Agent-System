@@ -35,8 +35,6 @@ const mockOffer = {
   currentTier: 0,
   tiers: [{ min: 5, max: 20, discount: 15, price: 4250 }],
   expiresAt: '2025-12-31',
-  buildingId: 'building-1',
-  contractorId: 'contractor-1'
 } as unknown as Offer;
 
 describe('MobileOfferCard', () => {
