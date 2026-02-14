@@ -79,13 +79,17 @@ async function setupCommonMocks(page: Page) {
 function setupContractorAuth(page: Page) {
   return page.addInitScript(() => {
     localStorage.setItem(
-      "auth",
+      "groupio-auth",
       JSON.stringify({
-        user: { id: "con_001", role: "contractor", status: "active" },
-        token: "jwt_token",
+        state: {
+          user: { id: "con_001", email: "moshe@coolair.co.il", fullName: "Moshe", phone: "0521234567", role: "contractor", preferredLanguage: "he", isVerified: true, contractorId: "con_001" },
+          accessToken: "jwt_token",
+          refreshToken: "jwt_refresh",
+          isAuthenticated: true,
+        },
+        version: 0,
       })
     );
-    localStorage.setItem("auth_token", "jwt_token");
   });
 }
 

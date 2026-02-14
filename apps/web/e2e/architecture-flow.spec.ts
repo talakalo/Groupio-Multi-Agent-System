@@ -15,21 +15,20 @@ test.describe('Architecture Upload Flow', () => {
       })
     );
 
-    // Mock auth state in localStorage
+    // Mock auth state in localStorage (Zustand persist key: groupio-auth)
     await page.addInitScript(() => {
       localStorage.setItem(
-        'auth',
+        'groupio-auth',
         JSON.stringify({
-          user: {
-            id: 'user-1',
-            email: 'test@test.com',
-            role: 'resident',
-            buildingId: 'bld-001',
+          state: {
+            user: { id: 'user-1', email: 'test@test.com', fullName: 'Test User', phone: '0541234567', role: 'resident', preferredLanguage: 'he', isVerified: true, buildingId: 'bld-001' },
+            accessToken: 'test-jwt-token',
+            refreshToken: 'test-jwt-refresh',
+            isAuthenticated: true,
           },
-          token: 'test-jwt-token',
+          version: 0,
         })
       );
-      localStorage.setItem('auth_token', 'test-jwt-token');
     });
   });
 
