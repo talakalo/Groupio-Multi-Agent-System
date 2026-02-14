@@ -53,8 +53,9 @@ export default function LoginPage() {
         // Store temp token for 2FA verification
         setTempToken(data.token || data.access_token || null);
         setStep("2fa");
-      } catch (err: any) {
-        setError(err.message || "Login failed. Please check your credentials.");
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "Login failed. Please check your credentials.";
+        setError(message);
       } finally {
         setLoading(false);
       }
@@ -98,8 +99,9 @@ export default function LoginPage() {
         }
 
         router.push("/dashboard");
-      } catch (err: any) {
-        setError(err.message || "Verification failed. Please try again.");
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "Verification failed. Please try again.";
+        setError(message);
         // Clear TOTP inputs on error
         setTotpCode(["", "", "", "", "", ""]);
         totpRefs.current[0]?.focus();

@@ -1,6 +1,5 @@
 """Architecture Analysis Agent – analyses floor plans via Vision AI."""
 
-import base64
 import json
 import logging
 from typing import Any
