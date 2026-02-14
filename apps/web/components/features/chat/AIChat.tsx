@@ -171,6 +171,7 @@ export function AIChat({
   // ---- Render ----
   return (
     <div
+      data-testid="chat-widget"
       className={cn(
         'flex flex-col rounded-2xl border border-gray-200 bg-white shadow-sm',
         'h-[600px] max-h-[80vh]',
@@ -267,6 +268,7 @@ export function AIChat({
       >
         <input
           ref={inputRef}
+          data-testid="chat-input"
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -309,7 +311,7 @@ export function AIChat({
 
 function TypingIndicator() {
   return (
-    <div className="flex items-center gap-1 py-1" aria-label="חושב...">
+    <div data-testid="typing-indicator" className="flex items-center gap-1 py-1" aria-label="חושב...">
       <span className="h-2 w-2 animate-bounce rounded-full bg-gray-400 [animation-delay:0ms]" />
       <span className="h-2 w-2 animate-bounce rounded-full bg-gray-400 [animation-delay:150ms]" />
       <span className="h-2 w-2 animate-bounce rounded-full bg-gray-400 [animation-delay:300ms]" />
