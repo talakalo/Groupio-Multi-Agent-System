@@ -55,7 +55,7 @@ export default function LoginPage() {
       };
 
       const response = await apiClient.login(credentials);
-      useAuthStore.getState().setTokens(response.token, response.refresh_token || '');
+      useAuthStore.getState().setAccessToken(response.token);
       router.push("/dashboard");
     } catch (err) {
       setError(

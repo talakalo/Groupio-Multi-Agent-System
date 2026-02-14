@@ -55,6 +55,7 @@ class ApiClient {
       method,
       headers: requestHeaders,
       body: body ? JSON.stringify(body) : undefined,
+      credentials: 'include', // send HTTP-only cookies (refresh token)
       signal,
     });
 
@@ -194,7 +195,7 @@ class ApiClient {
     const url = buildingId
       ? `${this.baseUrl}/api/v1/uploads/architecture?building_id=${encodeURIComponent(buildingId)}`
       : `${this.baseUrl}/api/v1/uploads/architecture`;
-    const res = await fetch(url, { method: "POST", headers, body: formData });
+    const res = await fetch(url, { method: "POST", headers, body: formData, credentials: 'include' });
     if (!res.ok) {
       const err = await res.json().catch(() => null);
       throw new ApiError(res.status, err?.detail || res.statusText, err);

@@ -58,7 +58,7 @@ export function useRealtimeOffers({
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectAttempts = useRef(0);
-  const connectRef = useRef<() => void>();
+  const connectRef = useRef<(() => void) | undefined>(undefined);
   const reconnectTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ---- Update query cache based on realtime events ----
