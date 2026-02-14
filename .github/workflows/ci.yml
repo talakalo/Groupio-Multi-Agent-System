@@ -107,19 +107,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  dependency-review:
-    name: Dependency Review
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Dependency Review
-        uses: actions/dependency-review-action@v4
-        with:
-          fail-on-severity: critical
+  # NOTE: dependency-review requires GitHub Advanced Security (not available).
+  # Re-enable when Advanced Security is activated on the repository.
+  # See: https://github.com/talakalo/Groupio-Multi-Agent-System/settings/security_analysis
 
   # ============================================
   # Backend Tests
