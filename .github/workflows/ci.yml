@@ -283,6 +283,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Validate Dockerfile copy sources
+        run: |
+          if grep -Eq 'COPY .*setup\.py' docker/Dockerfile && [[ ! -f setup.py ]]; then
+            echo "❌ docker/Dockerfile references setup.py, but setup.py is missing in repository root."
+            exit 1
+          fi
+          if grep -Eq 'COPY .*setup\.cfg' docker/Dockerfile && [[ ! -f setup.cfg ]]; then
+            echo "❌ docker/Dockerfile references setup.cfg, but setup.cfg is missing in repository root."
+            exit 1
+          fi
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
