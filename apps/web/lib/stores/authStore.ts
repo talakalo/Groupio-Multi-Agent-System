@@ -61,7 +61,6 @@ export const useAuthStore = create<AuthState>()(
         }),
 
       setTokens: (accessToken, refreshToken) => {
-        if (typeof window !== 'undefined') window.localStorage.setItem('auth_token', accessToken);
         set({
           accessToken,
           refreshToken,
@@ -70,7 +69,6 @@ export const useAuthStore = create<AuthState>()(
       },
 
       clearAuth: () => {
-        if (typeof window !== 'undefined') window.localStorage.removeItem('auth_token');
         set({
           user: null,
           accessToken: null,
@@ -97,7 +95,6 @@ export const useAuthStore = create<AuthState>()(
           }
 
           const data = await response.json();
-          if (typeof window !== 'undefined') window.localStorage.setItem('auth_token', data.access_token);
           set({
             accessToken: data.access_token,
             refreshToken: data.refresh_token,
@@ -165,7 +162,6 @@ export const useAuthStore = create<AuthState>()(
           }
 
       const data = await response.json();
-      if (typeof window !== 'undefined') window.localStorage.setItem('auth_token', data.access_token);
       set({
         accessToken: data.access_token,
         refreshToken: data.refresh_token,

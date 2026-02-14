@@ -68,11 +68,20 @@ class TaskScheduler:
         if not acquired:
             return
 
+        idempotency_key = f"scheduler:idempotent:{task.name}:{datetime.now(timezone.utc).strftime('%Y%m%d%H%M')}"
         try:
-            logger.info("Running scheduled task: %s", task.name)
+            # Check idempotency to prevent double-processing on restart
+            already_ran = await redis.get(idempotency_key)
+            if already_ran:
+                logger.info("Task %s already completed in this window (idempotency key exists), skipping", task.name)
+                return
+
+            logger.info("Running scheduled task: %s (idempotency=%s)", task.name, idempotency_key)
             await task.func()
+            # Mark as completed with TTL matching the task interval
+            await redis.set(idempotency_key, "done", ex=task.interval_seconds)
             await redis.set(last_run_key, datetime.now(timezone.utc).isoformat())
-            logger.info("Task %s completed", task.name)
+            logger.info("Task %s completed successfully", task.name)
         finally:
             await redis.delete(lock_key)
 

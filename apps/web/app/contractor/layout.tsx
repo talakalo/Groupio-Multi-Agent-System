@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -40,7 +40,18 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
   const router = useRouter();
   const t = useTranslations('contractorNav');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const token = useAuthStore((s) => s.accessToken);
   const logout = useAuthStore((s) => s.logout);
+
+  useEffect(() => {
+    if (!token) {
+      router.replace('/login');
+    }
+  }, [token, router]);
+
+  if (!token) {
+    return null;
+  }
 
   const handleLogout = async () => {
     await logout();

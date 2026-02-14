@@ -38,6 +38,8 @@ class VectorStore:
         self.client = AsyncQdrantClient(
             url=settings.QDRANT_URL,
             api_key=settings.QDRANT_API_KEY,
+            timeout=30,
+            prefer_grpc=True,
         )
         self._batch_size = 1000
 

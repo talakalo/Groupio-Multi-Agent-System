@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
+import { useAuthStore } from '@/lib/stores/authStore';
 import {
   LayoutDashboard,
   Tag,
@@ -37,8 +38,20 @@ const NAV_ITEMS: NavItem[] = [
 
 export default function ResidentLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const t = useTranslations('residentNav');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const token = useAuthStore((s) => s.accessToken);
+
+  useEffect(() => {
+    if (!token) {
+      router.replace('/login');
+    }
+  }, [token, router]);
+
+  if (!token) {
+    return null;
+  }
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 

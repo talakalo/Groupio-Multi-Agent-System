@@ -253,18 +253,21 @@ class NotificationAgent(BaseAgent):
         user_name = user_profile.get("full_name", "User")
         body_preview = (message.get("body", ""))[:80]
 
+        # Redact PII before logging
+        redacted_email = user_email[:3] + "***" if len(user_email) > 3 else "***"
+        redacted_phone = "***" + user_profile.get("phone", "")[-4:] if user_profile.get("phone") else "unknown"
+
         if channel == "email":
             logger.info(
                 "NOTIFICATION [email] to=%s subject='%s' body='%s...'",
-                user_email,
+                redacted_email,
                 message.get("subject", ""),
                 body_preview,
             )
         elif channel == "whatsapp":
-            phone = user_profile.get("phone", "unknown")
             logger.info(
                 "NOTIFICATION [whatsapp] to=%s body='%s...'",
-                phone,
+                redacted_phone,
                 body_preview,
             )
         elif channel == "push":

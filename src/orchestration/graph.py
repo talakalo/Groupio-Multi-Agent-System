@@ -76,8 +76,15 @@ class GroupioOrchestrator:
             try:
                 return await self.agents[agent_name].run(state)
             except Exception as exc:
-                logger.exception("Agent %s failed: %s", agent_name, exc)
-                err_msg = str(exc)[:200] if str(exc) else "unknown error"
+                is_transient = isinstance(exc, (TimeoutError, ConnectionError, OSError))
+                log_fn = logger.warning if is_transient else logger.exception
+                log_fn(
+                    "Agent %s failed (%s): %s",
+                    agent_name,
+                    "transient" if is_transient else "permanent",
+                    exc,
+                )
+                err_msg = f"[{'transient' if is_transient else 'permanent'}] {str(exc)[:180]}"
                 # Append single error action (reducer will merge with existing actions_taken)
                 state["actions_taken"] = [
                     {

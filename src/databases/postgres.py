@@ -35,7 +35,20 @@ def _row_to_user(row: dict) -> dict:
 
 
 class PostgresClient:
-    """PostgreSQL client - uses Supabase when configured, else local PostgreSQL via asyncpg."""
+    """PostgreSQL client with dual backend support.
+
+    Connects to **Supabase** (PostgREST) when ``SUPABASE_URL`` and
+    ``SUPABASE_KEY`` are set and ``USE_LOCAL_POSTGRES`` is not ``"1"``/``"true"``.
+    Otherwise falls back to a local **asyncpg** connection pool.
+
+    .. note::
+        **Production** currently uses Supabase.  The asyncpg path is
+        used in CI/testing and for local development.  Both paths are
+        exercised in integration tests.
+
+    Every public method contains an ``if self._use_supabase_client():``
+    branch.  When adding new queries, always implement both branches.
+    """
 
     def __init__(self) -> None:
         self._supabase_client: Any = None

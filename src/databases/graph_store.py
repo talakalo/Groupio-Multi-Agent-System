@@ -19,6 +19,8 @@ class GraphStore:
         self._driver: AsyncDriver = AsyncGraphDatabase.driver(
             settings.NEO4J_URI,
             auth=(settings.NEO4J_USER, settings.NEO4J_PASSWORD),
+            max_connection_pool_size=50,
+            connection_acquisition_timeout=30,
         )
 
     async def close(self) -> None:

@@ -47,11 +47,9 @@ jobs:
 
       - name: Run Ruff linter
         run: ruff check src/ tests/ --output-format=github
-        continue-on-error: true
 
       - name: Run Ruff formatter check
         run: ruff format src/ tests/ --check
-        continue-on-error: true
 
   frontend-lint:
     name: Frontend Lint & Type Check
@@ -77,11 +75,9 @@ jobs:
 
       - name: Run ESLint
         run: pnpm lint
-        continue-on-error: true
 
       - name: Run TypeScript type check
         run: pnpm typecheck
-        continue-on-error: true
 
   # ============================================
   # Security Scanning
@@ -96,19 +92,18 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.28.0
         with:
           scan-type: 'fs'
           scan-ref: '.'
           format: 'table'
           severity: 'CRITICAL,HIGH'
-          exit-code: '0'
+          exit-code: '1'
 
       - name: Run GitLeaks (secret scanning)
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        continue-on-error: true
 
   dependency-review:
     name: Dependency Review
@@ -123,7 +118,6 @@ jobs:
         uses: actions/dependency-review-action@v4
         with:
           fail-on-severity: critical
-        continue-on-error: true
 
   # ============================================
   # Backend Tests
@@ -186,7 +180,6 @@ jobs:
 
       - name: Run unit tests
         run: |
-          # All tests under tests/unit/ (router, matching, pricing, support, etc.)
           pytest tests/unit/ -v --cov=src --cov-report=xml --cov-report=term-missing
 
       - name: Run integration tests
@@ -199,7 +192,6 @@ jobs:
           OPENAI_API_KEY: 'test-key'
           JWT_SECRET_KEY: 'test-secret-key-for-ci-testing-only'
         run: |
-          # All tests under tests/integration/ (orchestrator handoff, payment, upload, websocket, api, e2e)
           pytest tests/integration/ -v --timeout=30
 
       - name: Upload coverage to Codecov
