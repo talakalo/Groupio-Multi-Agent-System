@@ -295,13 +295,17 @@ test.describe("Resident Browse Offers Flow", () => {
 
     await page.addInitScript(() => {
       localStorage.setItem(
-        "auth",
+        "groupio-auth",
         JSON.stringify({
-          user: { id: "user_123", name: "יעל כהן", role: "resident" },
-          token: "jwt_token",
+          state: {
+            user: { id: "user_123", email: "yael.cohen@example.com", fullName: "יעל כהן", phone: "0541234567", role: "resident", preferredLanguage: "he", isVerified: true, buildingId: "bld_001" },
+            accessToken: "jwt_token",
+            refreshToken: "jwt_refresh",
+            isAuthenticated: true,
+          },
+          version: 0,
         })
       );
-      localStorage.setItem("auth_token", "jwt_token");
     });
   });
 
@@ -347,13 +351,17 @@ test.describe("Resident Join Offer Flow", () => {
 
     await page.addInitScript(() => {
       localStorage.setItem(
-        "auth",
+        "groupio-auth",
         JSON.stringify({
-          user: { id: "user_123", name: "יעל כהן", role: "resident", buildingId: "bld_001" },
-          token: "jwt_token",
+          state: {
+            user: { id: "user_123", email: "yael.cohen@example.com", fullName: "יעל כהן", phone: "0541234567", role: "resident", preferredLanguage: "he", isVerified: true, buildingId: "bld_001" },
+            accessToken: "jwt_token",
+            refreshToken: "jwt_refresh",
+            isAuthenticated: true,
+          },
+          version: 0,
         })
       );
-      localStorage.setItem("auth_token", "jwt_token");
     });
   });
 
@@ -443,13 +451,17 @@ test.describe("Resident Profile & Settings", () => {
 
     await page.addInitScript(() => {
       localStorage.setItem(
-        "auth",
+        "groupio-auth",
         JSON.stringify({
-          user: { id: "user_123", name: "יעל כהן", role: "resident" },
-          token: "jwt_token",
+          state: {
+            user: { id: "user_123", email: "yael.cohen@example.com", fullName: "יעל כהן", phone: "0541234567", role: "resident", preferredLanguage: "he", isVerified: true, buildingId: "bld_001" },
+            accessToken: "jwt_token",
+            refreshToken: "jwt_refresh",
+            isAuthenticated: true,
+          },
+          version: 0,
         })
       );
-      localStorage.setItem("auth_token", "jwt_token");
     });
   });
 
