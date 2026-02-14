@@ -105,6 +105,6 @@ def test_chunk_overlap():
         last_words_first = set(chunks[0]["text"].split()[-5:])
         first_words_second = set(chunks[1]["text"].split()[:10])
         # There should be some overlap
-        overlap = last_words_first & first_words_second
+        last_words_first & first_words_second
         # Overlap may vary, but structure should be maintained
         assert len(chunks) >= 2

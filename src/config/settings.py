@@ -104,7 +104,5 @@ def get_settings() -> Settings:
     """Get cached settings instance."""
     s = Settings()
     if s.ENVIRONMENT == "production" and len(s.JWT_SECRET_KEY) < 32:
-        raise ValueError(
-            "JWT_SECRET_KEY must be set to a secure value (>= 32 chars) in production."
-        )
+        raise ValueError("JWT_SECRET_KEY must be set to a secure value (>= 32 chars) in production.")
     return s

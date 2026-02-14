@@ -226,13 +226,10 @@ class SupportAgent(BaseAgent):
 
         lang = detect_language(user_message)
         if lang == "he":
-            msg = (
-                "אני מעביר אותך לנציג אנושי שיוכל לטפל בבקשתך. אנא המתן ונציג יצור איתך קשר בהקדם."
-            )
+            msg = "אני מעביר אותך לנציג אנושי שיוכל לטפל בבקשתך. אנא המתן ונציג יצור איתך קשר בהקדם."
         else:
             msg = (
-                "I'm transferring you to a human agent who can help. "
-                "Please wait and someone will contact you shortly."
+                "I'm transferring you to a human agent who can help. Please wait and someone will contact you shortly."
             )
 
         state["actions_taken"] = [

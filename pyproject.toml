@@ -68,10 +68,15 @@ addopts = "--cov-fail-under=60"
 
 [tool.ruff]
 target-version = "py311"
-line-length = 100
+line-length = 120
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP"]
+ignore = ["UP031"]  # % formatting used intentionally in SQL parameter construction
+
+[tool.ruff.lint.per-file-ignores]
+"src/api/main.py" = ["E402"]  # late import for WebSocket router (avoids circular)
+"src/utils/monitoring.py" = ["E402"]  # late import for uuid
 
 [tool.mypy]
 python_version = "3.11"

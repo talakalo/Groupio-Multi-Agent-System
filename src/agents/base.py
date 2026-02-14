@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 from pydantic import BaseModel, Field
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from src.models.agent_state import AgentState
 from src.rag.pipeline import get_rag_pipeline
@@ -43,6 +43,7 @@ class CircuitBreaker:
     def is_open(self) -> bool:
         if self._state == "open" and self._last_failure_time is not None:
             import time
+
             if time.time() - self._last_failure_time >= self._recovery_timeout:
                 self._state = "half-open"
                 return False
@@ -54,6 +55,7 @@ class CircuitBreaker:
 
     def record_failure(self) -> None:
         import time
+
         self._failure_count += 1
         self._last_failure_time = time.time()
         if self._failure_count >= self._failure_threshold:
@@ -70,7 +72,7 @@ _llm_circuit_breaker = CircuitBreaker(failure_threshold=5, recovery_timeout=60.0
 
 class LLMResponseCache:
     """Semantic cache for LLM responses using Redis.
-    
+
     Caches responses keyed by a hash of the model, system prompt, and messages.
     This avoids repeated LLM calls for identical queries.
     """
@@ -88,6 +90,7 @@ class LLMResponseCache:
         """Retrieve a cached LLM response, or None if not cached."""
         try:
             from src.databases.redis_client import get_redis_client
+
             redis = get_redis_client()
             key = self._make_key(model, system, messages)
             cached = await redis.cache_get(key)
@@ -98,10 +101,18 @@ class LLMResponseCache:
             pass  # Cache miss on error
         return None
 
-    async def set(self, model: str, system: str, messages: list[dict[str, Any]], response: dict[str, Any], ttl: int | None = None) -> None:
+    async def set(
+        self,
+        model: str,
+        system: str,
+        messages: list[dict[str, Any]],
+        response: dict[str, Any],
+        ttl: int | None = None,
+    ) -> None:
         """Store an LLM response in the cache."""
         try:
             from src.databases.redis_client import get_redis_client
+
             redis = get_redis_client()
             key = self._make_key(model, system, messages)
             await redis.cache_set(key, response, ttl=ttl or self._default_ttl)

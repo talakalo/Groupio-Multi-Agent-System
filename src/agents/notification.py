@@ -106,8 +106,7 @@ class NotificationAgent(BaseAgent):
                 },
                 "response": {
                     "type": "notification_summary",
-                    "message": f"Processed {len(notifications_sent)} notification(s) "
-                    f"of type '{notification_type}'.",
+                    "message": f"Processed {len(notifications_sent)} notification(s) of type '{notification_type}'.",
                     "notifications": notifications_sent,
                 },
                 "requires_followup": False,
@@ -181,11 +180,7 @@ class NotificationAgent(BaseAgent):
 
         content = result.get("content", "")
         if isinstance(content, list):
-            content = " ".join(
-                block.get("text", "")
-                for block in content
-                if block.get("type") == "text"
-            )
+            content = " ".join(block.get("text", "") for block in content if block.get("type") == "text")
 
         # Parse JSON from the response
         try:
@@ -211,10 +206,7 @@ class NotificationAgent(BaseAgent):
 
         user_profile = state.get("user_profile", {})
         if user_profile:
-            parts.append(
-                f"User: {user_profile.get('full_name', 'Unknown')} "
-                f"({user_profile.get('email', '')})"
-            )
+            parts.append(f"User: {user_profile.get('full_name', 'Unknown')} ({user_profile.get('email', '')})")
 
         active_offers = state.get("active_offers", [])
         if active_offers:
@@ -223,9 +215,7 @@ class NotificationAgent(BaseAgent):
 
         building = state.get("building_context", {})
         if building:
-            parts.append(
-                f"Building: {building.get('name', building.get('address', 'Unknown'))}"
-            )
+            parts.append(f"Building: {building.get('name', building.get('address', 'Unknown'))}")
 
         # Add recent actions for context
         for action in state.get("actions_taken", [])[-2:]:

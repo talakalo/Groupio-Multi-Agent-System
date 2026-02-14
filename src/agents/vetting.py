@@ -66,7 +66,7 @@ class VettingAgent(BaseAgent):
     @track_agent_execution("vetting")
     async def run(self, state: AgentState) -> AgentState:
         """Run the full vetting pipeline for a contractor."""
-        user_message = self._get_last_user_message(state)
+        self._get_last_user_message(state)
 
         # Extract contractor ID from state or message
         contractor_id = self._extract_contractor_id(state)
@@ -179,8 +179,7 @@ class VettingAgent(BaseAgent):
             }
 
         docs_text = "\n".join(
-            f"- Type: {doc.get('doc_type', 'unknown')}, "
-            f"Content: {doc.get('extracted_text', 'N/A')[:300]}"
+            f"- Type: {doc.get('doc_type', 'unknown')}, Content: {doc.get('extracted_text', 'N/A')[:300]}"
             for doc in documents
         )
 

@@ -4,7 +4,6 @@ Tests cover: LLM timeouts, database connection failures, rate limiting
 edge cases, and circuit breaker behavior.
 """
 
-import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -16,7 +15,7 @@ class TestLLMErrorScenarios:
     @pytest.mark.asyncio
     async def test_llm_timeout_triggers_retry(self):
         """LLM timeout should be retried with backoff."""
-        from src.agents.base import BaseAgent, AgentConfig, _llm_circuit_breaker
+        from src.agents.base import AgentConfig, BaseAgent, _llm_circuit_breaker
 
         # Reset circuit breaker state
         _llm_circuit_breaker._failure_count = 0
@@ -55,7 +54,7 @@ class TestLLMErrorScenarios:
     @pytest.mark.asyncio
     async def test_llm_permanent_error_not_retried(self):
         """Non-transient errors should not be retried."""
-        from src.agents.base import BaseAgent, AgentConfig, _llm_circuit_breaker
+        from src.agents.base import AgentConfig, BaseAgent, _llm_circuit_breaker
 
         _llm_circuit_breaker._failure_count = 0
         _llm_circuit_breaker._state = "closed"
@@ -133,7 +132,7 @@ class TestWebSocketValidation:
     """Test WebSocket message validation."""
 
     def test_oversized_message_rejected(self):
-        from src.api.routes.websocket import _validate_message, MAX_MESSAGE_SIZE
+        from src.api.routes.websocket import MAX_MESSAGE_SIZE, _validate_message
 
         big_msg = "x" * (MAX_MESSAGE_SIZE + 100)
         is_valid, reason = _validate_message(big_msg)
@@ -147,16 +146,18 @@ class TestWebSocketValidation:
         assert is_valid
 
     def test_valid_json_accepted(self):
-        from src.api.routes.websocket import _validate_message
         import json
+
+        from src.api.routes.websocket import _validate_message
 
         msg = json.dumps({"type": "subscribe", "channel": "offers"})
         is_valid, _ = _validate_message(msg)
         assert is_valid
 
     def test_unknown_type_rejected(self):
-        from src.api.routes.websocket import _validate_message
         import json
+
+        from src.api.routes.websocket import _validate_message
 
         msg = json.dumps({"type": "hack_the_system"})
         is_valid, reason = _validate_message(msg)

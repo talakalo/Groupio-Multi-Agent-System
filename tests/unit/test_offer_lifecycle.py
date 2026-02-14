@@ -25,10 +25,12 @@ def mock_db():
 def mock_invoice_svc():
     """Mock InvoiceService."""
     svc = AsyncMock()
-    svc.create_invoice = AsyncMock(return_value={
-        "id": "inv_1",
-        "total": 1220.0,
-    })
+    svc.create_invoice = AsyncMock(
+        return_value={
+            "id": "inv_1",
+            "total": 1220.0,
+        }
+    )
     svc.split_payment = AsyncMock(return_value=[])
     svc.get_offer_invoice = AsyncMock(return_value=None)
     return svc

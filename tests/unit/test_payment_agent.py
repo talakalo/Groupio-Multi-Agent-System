@@ -93,9 +93,7 @@ def payment_state(sample_agent_state):
 async def test_payment_status_handler(payment_agent, payment_state):
     """sub_intent=payment_status → payment_status_check action."""
     agent, mock_pg = payment_agent
-    payment_state["messages"] = [
-        {"role": "user", "content": "מה סטטוס התשלום שלי?"}
-    ]
+    payment_state["messages"] = [{"role": "user", "content": "מה סטטוס התשלום שלי?"}]
 
     mock_db = AsyncMock()
     mock_db.list_payments_for_user = AsyncMock(
@@ -145,9 +143,7 @@ async def test_payment_status_handler(payment_agent, payment_state):
 async def test_invoice_request_with_offer_id(payment_agent, payment_state):
     """state has offer_id → invoice found."""
     agent, mock_pg = payment_agent
-    payment_state["messages"] = [
-        {"role": "user", "content": "I need my invoice please"}
-    ]
+    payment_state["messages"] = [{"role": "user", "content": "I need my invoice please"}]
     payment_state["offer_id"] = "offer_100"
 
     mock_db = AsyncMock()
@@ -187,9 +183,7 @@ async def test_invoice_request_with_offer_id(payment_agent, payment_state):
 async def test_invoice_request_no_offer(payment_agent, payment_state):
     """No offer_id in state → response still works, invoice not found."""
     agent, mock_pg = payment_agent
-    payment_state["messages"] = [
-        {"role": "user", "content": "אני צריך חשבונית"}
-    ]
+    payment_state["messages"] = [{"role": "user", "content": "אני צריך חשבונית"}]
     # No offer_id in state
 
     mock_db = AsyncMock()
@@ -220,9 +214,7 @@ async def test_invoice_request_no_offer(payment_agent, payment_state):
 async def test_refund_request_escalates(payment_agent, payment_state):
     """Message with refund keyword → needs_human=True, escalation_reason."""
     agent, mock_pg = payment_agent
-    payment_state["messages"] = [
-        {"role": "user", "content": "אני רוצה החזר כספי בבקשה"}
-    ]
+    payment_state["messages"] = [{"role": "user", "content": "אני רוצה החזר כספי בבקשה"}]
 
     mock_db = AsyncMock()
     mock_pg.return_value = mock_db
@@ -252,9 +244,7 @@ async def test_refund_request_escalates(payment_agent, payment_state):
 async def test_general_handler(payment_agent, payment_state):
     """Message doesn't match any sub-intent → general_payment_info action."""
     agent, mock_pg = payment_agent
-    payment_state["messages"] = [
-        {"role": "user", "content": "hello, I have a question"}
-    ]
+    payment_state["messages"] = [{"role": "user", "content": "hello, I have a question"}]
 
     mock_db = AsyncMock()
     mock_pg.return_value = mock_db

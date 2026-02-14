@@ -115,9 +115,7 @@ def test_match_weights_sum_to_one():
 @pytest.mark.asyncio
 async def test_matching_extracts_category_from_hebrew(matching_agent, sample_agent_state):
     """Test category extraction from Hebrew message."""
-    sample_agent_state["messages"] = [
-        {"role": "user", "content": "אני מחפש קבלן מזגנים לבניין שלי"}
-    ]
+    sample_agent_state["messages"] = [{"role": "user", "content": "אני מחפש קבלן מזגנים לבניין שלי"}]
 
     category = matching_agent._extract_category(
         sample_agent_state,

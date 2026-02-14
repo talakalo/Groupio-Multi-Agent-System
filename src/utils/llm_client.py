@@ -98,8 +98,7 @@ class LLMClient:
         schema_instruction = ""
         if output_schema:
             schema_instruction = (
-                f"\n\nYou must respond with valid JSON matching this schema:\n"
-                f"{json.dumps(output_schema, indent=2)}"
+                f"\n\nYou must respond with valid JSON matching this schema:\n{json.dumps(output_schema, indent=2)}"
             )
 
         full_system = (system or "") + schema_instruction

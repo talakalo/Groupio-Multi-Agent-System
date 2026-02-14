@@ -90,7 +90,11 @@ class MatchingAgent(BaseAgent):
         entities = state.get("entities") or {}
         building_id = state.get("building_id") or entities.get("building_id")
         # Merge discovered entities into state for downstream agents
-        state["entities"] = {**entities, "category": category, "building_id": building_id or entities.get("building_id")}
+        state["entities"] = {
+            **entities,
+            "category": category,
+            "building_id": building_id or entities.get("building_id"),
+        }
         if contractor_ids:
             state["entities"]["contractor_ids"] = contractor_ids
         state["context_for_next_agent"] = {
@@ -120,7 +124,9 @@ class MatchingAgent(BaseAgent):
                     "contractor_ids": contractor_ids,
                     "category": category,
                     "building_id": building_id,
-                } if has_matches else {},
+                }
+                if has_matches
+                else {},
                 "suggested_next_intent": "pricing_question" if has_matches else "",
                 "suggested_next_agent": "pricing" if has_matches else "",
             }
@@ -226,9 +232,7 @@ class MatchingAgent(BaseAgent):
         # Calculate overall scores
         results = []
         for cid, scores in contractor_scores.items():
-            overall = sum(
-                scores.get(metric, 0) * weight for metric, weight in MATCH_WEIGHTS.items()
-            )
+            overall = sum(scores.get(metric, 0) * weight for metric, weight in MATCH_WEIGHTS.items())
             results.append(
                 {
                     "contractor_id": cid,
@@ -256,12 +260,13 @@ class MatchingAgent(BaseAgent):
             lang = detect_language(user_message)
             if lang == "he":
                 return "לא מצאנו קבלנים מתאימים לבקשתך כרגע. נשמח לעזור לך לחפש בקריטריונים אחרים."
-            return "We couldn't find matching contractors for your request. We'd be happy to help with different criteria."
+            return (
+                "We couldn't find matching contractors for your request. We'd be happy to help with different criteria."
+            )
 
         top_5 = contractors[:5]
         contractors_text = "\n".join(
-            f"- {c['business_name']} (score: {c['overall_score']}, "
-            f"rating: {c['rating']}/5): {c['description']}"
+            f"- {c['business_name']} (score: {c['overall_score']}, rating: {c['rating']}/5): {c['description']}"
             for c in top_5
         )
 

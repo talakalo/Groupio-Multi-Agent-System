@@ -73,8 +73,7 @@ class VectorStore:
     ) -> None:
         """Upsert vectors in batches with retry logic."""
         points = [
-            models.PointStruct(id=id_, vector=vec, payload=payload)
-            for id_, vec, payload in zip(ids, vectors, payloads)
+            models.PointStruct(id=id_, vector=vec, payload=payload) for id_, vec, payload in zip(ids, vectors, payloads)
         ]
 
         for i in range(0, len(points), self._batch_size):

@@ -31,9 +31,7 @@ class GraphStore:
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=10),
     )
-    async def execute(
-        self, query: str, params: dict[str, Any] | None = None
-    ) -> list[dict[str, Any]]:
+    async def execute(self, query: str, params: dict[str, Any] | None = None) -> list[dict[str, Any]]:
         """Execute a Cypher query and return results."""
         async with self._driver.session() as session:
             result = await session.run(query, params or {})
@@ -141,9 +139,7 @@ class GraphStore:
         results = await self.execute(query, {"contractor_id": contractor_id})
         return results[0]["patterns"] if results else {}
 
-    async def get_contractor_building_history(
-        self, contractor_id: str, limit: int = 10
-    ) -> list[dict[str, Any]]:
+    async def get_contractor_building_history(self, contractor_id: str, limit: int = 10) -> list[dict[str, Any]]:
         """Get a contractor's past project history with buildings."""
         query = """
         MATCH (c:Contractor {id: $contractor_id})-[comp:COMPLETED]->(b:Building)
@@ -193,8 +189,7 @@ class GraphStore:
         constraints = [
             "CREATE CONSTRAINT resident_id IF NOT EXISTS FOR (r:Resident) REQUIRE r.id IS UNIQUE",
             "CREATE CONSTRAINT building_id IF NOT EXISTS FOR (b:Building) REQUIRE b.id IS UNIQUE",
-            "CREATE CONSTRAINT contractor_id IF NOT EXISTS "
-            "FOR (c:Contractor) REQUIRE c.id IS UNIQUE",
+            "CREATE CONSTRAINT contractor_id IF NOT EXISTS FOR (c:Contractor) REQUIRE c.id IS UNIQUE",
             "CREATE CONSTRAINT offer_id IF NOT EXISTS FOR (o:Offer) REQUIRE o.id IS UNIQUE",
         ]
 

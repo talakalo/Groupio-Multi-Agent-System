@@ -114,9 +114,7 @@ class RedisClient:
 
     # -- Agent State --
 
-    async def save_agent_state(
-        self, conversation_id: str, state: dict[str, Any], ttl: int = 3600
-    ) -> None:
+    async def save_agent_state(self, conversation_id: str, state: dict[str, Any], ttl: int = 3600) -> None:
         """Save agent state for a conversation."""
         key = f"agent_state:{conversation_id}"
         await self._redis.set(
