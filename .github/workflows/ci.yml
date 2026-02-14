@@ -224,7 +224,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run tests
-        run: pnpm turbo test --filter='!@groupio/mobile'
+        run: pnpm turbo test
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4
