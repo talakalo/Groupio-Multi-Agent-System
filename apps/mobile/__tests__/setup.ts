@@ -6,7 +6,11 @@ import { afterEach, vi } from 'vitest';
 vi.mock('@testing-library/react-native', () => {
   const { create, act } = require('react-test-renderer');
 
-  type TestNode = { children?: TestNode[]; props?: Record<string, unknown> };
+  type TestNode = {
+    children?: TestNode[];
+    props?: Record<string, unknown>;
+    findByProps?: (props: Record<string, unknown>) => TestNode;
+  };
 
   /** Collect all text strings from a test-instance subtree. */
   const collectText = (instance: unknown): string => {
@@ -26,7 +30,7 @@ vi.mock('@testing-library/react-native', () => {
   };
 
   const render = (element: React.ReactElement) => {
-    let renderer: { root: TestNode; unmount: () => void };
+    let renderer!: { root: TestNode; unmount: () => void };
     act(() => {
       renderer = create(element) as { root: TestNode; unmount: () => void };
     });
@@ -50,6 +54,9 @@ vi.mock('@testing-library/react-native', () => {
     };
 
     const getByTestId = (id: string) => {
+      if (!rootInstance.findByProps) {
+        throw new Error(`Unable to find testID: ${id}`);
+      }
       try {
         return rootInstance.findByProps({ testID: id });
       } catch {
