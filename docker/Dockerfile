@@ -23,7 +23,7 @@ COPY --from=builder /install /usr/local
 
 # Copy only necessary source code
 COPY src/ ./src/
-COPY pyproject.toml setup.py setup.cfg ./
+COPY pyproject.toml ./
 
 # Set ownership to non-root user
 RUN chown -R appuser:appuser /app
