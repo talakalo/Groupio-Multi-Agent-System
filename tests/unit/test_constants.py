@@ -82,8 +82,7 @@ def test_default_pricing_tiers_are_ordered():
             f"greater than tier {i - 1} ({prev['min_participants']})"
         )
         assert curr["discount_pct"] >= prev["discount_pct"], (
-            f"Tier {i} discount_pct ({curr['discount_pct']}) should be >= "
-            f"tier {i - 1} ({prev['discount_pct']})"
+            f"Tier {i} discount_pct ({curr['discount_pct']}) should be >= tier {i - 1} ({prev['discount_pct']})"
         )
 
 

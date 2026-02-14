@@ -58,13 +58,9 @@ def llm_client():
 @pytest.mark.asyncio
 async def test_create_message_returns_formatted_response(llm_client, mock_anthropic_response):
     """create_message should return a dict with content/model/usage keys."""
-    llm_client._client.messages.create = AsyncMock(
-        return_value=mock_anthropic_response("Test response")
-    )
+    llm_client._client.messages.create = AsyncMock(return_value=mock_anthropic_response("Test response"))
 
-    result = await llm_client.create_message(
-        messages=[{"role": "user", "content": "Hi"}]
-    )
+    result = await llm_client.create_message(messages=[{"role": "user", "content": "Hi"}])
 
     assert "content" in result
     assert "model" in result
@@ -79,9 +75,7 @@ async def test_create_message_returns_formatted_response(llm_client, mock_anthro
 @pytest.mark.asyncio
 async def test_create_message_includes_system_prompt(llm_client, mock_anthropic_response):
     """When a system prompt is provided it should be forwarded to the API."""
-    llm_client._client.messages.create = AsyncMock(
-        return_value=mock_anthropic_response("OK")
-    )
+    llm_client._client.messages.create = AsyncMock(return_value=mock_anthropic_response("OK"))
 
     await llm_client.create_message(
         messages=[{"role": "user", "content": "Hi"}],
@@ -95,9 +89,7 @@ async def test_create_message_includes_system_prompt(llm_client, mock_anthropic_
 @pytest.mark.asyncio
 async def test_create_message_includes_tools(llm_client, mock_anthropic_response):
     """When tools are provided they should be forwarded to the API."""
-    llm_client._client.messages.create = AsyncMock(
-        return_value=mock_anthropic_response("OK")
-    )
+    llm_client._client.messages.create = AsyncMock(return_value=mock_anthropic_response("OK"))
 
     tools = [{"name": "search", "description": "Search tool", "input_schema": {}}]
     await llm_client.create_message(
@@ -132,9 +124,7 @@ async def test_create_structured_output_parses_json(llm_client, mock_anthropic_r
 async def test_create_structured_output_extracts_json_from_text(llm_client, mock_anthropic_response):
     """When the response has extra text around JSON, it should still be extracted."""
     llm_client._client.messages.create = AsyncMock(
-        return_value=mock_anthropic_response(
-            'Here is the result:\n{"intent": "search", "confidence": 0.9}\nDone.'
-        )
+        return_value=mock_anthropic_response('Here is the result:\n{"intent": "search", "confidence": 0.9}\nDone.')
     )
 
     result = await llm_client.create_structured_output(
@@ -145,13 +135,9 @@ async def test_create_structured_output_extracts_json_from_text(llm_client, mock
 
 
 @pytest.mark.asyncio
-async def test_create_structured_output_returns_parse_error_on_invalid_json(
-    llm_client, mock_anthropic_response
-):
+async def test_create_structured_output_returns_parse_error_on_invalid_json(llm_client, mock_anthropic_response):
     """When the response cannot be parsed as JSON, return parse_error dict."""
-    llm_client._client.messages.create = AsyncMock(
-        return_value=mock_anthropic_response("this is not json at all")
-    )
+    llm_client._client.messages.create = AsyncMock(return_value=mock_anthropic_response("this is not json at all"))
 
     result = await llm_client.create_structured_output(
         messages=[{"role": "user", "content": "Something"}],
@@ -169,9 +155,7 @@ async def test_create_structured_output_returns_parse_error_on_invalid_json(
 @pytest.mark.asyncio
 async def test_analyze_sentiment_returns_float(llm_client, mock_anthropic_response):
     """analyze_sentiment should return a float sentiment score."""
-    llm_client._client.messages.create = AsyncMock(
-        return_value=mock_anthropic_response("0.75")
-    )
+    llm_client._client.messages.create = AsyncMock(return_value=mock_anthropic_response("0.75"))
 
     score = await llm_client.analyze_sentiment("Great service!")
 
@@ -183,16 +167,12 @@ async def test_analyze_sentiment_returns_float(llm_client, mock_anthropic_respon
 async def test_analyze_sentiment_clamps_to_range(llm_client, mock_anthropic_response):
     """Values outside -1 to 1 should be clamped."""
     # Test clamping from above
-    llm_client._client.messages.create = AsyncMock(
-        return_value=mock_anthropic_response("2.5")
-    )
+    llm_client._client.messages.create = AsyncMock(return_value=mock_anthropic_response("2.5"))
     score = await llm_client.analyze_sentiment("Amazing!")
     assert score == 1.0
 
     # Test clamping from below
-    llm_client._client.messages.create = AsyncMock(
-        return_value=mock_anthropic_response("-3.0")
-    )
+    llm_client._client.messages.create = AsyncMock(return_value=mock_anthropic_response("-3.0"))
     score = await llm_client.analyze_sentiment("Terrible!")
     assert score == -1.0
 
@@ -200,9 +180,7 @@ async def test_analyze_sentiment_clamps_to_range(llm_client, mock_anthropic_resp
 @pytest.mark.asyncio
 async def test_analyze_sentiment_returns_zero_on_parse_error(llm_client, mock_anthropic_response):
     """When the LLM returns non-numeric text, default to 0.0."""
-    llm_client._client.messages.create = AsyncMock(
-        return_value=mock_anthropic_response("I cannot determine sentiment")
-    )
+    llm_client._client.messages.create = AsyncMock(return_value=mock_anthropic_response("I cannot determine sentiment"))
 
     score = await llm_client.analyze_sentiment("Some text")
 

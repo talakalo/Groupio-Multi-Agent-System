@@ -163,7 +163,7 @@ def test_generate_conversation_id_has_prefix():
     assert isinstance(conv_id, str)
     assert conv_id.startswith("conv_")
     # The hex portion should be 16 characters
-    hex_part = conv_id[len("conv_"):]
+    hex_part = conv_id[len("conv_") :]
     assert len(hex_part) == 16
     # Should be valid hex
     int(hex_part, 16)
