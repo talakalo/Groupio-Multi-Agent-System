@@ -1,14 +1,14 @@
 """Contractor Pydantic models."""
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from src.models.offer import ServiceCategory
 
 
-class Region(str, Enum):
+class Region(StrEnum):
     """Service region enum."""
 
     CENTER = "center"
@@ -21,7 +21,7 @@ class Region(str, Enum):
     HAIFA = "haifa"
 
 
-class VerificationStatus(str, Enum):
+class VerificationStatus(StrEnum):
     """Contractor verification status."""
 
     PENDING = "pending"

@@ -49,9 +49,7 @@ class ArchitectureAgent(BaseAgent):
                         "message": "לא נמצא הקובץ שהועלה. אנא העלה מחדש.",
                     },
                     "requires_followup": False,
-                    "summary_for_next_agent": (
-                        "Architecture file not found; asked user to re-upload."
-                    ),
+                    "summary_for_next_agent": ("Architecture file not found; asked user to re-upload."),
                 }
             ]
             return state
@@ -73,9 +71,7 @@ class ArchitectureAgent(BaseAgent):
                         "message": "הניתוח נכשל. אנא נסה להעלות תמונה ברורה יותר.",
                     },
                     "requires_followup": False,
-                    "summary_for_next_agent": (
-                        "Architecture analysis failed; asked user for clearer image."
-                    ),
+                    "summary_for_next_agent": ("Architecture analysis failed; asked user for clearer image."),
                 }
             ]
             return state
@@ -91,11 +87,7 @@ class ArchitectureAgent(BaseAgent):
         if building_id:
             active_offers = state.get("active_offers", [])
             for suggestion in analysis.get("suggestions", []):
-                matching = [
-                    o.get("id")
-                    for o in active_offers
-                    if o.get("category") == suggestion.get("category")
-                ]
+                matching = [o.get("id") for o in active_offers if o.get("category") == suggestion.get("category")]
                 suggestion["matching_offers"] = matching
 
         state["actions_taken"] = [
@@ -113,8 +105,7 @@ class ArchitectureAgent(BaseAgent):
                 },
                 "requires_followup": False,
                 "summary_for_next_agent": (
-                    "Floor plan analysis completed; "
-                    "recommendations and matching offers provided."
+                    "Floor plan analysis completed; recommendations and matching offers provided."
                 ),
             }
         ]
@@ -122,16 +113,12 @@ class ArchitectureAgent(BaseAgent):
 
     # ------------------------------------------------------------------
 
-    async def _analyse_image(
-        self, record: dict[str, Any], state: AgentState
-    ) -> dict[str, Any]:
+    async def _analyse_image(self, record: dict[str, Any], state: AgentState) -> dict[str, Any]:
         """Call Claude Vision API with the uploaded image."""
         storage = get_storage_service()
 
         # Get a signed URL or the image bytes
-        signed_url = await storage.get_signed_url(
-            record["bucket"], record["storage_path"]
-        )
+        signed_url = await storage.get_signed_url(record["bucket"], record["storage_path"])
 
         system_prompt = self._build_system_prompt(state)
 
@@ -165,11 +152,7 @@ class ArchitectureAgent(BaseAgent):
         # Parse structured JSON from the response
         content = result.get("content", "")
         if isinstance(content, list):
-            content = " ".join(
-                block.get("text", "")
-                for block in content
-                if block.get("type") == "text"
-            )
+            content = " ".join(block.get("text", "") for block in content if block.get("type") == "text")
 
         try:
             # Extract JSON from possible markdown fences
@@ -205,15 +188,10 @@ class ArchitectureAgent(BaseAgent):
                 "response": {
                     "type": "architecture_analysis",
                     "analysis": result,
-                    "message": result.get(
-                        "summary_he", "הנה ההמלצות שלנו על בסיס התיאור שלך:"
-                    ),
+                    "message": result.get("summary_he", "הנה ההמלצות שלנו על בסיס התיאור שלך:"),
                 },
                 "requires_followup": False,
-                "summary_for_next_agent": (
-                    "Text-based renovation analysis completed; "
-                    "recommendations provided."
-                ),
+                "summary_for_next_agent": ("Text-based renovation analysis completed; recommendations provided."),
             }
         ]
         return state

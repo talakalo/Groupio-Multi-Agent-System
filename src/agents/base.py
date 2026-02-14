@@ -1,11 +1,13 @@
 """Base agent class for all Groupio agents."""
 
+import hashlib
 import json
 import logging
 from abc import ABC, abstractmethod
 from typing import Any
 
 from pydantic import BaseModel, Field
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from src.models.agent_state import AgentState
 from src.rag.pipeline import get_rag_pipeline
@@ -25,6 +27,100 @@ class AgentConfig(BaseModel):
     model: str = "claude-sonnet-4-20250514"
     temperature: float = 0.7
     max_tokens: int = 2000
+
+
+class CircuitBreaker:
+    """Simple circuit breaker for external service calls."""
+
+    def __init__(self, failure_threshold: int = 5, recovery_timeout: float = 60.0) -> None:
+        self._failure_count = 0
+        self._failure_threshold = failure_threshold
+        self._recovery_timeout = recovery_timeout
+        self._last_failure_time: float | None = None
+        self._state = "closed"  # closed, open, half-open
+
+    @property
+    def is_open(self) -> bool:
+        if self._state == "open" and self._last_failure_time is not None:
+            import time
+
+            if time.time() - self._last_failure_time >= self._recovery_timeout:
+                self._state = "half-open"
+                return False
+        return self._state == "open"
+
+    def record_success(self) -> None:
+        self._failure_count = 0
+        self._state = "closed"
+
+    def record_failure(self) -> None:
+        import time
+
+        self._failure_count += 1
+        self._last_failure_time = time.time()
+        if self._failure_count >= self._failure_threshold:
+            self._state = "open"
+
+
+# Transient errors that should be retried
+TRANSIENT_ERRORS = (TimeoutError, ConnectionError, OSError)
+
+
+# Module-level circuit breaker for LLM calls
+_llm_circuit_breaker = CircuitBreaker(failure_threshold=5, recovery_timeout=60.0)
+
+
+class LLMResponseCache:
+    """Semantic cache for LLM responses using Redis.
+
+    Caches responses keyed by a hash of the model, system prompt, and messages.
+    This avoids repeated LLM calls for identical queries.
+    """
+
+    def __init__(self, default_ttl: int = 3600) -> None:
+        self._default_ttl = default_ttl
+
+    @staticmethod
+    def _make_key(model: str, system: str, messages: list[dict[str, Any]]) -> str:
+        """Create a deterministic cache key from the LLM call parameters."""
+        raw = json.dumps({"model": model, "system": system, "messages": messages}, sort_keys=True, default=str)
+        return f"llm_cache:{hashlib.sha256(raw.encode()).hexdigest()}"
+
+    async def get(self, model: str, system: str, messages: list[dict[str, Any]]) -> dict[str, Any] | None:
+        """Retrieve a cached LLM response, or None if not cached."""
+        try:
+            from src.databases.redis_client import get_redis_client
+
+            redis = get_redis_client()
+            key = self._make_key(model, system, messages)
+            cached = await redis.cache_get(key)
+            if cached:
+                logger.debug("LLM cache hit for key %s", key[:30])
+                return cached
+        except Exception:
+            pass  # Cache miss on error
+        return None
+
+    async def set(
+        self,
+        model: str,
+        system: str,
+        messages: list[dict[str, Any]],
+        response: dict[str, Any],
+        ttl: int | None = None,
+    ) -> None:
+        """Store an LLM response in the cache."""
+        try:
+            from src.databases.redis_client import get_redis_client
+
+            redis = get_redis_client()
+            key = self._make_key(model, system, messages)
+            await redis.cache_set(key, response, ttl=ttl or self._default_ttl)
+        except Exception:
+            pass  # Don't fail on cache errors
+
+
+_llm_cache = LLMResponseCache(default_ttl=1800)  # 30 min default
 
 
 class BaseAgent(ABC):
@@ -67,6 +163,12 @@ class BaseAgent(ABC):
             strategy=strategy,
         )
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=10),
+        retry=retry_if_exception_type(TRANSIENT_ERRORS),
+        reraise=True,
+    )
     async def _call_llm(
         self,
         messages: list[dict[str, Any]],
@@ -74,22 +176,56 @@ class BaseAgent(ABC):
         tools: list[dict[str, Any]] | None = None,
         temperature: float | None = None,
     ) -> dict[str, Any]:
-        """Call Claude API with messages and optional tools."""
-        response = await self.llm_client.create_message(
-            model=self.config.model,
-            max_tokens=self.config.max_tokens,
-            temperature=temperature if temperature is not None else self.config.temperature,
-            system=system or self.config.system_prompt,
-            messages=messages,
-            tools=tools,
-        )
+        """Call Claude API with messages and optional tools.
 
-        # Track token usage
-        usage = response.get("usage", {})
-        self._metrics["tokens"] += usage.get("input_tokens", 0) + usage.get("output_tokens", 0)
+        Includes retry with exponential backoff for transient errors
+        and circuit breaker to prevent cascading failures.
+        """
+        if _llm_circuit_breaker.is_open:
+            logger.warning("LLM circuit breaker is open, failing fast for agent %s", self.config.name)
+            raise ConnectionError("LLM service circuit breaker is open")
 
-        return response
+        # Check cache first
+        system_prompt = system or self.config.system_prompt
+        cached = await _llm_cache.get(self.config.model, system_prompt, messages)
+        if cached is not None:
+            return cached
 
+        try:
+            response = await self.llm_client.create_message(
+                model=self.config.model,
+                max_tokens=self.config.max_tokens,
+                temperature=temperature if temperature is not None else self.config.temperature,
+                system=system or self.config.system_prompt,
+                messages=messages,
+                tools=tools,
+            )
+
+            _llm_circuit_breaker.record_success()
+
+            # Cache the response
+            await _llm_cache.set(self.config.model, system_prompt, messages, response)
+
+            # Track token usage
+            usage = response.get("usage", {})
+            self._metrics["tokens"] += usage.get("input_tokens", 0) + usage.get("output_tokens", 0)
+
+            return response
+        except TRANSIENT_ERRORS:
+            _llm_circuit_breaker.record_failure()
+            raise
+        except Exception as exc:
+            # Permanent errors: don't retry, but track
+            self._metrics["errors"] += 1
+            logger.error("Permanent LLM error in agent %s: %s", self.config.name, type(exc).__name__)
+            raise
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=10),
+        retry=retry_if_exception_type(TRANSIENT_ERRORS),
+        reraise=True,
+    )
     async def _call_llm_structured(
         self,
         messages: list[dict[str, Any]],
@@ -97,11 +233,19 @@ class BaseAgent(ABC):
         output_schema: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Call Claude API expecting structured JSON output."""
-        return await self.llm_client.create_structured_output(
-            messages=messages,
-            system=system or self.config.system_prompt,
-            output_schema=output_schema,
-        )
+        if _llm_circuit_breaker.is_open:
+            raise ConnectionError("LLM service circuit breaker is open")
+        try:
+            result = await self.llm_client.create_structured_output(
+                messages=messages,
+                system=system or self.config.system_prompt,
+                output_schema=output_schema,
+            )
+            _llm_circuit_breaker.record_success()
+            return result
+        except TRANSIENT_ERRORS:
+            _llm_circuit_breaker.record_failure()
+            raise
 
     def _get_last_user_message(self, state: AgentState) -> str:
         """Extract the last user message from state."""

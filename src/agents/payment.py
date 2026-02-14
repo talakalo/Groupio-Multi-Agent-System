@@ -13,14 +13,34 @@ logger = logging.getLogger(__name__)
 
 # Sub-intent keywords used for simple classification
 _PAYMENT_STATUS_KEYWORDS = [
-    "תשלום", "שילמתי", "סטטוס", "status", "payment", "paid", "שולם",
-    "ממתין", "pending", "processing", "עיבוד",
+    "תשלום",
+    "שילמתי",
+    "סטטוס",
+    "status",
+    "payment",
+    "paid",
+    "שולם",
+    "ממתין",
+    "pending",
+    "processing",
+    "עיבוד",
 ]
 _INVOICE_KEYWORDS = [
-    "חשבונית", "invoice", "קבלה", "receipt", "הפקה", "הורדה", "download",
+    "חשבונית",
+    "invoice",
+    "קבלה",
+    "receipt",
+    "הפקה",
+    "הורדה",
+    "download",
 ]
 _REFUND_KEYWORDS = [
-    "החזר", "refund", "ביטול", "cancel", "זיכוי", "credit",
+    "החזר",
+    "refund",
+    "ביטול",
+    "cancel",
+    "זיכוי",
+    "credit",
 ]
 
 
@@ -83,9 +103,7 @@ class PaymentAgent(BaseAgent):
     # Sub-handlers
     # ------------------------------------------------------------------
 
-    async def _handle_payment_status(
-        self, state: AgentState, user_id: str, user_message: str
-    ) -> AgentState:
+    async def _handle_payment_status(self, state: AgentState, user_id: str, user_message: str) -> AgentState:
         """Check and report the user's payment status."""
         db = get_postgres_client()
         payments = await db.list_payments_for_user(user_id)
@@ -98,10 +116,7 @@ class PaymentAgent(BaseAgent):
             messages=[
                 {
                     "role": "user",
-                    "content": (
-                        f"{user_message}\n\n"
-                        f"--- Payment Data ---\n{payment_summary}"
-                    ),
+                    "content": (f"{user_message}\n\n--- Payment Data ---\n{payment_summary}"),
                 }
             ],
             system=system_prompt,
@@ -125,12 +140,10 @@ class PaymentAgent(BaseAgent):
         ]
         return state
 
-    async def _handle_invoice_request(
-        self, state: AgentState, user_id: str, user_message: str
-    ) -> AgentState:
+    async def _handle_invoice_request(self, state: AgentState, user_id: str, user_message: str) -> AgentState:
         """Get or generate an invoice for an offer."""
         db = get_postgres_client()
-        payments = await db.list_payments_for_user(user_id)
+        await db.list_payments_for_user(user_id)
 
         # Find the most relevant offer_id from state or payments
         offer_id = None
@@ -155,10 +168,7 @@ class PaymentAgent(BaseAgent):
             messages=[
                 {
                     "role": "user",
-                    "content": (
-                        f"{user_message}\n\n"
-                        f"--- Invoice Data ---\n{invoice_info}"
-                    ),
+                    "content": (f"{user_message}\n\n--- Invoice Data ---\n{invoice_info}"),
                 }
             ],
             system=system_prompt,
@@ -188,9 +198,7 @@ class PaymentAgent(BaseAgent):
         ]
         return state
 
-    async def _handle_refund_request(
-        self, state: AgentState, user_id: str, user_message: str
-    ) -> AgentState:
+    async def _handle_refund_request(self, state: AgentState, user_id: str, user_message: str) -> AgentState:
         """Handle refund requests – escalate to human support."""
         system_prompt = self._build_system_prompt(state)
 
@@ -230,9 +238,7 @@ class PaymentAgent(BaseAgent):
         ]
         return state
 
-    async def _handle_general(
-        self, state: AgentState, user_message: str
-    ) -> AgentState:
+    async def _handle_general(self, state: AgentState, user_message: str) -> AgentState:
         """Provide general payment information."""
         system_prompt = self._build_system_prompt(state)
 
@@ -283,9 +289,5 @@ class PaymentAgent(BaseAgent):
         """Extract plain text from an LLM response."""
         content = llm_result.get("content", "")
         if isinstance(content, list):
-            return " ".join(
-                block.get("text", "")
-                for block in content
-                if block.get("type") == "text"
-            )
+            return " ".join(block.get("text", "") for block in content if block.get("type") == "text")
         return str(content)

@@ -1,0 +1,4 @@
+# Next.js 14 is EOL — GHSA-h25m-26qc-wcjf has no fix for v14.
+# Requires upgrading to Next.js 15+. Tracked in issue #36.
+# This only affects App Router Server Components (DoS via crafted HTTP request).
+GHSA-h25m-26qc-wcjf

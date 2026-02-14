@@ -16,7 +16,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
     """Middleware that logs request/response metadata with request ID tracking."""
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        request_id = str(uuid.uuid4())[:8]
+        request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
         start_time = time.time()
 
         # Add request ID to state for downstream access

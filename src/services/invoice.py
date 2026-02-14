@@ -1,7 +1,7 @@
 """Invoice service – creates invoices, splits payments among participants."""
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
@@ -50,7 +50,7 @@ class InvoiceService:
             "platform_fee": platform_fee,
             "total": total,
             "status": "pending",
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
         }
 
         result = await self._db.create_invoice(data)
@@ -65,7 +65,7 @@ class InvoiceService:
 
     async def generate_invoice_number(self) -> str:
         """Generate a sequential invoice number like ``INV-2026-00001``."""
-        year = datetime.now(timezone.utc).year
+        year = datetime.now(UTC).year
         next_num = await self._db.get_next_invoice_number()
         return f"INV-{year}-{next_num}"
 
@@ -92,7 +92,7 @@ class InvoiceService:
                 "amount": p["amount"],
                 "unit_count": p.get("unit_count", 1),
                 "status": "pending",
-                "created_at": datetime.now(timezone.utc).isoformat(),
+                "created_at": datetime.now(UTC).isoformat(),
             }
             result = await self._db.create_payment_split(split_data)
             splits.append(result)
@@ -120,9 +120,7 @@ class InvoiceService:
         """
         update: dict[str, Any] = {
             "status": "paid",
-            "paid_at": payment_data.get(
-                "paid_at", datetime.now(timezone.utc).isoformat()
-            ),
+            "paid_at": payment_data.get("paid_at", datetime.now(UTC).isoformat()),
             "transaction_id": payment_data.get("transaction_id"),
             "payment_method": payment_data.get("payment_method"),
         }

@@ -1,5 +1,6 @@
 """Environment configuration for Groupio Multi-Agent System."""
 
+import secrets
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings
@@ -64,7 +65,7 @@ class Settings(BaseSettings):
     RATE_LIMIT_WINDOW: int = 60  # seconds
 
     # JWT Authentication
-    JWT_SECRET_KEY: str = "your-secret-key-change-in-production"
+    JWT_SECRET_KEY: str = secrets.token_urlsafe(32)
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
@@ -98,16 +99,10 @@ class Settings(BaseSettings):
     }
 
 
-_DEFAULT_JWT_SECRET = "your-secret-key-change-in-production"
-
-
 @lru_cache
 def get_settings() -> Settings:
     """Get cached settings instance."""
     s = Settings()
-    if s.ENVIRONMENT == "production" and s.JWT_SECRET_KEY == _DEFAULT_JWT_SECRET:
-        raise ValueError(
-            "JWT_SECRET_KEY must be set to a secure value in production. "
-            "Do not use the default placeholder."
-        )
+    if s.ENVIRONMENT == "production" and len(s.JWT_SECRET_KEY) < 32:
+        raise ValueError("JWT_SECRET_KEY must be set to a secure value (>= 32 chars) in production.")
     return s

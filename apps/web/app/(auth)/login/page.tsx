@@ -8,6 +8,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Building2, Mail, Phone, Loader2, ArrowLeft } from "lucide-react";
 import { apiClient } from "@/lib/api/client";
+import { useAuthStore } from "@/lib/stores/authStore";
 import { cn } from "@/lib/utils/cn";
 
 const loginSchema = z.object({
@@ -54,7 +55,7 @@ export default function LoginPage() {
       };
 
       const response = await apiClient.login(credentials);
-      localStorage.setItem("auth_token", response.token);
+      useAuthStore.getState().setTokens(response.token, response.refresh_token || '');
       router.push("/dashboard");
     } catch (err) {
       setError(

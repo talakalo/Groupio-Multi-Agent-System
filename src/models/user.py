@@ -1,12 +1,12 @@
 """User Pydantic models."""
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
-class UserRole(str, Enum):
+class UserRole(StrEnum):
     """User role enum."""
 
     RESIDENT = "resident"

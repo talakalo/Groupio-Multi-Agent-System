@@ -49,48 +49,32 @@ class TestResolveNotificationType:
         result = notification_agent._resolve_notification_type(notification_state)
         assert result == "welcome"
 
-    def test_resolve_notification_type_from_actions_payment(
-        self, notification_agent, notification_state
-    ):
+    def test_resolve_notification_type_from_actions_payment(self, notification_agent, notification_state):
         """State has actions_taken with agent='payment' → returns 'payment_reminder'."""
-        notification_state["actions_taken"] = [
-            {"agent": "payment", "action": "payment_status_check"}
-        ]
+        notification_state["actions_taken"] = [{"agent": "payment", "action": "payment_status_check"}]
         result = notification_agent._resolve_notification_type(notification_state)
         assert result == "payment_reminder"
 
-    def test_resolve_notification_type_matching(
-        self, notification_agent, notification_state
-    ):
+    def test_resolve_notification_type_matching(self, notification_agent, notification_state):
         """State has actions with agent='matching' → 'contractor_matched'."""
-        notification_state["actions_taken"] = [
-            {"agent": "matching", "action": "contractor_found"}
-        ]
+        notification_state["actions_taken"] = [{"agent": "matching", "action": "contractor_found"}]
         result = notification_agent._resolve_notification_type(notification_state)
         assert result == "contractor_matched"
 
-    def test_resolve_notification_type_escalation(
-        self, notification_agent, notification_state
-    ):
+    def test_resolve_notification_type_escalation(self, notification_agent, notification_state):
         """State has actions with agent='support' → 'escalation_update'."""
-        notification_state["actions_taken"] = [
-            {"agent": "support", "action": "escalation_created"}
-        ]
+        notification_state["actions_taken"] = [{"agent": "support", "action": "escalation_created"}]
         result = notification_agent._resolve_notification_type(notification_state)
         assert result == "escalation_update"
 
-    def test_resolve_notification_type_default(
-        self, notification_agent, notification_state
-    ):
+    def test_resolve_notification_type_default(self, notification_agent, notification_state):
         """No context clues → defaults to 'offer_update'."""
         notification_state["actions_taken"] = []
         notification_state["intent"] = None
         result = notification_agent._resolve_notification_type(notification_state)
         assert result == "offer_update"
 
-    def test_resolve_notification_type_from_intent(
-        self, notification_agent, notification_state
-    ):
+    def test_resolve_notification_type_from_intent(self, notification_agent, notification_state):
         """Payment intent in state → 'payment_reminder'."""
         notification_state["actions_taken"] = []
         notification_state["intent"] = "payment_question"
@@ -119,9 +103,7 @@ class TestResolveChannels:
 
     def test_resolve_channels_filters_invalid(self, notification_agent, notification_state):
         """Explicit channels with invalid entries → filtered out."""
-        notification_state["notification_channels"] = [
-            "push", "sms", "email", "telegram"
-        ]
+        notification_state["notification_channels"] = ["push", "sms", "email", "telegram"]
         result = notification_agent._resolve_channels(notification_state)
         assert result == ["push", "email"]
         assert "sms" not in result
@@ -149,9 +131,7 @@ async def test_run_sends_to_all_channels(notification_agent, notification_state)
 
     agent.llm_client.create_message = AsyncMock(
         return_value={
-            "content": [
-                {"type": "text", "text": f"```json\n{json.dumps(crafted_message)}\n```"}
-            ],
+            "content": [{"type": "text", "text": f"```json\n{json.dumps(crafted_message)}\n```"}],
             "usage": {"input_tokens": 80, "output_tokens": 60},
         }
     )
@@ -190,9 +170,7 @@ async def test_run_handles_dispatch_failure(notification_agent, notification_sta
 
     agent.llm_client.create_message = AsyncMock(
         return_value={
-            "content": [
-                {"type": "text", "text": f"```json\n{json.dumps(crafted_message)}\n```"}
-            ],
+            "content": [{"type": "text", "text": f"```json\n{json.dumps(crafted_message)}\n```"}],
             "usage": {"input_tokens": 50, "output_tokens": 30},
         }
     )
@@ -228,9 +206,7 @@ async def test_run_handles_dispatch_failure(notification_agent, notification_sta
 class TestBuildContextSummary:
     """Tests for _build_context_summary."""
 
-    def test_build_context_summary_with_full_state(
-        self, notification_agent, notification_state
-    ):
+    def test_build_context_summary_with_full_state(self, notification_agent, notification_state):
         """State has user_profile, active_offers, building_context → all parts present."""
         notification_state["user_profile"] = {
             "full_name": "Yael Cohen",
@@ -251,9 +227,7 @@ class TestBuildContextSummary:
             }
         ]
 
-        result = NotificationAgent._build_context_summary(
-            notification_state, "offer_update"
-        )
+        result = NotificationAgent._build_context_summary(notification_state, "offer_update")
 
         assert "Yael Cohen" in result
         assert "yael@example.com" in result
@@ -269,9 +243,7 @@ class TestBuildContextSummary:
             "building_context": {},
             "actions_taken": [],
         }
-        result = NotificationAgent._build_context_summary(
-            empty_state, "offer_update"
-        )
+        result = NotificationAgent._build_context_summary(empty_state, "offer_update")
         assert "No additional context" in result
 
 
@@ -295,9 +267,7 @@ async def test_craft_message_parses_json(notification_agent, notification_state)
 
     agent.llm_client.create_message = AsyncMock(
         return_value={
-            "content": [
-                {"type": "text", "text": f"```json\n{json.dumps(expected)}\n```"}
-            ],
+            "content": [{"type": "text", "text": f"```json\n{json.dumps(expected)}\n```"}],
             "usage": {"input_tokens": 60, "output_tokens": 40},
         }
     )

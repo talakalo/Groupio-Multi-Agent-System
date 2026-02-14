@@ -2,8 +2,7 @@
 
 import logging
 import mimetypes
-import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -13,7 +12,13 @@ from src.config.settings import get_settings
 logger = logging.getLogger(__name__)
 
 ALLOWED_TYPES: dict[str, set[str]] = {
-    "architecture-plans": {"application/pdf", "image/png", "image/jpeg", "image/heic", "image/webp"},
+    "architecture-plans": {
+        "application/pdf",
+        "image/png",
+        "image/jpeg",
+        "image/heic",
+        "image/webp",
+    },
     "contractor-docs": {"application/pdf", "image/png", "image/jpeg"},
     "avatars": {"image/png", "image/jpeg", "image/webp"},
     "invoices": {"application/pdf"},
@@ -37,12 +42,10 @@ class StorageService:
 
     async def _get_client(self) -> Any:
         if self._supabase_client is None and self._use_supabase:
-            from supabase import AsyncClient, acreate_client
+            from supabase import acreate_client
 
             settings = get_settings()
-            self._supabase_client = await acreate_client(
-                settings.SUPABASE_URL, settings.SUPABASE_KEY
-            )
+            self._supabase_client = await acreate_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
         return self._supabase_client
 
     # ------------------------------------------------------------------
@@ -67,8 +70,7 @@ class StorageService:
         allowed = ALLOWED_TYPES[bucket]
         if content_type not in allowed:
             raise StorageError(
-                f"File type '{content_type}' not allowed for bucket '{bucket}'. "
-                f"Allowed: {', '.join(sorted(allowed))}"
+                f"File type '{content_type}' not allowed for bucket '{bucket}'. Allowed: {', '.join(sorted(allowed))}"
             )
 
     # ------------------------------------------------------------------
@@ -88,16 +90,14 @@ class StorageService:
 
         ext = Path(file_name).suffix
         unique_name = f"{uuid4().hex}{ext}"
-        prefix = datetime.now(timezone.utc).strftime("%Y/%m")
+        prefix = datetime.now(UTC).strftime("%Y/%m")
         storage_path = f"{prefix}/{unique_name}"
 
         if self._use_supabase:
             return await self._upload_supabase(bucket, storage_path, file_data, content_type)
         return await self._upload_local(bucket, storage_path, file_data)
 
-    async def _upload_supabase(
-        self, bucket: str, path: str, data: bytes, content_type: str | None
-    ) -> dict[str, str]:
+    async def _upload_supabase(self, bucket: str, path: str, data: bytes, content_type: str | None) -> dict[str, str]:
         client = await self._get_client()
         try:
             opts: dict[str, Any] = {}

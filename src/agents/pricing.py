@@ -63,11 +63,7 @@ class PricingAgent(BaseAgent):
         entities = state.get("entities") or {}
         building_context = state.get("building_context", {})
         region = building_context.get("region", "center")
-        category = (
-            context_next.get("category")
-            or entities.get("category")
-            or self._extract_category(state)
-        )
+        category = context_next.get("category") or entities.get("category") or self._extract_category(state)
 
         # Step 1: Retrieve pricing guides from knowledge base
         pricing_context = await self._retrieve_context(
@@ -105,14 +101,22 @@ class PricingAgent(BaseAgent):
 
         offer_id = entities.get("offer_id") or context_next.get("offer_id")
         # Merge pricing entities into state for downstream agents
-        state["entities"] = {**(state.get("entities") or {}), "category": category, "offer_id": offer_id}
+        state["entities"] = {
+            **(state.get("entities") or {}),
+            "category": category,
+            "offer_id": offer_id,
+        }
         state["context_for_next_agent"] = {
             "category": category,
             "region": region,
             "offer_id": offer_id,
             "base_price": base_price,
             "tiers_summary": [
-                {"min": t.get("min_participants"), "max": t.get("max_participants"), "discount": t.get("discount_percent")}
+                {
+                    "min": t.get("min_participants"),
+                    "max": t.get("max_participants"),
+                    "discount": t.get("discount_percent"),
+                }
                 for t in tiers
             ],
         }
@@ -184,9 +188,7 @@ class PricingAgent(BaseAgent):
 
             # Quality check: don't go below 80% of market minimum
             if min_price > 0 and tier_price < min_price * 0.8:
-                flags.append(
-                    f"Tier {tier['min']}-{tier['max'] or '+'}: price too low - quality risk"
-                )
+                flags.append(f"Tier {tier['min']}-{tier['max'] or '+'}: price too low - quality risk")
                 tier_price = min_price * 0.8
 
             # Market positioning check

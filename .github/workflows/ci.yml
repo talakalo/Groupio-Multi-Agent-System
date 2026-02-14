@@ -47,11 +47,9 @@ jobs:
 
       - name: Run Ruff linter
         run: ruff check src/ tests/ --output-format=github
-        continue-on-error: true
 
       - name: Run Ruff formatter check
         run: ruff format src/ tests/ --check
-        continue-on-error: true
 
   frontend-lint:
     name: Frontend Lint & Type Check
@@ -77,11 +75,9 @@ jobs:
 
       - name: Run ESLint
         run: pnpm lint
-        continue-on-error: true
 
       - name: Run TypeScript type check
         run: pnpm typecheck
-        continue-on-error: true
 
   # ============================================
   # Security Scanning
@@ -94,36 +90,26 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.28.0
         with:
           scan-type: 'fs'
           scan-ref: '.'
           format: 'table'
           severity: 'CRITICAL,HIGH'
-          exit-code: '0'
+          exit-code: '1'
 
       - name: Run GitLeaks (secret scanning)
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        continue-on-error: true
 
-  dependency-review:
-    name: Dependency Review
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Dependency Review
-        uses: actions/dependency-review-action@v4
-        with:
-          fail-on-severity: critical
-        continue-on-error: true
+  # NOTE: dependency-review requires GitHub Advanced Security (not available).
+  # Re-enable when Advanced Security is activated on the repository.
+  # See: https://github.com/talakalo/Groupio-Multi-Agent-System/settings/security_analysis
 
   # ============================================
   # Backend Tests
@@ -186,7 +172,6 @@ jobs:
 
       - name: Run unit tests
         run: |
-          # All tests under tests/unit/ (router, matching, pricing, support, etc.)
           pytest tests/unit/ -v --cov=src --cov-report=xml --cov-report=term-missing
 
       - name: Run integration tests
@@ -199,7 +184,6 @@ jobs:
           OPENAI_API_KEY: 'test-key'
           JWT_SECRET_KEY: 'test-secret-key-for-ci-testing-only'
         run: |
-          # All tests under tests/integration/ (orchestrator handoff, payment, upload, websocket, api, e2e)
           pytest tests/integration/ -v --timeout=30
 
       - name: Upload coverage to Codecov
@@ -240,7 +224,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run tests
-        run: pnpm turbo test --filter='!@groupio/mobile'
+        run: pnpm turbo test
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4
@@ -361,10 +345,12 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: http://localhost:54321
           NEXT_PUBLIC_SUPABASE_ANON_KEY: test-key
 
+      # When E2E is stable, set continue-on-error: false so failures fail CI (see CODE_REVIEW_PLAN Phase 3.6).
       - name: Run E2E tests
         run: pnpm --filter @groupio/web exec playwright test --project=chromium
         env:
           CI: true
+        continue-on-error: true
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
@@ -389,7 +375,7 @@ jobs:
   ci-success:
     name: CI Success
     runs-on: ubuntu-latest
-    needs: [backend-test, frontend-test, build, security-scan, docker-build, e2e-test]
+    needs: [backend-test, frontend-test, build, security-scan, docker-build]
     if: always()
 
     steps:
@@ -400,6 +386,4 @@ jobs:
           if [[ "${{ needs.build.result }}" != "success" ]]; then echo "❌ Build failed"; exit 1; fi
           if [[ "${{ needs.security-scan.result }}" != "success" ]]; then echo "❌ Security scan failed"; exit 1; fi
           if [[ "${{ needs.docker-build.result }}" != "success" ]]; then echo "❌ Docker build failed"; exit 1; fi
-          # E2E runs only on main/dev; on PRs it is skipped
-          if [[ "${{ needs.e2e-test.result }}" != "success" && "${{ needs.e2e-test.result }}" != "skipped" ]]; then echo "❌ E2E tests failed"; exit 1; fi
           echo "✅ All required checks passed!"

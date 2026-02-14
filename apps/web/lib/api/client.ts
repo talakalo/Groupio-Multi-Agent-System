@@ -1,4 +1,5 @@
 import type { MessageRequest, MessageResponse } from "@groupio/types";
+import { useAuthStore } from "@/lib/stores/authStore";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -30,14 +31,7 @@ class ApiClient {
   }
 
   private getAuthToken(): string | null {
-    if (typeof window === "undefined") return null;
-    return localStorage.getItem("auth_token");
-  }
-
-  private setAuthToken(token: string): void {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("auth_token", token);
-    }
+    return useAuthStore.getState().accessToken;
   }
 
   private async request<T>(
@@ -67,7 +61,6 @@ class ApiClient {
     if (response.status === 401 && this.on401Retry && !isRetry) {
       const newToken = await this.on401Retry();
       if (newToken) {
-        this.setAuthToken(newToken);
         return this.request<T>(endpoint, options, true);
       }
     }

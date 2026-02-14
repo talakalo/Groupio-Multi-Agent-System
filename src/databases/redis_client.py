@@ -20,6 +20,10 @@ class RedisClient:
         self._redis = redis.from_url(
             settings.REDIS_URL,
             decode_responses=True,
+            max_connections=20,
+            socket_connect_timeout=5,
+            socket_timeout=5,
+            retry_on_timeout=True,
         )
         self._context_window = 10
         self._conversation_ttl = 86400  # 24 hours
@@ -110,9 +114,7 @@ class RedisClient:
 
     # -- Agent State --
 
-    async def save_agent_state(
-        self, conversation_id: str, state: dict[str, Any], ttl: int = 3600
-    ) -> None:
+    async def save_agent_state(self, conversation_id: str, state: dict[str, Any], ttl: int = 3600) -> None:
         """Save agent state for a conversation."""
         key = f"agent_state:{conversation_id}"
         await self._redis.set(

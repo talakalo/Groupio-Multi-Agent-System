@@ -1,7 +1,6 @@
 """Offer lifecycle automation - handles state transitions and notifications."""
 
 import logging
-from datetime import datetime, timezone
 from typing import Any
 
 from src.databases.postgres import get_postgres_client
@@ -58,10 +57,7 @@ class OfferLifecycleManager:
             participants = await self._db.get_offer_participants(offer_id)
             if participants:
                 per_person = invoice["total"] / len(participants)
-                splits = [
-                    {"participant_user_id": p["user_id"], "amount": round(per_person, 2)}
-                    for p in participants
-                ]
+                splits = [{"participant_user_id": p["user_id"], "amount": round(per_person, 2)} for p in participants]
                 await invoice_svc.split_payment(invoice["id"], splits)
 
             logger.info("Invoice %s generated for offer %s", invoice["id"], offer_id)
@@ -100,6 +96,7 @@ class OfferLifecycleManager:
 
 
 _lifecycle_manager: OfferLifecycleManager | None = None
+
 
 def get_offer_lifecycle() -> OfferLifecycleManager:
     global _lifecycle_manager
