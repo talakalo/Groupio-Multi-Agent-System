@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -20,6 +21,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
+import { useAuthStore } from '@/lib/stores/authStore';
 import type { Resident } from '@groupio/types';
 
 // ---------------------------------------------------------------------------
@@ -97,6 +99,13 @@ export default function ResidentProfilePage() {
   const t = useTranslations('profile');
   const tCommon = useTranslations('common');
   const queryClient = useQueryClient();
+  const router = useRouter();
+  const logoutAction = useAuthStore((s) => s.logout);
+
+  const handleLogout = async () => {
+    await logoutAction();
+    router.push('/login');
+  };
 
   const [activeTab, setActiveTab] = useState<'personal' | 'notifications' | 'security'>('personal');
 
@@ -400,7 +409,7 @@ export default function ResidentProfilePage() {
                 <Trash2 className="h-4 w-4" />
                 {t('deleteAccount')}
               </button>
-              <button type="button" className="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors text-sm font-medium">
+              <button type="button" onClick={handleLogout} className="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors text-sm font-medium">
                 <LogOut className="h-4 w-4" />
                 {t('logout')}
               </button>

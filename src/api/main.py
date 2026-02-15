@@ -4,12 +4,11 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from src.api.middleware.auth import get_admin_user
 from src.api.middleware.logging import RequestLoggingMiddleware
 from src.api.routes import api_router
 from src.config.settings import get_settings
@@ -17,9 +16,7 @@ from src.databases.graph_store import get_graph_store
 from src.databases.postgres import get_postgres_client
 from src.databases.redis_client import get_redis_client
 from src.databases.vector_store import get_vector_store
-from src.models.user import UserInDB
 from src.orchestration.graph import get_orchestrator
-from src.rag.pipeline import get_rag_pipeline
 from src.utils.monitoring import init_monitoring
 from src.utils.validators import sanitize_input, validate_message_request
 
@@ -65,14 +62,28 @@ app = FastAPI(
 )
 
 
+def _is_db_connection_error(exc: Exception) -> bool:
+    """True if exception is due to DB (e.g. PostgreSQL) not reachable."""
+    if isinstance(exc, ConnectionRefusedError):
+        return True
+    if isinstance(exc, OSError) and getattr(exc, "errno", None) == 61:
+        return True
+    return False
+
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Ensure CORS headers on error responses so browser shows real error, not CORS."""
     logger.exception("Unhandled exception: %s", exc)
-    show_detail = get_settings().ENVIRONMENT == "development"
-    content = {"detail": str(exc) if show_detail else "Internal server error"}
-    response = JSONResponse(status_code=500, content=content)
-    # Add CORS headers so browser doesn't mask 500 as CORS error
+    if _is_db_connection_error(exc):
+        status_code = 503
+        content = {"detail": "Database unavailable. Please try again later."}
+    else:
+        status_code = 500
+        show_detail = get_settings().ENVIRONMENT == "development"
+        content = {"detail": str(exc) if show_detail else "Internal server error"}
+    response = JSONResponse(status_code=status_code, content=content)
+    # Add CORS headers so browser doesn't mask error as CORS
     origin = request.headers.get("origin")
     if origin:
         response.headers["Access-Control-Allow-Origin"] = origin
@@ -185,42 +196,6 @@ async def send_message(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@app.post("/api/v1/webhooks/whatsapp")
-async def whatsapp_webhook(
-    payload: dict[str, Any],
-    background_tasks: BackgroundTasks,
-) -> dict[str, str]:
-    """Handle incoming WhatsApp messages."""
-    try:
-        message = _parse_whatsapp_message(payload)
-
-        if not message:
-            return {"status": "ignored"}
-
-        db = get_postgres_client()
-        building_id = await db.get_building_by_phone(message["phone_number"])
-
-        orchestrator = get_orchestrator()
-        result = await orchestrator.run(
-            user_message=message["text"],
-            user_id=message["phone_number"],
-            building_id=building_id,
-        )
-
-        # Queue response send (in production, use BullMQ)
-        background_tasks.add_task(
-            _send_whatsapp_response,
-            to=message["phone_number"],
-            message=result["response"].get("message", ""),
-        )
-
-        return {"status": "processed"}
-
-    except Exception as e:
-        logger.error("WhatsApp webhook error: %s", e, exc_info=True)
-        return {"status": "error"}
-
-
 @app.get("/api/v1/health/live")
 async def health_live() -> dict[str, str]:
     """Liveness probe: process is up. No DB or external calls."""
@@ -264,49 +239,6 @@ async def health_check() -> dict[str, Any]:
     }
 
 
-# -- Admin Endpoints --
-
-
-@app.post("/api/v1/admin/agents/{agent_name}/reload")
-async def reload_agent(
-    agent_name: str,
-    current_user: UserInDB = Depends(get_admin_user),
-) -> dict[str, str]:
-    """Reload an agent's configuration without restarting. Requires admin access."""
-    orchestrator = get_orchestrator()
-    agent = orchestrator.agents.get(agent_name)
-    if not agent:
-        raise HTTPException(status_code=404, detail=f"Agent '{agent_name}' not found")
-
-    await agent.reload_config()
-    logger.info("Agent %s reloaded by admin %s", agent_name, current_user.email)
-    return {"status": "reloaded", "agent": agent_name}
-
-
-@app.get("/api/v1/admin/metrics")
-async def get_metrics(
-    current_user: UserInDB = Depends(get_admin_user),
-) -> dict[str, Any]:
-    """Get system metrics for all agents and services. Requires admin access."""
-    orchestrator = get_orchestrator()
-
-    agent_metrics = {}
-    for name, agent in orchestrator.agents.items():
-        agent_metrics[name] = await agent.get_metrics()
-
-    rag_metrics = {}
-    try:
-        rag = get_rag_pipeline()
-        rag_metrics = await rag.get_metrics()
-    except Exception:
-        pass
-
-    return {
-        "agents": agent_metrics,
-        "rag": rag_metrics,
-    }
-
-
 # -- Helper Functions --
 
 
@@ -324,61 +256,3 @@ async def _log_conversation(
         logger.warning("Failed to log conversation for user %s", user_id)
 
 
-def _parse_whatsapp_message(payload: dict) -> dict[str, str] | None:
-    """Parse incoming WhatsApp webhook payload."""
-    try:
-        entry = payload.get("entry", [{}])[0]
-        changes = entry.get("changes", [{}])[0]
-        value = changes.get("value", {})
-        messages = value.get("messages", [])
-
-        if not messages:
-            return None
-
-        msg = messages[0]
-        return {
-            "phone_number": msg.get("from", ""),
-            "text": msg.get("text", {}).get("body", ""),
-            "type": msg.get("type", "text"),
-        }
-    except (IndexError, KeyError):
-        return None
-
-
-async def _send_whatsapp_response(to: str, message: str) -> None:
-    """Send a WhatsApp message using Meta WhatsApp Business API."""
-    settings = get_settings()
-
-    if not settings.WHATSAPP_API_TOKEN or not settings.WHATSAPP_PHONE_ID:
-        logger.warning("WhatsApp not configured - message not sent to %s", to)
-        return
-
-    try:
-        import httpx
-
-        url = f"https://graph.facebook.com/v18.0/{settings.WHATSAPP_PHONE_ID}/messages"
-        headers = {
-            "Authorization": f"Bearer {settings.WHATSAPP_API_TOKEN}",
-            "Content-Type": "application/json",
-        }
-        payload = {
-            "messaging_product": "whatsapp",
-            "recipient_type": "individual",
-            "to": to,
-            "type": "text",
-            "text": {"preview_url": False, "body": message},
-        }
-
-        async with httpx.AsyncClient() as client:
-            response = await client.post(url, headers=headers, json=payload, timeout=30.0)
-
-            if response.status_code == 200:
-                logger.info("WhatsApp message sent to %s", to)
-            else:
-                logger.error(
-                    "WhatsApp API error: %s - %s",
-                    response.status_code,
-                    response.text,
-                )
-    except Exception as e:
-        logger.error("Failed to send WhatsApp message to %s: %s", to, e)

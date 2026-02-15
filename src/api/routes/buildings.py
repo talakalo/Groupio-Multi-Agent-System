@@ -5,7 +5,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from src.api.middleware.auth import get_current_user
+from src.api.middleware.auth import get_current_user, is_admin
 from src.databases.postgres import get_postgres_client
 from src.models.building import (
     BuildingCreate,
@@ -68,7 +68,7 @@ async def list_buildings(
         filters["region"] = region.value
 
     # Non-admins can only see their own buildings
-    if current_user.role not in ("admin", "super_admin"):
+    if not is_admin(current_user):
         filters["user_id"] = current_user.id
 
     buildings, total = await db.list_buildings(
@@ -99,7 +99,7 @@ async def get_building(
         raise HTTPException(status_code=404, detail="Building not found")
 
     # Check access
-    if current_user.role not in ("admin", "super_admin"):
+    if not is_admin(current_user):
         is_resident = await db.is_user_in_building(current_user.id, building_id)
         if not is_resident:
             raise HTTPException(status_code=403, detail="Not authorized")
@@ -139,7 +139,7 @@ async def delete_building(
     current_user: UserInDB = Depends(get_current_user),
 ) -> dict[str, str]:
     """Delete a building (admin only)."""
-    if current_user.role not in ("admin", "super_admin"):
+    if not is_admin(current_user):
         raise HTTPException(status_code=403, detail="Admin access required")
 
     db = get_postgres_client()
@@ -273,7 +273,7 @@ async def get_building_stats(
         raise HTTPException(status_code=404, detail="Building not found")
 
     # Check access
-    if current_user.role not in ("admin", "super_admin"):
+    if not is_admin(current_user):
         is_resident = await db.is_user_in_building(current_user.id, building_id)
         if not is_resident:
             raise HTTPException(status_code=403, detail="Not authorized")
@@ -298,7 +298,7 @@ async def get_building_offers(
         raise HTTPException(status_code=404, detail="Building not found")
 
     # Check access
-    if current_user.role not in ("admin", "super_admin"):
+    if not is_admin(current_user):
         is_resident = await db.is_user_in_building(current_user.id, building_id)
         if not is_resident:
             raise HTTPException(status_code=403, detail="Not authorized")

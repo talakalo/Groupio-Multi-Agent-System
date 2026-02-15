@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import {
   LayoutDashboard,
@@ -18,6 +18,7 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
+import { useAuthStore } from '@/lib/stores/authStore';
 
 interface NavItem {
   href: string;
@@ -35,8 +36,15 @@ const NAV_ITEMS: NavItem[] = [
 
 export default function ResidentLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const t = useTranslations('residentNav');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const logout = useAuthStore((s) => s.logout);
+
+  const handleLogout = async () => {
+    await logout();
+    router.push('/login');
+  };
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
@@ -87,6 +95,7 @@ export default function ResidentLayout({ children }: { children: React.ReactNode
       <div className="border-t border-gray-100 px-4 py-4">
         <button
           type="button"
+          onClick={handleLogout}
           className="flex items-center gap-3 w-full text-start text-sm text-gray-600 hover:text-gray-900 transition-colors"
         >
           <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center">

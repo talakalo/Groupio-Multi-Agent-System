@@ -1,5 +1,6 @@
 """Admin API routes for system management."""
 
+import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -10,6 +11,8 @@ from src.databases.vector_store import get_vector_store
 from src.orchestration.graph import get_orchestrator
 from src.rag.pipeline import get_rag_pipeline
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(
     tags=["admin"],
     dependencies=[Depends(get_admin_user)],  # Require admin auth for all routes
@@ -18,33 +21,39 @@ router = APIRouter(
 
 @router.get("/analytics")
 async def get_analytics() -> dict[str, Any]:
-    """Dashboard analytics (counts and derived metrics)."""
+    """Dashboard analytics (admin). Aggregates from DB when available; otherwise placeholder."""
     db = get_postgres_client()
     open_tickets = 0
     total_contractors = 0
+
     try:
         stats = await db.get_escalation_stats()
         if isinstance(stats, dict):
             by_status = stats.get("by_status") or {}
             open_tickets = sum(
-                c for s, c in by_status.items() if s and s != "resolved" and s != "closed"
+                c
+                for s, c in by_status.items()
+                if s and str(s).lower() not in ("resolved", "closed")
             )
     except Exception:
-        pass
+        logger.debug("Could not fetch escalation stats for analytics")
+
     try:
         _, total_contractors = await db.list_contractors(filters={}, page=1, page_size=1)
     except Exception:
-        pass
+        logger.debug("Could not fetch contractor count for analytics")
+
     return {
-        "gmv_today": 0,
-        "gmv_change": 0,
-        "active_offers": 0,
-        "active_offers_change": 0,
-        "pending_verifications": 0,
-        "urgent_verifications": 0,
-        "open_tickets": open_tickets,
-        "open_tickets_change": 0,
-        "total_contractors": total_contractors,
+        "gmvToday": 0,
+        "gmvChange": 0,
+        "activeOffers": 0,
+        "activeOffersChange": 0,
+        "pendingVerifications": 0,
+        "urgentVerifications": 0,
+        "openTickets": open_tickets,
+        "openTicketsChange": 0,
+        "totalContractors": total_contractors,
+        "resolvedToday": 0,
     }
 
 
@@ -124,34 +133,3 @@ async def list_collections() -> dict[str, Any]:
         except Exception:
             collections[name] = {"status": "unavailable"}
     return {"collections": collections}
-
-
-@router.get("/analytics")
-async def get_analytics() -> dict[str, Any]:
-    """Dashboard analytics (admin). Aggregates from DB when available; otherwise placeholder."""
-    try:
-        db = get_postgres_client()
-        stats = await db.get_escalation_stats()
-        by_status = stats.get("by_status") or {}
-        open_count = sum(
-            c for s, c in by_status.items() if str(s).lower() not in ("resolved", "closed")
-        )
-        return {
-            "gmvToday": 0,
-            "gmvChange": 0,
-            "activeOffers": 0,
-            "activeOffersChange": 0,
-            "openTickets": open_count,
-            "openTicketsChange": 0,
-            "resolvedToday": 0,
-        }
-    except Exception:
-        return {
-            "gmvToday": 0,
-            "gmvChange": 0,
-            "activeOffers": 0,
-            "activeOffersChange": 0,
-            "openTickets": 0,
-            "openTicketsChange": 0,
-            "resolvedToday": 0,
-        }

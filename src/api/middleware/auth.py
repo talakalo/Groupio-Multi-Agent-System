@@ -1,7 +1,7 @@
 """Authentication middleware for the API."""
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import bcrypt
 import jwt
@@ -15,6 +15,11 @@ logger = logging.getLogger(__name__)
 
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
+
+
+def _utcnow() -> datetime:
+    """Return timezone-aware UTC now (replaces deprecated datetime.utcnow())."""
+    return datetime.now(timezone.utc)
 
 
 def hash_password(password: str) -> str:
@@ -37,17 +42,18 @@ def create_access_token(
     """Create a JWT access token."""
     settings = get_settings()
 
+    now = _utcnow()
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = now + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = now + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
 
     payload = {
         "sub": user_id,
         "email": email,
         "role": role.value if isinstance(role, UserRole) else role,
         "exp": expire,
-        "iat": datetime.utcnow(),
+        "iat": now,
         "type": "access",
     }
 
@@ -58,12 +64,13 @@ def create_refresh_token(user_id: str) -> str:
     """Create a JWT refresh token."""
     settings = get_settings()
 
-    expire = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+    now = _utcnow()
+    expire = now + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
 
     payload = {
         "sub": user_id,
         "exp": expire,
-        "iat": datetime.utcnow(),
+        "iat": now,
         "type": "refresh",
     }
 
@@ -169,7 +176,7 @@ async def get_admin_user(
     current_user: UserInDB = Depends(get_current_user),
 ) -> UserInDB:
     """Get current user and verify they have admin privileges."""
-    if current_user.role not in (UserRole.ADMIN, UserRole.SUPER_ADMIN):
+    if current_user.role not in (UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.BUILDINGS_MANAGER):
         raise HTTPException(status_code=403, detail="Admin access required")
     return current_user
 
@@ -213,3 +220,16 @@ def require_roles(*roles: UserRole):
         return current_user
 
     return role_checker
+
+
+# Convenience: checks admin, super_admin, buildings_manager (same as get_admin_user)
+ADMIN_ROLES = frozenset({UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.BUILDINGS_MANAGER})
+
+
+def is_admin(user: UserInDB) -> bool:
+    """Return True if user has any admin-level role.
+
+    Prefer using ``get_admin_user`` as a dependency.  This helper exists for
+    inline checks where a dependency isn't convenient.
+    """
+    return user.role in ADMIN_ROLES

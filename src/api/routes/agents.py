@@ -2,12 +2,16 @@
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from src.api.middleware.auth import get_admin_user
 from src.orchestration.graph import get_orchestrator
 
-router = APIRouter(tags=["agents"])
+router = APIRouter(
+    tags=["agents"],
+    dependencies=[Depends(get_admin_user)],  # Require admin auth for all agent routes
+)
 
 
 class AgentInvokeRequest(BaseModel):
