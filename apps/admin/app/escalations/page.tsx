@@ -46,7 +46,8 @@ export default function EscalationsPage() {
   const resolveMutation = useResolveEscalation();
 
   // ---- API helpers ----
-  const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "") || "/api/v1";
+  const rawApiUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "") || "http://localhost:8000";
+  const API_BASE = rawApiUrl.endsWith("/api/v1") ? rawApiUrl : `${rawApiUrl}/api/v1`;
 
   function getAuthHeaders(): Record<string, string> {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -169,7 +170,7 @@ export default function EscalationsPage() {
             : "admin";
 
         const res = await fetch(
-          `${API_URL}/api/v1/escalations/${encodeURIComponent(id)}/assign`,
+          `${API_BASE}/escalations/${encodeURIComponent(id)}/assign`,
           {
             method: "POST",
             headers: getAuthHeaders(),
@@ -182,7 +183,7 @@ export default function EscalationsPage() {
         alert(err instanceof Error ? err.message : "Failed to reassign escalation");
       }
     },
-    [API_URL, queryClient]
+    [API_BASE, queryClient]
   );
 
   const handleEscalate = useCallback(
@@ -199,7 +200,7 @@ export default function EscalationsPage() {
         }
 
         const res = await fetch(
-          `${API_URL}/api/v1/escalations/${encodeURIComponent(id)}`,
+          `${API_BASE}/escalations/${encodeURIComponent(id)}`,
           {
             method: "PUT",
             headers: getAuthHeaders(),
@@ -212,7 +213,7 @@ export default function EscalationsPage() {
         alert(err instanceof Error ? err.message : "Failed to escalate further");
       }
     },
-    [API_URL, allEscalations, queryClient]
+    [API_BASE, allEscalations, queryClient]
   );
 
   const handleExport = useCallback(() => {

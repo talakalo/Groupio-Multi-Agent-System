@@ -23,6 +23,46 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["buildings"])
 
 
+@router.get("/me")
+async def get_my_building(
+    current_user: UserInDB = Depends(get_current_user),
+) -> dict:
+    """Get the current user's building (resident). Returns building with residents, active offers, stats, and invite code."""
+    if not current_user.building_id:
+        raise HTTPException(status_code=404, detail="No building associated with your account")
+    db = get_postgres_client()
+    building_id = current_user.building_id
+    building = await db.get_building(building_id)
+    if not building:
+        raise HTTPException(status_code=404, detail="Building not found")
+
+    residents, _ = await db.get_building_residents(building_id, page=1, page_size=50)
+    active_offers = await db.get_active_offers(building_id)
+    stats = await db.get_building_stats(building_id)
+
+    # Build resident summaries for frontend (BuildingProfile.residents)
+    resident_summaries = []
+    for r in residents:
+        resident_summaries.append({
+            "id": r.get("user_id") or r.get("id"),
+            "name": r.get("full_name", ""),
+            "apartmentNumber": r.get("unit_number", ""),
+            "joinedAt": (r.get("joined_at") or "").isoformat() if hasattr(r.get("joined_at"), "isoformat") else str(r.get("joined_at", "")),
+            "isCommitteeMember": building.get("admin_user_id") == r.get("user_id"),
+        })
+
+    # Shareable invite code (short id for now; can be from invitations table later)
+    invite_code = building_id.replace("-", "")[:8].upper() if building_id else ""
+
+    return {
+        **building,
+        "residents": resident_summaries,
+        "activeOffers": active_offers,
+        "totalSavings": building.get("total_savings") or stats.get("total_savings", 0),
+        "inviteCode": invite_code,
+    }
+
+
 @router.post("/", response_model=BuildingResponse)
 async def create_building(
     request: BuildingCreate,

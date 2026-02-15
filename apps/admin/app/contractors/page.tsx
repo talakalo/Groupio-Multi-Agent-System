@@ -177,7 +177,8 @@ export default function ContractorsPage() {
   const [actionLoading, setActionLoading] = useState(false);
 
   // ---- API helpers ----
-  const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "") || "/api/v1";
+  const rawApiUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "") || "http://localhost:8000";
+  const API_BASE = rawApiUrl.endsWith("/api/v1") ? rawApiUrl : `${rawApiUrl}/api/v1`;
 
   function getAuthHeaders(): Record<string, string> {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -187,7 +188,7 @@ export default function ContractorsPage() {
   }
 
   async function approveContractor(id: string) {
-    const res = await fetch(`${API_URL}/api/v1/contractors/${encodeURIComponent(id)}/verify`, {
+    const res = await fetch(`${API_BASE}/contractors/${encodeURIComponent(id)}/verify`, {
       method: "POST",
       headers: getAuthHeaders(),
       body: JSON.stringify({ decision: "approved" }),
@@ -197,7 +198,7 @@ export default function ContractorsPage() {
   }
 
   async function suspendContractor(id: string) {
-    const res = await fetch(`${API_URL}/api/v1/contractors/${encodeURIComponent(id)}`, {
+    const res = await fetch(`${API_BASE}/contractors/${encodeURIComponent(id)}`, {
       method: "PUT",
       headers: getAuthHeaders(),
       body: JSON.stringify({ verification_status: "suspended" }),
@@ -207,7 +208,7 @@ export default function ContractorsPage() {
   }
 
   async function requestDocuments(id: string) {
-    const res = await fetch(`${API_URL}/api/v1/contractors/${encodeURIComponent(id)}/request-docs`, {
+    const res = await fetch(`${API_BASE}/contractors/${encodeURIComponent(id)}/request-docs`, {
       method: "POST",
       headers: getAuthHeaders(),
     });
