@@ -40,6 +40,15 @@ class AgentState(TypedDict):
     building_context: dict[str, Any]
     active_offers: list[dict[str, Any]]
 
+    # Entities (single source: building_id, offer_id, contractor_id, category)
+    entities: dict[str, Any] | None
+
+    # Inter-agent handoff (set by orchestrator from last actions_taken when re-entering router)
+    last_agent_handoff: dict[str, Any] | None
+
+    # Context for next agent (e.g. contractor_ids, offer_id set by matching/pricing)
+    context_for_next_agent: dict[str, Any] | None
+
     # RAG results
     rag_results: list[dict[str, Any]]
 

@@ -82,17 +82,22 @@ class AppErrorBoundary extends Component<
 // ---------------------------------------------------------------------------
 
 export function Providers({ children }: { children: React.ReactNode }) {
+  // Wire up 401 retry: refresh via HTTP-only cookie, then retry request.
   useEffect(() => {
     apiClient.setOn401Retry(async () => {
       const ok = await useAuthStore.getState().refreshAccessToken();
-      const token = useAuthStore.getState().accessToken;
-      if (ok && token && typeof window !== "undefined") {
-        window.localStorage.setItem("auth_token", token);
-        return token;
-      }
-      return null;
+      return ok ? useAuthStore.getState().accessToken : null;
     });
     return () => apiClient.setOn401Retry(null);
+  }, []);
+
+  // On first mount, silently refresh the access token from the HTTP-only
+  // refresh cookie so returning visitors are immediately authenticated.
+  useEffect(() => {
+    const { isAuthenticated, accessToken } = useAuthStore.getState();
+    if (isAuthenticated && !accessToken) {
+      useAuthStore.getState().refreshAccessToken();
+    }
   }, []);
 
   const [queryClient] = useState(

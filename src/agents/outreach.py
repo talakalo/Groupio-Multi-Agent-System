@@ -71,9 +71,7 @@ class ABTestManager:
     def __init__(self) -> None:
         self._redis = get_redis_client()
 
-    async def assign_variant(
-        self, campaign_id: str, user_id: str, variants: dict[str, int] | None = None
-    ) -> str:
+    async def assign_variant(self, campaign_id: str, user_id: str, variants: dict[str, int] | None = None) -> str:
         """Assign user to a test variant using hash-based assignment."""
         if not variants:
             return "control"
@@ -133,7 +131,7 @@ class OutreachAgent(BaseAgent):
     @track_agent_execution("outreach")
     async def run(self, state: AgentState) -> AgentState:
         """Execute outreach campaign logic."""
-        user_message = self._get_last_user_message(state)
+        self._get_last_user_message(state)
 
         # Determine campaign type from context
         campaign_type = self._determine_campaign_type(state)
@@ -149,6 +147,7 @@ class OutreachAgent(BaseAgent):
                         "message": "No active campaign for this context.",
                     },
                     "requires_followup": False,
+                    "summary_for_next_agent": "No active outreach campaign for this context.",
                 }
             ]
             return state
@@ -186,6 +185,7 @@ class OutreachAgent(BaseAgent):
                     "variant": variant,
                 },
                 "requires_followup": False,
+                "summary_for_next_agent": f"Outreach campaign ({campaign_type}) message generated and dispatched.",
             }
         ]
 
@@ -242,7 +242,7 @@ class OutreachAgent(BaseAgent):
 
     def _determine_campaign_type(self, state: AgentState) -> str:
         """Determine which campaign type to run based on context."""
-        intent = state.get("intent", "")
+        state.get("intent", "")
 
         # Check if there's an explicit campaign request
         user_message = self._get_last_user_message(state)

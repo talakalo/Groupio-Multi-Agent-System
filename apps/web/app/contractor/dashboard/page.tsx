@@ -131,7 +131,7 @@ export default function ContractorDashboardPage() {
             </div>
           ) : (
             <div className="space-y-4">
-              {pendingOffers.map((offer) => (
+              {pendingOffers.map((offer: Offer) => (
                 <OfferCard
                   key={offer.id}
                   offer={offer}
@@ -170,7 +170,7 @@ export default function ContractorDashboardPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {activeOffers.slice(0, 6).map((offer) => (
+            {activeOffers.slice(0, 6).map((offer: Offer) => (
               <OfferCard
                 key={offer.id}
                 offer={offer}

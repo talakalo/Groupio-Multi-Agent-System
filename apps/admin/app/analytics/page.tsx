@@ -60,14 +60,26 @@ export default function AnalyticsPage() {
 
   const data = useMemo((): AnalyticsData => {
     if (!backendAnalytics) return DEFAULT_ANALYTICS;
+
+    const activeOffers = backendAnalytics.activeOffers ?? 0;
+    const gmvToday = backendAnalytics.gmvToday ?? 0;
+    const openTickets = backendAnalytics.openTickets ?? 0;
+    const resolvedToday = backendAnalytics.resolvedToday ?? 0;
+    const totalContractors = backendAnalytics.totalContractors ?? 0;
+
+    const insights: string[] = [];
+    if (resolvedToday > 0) insights.push(`${resolvedToday} escalations resolved today`);
+    if (gmvToday > 0) insights.push(`₪${gmvToday.toLocaleString()} GMV recorded today`);
+    if (activeOffers > 0) insights.push(`${activeOffers} offers currently active on the platform`);
+
     return {
       ...DEFAULT_ANALYTICS,
-      totalOffers: backendAnalytics.activeOffers ?? 0,
-      totalRevenue: backendAnalytics.gmvToday ?? 0,
-      escalationRate: (backendAnalytics.openTickets ?? 0) > 0 ? 2.5 : 0,
-      insights: (backendAnalytics.resolvedToday ?? 0) > 0
-        ? [`${backendAnalytics.resolvedToday} escalations resolved today`]
-        : [],
+      totalOffers: activeOffers,
+      totalRevenue: gmvToday,
+      revenueTrend: backendAnalytics.gmvChange ?? 0,
+      activeContractors: totalContractors,
+      escalationRate: openTickets > 0 ? 2.5 : 0,
+      insights,
     };
   }, [backendAnalytics]);
 

@@ -1,14 +1,14 @@
 """Contractor Pydantic models."""
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from src.models.offer import ServiceCategory
 
 
-class Region(str, Enum):
+class Region(StrEnum):
     """Service region enum."""
 
     CENTER = "center"
@@ -21,7 +21,7 @@ class Region(str, Enum):
     HAIFA = "haifa"
 
 
-class VerificationStatus(str, Enum):
+class VerificationStatus(StrEnum):
     """Contractor verification status."""
 
     PENDING = "pending"
@@ -81,6 +81,8 @@ class TrustScoreBreakdown(BaseModel):
 class ContractorInDB(ContractorBase):
     """Contractor stored in database."""
 
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     verification_status: VerificationStatus = VerificationStatus.PENDING
     trust_score: float = 0
@@ -97,9 +99,6 @@ class ContractorInDB(ContractorBase):
     average_response_time_hours: float = 0
     created_at: datetime
     updated_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class ContractorResponse(ContractorInDB):

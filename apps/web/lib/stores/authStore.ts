@@ -16,20 +16,21 @@ export interface User {
 
 interface AuthState {
   user: User | null;
+  /** In-memory only – never persisted to localStorage. */
   accessToken: string | null;
-  refreshToken: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
 
   // Actions
   setUser: (user: User | null) => void;
-  setTokens: (accessToken: string, refreshToken: string) => void;
+  setAccessToken: (token: string | null) => void;
   clearAuth: () => void;
   setLoading: (loading: boolean) => void;
 
   // Async actions
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  /** Refresh the access token via the HTTP-only refresh cookie. */
   refreshAccessToken: () => Promise<boolean>;
   register: (data: RegisterData) => Promise<void>;
   updateProfile: (data: Partial<User>) => Promise<void>;
@@ -50,7 +51,6 @@ export const useAuthStore = create<AuthState>()(
     (set, get) => ({
       user: null,
       accessToken: null,
-      refreshToken: null,
       isAuthenticated: false,
       isLoading: false,
 
@@ -60,13 +60,8 @@ export const useAuthStore = create<AuthState>()(
           isAuthenticated: !!user,
         }),
 
-      setTokens: (accessToken, refreshToken) => {
-        if (typeof window !== 'undefined') window.localStorage.setItem('auth_token', accessToken);
-        set({
-          accessToken,
-          refreshToken,
-          isAuthenticated: true,
-        });
+      setAccessToken: (accessToken) => {
+        set({ accessToken, isAuthenticated: !!accessToken });
       },
 
       clearAuth: () => {
@@ -77,7 +72,6 @@ export const useAuthStore = create<AuthState>()(
         set({
           user: null,
           accessToken: null,
-          refreshToken: null,
           isAuthenticated: false,
         });
       },
@@ -91,6 +85,7 @@ export const useAuthStore = create<AuthState>()(
           const response = await fetch(`${API_URL}/api/v1/auth/login/json`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'include', // receive HTTP-only refresh cookie
             body: JSON.stringify({ email, password }),
           });
 
@@ -100,10 +95,10 @@ export const useAuthStore = create<AuthState>()(
           }
 
           const data = await response.json();
-          if (typeof window !== 'undefined') window.localStorage.setItem('auth_token', data.access_token);
+          // Only keep the access token in memory – refresh token
+          // is stored as an HTTP-only cookie by the backend.
           set({
             accessToken: data.access_token,
-            refreshToken: data.refresh_token,
             isAuthenticated: true,
           });
 
@@ -112,6 +107,7 @@ export const useAuthStore = create<AuthState>()(
             headers: {
               Authorization: `Bearer ${data.access_token}`,
             },
+            credentials: 'include',
           });
 
           if (userResponse.ok) {
@@ -134,6 +130,7 @@ export const useAuthStore = create<AuthState>()(
               headers: {
                 Authorization: `Bearer ${accessToken}`,
               },
+              credentials: 'include', // clear HTTP-only refresh cookie
             }).catch(() => {});
           }
         } finally {
@@ -143,18 +140,13 @@ export const useAuthStore = create<AuthState>()(
       },
 
       refreshAccessToken: async () => {
-        const { refreshToken } = get();
-
-        if (!refreshToken) {
-          get().clearAuth();
-          return false;
-        }
-
+        // No refresh token in state – the browser sends the HTTP-only
+        // cookie automatically when credentials: 'include' is set.
         try {
           const response = await fetch(`${API_URL}/api/v1/auth/refresh`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ refresh_token: refreshToken }),
+            credentials: 'include',
           });
 
           if (!response.ok) {
@@ -162,14 +154,10 @@ export const useAuthStore = create<AuthState>()(
             return false;
           }
 
-      const data = await response.json();
-      if (typeof window !== 'undefined') window.localStorage.setItem('auth_token', data.access_token);
-      set({
-        accessToken: data.access_token,
-        refreshToken: data.refresh_token,
-      });
+          const data = await response.json();
+          set({ accessToken: data.access_token });
 
-      return true;
+          return true;
         } catch {
           get().clearAuth();
           return false;
@@ -183,6 +171,7 @@ export const useAuthStore = create<AuthState>()(
           const response = await fetch(`${API_URL}/api/v1/auth/register`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({
               email: data.email,
               password: data.password,
@@ -220,6 +209,7 @@ export const useAuthStore = create<AuthState>()(
               'Content-Type': 'application/json',
               Authorization: `Bearer ${accessToken}`,
             },
+            credentials: 'include',
             body: JSON.stringify(data),
           });
 
@@ -238,10 +228,11 @@ export const useAuthStore = create<AuthState>()(
     {
       name: 'groupio-auth',
       storage: createJSONStorage(() => localStorage),
+      // Only persist non-sensitive data. Tokens are NEVER written to
+      // localStorage – the access token lives in memory and the refresh
+      // token lives in an HTTP-only cookie managed by the backend.
       partialize: (state) => ({
         user: state.user,
-        accessToken: state.accessToken,
-        refreshToken: state.refreshToken,
         isAuthenticated: state.isAuthenticated,
       }),
     }

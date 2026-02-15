@@ -24,9 +24,7 @@ class EmailService:
 
     def _is_configured(self) -> bool:
         """Check if email service is properly configured."""
-        return bool(
-            self.settings.SMTP_HOST and self.settings.SMTP_USER and self.settings.SMTP_PASSWORD
-        )
+        return bool(self.settings.SMTP_HOST and self.settings.SMTP_USER and self.settings.SMTP_PASSWORD)
 
     def _send_sync(self, msg: MIMEMultipart, to_email: str) -> None:
         """Synchronous SMTP send (run inside a thread)."""

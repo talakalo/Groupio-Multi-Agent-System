@@ -275,9 +275,7 @@ async def add_review(
         raise HTTPException(status_code=404, detail="Contractor not found")
 
     # Verify user completed an offer with this contractor
-    has_completed = await db.has_user_completed_offer_with_contractor(
-        current_user.id, contractor_id
-    )
+    has_completed = await db.has_user_completed_offer_with_contractor(current_user.id, contractor_id)
     if not has_completed:
         raise HTTPException(
             status_code=403,

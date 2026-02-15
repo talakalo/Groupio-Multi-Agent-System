@@ -6,10 +6,11 @@ from typing import Any
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
 from src.api.middleware.logging import RequestLoggingMiddleware
+from src.api.middleware.security import SecurityHeadersMiddleware
 from src.api.routes import api_router
 from src.config.settings import get_settings
 from src.databases.graph_store import get_graph_store
@@ -113,11 +114,19 @@ app.add_middleware(
     expose_headers=["Authorization"],
 )
 
-# Request logging middleware
+# Security headers middleware (HSTS, CSP, X-Frame-Options, etc.)
+app.add_middleware(SecurityHeadersMiddleware, environment=settings.ENVIRONMENT)
+
+# Request logging middleware (with PII redaction)
 app.add_middleware(RequestLoggingMiddleware)
 
 # Include API routes (auth, offers, contractors, buildings, etc.)
 app.include_router(api_router, prefix="/api/v1")
+
+# WebSocket routes (mounted separately – no prefix collision with REST routes)
+from src.api.routes.websocket import router as ws_router
+
+app.include_router(ws_router, prefix="/api/v1")
 
 
 # -- Request/Response Models --
@@ -143,7 +152,17 @@ class MessageResponse(BaseModel):
 # -- Endpoints --
 
 
-@app.post("/api/v1/message", response_model=MessageResponse)
+@app.post(
+    "/api/v1/message",
+    response_model=MessageResponse,
+    summary="Process user message",
+    description=(
+        "Main endpoint for processing user messages through the "
+        "multi-agent system. Validates input, checks rate limits, "
+        "routes through the agent orchestrator, and returns the "
+        "AI response."
+    ),
+)
 async def send_message(
     request: MessageRequest,
     background_tasks: BackgroundTasks,
@@ -196,13 +215,21 @@ async def send_message(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@app.get("/api/v1/health/live")
+@app.get(
+    "/api/v1/health/live",
+    summary="Liveness probe",
+    description="Simple liveness check — returns 200 if the process is running. No external calls.",
+)
 async def health_live() -> dict[str, str]:
     """Liveness probe: process is up. No DB or external calls."""
     return {"status": "ok"}
 
 
-@app.get("/api/v1/health")
+@app.get(
+    "/api/v1/health",
+    summary="Readiness probe",
+    description="Checks connectivity to all backend services (PostgreSQL, Redis, Qdrant, Neo4j).",
+)
 async def health_check() -> dict[str, Any]:
     """Readiness probe: all services (DB, Redis, vector, graph) checked."""
     services: dict[str, bool] = {}
@@ -237,6 +264,19 @@ async def health_check() -> dict[str, Any]:
         "status": "healthy" if all_healthy else "degraded",
         "services": services,
     }
+
+
+
+@app.get("/metrics")
+async def prometheus_metrics() -> Response:
+    """Expose Prometheus metrics in standard text format for scraping."""
+    from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+
+    return Response(
+        content=generate_latest(),
+        media_type=CONTENT_TYPE_LATEST,
+    )
+
 
 
 # -- Helper Functions --

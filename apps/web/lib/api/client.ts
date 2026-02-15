@@ -1,4 +1,5 @@
 import type { MessageRequest, MessageResponse } from "@groupio/types";
+import { useAuthStore } from "@/lib/stores/authStore";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -30,14 +31,7 @@ class ApiClient {
   }
 
   private getAuthToken(): string | null {
-    if (typeof window === "undefined") return null;
-    return localStorage.getItem("auth_token");
-  }
-
-  private setAuthToken(token: string): void {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("auth_token", token);
-    }
+    return useAuthStore.getState().accessToken;
   }
 
   private async request<T>(
@@ -61,13 +55,13 @@ class ApiClient {
       method,
       headers: requestHeaders,
       body: body ? JSON.stringify(body) : undefined,
+      credentials: 'include', // send HTTP-only cookies (refresh token)
       signal,
     });
 
     if (response.status === 401 && this.on401Retry && !isRetry) {
       const newToken = await this.on401Retry();
       if (newToken) {
-        this.setAuthToken(newToken);
         return this.request<T>(endpoint, options, true);
       }
     }
@@ -98,15 +92,40 @@ class ApiClient {
 
   // ---- Offers endpoints ----
 
-  async getOffers(buildingId: string, params?: { category?: string; status?: string }) {
+  async getOffers(
+    buildingId: string,
+    params?: { category?: string; status?: string; page?: number; page_size?: number }
+  ) {
     const searchParams = new URLSearchParams();
     searchParams.set("building_id", buildingId);
     if (params?.category) searchParams.set("category", params.category);
     if (params?.status) searchParams.set("status", params.status);
+    if (params?.page != null) searchParams.set("page", String(params.page));
+    if (params?.page_size != null) searchParams.set("page_size", String(params.page_size));
 
-    return this.request<{ offers: import("@groupio/types").Offer[] }>(
-      `/api/v1/offers?${searchParams.toString()}`
-    );
+    return this.request<{
+      items: import("@groupio/types").Offer[];
+      total: number;
+      page: number;
+      page_size: number;
+      has_more: boolean;
+    }>(`/api/v1/offers?${searchParams.toString()}`);
+  }
+
+  async createOffer(body: {
+    title: string;
+    description: string;
+    category: string;
+    base_price: number;
+    min_participants: number;
+    max_participants: number;
+    deadline?: string | null;
+    building_id: string;
+  }) {
+    return this.request<import("@groupio/types").Offer>("/api/v1/offers", {
+      method: "POST",
+      body,
+    });
   }
 
   async getOffer(offerId: string) {
@@ -165,6 +184,39 @@ class ApiClient {
     return { token: data.access_token, ...data };
   }
 
+  // ---- File Upload endpoints ----
+
+  async uploadArchitecturePlan(file: File, buildingId: string) {
+    const formData = new FormData();
+    formData.append("file", file);
+    const token = this.getAuthToken();
+    const headers: Record<string, string> = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    const url = buildingId
+      ? `${this.baseUrl}/api/v1/uploads/architecture?building_id=${encodeURIComponent(buildingId)}`
+      : `${this.baseUrl}/api/v1/uploads/architecture`;
+    const res = await fetch(url, { method: "POST", headers, body: formData, credentials: 'include' });
+    if (!res.ok) {
+      const err = await res.json().catch(() => null);
+      throw new ApiError(res.status, err?.detail || res.statusText, err);
+    }
+    return res.json() as Promise<{ id: string; file_name: string; analysis_status: string }>;
+  }
+
+  async getFileUpload(fileId: string) {
+    return this.request<{
+      id: string;
+      analysis_status: string;
+      analysis_result: unknown;
+      [key: string]: unknown;
+    }>(`/api/v1/uploads/${fileId}`);
+  }
+
+  async getMyUploads(bucket?: string) {
+    const params = bucket ? `?bucket=${encodeURIComponent(bucket)}` : "";
+    return this.request<{ items: unknown[]; total: number }>(`/api/v1/uploads/${params}`);
+  }
+
   async signup(data: {
     name: string;
     email: string;
@@ -180,6 +232,35 @@ class ApiClient {
         body: data,
       }
     );
+  }
+
+  // ---- Payment endpoints ----
+
+  async getMyPayments() {
+    return this.request<import("@groupio/types").Payment[]>("/api/v1/payments/my");
+  }
+
+  async initiatePayment(offerId: string, paymentMethodId?: string) {
+    return this.request<import("@groupio/types").Payment>("/api/v1/payments/initiate", {
+      method: "POST",
+      body: { offer_id: offerId, payment_method_id: paymentMethodId },
+    });
+  }
+
+  async getPayment(paymentId: string) {
+    return this.request<import("@groupio/types").Payment>(
+      `/api/v1/payments/${paymentId}`
+    );
+  }
+
+  async getInvoice(invoiceId: string) {
+    return this.request<import("@groupio/types").Invoice>(
+      `/api/v1/payments/invoices/${invoiceId}`
+    );
+  }
+
+  async getMyInvoices() {
+    return this.request<import("@groupio/types").Invoice[]>("/api/v1/payments/invoices/my");
   }
 }
 

@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
+import { useAuthStore } from '@/lib/stores/authStore';
 import {
   LayoutDashboard,
   Tag,
@@ -16,9 +17,9 @@ import {
   MessageSquare,
   Bell,
   ChevronDown,
+  FileImage,
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
-import { useAuthStore } from '@/lib/stores/authStore';
 
 interface NavItem {
   href: string;
@@ -30,6 +31,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', labelKey: 'dashboard', icon: LayoutDashboard },
   { href: '/offers', labelKey: 'offers', icon: Tag },
   { href: '/contractors', labelKey: 'contractors', icon: Wrench },
+  { href: '/architecture', labelKey: 'architecture', icon: FileImage },
   { href: '/building', labelKey: 'building', icon: Building2 },
   { href: '/profile', labelKey: 'profile', icon: UserCircle },
 ];
@@ -39,7 +41,18 @@ export default function ResidentLayout({ children }: { children: React.ReactNode
   const router = useRouter();
   const t = useTranslations('residentNav');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const token = useAuthStore((s) => s.accessToken);
   const logout = useAuthStore((s) => s.logout);
+
+  useEffect(() => {
+    if (!token) {
+      router.replace('/login');
+    }
+  }, [token, router]);
+
+  if (!token) {
+    return null;
+  }
 
   const handleLogout = async () => {
     await logout();

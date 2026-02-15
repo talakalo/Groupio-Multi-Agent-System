@@ -197,19 +197,19 @@ export default function OffersListPage() {
     if (filters.search.trim()) {
       const q = filters.search.toLowerCase();
       results = results.filter(
-        (o) =>
+        (o: Offer) =>
           o.contractor?.businessName?.toLowerCase().includes(q) ||
           o.category.toLowerCase().includes(q)
       );
     }
     if (filters.priceMin !== null) {
-      results = results.filter((o) => {
+      results = results.filter((o: Offer) => {
         const price = o.tiers[o.currentTier]?.price ?? o.basePrice;
         return price >= (filters.priceMin ?? 0);
       });
     }
     if (filters.priceMax !== null) {
-      results = results.filter((o) => {
+      results = results.filter((o: Offer) => {
         const price = o.tiers[o.currentTier]?.price ?? o.basePrice;
         return price <= (filters.priceMax ?? Infinity);
       });
@@ -417,7 +417,7 @@ export default function OffersListPage() {
         </div>
       ) : filteredOffers.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {filteredOffers.map((offer) => (
+          {filteredOffers.map((offer: Offer) => (
             <OfferCard key={offer.id} offer={offer} />
           ))}
         </div>

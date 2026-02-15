@@ -53,7 +53,13 @@ interface JoinOfferPayload {
 
 export function useOffers(
   filters: OfferFilters,
-  options?: Omit<UseQueryOptions<{ offers: Offer[] }, Error>, 'queryKey' | 'queryFn'>,
+  options?: Omit<
+    UseQueryOptions<
+      { items: Offer[]; total: number; page: number; page_size: number; has_more: boolean },
+      Error
+    >,
+    'queryKey' | 'queryFn'
+  >,
 ) {
   return useQuery({
     queryKey: offerKeys.list(filters),

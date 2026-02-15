@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
+import { useAuthStore } from '@/lib/stores/authStore';
 import {
   LayoutDashboard,
   Tag,
@@ -19,7 +20,6 @@ import {
   ClipboardList,
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
-import { useAuthStore } from '@/lib/stores/authStore';
 
 interface NavItem {
   href: string;
@@ -40,7 +40,19 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
   const router = useRouter();
   const t = useTranslations('contractorNav');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const token = useAuthStore((s) => s.accessToken);
   const logout = useAuthStore((s) => s.logout);
+
+  useEffect(() => {
+    if (!token) {
+      router.replace('/login');
+    }
+  }, [token, router]);
+
+  if (!token) {
+    return null;
+  }
+
 
   const handleLogout = async () => {
     await logout();
@@ -99,6 +111,7 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
           type="button"
           onClick={handleLogout}
           className="flex items-center gap-3 w-full text-start text-sm text-gray-600 hover:text-gray-900 transition-colors"
+          aria-label={t('logout')}
         >
           <div className="w-8 h-8 rounded-full bg-accent-100 flex items-center justify-center">
             <UserCircle className="h-5 w-5 text-accent-600" />

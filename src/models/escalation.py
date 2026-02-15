@@ -1,13 +1,13 @@
 """Escalation Pydantic models."""
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
-class EscalationPriority(str, Enum):
+class EscalationPriority(StrEnum):
     """Escalation priority levels."""
 
     LOW = "low"
@@ -16,7 +16,7 @@ class EscalationPriority(str, Enum):
     CRITICAL = "critical"
 
 
-class EscalationStatus(str, Enum):
+class EscalationStatus(StrEnum):
     """Escalation status enum."""
 
     OPEN = "open"
@@ -26,7 +26,7 @@ class EscalationStatus(str, Enum):
     CLOSED = "closed"
 
 
-class EscalationSource(str, Enum):
+class EscalationSource(StrEnum):
     """Source agent that triggered escalation."""
 
     ROUTER = "router"
@@ -39,7 +39,7 @@ class EscalationSource(str, Enum):
     SYSTEM = "system"
 
 
-class EscalationReason(str, Enum):
+class EscalationReason(StrEnum):
     """Reason for escalation."""
 
     LOW_CONFIDENCE = "low_confidence"
@@ -94,6 +94,8 @@ class EscalationMessage(BaseModel):
 class EscalationInDB(EscalationBase):
     """Escalation stored in database."""
 
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     status: EscalationStatus = EscalationStatus.OPEN
     assigned_to: str | None = None
@@ -104,9 +106,6 @@ class EscalationInDB(EscalationBase):
     created_at: datetime
     updated_at: datetime
     resolved_at: datetime | None = None
-
-    class Config:
-        from_attributes = True
 
 
 class EscalationResponse(EscalationInDB):

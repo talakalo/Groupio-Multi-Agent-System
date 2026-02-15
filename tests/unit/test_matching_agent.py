@@ -84,6 +84,10 @@ async def test_matching_finds_contractors(matching_agent, sample_agent_state):
     action = result["actions_taken"][-1]
     assert action["action"] == "contractors_found"
     assert len(action["contractors"]) > 0
+    assert "summary_for_next_agent" in action
+    assert "entities_to_pass" in action
+    assert action["entities_to_pass"].get("contractor_ids")
+    assert "category" in result.get("context_for_next_agent", {})
 
 
 @pytest.mark.asyncio
@@ -111,9 +115,7 @@ def test_match_weights_sum_to_one():
 @pytest.mark.asyncio
 async def test_matching_extracts_category_from_hebrew(matching_agent, sample_agent_state):
     """Test category extraction from Hebrew message."""
-    sample_agent_state["messages"] = [
-        {"role": "user", "content": "אני מחפש קבלן מזגנים לבניין שלי"}
-    ]
+    sample_agent_state["messages"] = [{"role": "user", "content": "אני מחפש קבלן מזגנים לבניין שלי"}]
 
     category = matching_agent._extract_category(
         sample_agent_state,

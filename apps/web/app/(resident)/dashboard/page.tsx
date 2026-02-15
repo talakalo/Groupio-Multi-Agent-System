@@ -325,7 +325,7 @@ export default function ResidentDashboardPage() {
             </div>
           ) : offers.length > 0 ? (
             <div className="space-y-4">
-              {offers.map((offer) => (
+              {offers.map((offer: Offer) => (
                 <OfferCardCompact key={offer.id} offer={offer} />
               ))}
             </div>

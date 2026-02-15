@@ -258,7 +258,7 @@ test.describe("Admin Dashboard", () => {
   });
 
   test("should show pending escalations alert", async ({ page }) => {
-    await page.route("**/api/v1/admin/escalations*", (route) =>
+    await page.route("**/api/v1/escalations*", (route) =>
       route.fulfill({
         status: 200,
         body: JSON.stringify({ items: MOCK_ESCALATIONS, total: 8 }),
@@ -312,7 +312,7 @@ test.describe("Admin Contractor Management", () => {
     await setupCommonMocks(page);
     await setupAdminAuth(page);
 
-    await page.route("**/api/v1/admin/contractors*", (route) => {
+    await page.route("**/api/v1/contractors*", (route) => {
       const url = new URL(route.request().url());
       const status = url.searchParams.get("status");
 
@@ -360,7 +360,7 @@ test.describe("Admin Contractor Management", () => {
   });
 
   test("should view contractor details", async ({ page }) => {
-    await page.route("**/api/v1/admin/contractors/con_pending_001", (route) =>
+    await page.route("**/api/v1/contractors/con_pending_001", (route) =>
       route.fulfill({
         status: 200,
         body: JSON.stringify({
@@ -383,7 +383,7 @@ test.describe("Admin Contractor Management", () => {
   });
 
   test("should approve contractor", async ({ page }) => {
-    await page.route("**/api/v1/admin/contractors/con_pending_001/approve", (route) =>
+    await page.route("**/api/v1/contractors/con_pending_001/approve", (route) =>
       route.fulfill({
         status: 200,
         body: JSON.stringify({ status: "approved" }),
@@ -400,7 +400,7 @@ test.describe("Admin Contractor Management", () => {
   });
 
   test("should reject contractor with reason", async ({ page }) => {
-    await page.route("**/api/v1/admin/contractors/con_pending_001/reject", (route) =>
+    await page.route("**/api/v1/contractors/con_pending_001/reject", (route) =>
       route.fulfill({
         status: 200,
         body: JSON.stringify({ status: "rejected" }),
@@ -418,7 +418,7 @@ test.describe("Admin Contractor Management", () => {
   });
 
   test("should request additional documents", async ({ page }) => {
-    await page.route("**/api/v1/admin/contractors/con_pending_001/request-documents", (route) =>
+    await page.route("**/api/v1/contractors/con_pending_001/request-documents", (route) =>
       route.fulfill({
         status: 200,
         body: JSON.stringify({ success: true }),
@@ -436,7 +436,7 @@ test.describe("Admin Contractor Management", () => {
   });
 
   test("should suspend contractor", async ({ page }) => {
-    await page.route("**/api/v1/admin/contractors/con_001/suspend", (route) =>
+    await page.route("**/api/v1/contractors/con_001/suspend", (route) =>
       route.fulfill({
         status: 200,
         body: JSON.stringify({ status: "suspended" }),
@@ -453,7 +453,7 @@ test.describe("Admin Contractor Management", () => {
   });
 
   test("should view contractor analytics", async ({ page }) => {
-    await page.route("**/api/v1/admin/contractors/con_001/analytics", (route) =>
+    await page.route("**/api/v1/contractors/con_001/analytics", (route) =>
       route.fulfill({
         status: 200,
         body: JSON.stringify({
@@ -479,7 +479,7 @@ test.describe("Admin Escalation Management", () => {
     await setupCommonMocks(page);
     await setupAdminAuth(page);
 
-    await page.route("**/api/v1/admin/escalations*", (route) =>
+    await page.route("**/api/v1/escalations*", (route) =>
       route.fulfill({
         status: 200,
         body: JSON.stringify({ items: MOCK_ESCALATIONS, total: 2 }),
@@ -512,7 +512,7 @@ test.describe("Admin Escalation Management", () => {
   });
 
   test("should view escalation details with conversation", async ({ page }) => {
-    await page.route("**/api/v1/admin/escalations/esc_001", (route) =>
+    await page.route("**/api/v1/escalations/esc_001", (route) =>
       route.fulfill({
         status: 200,
         body: JSON.stringify(MOCK_ESCALATIONS[0]),
@@ -527,7 +527,7 @@ test.describe("Admin Escalation Management", () => {
   });
 
   test("should take over conversation", async ({ page }) => {
-    await page.route("**/api/v1/admin/escalations/esc_001/takeover", (route) =>
+    await page.route("**/api/v1/escalations/esc_001/takeover", (route) =>
       route.fulfill({
         status: 200,
         body: JSON.stringify({ success: true }),
@@ -541,7 +541,7 @@ test.describe("Admin Escalation Management", () => {
   });
 
   test("should send message as admin", async ({ page }) => {
-    await page.route("**/api/v1/admin/escalations/esc_001/message", (route) =>
+    await page.route("**/api/v1/escalations/esc_001/message", (route) =>
       route.fulfill({
         status: 200,
         body: JSON.stringify({ success: true }),
@@ -558,7 +558,7 @@ test.describe("Admin Escalation Management", () => {
   });
 
   test("should resolve escalation", async ({ page }) => {
-    await page.route("**/api/v1/admin/escalations/esc_001/resolve", (route) =>
+    await page.route("**/api/v1/escalations/esc_001/resolve", (route) =>
       route.fulfill({
         status: 200,
         body: JSON.stringify({ status: "resolved" }),
@@ -576,7 +576,7 @@ test.describe("Admin Escalation Management", () => {
   });
 
   test("should escalate to higher level", async ({ page }) => {
-    await page.route("**/api/v1/admin/escalations/esc_001/escalate", (route) =>
+    await page.route("**/api/v1/escalations/esc_001/escalate", (route) =>
       route.fulfill({
         status: 200,
         body: JSON.stringify({ newPriority: "critical" }),
@@ -593,7 +593,7 @@ test.describe("Admin Escalation Management", () => {
   });
 
   test("should add internal note", async ({ page }) => {
-    await page.route("**/api/v1/admin/escalations/esc_001/notes", (route) =>
+    await page.route("**/api/v1/escalations/esc_001/notes", (route) =>
       route.fulfill({
         status: 200,
         body: JSON.stringify({ success: true }),
