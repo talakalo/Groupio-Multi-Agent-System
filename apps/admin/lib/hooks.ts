@@ -19,13 +19,20 @@ import {
 
 let apiClient: GroupioApiClient | undefined;
 
+function getAuthToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem("auth_token");
+}
+
 function getApiClient(authToken?: string | null): GroupioApiClient {
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? "/api/v1";
-  if (authToken != null) {
-    return new GroupioApiClient({ baseUrl, authToken });
+  const token = authToken !== undefined ? authToken : getAuthToken();
+  const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "") || "http://localhost:8000";
+  const baseUrlWithPrefix = baseUrl.endsWith("/api/v1") ? baseUrl : `${baseUrl}/api/v1`;
+  if (token != null) {
+    return new GroupioApiClient({ baseUrl: baseUrlWithPrefix, authToken: token });
   }
   if (!apiClient) {
-    apiClient = new GroupioApiClient({ baseUrl });
+    apiClient = new GroupioApiClient({ baseUrl: baseUrlWithPrefix });
   }
   return apiClient;
 }
@@ -70,32 +77,57 @@ export function useDashboardMetrics() {
   return useQuery<DashboardMetrics>({
     queryKey: [...queryKeys.metrics, "dashboard"],
     queryFn: async (): Promise<DashboardMetrics> => {
-      // In production this would call a dedicated dashboard endpoint.
-      // For now, we derive sample metrics from the available API data.
+      const token = getAuthToken();
+      const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/?$/, "") || "http://localhost:8000";
+      const analyticsUrl = baseUrl.endsWith("/api/v1")
+        ? `${baseUrl.replace(/\/api\/v1$/, "")}/api/v1/admin/analytics`
+        : `${baseUrl}/api/v1/admin/analytics`;
+
+      try {
+        const headers: Record<string, string> = {};
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+        const res = await fetch(analyticsUrl, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          return {
+            gmvToday: data.gmvToday ?? 0,
+            gmvChange: data.gmvChange ?? 0,
+            activeOffers: data.activeOffers ?? 0,
+            activeOffersChange: data.activeOffersChange ?? 0,
+            pendingVerifications: 0,
+            urgentVerifications: 0,
+            openTickets: data.openTickets ?? 0,
+            openTicketsChange: data.openTicketsChange ?? 0,
+          };
+        }
+      } catch {
+        // Fall through to fallback
+      }
+
+      // Fallback: try system metrics
       const client = getApiClient();
       try {
         const metricsData = await client.getMetrics();
         return {
-          gmvToday: 47_250,
-          gmvChange: 12.5,
+          gmvToday: 0,
+          gmvChange: 0,
           activeOffers: metricsData.totalCalls > 0 ? 34 : 0,
-          activeOffersChange: 8.3,
-          pendingVerifications: 7,
-          urgentVerifications: 2,
+          activeOffersChange: 0,
+          pendingVerifications: 0,
+          urgentVerifications: 0,
           openTickets: metricsData.totalErrors,
-          openTicketsChange: -3.2,
+          openTicketsChange: 0,
         };
       } catch {
-        // Return reasonable defaults when the API is not reachable
         return {
-          gmvToday: 47_250,
-          gmvChange: 12.5,
-          activeOffers: 34,
-          activeOffersChange: 8.3,
-          pendingVerifications: 7,
-          urgentVerifications: 2,
-          openTickets: 3,
-          openTicketsChange: -3.2,
+          gmvToday: 0,
+          gmvChange: 0,
+          activeOffers: 0,
+          activeOffersChange: 0,
+          pendingVerifications: 0,
+          urgentVerifications: 0,
+          openTickets: 0,
+          openTicketsChange: 0,
         };
       }
     },
@@ -227,8 +259,9 @@ export function useResolveEscalation() {
       escalationId: string;
       resolution_notes?: string;
     }) => {
-      const base = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "") || "/api/v1";
-      const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
+      const rawBase = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "") || "http://localhost:8000";
+      const base = rawBase.endsWith("/api/v1") ? rawBase : `${rawBase}/api/v1`;
+      const token = getAuthToken();
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (token) headers["Authorization"] = `Bearer ${token}`;
       const response = await fetch(
@@ -494,6 +527,17 @@ export function useAdminAnalyticsDashboard() {
   return useQuery<AdminAnalyticsDashboard>({
     queryKey: ["admin", "analytics-dashboard"],
     queryFn: async () => {
+      const token = getAuthToken();
+      const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "") || "http://localhost:8000";
+      const backendUrl = baseUrl.endsWith("/api/v1") ? `${baseUrl.replace(/\/api\/v1$/, "")}/api/v1/admin/analytics` : `${baseUrl}/api/v1/admin/analytics`;
+      try {
+        const headers: Record<string, string> = {};
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+        const res = await fetch(backendUrl, { headers });
+        if (res.ok) return res.json() as Promise<AdminAnalyticsDashboard>;
+      } catch {
+        // Fallback to Next.js mock route
+      }
       const res = await fetch("/api/admin/analytics");
       if (!res.ok) throw new Error("Failed to fetch analytics");
       return res.json();
@@ -512,6 +556,30 @@ export function useAnalyticsQuery() {
         channel: "admin",
       });
       return response;
+    },
+  });
+}
+
+// ---- Admin user (for header) ----
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  full_name: string;
+  role: string;
+}
+
+export function useAdminUser() {
+  return useQuery<AdminUser | null>({
+    queryKey: ["admin", "me"],
+    queryFn: async (): Promise<AdminUser | null> => {
+      const token = getAuthToken();
+      if (!token) return null;
+      const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "") || "http://localhost:8000";
+      const url = baseUrl.endsWith("/api/v1") ? `${baseUrl.replace(/\/api\/v1$/, "")}/api/v1/auth/me` : `${baseUrl}/api/v1/auth/me`;
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) return null;
+      return res.json();
     },
   });
 }

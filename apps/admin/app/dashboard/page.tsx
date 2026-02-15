@@ -13,7 +13,6 @@ import {
   AlertTriangle,
   TrendingUp,
   Users,
-  Percent,
   Zap,
 } from "lucide-react";
 import { MetricCard } from "@/components/features/metrics/MetricCard";
@@ -24,6 +23,7 @@ import {
   useSystemStatus,
   useEscalations,
   useHealthStatus,
+  useAdminAnalyticsDashboard,
 } from "@/lib/hooks";
 
 // ---------------------------------------------------------------------------
@@ -124,6 +124,7 @@ export default function DashboardPage() {
   const { data: systemStatus } = useSystemStatus();
   const { data: escalationsData } = useEscalations();
   const { data: health } = useHealthStatus();
+  const { data: analyticsData } = useAdminAnalyticsDashboard();
 
   const activityLog = useMemo(() => generateActivityLog(), []);
 
@@ -295,19 +296,17 @@ export default function DashboardPage() {
         />
         <MetricCard
           label="Active Contractors"
-          value="142"
-          changePercent={4.2}
-          changePeriodLabel="vs last month"
+          value={String(analyticsData?.totalContractors ?? metrics?.pendingVerifications ?? 0)}
           variant="default"
           icon={<ShieldCheck className="w-4.5 h-4.5" />}
         />
         <MetricCard
-          label="Conversion Rate"
-          value="23.4%"
-          changePercent={1.8}
+          label="Open Tickets"
+          value={String(metrics?.openTickets ?? 0)}
+          changePercent={metrics?.openTicketsChange}
           changePeriodLabel="vs last week"
           variant="warning"
-          icon={<Percent className="w-4.5 h-4.5" />}
+          icon={<Ticket className="w-4.5 h-4.5" />}
         />
       </div>
 

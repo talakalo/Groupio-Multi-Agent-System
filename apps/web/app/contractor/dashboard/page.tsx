@@ -16,16 +16,32 @@ export default function ContractorDashboardPage() {
 
   useEffect(() => {
     async function fetchDashboardData() {
-      try {
-        const [statsRes, activeRes, pendingRes] = await Promise.all([
-          fetch('/api/contractor/stats'),
-          fetch('/api/contractor/offers?status=active'),
-          fetch('/api/contractor/offers?status=pending'),
-        ]);
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
 
-        if (statsRes.ok) setStats(await statsRes.json());
-        if (activeRes.ok) setActiveOffers(await activeRes.json());
-        if (pendingRes.ok) setPendingOffers(await pendingRes.json());
+      try {
+        // Get current user to find contractor_id
+        const meRes = await fetch(`${apiBase}/api/v1/auth/me`, { headers });
+        if (!meRes.ok) throw new Error('Not authenticated');
+        const me = await meRes.json();
+        const contractorId = me.contractor_id;
+
+        if (contractorId) {
+          const [statsRes, offersRes] = await Promise.all([
+            fetch(`${apiBase}/api/v1/contractors/${contractorId}/stats`, { headers }),
+            fetch(`${apiBase}/api/v1/offers?status=active`, { headers }),
+          ]);
+
+          if (statsRes.ok) setStats(await statsRes.json());
+          if (offersRes.ok) {
+            const data = await offersRes.json();
+            const allOffers = data.items ?? data.offers ?? [];
+            setActiveOffers(allOffers.filter((o: Offer) => o.status === 'active' || o.status === 'in_progress'));
+            setPendingOffers(allOffers.filter((o: Offer) => o.status === 'pending' || o.status === 'draft'));
+          }
+        }
       } catch (error) {
         console.error('Failed to fetch dashboard data:', error);
       } finally {

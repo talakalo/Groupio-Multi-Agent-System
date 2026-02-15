@@ -8,30 +8,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Building2, Mail, Phone, Loader2, ArrowLeft } from "lucide-react";
 import { apiClient, ApiError } from "@/lib/api/client";
+import { setAuthCookie } from "@/lib/auth/setAuthCookie";
 import { useAuthStore } from "@/lib/stores/authStore";
 import { cn } from "@/lib/utils/cn";
 
-const AUTH_COOKIE_NAME = "groupio-auth";
-const AUTH_COOKIE_MAX_AGE_DAYS = 7;
-
-function setAuthCookie(accessToken: string, user: { role: string } | null) {
-  const value = encodeURIComponent(
-    JSON.stringify({
-      state: {
-        accessToken,
-        user: user ? { role: user.role } : null,
-        isAuthenticated: true,
-      },
-    })
-  );
-  const maxAge = AUTH_COOKIE_MAX_AGE_DAYS * 24 * 60 * 60;
-  // Note: this cookie is read by Next.js middleware (server-side) so it cannot
-  // be HttpOnly. The Secure flag is set in production (HTTPS) and omitted in
-  // localhost development to avoid cookie-rejection by the browser.
-  const isSecure = typeof window !== "undefined" && window.location.protocol === "https:";
-  const securePart = isSecure ? "; secure" : "";
-  document.cookie = `${AUTH_COOKIE_NAME}=${value}; path=/; max-age=${maxAge}; samesite=lax${securePart}`;
-}
 
 const loginSchema = z.object({
   identifier: z

@@ -151,7 +151,7 @@ class ApiClient {
     if (params?.category) searchParams.set("category", params.category);
     if (params?.region) searchParams.set("region", params.region);
 
-    return this.request<{ contractors: import("@groupio/types").Contractor[] }>(
+    return this.request<{ items: import("@groupio/types").Contractor[]; total: number; page: number; page_size: number; has_more: boolean }>(
       `/api/v1/contractors?${searchParams.toString()}`
     );
   }
