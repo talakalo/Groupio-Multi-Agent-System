@@ -114,18 +114,25 @@ export function AIChat({
       ]);
 
       try {
+        // Use AbortController to enforce a 30-second timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30_000);
+
         const response = await fetch(`${baseUrl}/api/v1/message`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            userId,
+            user_id: userId,
             message: text.trim(),
-            ...(buildingId ? { buildingId } : {}),
+            ...(buildingId ? { building_id: buildingId } : {}),
             channel: 'web',
             context,
             ...(category ? { category } : {}),
           }),
+          signal: controller.signal,
         });
+
+        clearTimeout(timeoutId);
 
         if (!response.ok) {
           throw new Error(`API error: ${response.status}`);

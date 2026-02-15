@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter, usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useAuthStore } from '@/lib/stores/authStore';
 import {
@@ -52,6 +52,7 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
   if (!token) {
     return null;
   }
+
 
   const handleLogout = async () => {
     await logout();

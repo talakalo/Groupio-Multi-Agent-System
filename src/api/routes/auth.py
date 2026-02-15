@@ -1,7 +1,7 @@
 """Authentication API routes."""
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -20,6 +20,7 @@ from src.config.settings import get_settings
 from src.databases.postgres import get_postgres_client
 from src.databases.redis_client import get_redis_client
 from src.models.user import (
+    LoginRequest,
     PasswordChange,
     PasswordReset,
     PasswordResetConfirm,
@@ -204,7 +205,7 @@ async def login(
     )
 
     # Update last login
-    await db.update_user(user.id, {"last_login": datetime.utcnow()})
+    await db.update_user(user.id, {"last_login": datetime.now(timezone.utc)})
 
     # Set refresh token as HTTP-only cookie
     response.set_cookie(
@@ -227,13 +228,17 @@ async def login(
 
 @router.post("/login/json", response_model=TokenResponse)
 async def login_json(
-    request: UserLogin,
+    request: LoginRequest,
     response: Response,
 ) -> TokenResponse:
-    """Login with JSON body."""
+    """Login with JSON body (email or phone)."""
     db = get_postgres_client()
 
-    user = await db.get_user_by_email(request.email)
+    if request.email:
+        user = await db.get_user_by_email(request.email)
+    else:
+        assert request.phone is not None  # validated by LoginRequest
+        user = await db.get_user_by_phone(request.phone)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
@@ -260,7 +265,7 @@ async def login_json(
         ex=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
     )
 
-    await db.update_user(user.id, {"last_login": datetime.utcnow()})
+    await db.update_user(user.id, {"last_login": datetime.now(timezone.utc)})
 
     response.set_cookie(
         key="refresh_token",

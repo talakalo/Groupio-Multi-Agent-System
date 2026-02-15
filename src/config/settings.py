@@ -1,9 +1,22 @@
 """Environment configuration for Groupio Multi-Agent System."""
 
+import logging
 import secrets
 from functools import lru_cache
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings
+
+logger = logging.getLogger(__name__)
+
+_INSECURE_JWT_DEFAULTS = frozenset(
+    {
+        "your-secret-key-change-in-production",
+        "secret",
+        "changeme",
+        "",
+    }
+)
 
 
 class Settings(BaseSettings):
@@ -50,6 +63,8 @@ class Settings(BaseSettings):
     # Agent Settings
     ROUTER_CONFIDENCE_THRESHOLD: float = 0.7
     HUMAN_ESCALATION_ENABLED: bool = True
+    SENTIMENT_ESCALATION_THRESHOLD: float = -0.5
+    MAX_SUPPORT_ATTEMPTS_BEFORE_ESCALATION: int = 3
 
     # Feature Flags
     ENABLE_WEB_SEARCH: bool = True
@@ -97,6 +112,25 @@ class Settings(BaseSettings):
         "env_file_encoding": "utf-8",
         "extra": "ignore",
     }
+
+    @model_validator(mode="after")
+    def _validate_jwt_secret(self) -> "Settings":
+        """Refuse to start in production with an insecure JWT secret."""
+        if (
+            self.ENVIRONMENT not in ("development", "test")
+            and self.JWT_SECRET_KEY in _INSECURE_JWT_DEFAULTS
+        ):
+            raise ValueError(
+                "JWT_SECRET_KEY must be set to a secure, random value in "
+                f"non-development environments (current: ENVIRONMENT={self.ENVIRONMENT}). "
+                "Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(64))\""
+            )
+        if self.JWT_SECRET_KEY in _INSECURE_JWT_DEFAULTS:
+            logger.warning(
+                "⚠️  JWT_SECRET_KEY is set to an insecure default. "
+                "This is acceptable in development but MUST be changed before deploying."
+            )
+        return self
 
 
 @lru_cache

@@ -1,5 +1,6 @@
 """Email service for sending verification and notification emails."""
 
+import asyncio
 import logging
 import smtplib
 from email.mime.multipart import MIMEMultipart
@@ -11,14 +12,30 @@ logger = logging.getLogger(__name__)
 
 
 class EmailService:
-    """Service for sending emails via SMTP."""
+    """Service for sending emails via SMTP (async-safe).
 
-    def __init__(self):
+    Uses asyncio.to_thread to avoid blocking the event loop on
+    synchronous SMTP operations. If aiosmtplib is installed it can
+    be swapped in as a drop-in replacement for even better performance.
+    """
+
+    def __init__(self) -> None:
         self.settings = get_settings()
 
     def _is_configured(self) -> bool:
         """Check if email service is properly configured."""
         return bool(self.settings.SMTP_HOST and self.settings.SMTP_USER and self.settings.SMTP_PASSWORD)
+
+    def _send_sync(self, msg: MIMEMultipart, to_email: str) -> None:
+        """Synchronous SMTP send (run inside a thread)."""
+        with smtplib.SMTP(self.settings.SMTP_HOST, self.settings.SMTP_PORT) as server:
+            server.starttls()
+            server.login(self.settings.SMTP_USER, self.settings.SMTP_PASSWORD)
+            server.sendmail(
+                self.settings.SMTP_FROM_EMAIL,
+                to_email,
+                msg.as_string(),
+            )
 
     async def send_email(
         self,
@@ -27,7 +44,7 @@ class EmailService:
         html_content: str,
         text_content: str | None = None,
     ) -> bool:
-        """Send an email.
+        """Send an email without blocking the event loop.
 
         Args:
             to_email: Recipient email address
@@ -57,15 +74,8 @@ class EmailService:
             part2 = MIMEText(html_content, "html", "utf-8")
             msg.attach(part2)
 
-            # Send email
-            with smtplib.SMTP(self.settings.SMTP_HOST, self.settings.SMTP_PORT) as server:
-                server.starttls()
-                server.login(self.settings.SMTP_USER, self.settings.SMTP_PASSWORD)
-                server.sendmail(
-                    self.settings.SMTP_FROM_EMAIL,
-                    to_email,
-                    msg.as_string(),
-                )
+            # Run blocking SMTP in a thread to avoid blocking the event loop
+            await asyncio.to_thread(self._send_sync, msg, to_email)
 
             logger.info("Email sent successfully to %s", to_email)
             return True

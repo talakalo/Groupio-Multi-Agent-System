@@ -1,5 +1,6 @@
 """Admin API routes for system management."""
 
+import logging
 from typing import Any
 from uuid import uuid4
 
@@ -12,6 +13,8 @@ from src.databases.vector_store import get_vector_store
 from src.models.user import UserInDB
 from src.orchestration.graph import get_orchestrator
 from src.rag.pipeline import get_rag_pipeline
+
+logger = logging.getLogger(__name__)
 
 # --------------- Pydantic request models ---------------
 
@@ -131,7 +134,7 @@ async def get_analytics() -> dict[str, Any]:
         open_tickets = sum(c for s, c in by_status.items() if str(s).lower() not in ("resolved", "closed"))
         resolved_today = by_status.get("resolved", 0)
     except Exception:
-        pass
+        logger.debug("Could not fetch escalation stats for analytics")
 
     # --- Offer stats (active count + GMV) ---
     try:
@@ -158,7 +161,7 @@ async def get_analytics() -> dict[str, Any]:
     try:
         _, total_contractors = await db.list_contractors(filters={}, page=1, page_size=1)
     except Exception:
-        pass
+        logger.debug("Could not fetch contractor count for analytics")
 
     return {
         "gmvToday": gmv_today,

@@ -5,7 +5,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from src.api.middleware.auth import get_current_user
+from src.api.middleware.auth import get_current_user, is_admin
 from src.databases.graph_store import get_graph_store
 from src.databases.postgres import get_postgres_client
 from src.databases.vector_store import get_vector_store
@@ -32,8 +32,9 @@ router = APIRouter(tags=["contractors"])
 @router.post("/", response_model=ContractorResponse)
 async def create_contractor(
     request: ContractorCreate,
+    current_user: UserInDB = Depends(get_current_user),
 ) -> ContractorResponse:
-    """Register a new contractor."""
+    """Register a new contractor (requires authentication)."""
     db = get_postgres_client()
 
     # Check if email already exists
@@ -57,17 +58,15 @@ async def create_contractor(
         vs = get_vector_store()
         await vs.upsert(
             collection="contractors",
-            points=[
+            ids=[contractor_id],
+            vectors=[embedding],
+            payloads=[
                 {
-                    "id": contractor_id,
-                    "vector": embedding,
-                    "payload": {
-                        "business_name": contractor.business_name,
-                        "categories": [c.value for c in contractor.categories],
-                        "regions": [r.value for r in contractor.regions],
-                        "trust_score": contractor.trust_score,
-                    },
-                }
+                    "business_name": contractor.business_name,
+                    "categories": [c.value for c in contractor.categories],
+                    "regions": [r.value for r in contractor.regions],
+                    "trust_score": contractor.trust_score,
+                },
             ],
         )
     except Exception as e:
@@ -144,9 +143,8 @@ async def search_contractors(
         results = await vs.search(
             collection="contractors",
             query_vector=query_embedding,
-            filters=filters,
-            limit=request.page_size,
-            offset=(request.page - 1) * request.page_size,
+            filters=filters if filters else None,
+            top_k=request.page_size,
         )
 
         contractor_ids = [r["id"] for r in results]
@@ -207,10 +205,7 @@ async def update_contractor(
         raise HTTPException(status_code=404, detail="Contractor not found")
 
     # Only the contractor or admin can update
-    if current_user.contractor_id != contractor_id and current_user.role not in (
-        "admin",
-        "super_admin",
-    ):
+    if current_user.contractor_id != contractor_id and not is_admin(current_user):
         raise HTTPException(status_code=403, detail="Not authorized")
 
     update_data = request.model_dump(exclude_unset=True)
@@ -225,17 +220,15 @@ async def update_contractor(
         vs = get_vector_store()
         await vs.upsert(
             collection="contractors",
-            points=[
+            ids=[contractor_id],
+            vectors=[embedding],
+            payloads=[
                 {
-                    "id": contractor_id,
-                    "vector": embedding,
-                    "payload": {
-                        "business_name": updated.business_name,
-                        "categories": [c.value for c in updated.categories],
-                        "regions": [r.value for r in updated.regions],
-                        "trust_score": updated.trust_score,
-                    },
-                }
+                    "business_name": updated.business_name,
+                    "categories": [c.value for c in updated.categories],
+                    "regions": [r.value for r in updated.regions],
+                    "trust_score": updated.trust_score,
+                },
             ],
         )
     except Exception as e:
@@ -308,10 +301,7 @@ async def get_contractor_stats(
     current_user: UserInDB = Depends(get_current_user),
 ) -> ContractorStats:
     """Get contractor statistics (contractor or admin only)."""
-    if current_user.contractor_id != contractor_id and current_user.role not in (
-        "admin",
-        "super_admin",
-    ):
+    if current_user.contractor_id != contractor_id and not is_admin(current_user):
         raise HTTPException(status_code=403, detail="Not authorized")
 
     db = get_postgres_client()
@@ -334,7 +324,7 @@ async def verify_contractor(
     current_user: UserInDB = Depends(get_current_user),
 ) -> ContractorResponse:
     """Verify or reject a contractor (admin only)."""
-    if current_user.role not in ("admin", "super_admin"):
+    if not is_admin(current_user):
         raise HTTPException(status_code=403, detail="Admin access required")
 
     db = get_postgres_client()
@@ -359,7 +349,7 @@ async def recalculate_trust_score(
     current_user: UserInDB = Depends(get_current_user),
 ) -> dict:
     """Trigger trust score recalculation (admin only)."""
-    if current_user.role not in ("admin", "super_admin"):
+    if not is_admin(current_user):
         raise HTTPException(status_code=403, detail="Admin access required")
 
     db = get_postgres_client()

@@ -7,9 +7,31 @@ import { z } from "zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Building2, Mail, Phone, Loader2, ArrowLeft } from "lucide-react";
-import { apiClient } from "@/lib/api/client";
+import { apiClient, ApiError } from "@/lib/api/client";
 import { useAuthStore } from "@/lib/stores/authStore";
 import { cn } from "@/lib/utils/cn";
+
+const AUTH_COOKIE_NAME = "groupio-auth";
+const AUTH_COOKIE_MAX_AGE_DAYS = 7;
+
+function setAuthCookie(accessToken: string, user: { role: string } | null) {
+  const value = encodeURIComponent(
+    JSON.stringify({
+      state: {
+        accessToken,
+        user: user ? { role: user.role } : null,
+        isAuthenticated: true,
+      },
+    })
+  );
+  const maxAge = AUTH_COOKIE_MAX_AGE_DAYS * 24 * 60 * 60;
+  // Note: this cookie is read by Next.js middleware (server-side) so it cannot
+  // be HttpOnly. The Secure flag is set in production (HTTPS) and omitted in
+  // localhost development to avoid cookie-rejection by the browser.
+  const isSecure = typeof window !== "undefined" && window.location.protocol === "https:";
+  const securePart = isSecure ? "; secure" : "";
+  document.cookie = `${AUTH_COOKIE_NAME}=${value}; path=/; max-age=${maxAge}; samesite=lax${securePart}`;
+}
 
 const loginSchema = z.object({
   identifier: z
@@ -49,19 +71,64 @@ export default function LoginPage() {
       const isEmail = data.identifier.includes("@");
       const credentials = {
         ...(isEmail
-          ? { email: data.identifier }
-          : { phone: data.identifier }),
+          ? { email: data.identifier.trim() }
+          : { phone: data.identifier.replace(/[-\s]/g, "") }),
         password: data.password,
       };
 
       const response = await apiClient.login(credentials);
+      localStorage.setItem("auth_token", response.token);
       useAuthStore.getState().setAccessToken(response.token);
+      let user: { role: string } | null = null;
+      try {
+        const meRes = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/v1/auth/me`,
+          { headers: { Authorization: `Bearer ${response.token}` } }
+        );
+        if (meRes.ok) {
+          const meData = await meRes.json();
+          user = { role: meData.role };
+          useAuthStore.getState().setUser({
+            id: meData.id,
+            email: meData.email,
+            fullName: meData.full_name ?? meData.fullName ?? "",
+            phone: meData.phone ?? "",
+            role: meData.role,
+            preferredLanguage: (meData.preferred_language ?? meData.preferredLanguage ?? "he") as "he" | "en",
+            avatarUrl: meData.avatar_url ?? meData.avatarUrl,
+            buildingId: meData.building_id ?? meData.buildingId,
+            contractorId: meData.contractor_id ?? meData.contractorId,
+            isVerified: meData.is_verified ?? meData.isVerified ?? false,
+          });
+        }
+      } catch {
+        // /me failed; still set cookie with token so middleware allows access
+      }
+      setAuthCookie(response.token, user);
       router.push("/dashboard");
     } catch (err) {
+      const rawMessage = err instanceof Error ? err.message : String(err);
+      const status = err instanceof ApiError ? err.status : null;
+      const is401 = status === 401;
+      const is503 = status === 503;
+      const is500 = status === 500;
+      const isConnectionError =
+        !is401 &&
+        !is503 &&
+        !is500 &&
+        (rawMessage.includes("Connection refused") ||
+          rawMessage.includes("Failed to fetch") ||
+          rawMessage.includes("NetworkError") ||
+          rawMessage.includes("ERR_") ||
+          rawMessage.includes("Cannot assign"));
       setError(
-        err instanceof Error
-          ? err.message
-          : "אירעה שגיאה בהתחברות. נסו שוב."
+        is401
+          ? "אימייל או סיסמה שגויים. נסו שוב."
+          : is503
+            ? "מסד הנתונים לא זמין. נסו שוב מאוחר יותר."
+            : is500 || isConnectionError
+              ? "לא ניתן להתחבר לשרת. וודא שהשירות (פורט 8000) ומסד הנתונים פועלים."
+              : rawMessage || "אירעה שגיאה בהתחברות. נסו שוב."
       );
     } finally {
       setIsLoading(false);

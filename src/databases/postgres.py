@@ -2,7 +2,7 @@
 
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
@@ -29,8 +29,8 @@ def _row_to_user(row: dict) -> dict:
         "building_id": row.get("building_id"),
         "contractor_id": row.get("contractor_id"),
         "last_login": row.get("last_login"),
-        "created_at": row.get("created_at") or datetime.utcnow(),
-        "updated_at": row.get("updated_at") or datetime.utcnow(),
+        "created_at": row.get("created_at") or datetime.now(timezone.utc),
+        "updated_at": row.get("updated_at") or datetime.now(timezone.utc),
     }
 
 
@@ -111,6 +111,31 @@ class PostgresClient:
         pool = await self._get_client()
         async with pool.acquire() as conn:
             await conn.execute(query, *args)
+
+    from contextlib import asynccontextmanager as _acm
+    from collections.abc import AsyncIterator as _AsyncIterator
+
+    @_acm
+    async def transaction(self) -> "_AsyncIterator[Any]":
+        """Provide a transactional scope for multi-step DB operations.
+
+        Usage::
+
+            async with db.transaction() as conn:
+                await conn.execute("INSERT INTO ...", ...)
+                await conn.execute("UPDATE ...", ...)
+                # auto-committed on success, rolled back on exception
+        """
+        if self._use_supabase_client():
+            # Supabase client doesn't expose raw transactions; yield None
+            # so callers fall back to individual requests.
+            yield None
+            return
+
+        pool = await self._get_client()
+        async with pool.acquire() as conn:
+            async with conn.transaction():
+                yield conn
 
     @retry(
         stop=stop_after_attempt(3),
