@@ -70,7 +70,10 @@ export const useAuthStore = create<AuthState>()(
       },
 
       clearAuth: () => {
-        if (typeof window !== 'undefined') window.localStorage.removeItem('auth_token');
+        if (typeof window !== 'undefined') {
+          window.localStorage.removeItem('auth_token');
+          document.cookie = 'groupio-auth=; path=/; max-age=0';
+        }
         set({
           user: null,
           accessToken: null,
@@ -131,16 +134,11 @@ export const useAuthStore = create<AuthState>()(
               headers: {
                 Authorization: `Bearer ${accessToken}`,
               },
-            });
+            }).catch(() => {});
           }
         } finally {
-          set({
-            user: null,
-            accessToken: null,
-            refreshToken: null,
-            isAuthenticated: false,
-            isLoading: false,
-          });
+          get().clearAuth();
+          set({ isLoading: false });
         }
       },
 

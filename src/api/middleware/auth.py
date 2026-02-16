@@ -169,7 +169,7 @@ async def get_admin_user(
     current_user: UserInDB = Depends(get_current_user),
 ) -> UserInDB:
     """Get current user and verify they have admin privileges."""
-    if current_user.role not in (UserRole.ADMIN, UserRole.SUPER_ADMIN):
+    if current_user.role not in (UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.BUILDINGS_MANAGER):
         raise HTTPException(status_code=403, detail="Admin access required")
     return current_user
 

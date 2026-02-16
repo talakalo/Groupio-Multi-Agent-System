@@ -20,6 +20,7 @@ from src.config.settings import get_settings
 from src.databases.postgres import get_postgres_client
 from src.databases.redis_client import get_redis_client
 from src.models.user import (
+    LoginRequest,
     PasswordChange,
     PasswordReset,
     PasswordResetConfirm,
@@ -227,13 +228,17 @@ async def login(
 
 @router.post("/login/json", response_model=TokenResponse)
 async def login_json(
-    request: UserLogin,
+    request: LoginRequest,
     response: Response,
 ) -> TokenResponse:
-    """Login with JSON body."""
+    """Login with JSON body (email or phone)."""
     db = get_postgres_client()
 
-    user = await db.get_user_by_email(request.email)
+    if request.email:
+        user = await db.get_user_by_email(request.email)
+    else:
+        assert request.phone is not None  # validated by LoginRequest
+        user = await db.get_user_by_phone(request.phone)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
