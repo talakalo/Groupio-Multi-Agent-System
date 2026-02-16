@@ -1,4 +1,7 @@
-# -- Stage 1: Build dependencies --
+# Multi-stage build keeps runtime image smaller (no build-essential, no dev deps).
+# Build context is trimmed via .dockerignore (e.g. exclude node_modules, venv).
+# Rebuild with: docker compose -f docker/docker-compose.yml build --no-cache api worker
+# -- Stage 1: Build dependencies (prod only = smaller image) --
 FROM python:3.11-slim AS builder
 
 WORKDIR /build
@@ -7,8 +10,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+COPY requirements-prod.txt .
+RUN pip install --no-cache-dir --prefix=/install -r requirements-prod.txt \
+    && find /install -type d -name __pycache__ -print0 | xargs -0 rm -rf 2>/dev/null || true \
+    && find /install -name "*.pyc" -delete 2>/dev/null || true \
+    && find /install -type d -name "tests" -print0 | xargs -0 rm -rf 2>/dev/null || true \
+    && find /install -type d -name "test" -print0 | xargs -0 rm -rf 2>/dev/null || true \
+    && find /install -type d -name "examples" -print0 | xargs -0 rm -rf 2>/dev/null || true \
+    && rm -rf /install/lib/python3.11/site-packages/pip* /install/lib/python3.11/site-packages/setuptools* \
+       /install/lib/python3.11/site-packages/wheel* /install/lib/python3.11/site-packages/pkg_resources* \
+       /install/bin/pip* /install/bin/pip3* /install/bin/easy_install* 2>/dev/null || true
 
 # -- Stage 2: Runtime image --
 FROM python:3.11-slim
