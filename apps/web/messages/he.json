@@ -274,5 +274,80 @@
     "escrowProtection": "התשלום מוחזק ב-Escrow עד סיום העבודה",
     "payNow": "שלם עכשיו",
     "total": "סה\"כ"
+  },
+  "contractorNav": {
+    "dashboard": "לוח בקרה",
+    "activeOffers": "הצעות פעילות",
+    "createOffer": "צור הצעה",
+    "projects": "פרויקטים",
+    "profile": "פרופיל",
+    "contractorBadge": "קבלן",
+    "newOffer": "הצעה חדשה",
+    "myBusiness": "העסק שלי",
+    "logout": "התנתקות"
+  },
+  "contractor": {
+    "offers": {
+      "create": {
+        "fields": {
+          "buildingId": "מזהה בניין"
+        },
+        "placeholders": {
+          "buildingId": "הזן מזהה בניין"
+        }
+      }
+    }
+  },
+  "residentNav": {
+    "dashboard": "לוח בקרה",
+    "offers": "הצעות",
+    "contractors": "קבלנים",
+    "architecture": "תוכנית הדירה",
+    "building": "בניין",
+    "profile": "פרופיל",
+    "aiAssistant": "עוזר AI",
+    "myAccount": "החשבון שלי"
+  },
+  "architecture": {
+    "title": "תוכנית הדירה שלי",
+    "subtitle": "העלה תוכנית קומה וקבל המלצות שיפוץ חכמות מבוססות AI",
+    "uploading": "מעלה...",
+    "dropzone": {
+      "title": "העלה את תוכנית הדירה שלך",
+      "subtitle": "גרור ושחרר קובץ או לחץ לבחירה",
+      "button": "בחר קובץ",
+      "formats": "PDF, PNG, JPG, HEIC (עד 20MB)"
+    },
+    "analyzing": {
+      "title": "מנתח את תוכנית הדירה...",
+      "subtitle": "ה-AI שלנו מזהה חדרים וממליץ על שירותים",
+      "steps": {
+        "rooms": "זיהוי חדרים",
+        "services": "חיפוש שירותים",
+        "pricing": "הערכת מחירים"
+      }
+    },
+    "results": {
+      "title": "הניתוח הושלם",
+      "roomsDetected": "חדרים שזוהו",
+      "sqm": "מ\"ר",
+      "totalArea": "שטח כולל",
+      "suggestions": "שירותים מומלצים",
+      "matchingOffers": "{count} הצעה/ות פעילה/ות זמינה/ות",
+      "joinOffer": "הצטרף להצעה",
+      "findContractor": "מצא קבלן"
+    },
+    "priority": {
+      "high": "גבוה",
+      "medium": "בינוני",
+      "low": "נמוך"
+    },
+    "errors": {
+      "uploadFailed": "ההעלאה נכשלה. נסה שוב.",
+      "analysisFailed": "הניתוח נכשל. נסה תמונה ברורה יותר.",
+      "timeout": "הניתוח ארך יותר מדי. נסה שוב."
+    },
+    "tryAgain": "נסה שוב",
+    "uploadAnother": "העלה תוכנית נוספת"
   }
 }

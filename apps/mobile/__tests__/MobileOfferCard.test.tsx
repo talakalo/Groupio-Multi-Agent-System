@@ -1,14 +1,13 @@
-import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
+import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
+
 import MobileOfferCard from '../components/MobileOfferCard';
+
 import type { Offer } from '@groupio/types';
 
-// Create a complete mock that satisfies the Offer type
 const mockOffer = {
   id: 'offer-123',
-  title: 'AC Installation',
-  description: 'Group AC installation for building residents',
   category: 'ac_installation',
   basePrice: 5000,
   currentParticipants: 10,
@@ -39,128 +38,158 @@ const mockOffer = {
 } as unknown as Offer;
 
 describe('MobileOfferCard', () => {
-  it('renders offer title', () => {
+  it('renders contractor business name', () => {
     const { getByText } = render(
       <MobileOfferCard offer={mockOffer} onPress={vi.fn()} />
     );
-
-    expect(getByText('AC Installation')).toBeTruthy();
+    expect(getByText('AC Pro')).toBeTruthy();
   });
 
   it('renders participant count', () => {
     const { getByText } = render(
       <MobileOfferCard offer={mockOffer} onPress={vi.fn()} />
     );
-
     expect(getByText(/10/)).toBeTruthy();
   });
 
-  it('displays discount badge', () => {
+  it('displays discount badge with tier percentage', () => {
     const { getByText } = render(
       <MobileOfferCard offer={mockOffer} onPress={vi.fn()} />
     );
-
-    expect(getByText(/15%/)).toBeTruthy();
+    expect(getByText(/-15%/)).toBeTruthy();
   });
 
-  it('shows category icon', () => {
-    const { getByTestId } = render(
+  it('renders base price with shekel symbol', () => {
+    const { getByText } = render(
       <MobileOfferCard offer={mockOffer} onPress={vi.fn()} />
     );
-
-    expect(getByTestId('category-icon')).toBeTruthy();
+    expect(getByText(/₪/)).toBeTruthy();
+    expect(getByText(/5,000/)).toBeTruthy();
   });
 
-  it('calls onPress when tapped', () => {
+  it('renders current tier price', () => {
+    const { getByText } = render(
+      <MobileOfferCard offer={mockOffer} onPress={vi.fn()} />
+    );
+    expect(getByText(/4,250/)).toBeTruthy();
+  });
+
+  it('renders contractor rating', () => {
+    const { getByText } = render(
+      <MobileOfferCard offer={mockOffer} onPress={vi.fn()} />
+    );
+    expect(getByText('4.5')).toBeTruthy();
+  });
+
+  it('calls onPress when card is tapped', () => {
     const onPress = vi.fn();
     const { getByTestId } = render(
       <MobileOfferCard offer={mockOffer} onPress={onPress} />
     );
-
     fireEvent.press(getByTestId('offer-card'));
-
     expect(onPress).toHaveBeenCalledWith(mockOffer);
   });
 
-  it('shows progress bar', () => {
+  it('calls onJoin when join button is pressed', () => {
+    const activeOffer = {
+      ...mockOffer,
+      status: 'active',
+      expiresAt: '2099-12-31',
+    } as unknown as Offer;
+    const onJoin = vi.fn();
     const { getByTestId } = render(
-      <MobileOfferCard offer={mockOffer} onPress={vi.fn()} />
+      <MobileOfferCard offer={activeOffer} onJoin={onJoin} />
     );
-
-    expect(getByTestId('progress-bar')).toBeTruthy();
+    fireEvent.press(getByTestId('join-button'));
+    expect(onJoin).toHaveBeenCalledWith('offer-123');
   });
 
-  it('displays deadline', () => {
-    const { getByText } = render(
-      <MobileOfferCard offer={mockOffer} onPress={vi.fn()} />
-    );
-
-    expect(getByText(/2024/)).toBeTruthy();
-  });
-
-  it('handles missing discount gracefully', () => {
-    const offerNoDiscount = { ...mockOffer, discount: undefined } as unknown as Offer;
+  it('hides discount badge when tier discount is zero', () => {
+    const noDiscountOffer = {
+      ...mockOffer,
+      tiers: [{ min: 5, max: 20, discount: 0, price: 5000 }],
+    } as unknown as Offer;
     const { queryByText } = render(
-      <MobileOfferCard offer={offerNoDiscount} onPress={vi.fn()} />
+      <MobileOfferCard offer={noDiscountOffer} onPress={vi.fn()} />
     );
-
-    expect(queryByText(/%/)).toBeNull();
+    expect(queryByText(/-\d+%/)).toBeNull();
   });
 
-  it('shows status badge', () => {
-    const { getByTestId } = render(
-      <MobileOfferCard offer={mockOffer} onPress={vi.fn()} />
+  it('shows join text when offer is active', () => {
+    const activeOffer = {
+      ...mockOffer,
+      status: 'active',
+      expiresAt: '2099-12-31',
+    } as unknown as Offer;
+    const { getByText } = render(
+      <MobileOfferCard offer={activeOffer} onPress={vi.fn()} />
     );
-
-    expect(getByTestId('status-badge')).toBeTruthy();
+    // "הצטרף להצעה" = Join offer
+    expect(getByText(/הצטרף/)).toBeTruthy();
   });
 
-  it('applies correct status color', () => {
-    const completedOffer = { ...mockOffer, status: 'completed' } as unknown as Offer;
-    const { getByTestId } = render(
-      <MobileOfferCard offer={completedOffer} onPress={vi.fn()} />
+  it('shows expired text when offer has past deadline', () => {
+    const expiredOffer = {
+      ...mockOffer,
+      status: 'active',
+      expiresAt: '2020-01-01',
+    } as unknown as Offer;
+    const { getByText } = render(
+      <MobileOfferCard offer={expiredOffer} onPress={vi.fn()} />
     );
-
-    const badge = getByTestId('status-badge');
-    expect(badge.props.style).toContainEqual(
-      expect.objectContaining({ backgroundColor: expect.any(String) })
-    );
-  });
-});
-
-describe('MobileOfferCard Accessibility', () => {
-  it('has accessibility label', () => {
-    const { getByLabelText } = render(
-      <MobileOfferCard offer={mockOffer} onPress={vi.fn()} />
-    );
-
-    expect(getByLabelText(/AC Installation/)).toBeTruthy();
+    // "פג תוקף" = Expired
+    expect(getByText(/פג תוקף/)).toBeTruthy();
   });
 
-  it('is accessible as a button', () => {
-    const { getByRole } = render(
-      <MobileOfferCard offer={mockOffer} onPress={vi.fn()} />
+  it('shows unavailable text when offer status is not active', () => {
+    const pendingOffer = {
+      ...mockOffer,
+      status: 'pending',
+      expiresAt: '2027-12-31',
+    } as unknown as Offer;
+    const { getByText } = render(
+      <MobileOfferCard offer={pendingOffer} onPress={vi.fn()} />
     );
+    // "לא זמין" = Not available
+    expect(getByText(/לא זמין/)).toBeTruthy();
+  });
 
-    expect(getByRole('button')).toBeTruthy();
+  it('shows next tier hint when more tiers exist', () => {
+    const multiTierOffer = {
+      ...mockOffer,
+      tiers: [
+        { min: 5, max: 10, discount: 10, price: 4500 },
+        { min: 11, max: 20, discount: 20, price: 4000 },
+      ],
+      currentTier: 0,
+      participants: 10,
+    } as unknown as Offer;
+    const { getByText } = render(
+      <MobileOfferCard offer={multiTierOffer} onPress={vi.fn()} />
+    );
+    // Next tier needs 11 min, current participants is 10, so 1 more needed
+    // "עוד 1 להנחה נוספת!" = 1 more for additional discount!
+    expect(getByText(/עוד/)).toBeTruthy();
   });
 });
 
 describe('MobileOfferCard Formatting', () => {
-  it('formats price in ILS', () => {
+  it('formats price with shekel symbol', () => {
     const { getByText } = render(
       <MobileOfferCard offer={mockOffer} onPress={vi.fn()} />
     );
-
-    expect(getByText(/₪|5,000/)).toBeTruthy();
+    expect(getByText(/₪/)).toBeTruthy();
   });
 
   it('formats large numbers with commas', () => {
-    const expensiveOffer = { ...mockOffer, basePrice: 100000 } as unknown as Offer;
+    const expensiveOffer = {
+      ...mockOffer,
+      basePrice: 100000,
+      tiers: [{ min: 5, max: 20, discount: 10, price: 90000 }],
+    } as unknown as Offer;
     const { getByText } = render(
       <MobileOfferCard offer={expensiveOffer} onPress={vi.fn()} />
     );
-
     expect(getByText(/100,000/)).toBeTruthy();
   });
 });

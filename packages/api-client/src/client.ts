@@ -7,6 +7,11 @@ import type {
   AgentMetrics,
   Escalation,
   SystemStatus,
+  Payment,
+  Invoice,
+  EscrowAccount,
+  ContractorPayout,
+  PaymentSummary,
 } from "@groupio/types";
 
 // ---- Error Types ----
@@ -197,6 +202,53 @@ export class GroupioApiClient {
     resolvedToday?: number;
   }> {
     return this.get("/admin/analytics");
+  }
+
+  // ---- Payment Methods ----
+
+  async getMyPayments(): Promise<Payment[]> {
+    return this.get<Payment[]>("/payments/my");
+  }
+
+  async initiatePayment(offerId: string, paymentMethodId?: string): Promise<Payment> {
+    return this.post<Payment>("/payments/initiate", {
+      offer_id: offerId,
+      payment_method_id: paymentMethodId,
+    });
+  }
+
+  async getPayment(paymentId: string): Promise<Payment> {
+    return this.get<Payment>(`/payments/${encodeURIComponent(paymentId)}`);
+  }
+
+  async getInvoice(invoiceId: string): Promise<Invoice> {
+    return this.get<Invoice>(`/payments/invoices/${encodeURIComponent(invoiceId)}`);
+  }
+
+  // ---- Admin Payment Methods ----
+
+  async getPaymentSummary(): Promise<PaymentSummary> {
+    return this.get<PaymentSummary>("/admin/payments/summary");
+  }
+
+  async getEscrowAccounts(): Promise<EscrowAccount[]> {
+    return this.get<EscrowAccount[]>("/admin/payments/escrow");
+  }
+
+  async getContractorPayouts(): Promise<ContractorPayout[]> {
+    return this.get<ContractorPayout[]>("/admin/payments/payouts");
+  }
+
+  async approveContractorPayout(payoutId: string): Promise<ContractorPayout> {
+    return this.post<ContractorPayout>(
+      `/admin/payments/payouts/${encodeURIComponent(payoutId)}/approve`
+    );
+  }
+
+  async releaseEscrow(offerId: string): Promise<{ status: string }> {
+    return this.post<{ status: string }>(
+      `/admin/payments/escrow/${encodeURIComponent(offerId)}/release`
+    );
   }
 
   // ---- Internal HTTP Helpers ----

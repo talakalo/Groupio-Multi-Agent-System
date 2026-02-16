@@ -24,9 +24,15 @@ export default function ContractorActiveOffersPage() {
         if (categoryFilter !== 'all') params.set('category', categoryFilter);
         params.set('sort', sortBy);
 
-        const res = await fetch(`/api/contractor/offers?${params}`);
+        const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+        const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const res = await fetch(`${apiBase}/api/v1/offers?${params}`, { headers });
         if (res.ok) {
-          setOffers(await res.json());
+          const data = await res.json();
+          setOffers(data.items ?? data.offers ?? data);
         }
       } catch (error) {
         console.error('Failed to fetch offers:', error);
@@ -155,7 +161,7 @@ export default function ContractorActiveOffersPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          {offers.map((offer) => (
+          {offers.map((offer: Offer) => (
             <OfferCard
               key={offer.id}
               offer={offer}

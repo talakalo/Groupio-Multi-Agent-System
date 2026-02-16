@@ -114,18 +114,25 @@ export function AIChat({
       ]);
 
       try {
+        // Use AbortController to enforce a 30-second timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30_000);
+
         const response = await fetch(`${baseUrl}/api/v1/message`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            userId,
+            user_id: userId,
             message: text.trim(),
-            ...(buildingId ? { buildingId } : {}),
+            ...(buildingId ? { building_id: buildingId } : {}),
             channel: 'web',
             context,
             ...(category ? { category } : {}),
           }),
+          signal: controller.signal,
         });
+
+        clearTimeout(timeoutId);
 
         if (!response.ok) {
           throw new Error(`API error: ${response.status}`);
@@ -171,6 +178,7 @@ export function AIChat({
   // ---- Render ----
   return (
     <div
+      data-testid="chat-widget"
       className={cn(
         'flex flex-col rounded-2xl border border-gray-200 bg-white shadow-sm',
         'h-[600px] max-h-[80vh]',
@@ -267,6 +275,7 @@ export function AIChat({
       >
         <input
           ref={inputRef}
+          data-testid="chat-input"
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -309,7 +318,7 @@ export function AIChat({
 
 function TypingIndicator() {
   return (
-    <div className="flex items-center gap-1 py-1" aria-label="חושב...">
+    <div data-testid="typing-indicator" className="flex items-center gap-1 py-1" aria-label="חושב...">
       <span className="h-2 w-2 animate-bounce rounded-full bg-gray-400 [animation-delay:0ms]" />
       <span className="h-2 w-2 animate-bounce rounded-full bg-gray-400 [animation-delay:150ms]" />
       <span className="h-2 w-2 animate-bounce rounded-full bg-gray-400 [animation-delay:300ms]" />

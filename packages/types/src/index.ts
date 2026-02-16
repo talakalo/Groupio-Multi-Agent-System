@@ -265,3 +265,125 @@ export type ResponseType =
   | "handoff"
   | "clarification"
   | "error";
+
+// ---- Payment & Financial Types ----
+
+export type PaymentStatus =
+  | "pending"
+  | "processing"
+  | "succeeded"
+  | "failed"
+  | "refunded"
+  | "partially_refunded";
+
+export type InvoiceStatus =
+  | "draft"
+  | "pending"
+  | "paid"
+  | "overdue"
+  | "cancelled"
+  | "refunded";
+
+export type EscrowStatus =
+  | "collecting"
+  | "held"
+  | "released"
+  | "partially_released"
+  | "disputed"
+  | "refunded";
+
+export type PayoutStatus =
+  | "pending"
+  | "approved"
+  | "processing"
+  | "completed"
+  | "failed"
+  | "on_hold";
+
+export interface Payment {
+  id: string;
+  userId: string;
+  offerId: string;
+  invoiceId?: string;
+  amount: number;
+  currency: string;
+  status: PaymentStatus;
+  transactionId?: string;
+  paymentMethod?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface Invoice {
+  id: string;
+  invoiceNumber?: string;
+  offerId: string;
+  contractorId?: string;
+  subtotal: number;
+  taxRate: number;
+  tax: number;
+  platformFeeRate: number;
+  platformFee: number;
+  total: number;
+  currency: string;
+  status: InvoiceStatus;
+  dueDate?: string;
+  paidAt?: string;
+  createdAt: string;
+}
+
+export interface PaymentSplit {
+  id: string;
+  invoiceId: string;
+  userId: string;
+  userName?: string;
+  amount: number;
+  unitCount: number;
+  status: PaymentStatus;
+  paidAt?: string;
+  createdAt: string;
+}
+
+export interface EscrowAccount {
+  offerId: string;
+  offerTitle?: string;
+  contractorId?: string;
+  contractorName?: string;
+  totalCollected: number;
+  totalExpected: number;
+  platformFee: number;
+  netPayoutAmount: number;
+  currency: string;
+  escrowStatus: EscrowStatus;
+  participantsPaid: number;
+  participantsTotal: number;
+  splits: PaymentSplit[];
+  createdAt: string;
+}
+
+export interface ContractorPayout {
+  id: string;
+  contractorId: string;
+  contractorName: string;
+  offerId: string;
+  offerTitle?: string;
+  grossAmount: number;
+  platformFee: number;
+  netAmount: number;
+  currency: string;
+  status: PayoutStatus;
+  approvedBy?: string;
+  approvedAt?: string;
+  paidAt?: string;
+  createdAt: string;
+}
+
+export interface PaymentSummary {
+  totalCollected: number;
+  totalInEscrow: number;
+  totalReleasedToContractors: number;
+  totalPlatformFees: number;
+  totalRefunded: number;
+  pendingPayouts: number;
+  currency: string;
+}

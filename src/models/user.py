@@ -1,12 +1,12 @@
 """User Pydantic models."""
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
-from pydantic import BaseModel, EmailStr, Field, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
 
-class UserRole(str, Enum):
+class UserRole(StrEnum):
     """User role enum."""
 
     RESIDENT = "resident"
@@ -44,6 +44,8 @@ class UserUpdate(BaseModel):
 class UserInDB(UserBase):
     """User stored in database."""
 
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     role: UserRole
     is_active: bool = True
@@ -54,9 +56,6 @@ class UserInDB(UserBase):
     last_login: datetime | None = None
     created_at: datetime
     updated_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class UserResponse(UserInDB):

@@ -72,8 +72,7 @@ async def test_router_low_confidence_asks_clarification(router_agent, sample_age
             "entities": {},
             "confidence": 0.4,
             "clarifying_question": (
-                "היי! איך אוכל לעזור לך? האם אתה מחפש קבלן, מעוניין במידע על מחירים, "
-                "או צריך עזרה בנושא אחר?"
+                "היי! איך אוכל לעזור לך? האם אתה מחפש קבלן, מעוניין במידע על מחירים, או צריך עזרה בנושא אחר?"
             ),
             "suggested_agent": "support",
         }
@@ -110,3 +109,99 @@ async def test_router_handles_parse_error(router_agent, sample_agent_state):
     assert result["intent"] == "general_info"
     assert result["confidence"] == 0.5
     assert result["current_agent"] == "support"
+
+
+@pytest.mark.asyncio
+async def test_router_validates_intent_maps_unknown_to_general_info(router_agent, sample_agent_state):
+    """Test that invalid intent is mapped to general_info."""
+    router_agent.llm_client.create_structured_output = AsyncMock(
+        return_value={
+            "intent": "unknown_intent",
+            "entities": {},
+            "confidence": 0.9,
+            "clarifying_question": None,
+            "suggested_agent": "support",
+        }
+    )
+    result = await router_agent.run(sample_agent_state)
+    assert result["intent"] == "general_info"
+    assert result["current_agent"] == "support"
+
+
+@pytest.mark.asyncio
+async def test_router_clamps_confidence_to_unit_interval(router_agent, sample_agent_state):
+    """Test that confidence > 1 is clamped to 1.0."""
+    router_agent.llm_client.create_structured_output = AsyncMock(
+        return_value={
+            "intent": "contractor_search",
+            "entities": {},
+            "confidence": 1.5,
+            "clarifying_question": None,
+            "suggested_agent": "matching",
+        }
+    )
+    result = await router_agent.run(sample_agent_state)
+    assert result["confidence"] == 1.0
+
+
+@pytest.mark.asyncio
+async def test_router_validates_suggested_agent_fallback_to_support(router_agent, sample_agent_state):
+    """Test that unknown suggested_agent falls back to support."""
+    router_agent.llm_client.create_structured_output = AsyncMock(
+        return_value={
+            "intent": "general_info",
+            "entities": {},
+            "confidence": 0.9,
+            "clarifying_question": None,
+            "suggested_agent": "unknown_agent",
+        }
+    )
+    result = await router_agent.run(sample_agent_state)
+    assert result["current_agent"] == "support"
+
+
+@pytest.mark.asyncio
+async def test_router_writes_entities_to_state(router_agent, sample_agent_state):
+    """Test that router writes extracted entities to state["entities"]."""
+    router_agent.llm_client.create_structured_output = AsyncMock(
+        return_value={
+            "intent": "contractor_search",
+            "entities": {
+                "category": "ac_installation",
+                "building_id": "bld_001",
+                "contractor_id": None,
+                "offer_id": None,
+            },
+            "confidence": 0.95,
+            "clarifying_question": None,
+            "suggested_agent": "matching",
+        }
+    )
+    result = await router_agent.run(sample_agent_state)
+    assert result.get("entities") == {
+        "category": "ac_installation",
+        "building_id": "bld_001",
+    }
+
+
+@pytest.mark.asyncio
+async def test_router_injects_last_agent_handoff_when_present(router_agent, sample_agent_state):
+    """Test that router receives last_agent_handoff and system prompt is extended (no crash)."""
+    sample_agent_state["last_agent_handoff"] = {
+        "agent": "matching",
+        "summary_for_next_agent": "Found 3 contractors for AC installation.",
+        "suggested_next_intent": "pricing_question",
+    }
+    sample_agent_state["messages"] = [{"role": "user", "content": "what about price?"}]
+    router_agent.llm_client.create_structured_output = AsyncMock(
+        return_value={
+            "intent": "pricing_question",
+            "entities": {"category": "ac_installation"},
+            "confidence": 0.85,
+            "clarifying_question": None,
+            "suggested_agent": "pricing",
+        }
+    )
+    result = await router_agent.run(sample_agent_state)
+    assert result["intent"] == "pricing_question"
+    assert result["current_agent"] == "pricing"

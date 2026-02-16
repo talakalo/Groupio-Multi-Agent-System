@@ -1,10 +1,13 @@
 """Webhook routes for external integrations."""
 
+import hashlib
+import hmac
 import logging
 from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Header, Request
 
+from src.config.settings import get_settings
 from src.databases.postgres import get_postgres_client
 from src.orchestration.graph import get_orchestrator
 
@@ -13,12 +16,48 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["webhooks"])
 
 
+def _verify_whatsapp_signature(payload: bytes, signature: str | None) -> bool:
+    """Verify WhatsApp webhook signature using HMAC-SHA256.
+
+    Returns True if valid. Logs warnings and returns False otherwise.
+    """
+    settings = get_settings()
+    secret = settings.WHATSAPP_WEBHOOK_SECRET
+    if not secret:
+        logger.warning("WHATSAPP_WEBHOOK_SECRET not set — skipping signature check")
+        return True  # Allow in dev; will fail the validator in prod settings
+
+    if not signature:
+        logger.warning("Missing X-Hub-Signature-256 header")
+        return False
+
+    expected = "sha256=" + hmac.new(
+        secret.encode(), payload, hashlib.sha256
+    ).hexdigest()
+    return hmac.compare_digest(expected, signature)
+
+
 @router.post("/whatsapp")
 async def whatsapp_webhook(
-    payload: dict[str, Any],
+    request: Request,
     background_tasks: BackgroundTasks,
+    x_hub_signature_256: str | None = Header(None),
 ) -> dict[str, str]:
-    """Handle incoming WhatsApp Business API messages."""
+    """Handle incoming WhatsApp Business API messages.
+
+    Verifies the X-Hub-Signature-256 header before processing.
+    """
+    raw_body = await request.body()
+
+    if not _verify_whatsapp_signature(raw_body, x_hub_signature_256):
+        raise HTTPException(status_code=403, detail="Invalid webhook signature")
+
+    import json
+    try:
+        payload: dict[str, Any] = json.loads(raw_body)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid JSON payload")
+
     message = _parse_whatsapp_payload(payload)
 
     if not message:
@@ -35,10 +74,17 @@ async def whatsapp_webhook(
             building_id=building_id,
         )
 
+        response_obj = result.get("response", {})
+        response_text = (
+            response_obj.get("message", "")
+            if isinstance(response_obj, dict)
+            else str(response_obj)
+        )
+
         background_tasks.add_task(
             _send_whatsapp_reply,
             phone=message["phone"],
-            text=result["response"].get("message", ""),
+            text=response_text,
         )
 
         return {"status": "processed"}
@@ -53,9 +99,16 @@ async def whatsapp_verify(
     hub_challenge: str = "",
     hub_verify_token: str = "",
 ) -> Any:
-    """WhatsApp webhook verification endpoint."""
-    # In production, verify hub_verify_token against a stored secret
+    """WhatsApp webhook verification endpoint.
+
+    Validates hub.verify_token against WHATSAPP_WEBHOOK_SECRET.
+    """
+    settings = get_settings()
+    expected_token = settings.WHATSAPP_WEBHOOK_SECRET
+
     if hub_mode == "subscribe":
+        if expected_token and hub_verify_token != expected_token:
+            raise HTTPException(status_code=403, detail="Invalid verify token")
         return int(hub_challenge)
     return {"status": "invalid"}
 

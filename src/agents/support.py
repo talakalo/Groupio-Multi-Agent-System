@@ -5,6 +5,7 @@ from typing import Any
 
 from src.agents.base import AgentConfig, BaseAgent
 from src.config.prompts.support import SUPPORT_SYSTEM_PROMPT
+from src.config.settings import get_settings
 from src.databases.postgres import get_postgres_client
 from src.databases.redis_client import get_redis_client
 from src.models.agent_state import AgentState
@@ -142,6 +143,7 @@ class SupportAgent(BaseAgent):
                     "message": response,
                 },
                 "requires_followup": False,
+                "summary_for_next_agent": f"Answered support request (intent: {intent}).",
             }
         ]
 
@@ -191,18 +193,19 @@ class SupportAgent(BaseAgent):
         if state.get("intent") == "complaint" and user_profile.get("user_value") == "high":
             return True
 
-        # Sentiment check
+        # Sentiment check (threshold configurable via settings)
+        settings = get_settings()
         try:
             sentiment = await self.llm_client.analyze_sentiment(user_message)
-            if sentiment < -0.5:
+            if sentiment < settings.SENTIMENT_ESCALATION_THRESHOLD:
                 return True
         except Exception:
             pass
 
-        # Too many resolution attempts
+        # Too many resolution attempts (threshold configurable via settings)
         actions = state.get("actions_taken", [])
         support_attempts = sum(1 for a in actions if a.get("agent") == "support")
-        if support_attempts >= 3:
+        if support_attempts >= settings.MAX_SUPPORT_ATTEMPTS_BEFORE_ESCALATION:
             return True
 
         return False
@@ -225,13 +228,10 @@ class SupportAgent(BaseAgent):
 
         lang = detect_language(user_message)
         if lang == "he":
-            msg = (
-                "אני מעביר אותך לנציג אנושי שיוכל לטפל בבקשתך. אנא המתן ונציג יצור איתך קשר בהקדם."
-            )
+            msg = "אני מעביר אותך לנציג אנושי שיוכל לטפל בבקשתך. אנא המתן ונציג יצור איתך קשר בהקדם."
         else:
             msg = (
-                "I'm transferring you to a human agent who can help. "
-                "Please wait and someone will contact you shortly."
+                "I'm transferring you to a human agent who can help. Please wait and someone will contact you shortly."
             )
 
         state["actions_taken"] = [
@@ -244,6 +244,7 @@ class SupportAgent(BaseAgent):
                     "message": msg,
                 },
                 "requires_followup": False,
+                "summary_for_next_agent": f"Escalated to human: {reason}.",
             }
         ]
 
@@ -260,7 +261,7 @@ class SupportAgent(BaseAgent):
         """Generate support response using LLM with retrieved context."""
         # Build system prompt with context
         system_prompt = self._build_system_prompt(state)
-        if context:
+        if context and self.rag is not None:
             system_prompt = await self.rag.augment_prompt(
                 query=user_message,
                 context_docs=context,

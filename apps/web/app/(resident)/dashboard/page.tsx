@@ -17,7 +17,7 @@ import {
   ChevronLeft,
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
-import { apiClient } from '@/lib/api/client';
+import { useAuthStore } from '@/lib/stores/authStore';
 import type { Offer, ServiceCategory } from '@groupio/types';
 import { formatPrice } from '@groupio/utils';
 
@@ -195,38 +195,50 @@ export default function ResidentDashboardPage() {
   const t = useTranslations('dashboard');
   const tCommon = useTranslations('common');
 
-  // Fetch dashboard stats
+  const accessToken = useAuthStore((s) => s.accessToken);
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  const authHeaders = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+
+  // Fetch dashboard stats from building endpoint
   const statsQuery = useQuery<DashboardStats>({
     queryKey: ['resident', 'dashboard', 'stats'],
     queryFn: async () => {
-      const res = await fetch('/api/v1/resident/dashboard/stats');
-      if (!res.ok) throw new Error('Failed to fetch stats');
-      return res.json();
+      const res = await fetch(`${apiBase}/api/v1/buildings/me`, { headers: authHeaders });
+      if (!res.ok) {
+        return { activeOffers: 0, neighborsJoined: 0, totalSavings: 0, buildingName: '-' };
+      }
+      const data = await res.json();
+      return {
+        activeOffers: data.activeOffers?.length ?? 0,
+        neighborsJoined: data.residents?.length ?? 0,
+        totalSavings: data.totalSavings ?? data.total_savings ?? 0,
+        buildingName: data.name ?? data.address ?? '-',
+      };
     },
+    enabled: !!accessToken,
   });
 
-  // Fetch active offers for this building
-  const offersQuery = useQuery<{ offers: Offer[] }>({
+  // Fetch active offers
+  const offersQuery = useQuery<{ items: Offer[] }>({
     queryKey: ['resident', 'offers', 'active'],
     queryFn: async () => {
-      const res = await fetch('/api/v1/offers?status=active&limit=4');
+      const res = await fetch(`${apiBase}/api/v1/offers?status=active&page_size=4`, { headers: authHeaders });
       if (!res.ok) throw new Error('Failed to fetch offers');
       return res.json();
     },
+    enabled: !!accessToken,
   });
 
-  // Fetch recent activity
+  // Recent activity (not yet backed by a dedicated endpoint; uses empty fallback)
   const activityQuery = useQuery<{ activities: RecentActivity[] }>({
     queryKey: ['resident', 'dashboard', 'activity'],
     queryFn: async () => {
-      const res = await fetch('/api/v1/resident/dashboard/activity?limit=5');
-      if (!res.ok) throw new Error('Failed to fetch activity');
-      return res.json();
+      return { activities: [] };
     },
   });
 
   const stats = statsQuery.data;
-  const offers = offersQuery.data?.offers ?? [];
+  const offers = offersQuery.data?.items ?? [];
   const activities = activityQuery.data?.activities ?? [];
 
   return (
@@ -325,7 +337,7 @@ export default function ResidentDashboardPage() {
             </div>
           ) : offers.length > 0 ? (
             <div className="space-y-4">
-              {offers.map((offer) => (
+              {offers.map((offer: Offer) => (
                 <OfferCardCompact key={offer.id} offer={offer} />
               ))}
             </div>

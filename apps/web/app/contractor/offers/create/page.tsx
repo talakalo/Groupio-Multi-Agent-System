@@ -7,6 +7,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { PricingTiers } from '@/components/features/offers/PricingTiers';
+import { apiClient, ApiError } from '@/lib/api/client';
 import type { ServiceCategory, Region } from '@groupio/types';
 
 const createOfferSchema = z.object({
@@ -18,6 +19,7 @@ const createOfferSchema = z.object({
   minParticipants: z.number().min(3, 'Minimum 3 participants required'),
   maxParticipants: z.number().max(100, 'Maximum 100 participants'),
   validUntil: z.string().min(1, 'Expiration date is required'),
+  buildingId: z.string().min(1, 'Building is required'),
   requirements: z.string().optional(),
   includedServices: z.array(z.string()).min(1, 'At least one service must be included'),
 });
@@ -41,6 +43,7 @@ export default function CreateOfferPage() {
       minParticipants: 5,
       maxParticipants: 20,
       includedServices: [],
+      buildingId: '',
     },
   });
 
@@ -81,22 +84,22 @@ export default function CreateOfferPage() {
   async function onSubmit(data: CreateOfferForm) {
     setIsSubmitting(true);
     try {
-      const res = await fetch('/api/contractor/offers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+      const deadline = data.validUntil ? new Date(data.validUntil).toISOString() : null;
+      const offer = await apiClient.createOffer({
+        title: data.title,
+        description: data.description,
+        category: data.category,
+        base_price: data.basePrice,
+        min_participants: data.minParticipants,
+        max_participants: data.maxParticipants,
+        deadline,
+        building_id: data.buildingId,
       });
-
-      if (res.ok) {
-        const offer = await res.json();
-        router.push(`/contractor/offers/${offer.id}`);
-      } else {
-        const error = await res.json();
-        alert(error.message || t('errors.createFailed'));
-      }
+      router.push(`/contractor/offers/${offer.id}`);
     } catch (error) {
-      console.error('Failed to create offer:', error);
-      alert(t('errors.createFailed'));
+      const message =
+        error instanceof ApiError ? error.message : t('errors.createFailed');
+      alert(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -163,6 +166,21 @@ export default function CreateOfferPage() {
                 </select>
                 {errors.category && (
                   <p className="text-red-500 text-sm mt-1">{errors.category.message}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {t('fields.buildingId')} *
+                </label>
+                <input
+                  type="text"
+                  {...register('buildingId')}
+                  className="w-full rounded-lg border-gray-300 shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                  placeholder={t('placeholders.buildingId')}
+                />
+                {errors.buildingId && (
+                  <p className="text-red-500 text-sm mt-1">{errors.buildingId.message}</p>
                 )}
               </div>
 

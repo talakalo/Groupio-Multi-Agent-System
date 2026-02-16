@@ -38,6 +38,7 @@ dependencies = [
     "tenacity>=8.2.0",
     "sentry-sdk[fastapi]>=1.39.0",
     "prometheus-client>=0.19.0",
+    "PyJWT>=2.8.0",
     "python-jose[cryptography]>=3.3.0",
     "structlog>=23.2.0",
     "bcrypt>=4.0.0",
@@ -63,13 +64,19 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+addopts = "--cov-fail-under=45"
 
 [tool.ruff]
 target-version = "py311"
-line-length = 100
+line-length = 120
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP"]
+ignore = ["UP031"]  # % formatting used intentionally in SQL parameter construction
+
+[tool.ruff.lint.per-file-ignores]
+"src/api/main.py" = ["E402"]  # late import for WebSocket router (avoids circular)
+"src/utils/monitoring.py" = ["E402"]  # late import for uuid
 
 [tool.mypy]
 python_version = "3.11"

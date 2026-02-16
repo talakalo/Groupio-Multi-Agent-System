@@ -123,9 +123,13 @@ export default function OnboardingPage() {
           ? { building: residentInfo }
           : { business: contractorInfo }),
       };
-      const response = await fetch('/api/v1/onboarding', {
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const response = await fetch(`${apiBase}/api/v1/onboarding`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(payload),
       });
       if (!response.ok) throw new Error('Onboarding failed');

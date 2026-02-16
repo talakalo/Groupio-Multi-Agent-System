@@ -5,7 +5,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from src.api.middleware.auth import get_current_user
+from src.api.middleware.auth import get_current_user, is_admin
 from src.databases.postgres import get_postgres_client
 from src.models.building import (
     BuildingCreate,
@@ -21,6 +21,46 @@ from src.models.user import UserInDB
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["buildings"])
+
+
+@router.get("/me")
+async def get_my_building(
+    current_user: UserInDB = Depends(get_current_user),
+) -> dict:
+    """Get the current user's building (resident). Returns building with residents, active offers, stats, and invite code."""
+    if not current_user.building_id:
+        raise HTTPException(status_code=404, detail="No building associated with your account")
+    db = get_postgres_client()
+    building_id = current_user.building_id
+    building = await db.get_building(building_id)
+    if not building:
+        raise HTTPException(status_code=404, detail="Building not found")
+
+    residents, _ = await db.get_building_residents(building_id, page=1, page_size=50)
+    active_offers = await db.get_active_offers(building_id)
+    stats = await db.get_building_stats(building_id)
+
+    # Build resident summaries for frontend (BuildingProfile.residents)
+    resident_summaries = []
+    for r in residents:
+        resident_summaries.append({
+            "id": r.get("user_id") or r.get("id"),
+            "name": r.get("full_name", ""),
+            "apartmentNumber": r.get("unit_number", ""),
+            "joinedAt": (r.get("joined_at") or "").isoformat() if hasattr(r.get("joined_at"), "isoformat") else str(r.get("joined_at", "")),
+            "isCommitteeMember": building.get("admin_user_id") == r.get("user_id"),
+        })
+
+    # Shareable invite code (short id for now; can be from invitations table later)
+    invite_code = building_id.replace("-", "")[:8].upper() if building_id else ""
+
+    return {
+        **building,
+        "residents": resident_summaries,
+        "activeOffers": active_offers,
+        "totalSavings": building.get("total_savings") or stats.get("total_savings", 0),
+        "inviteCode": invite_code,
+    }
 
 
 @router.post("/", response_model=BuildingResponse)
@@ -68,7 +108,7 @@ async def list_buildings(
         filters["region"] = region.value
 
     # Non-admins can only see their own buildings
-    if current_user.role not in ("admin", "super_admin"):
+    if not is_admin(current_user):
         filters["user_id"] = current_user.id
 
     buildings, total = await db.list_buildings(
@@ -99,7 +139,7 @@ async def get_building(
         raise HTTPException(status_code=404, detail="Building not found")
 
     # Check access
-    if current_user.role not in ("admin", "super_admin"):
+    if not is_admin(current_user):
         is_resident = await db.is_user_in_building(current_user.id, building_id)
         if not is_resident:
             raise HTTPException(status_code=403, detail="Not authorized")
@@ -139,7 +179,7 @@ async def delete_building(
     current_user: UserInDB = Depends(get_current_user),
 ) -> dict[str, str]:
     """Delete a building (admin only)."""
-    if current_user.role not in ("admin", "super_admin"):
+    if not is_admin(current_user):
         raise HTTPException(status_code=403, detail="Admin access required")
 
     db = get_postgres_client()
@@ -273,7 +313,7 @@ async def get_building_stats(
         raise HTTPException(status_code=404, detail="Building not found")
 
     # Check access
-    if current_user.role not in ("admin", "super_admin"):
+    if not is_admin(current_user):
         is_resident = await db.is_user_in_building(current_user.id, building_id)
         if not is_resident:
             raise HTTPException(status_code=403, detail="Not authorized")
@@ -298,7 +338,7 @@ async def get_building_offers(
         raise HTTPException(status_code=404, detail="Building not found")
 
     # Check access
-    if current_user.role not in ("admin", "super_admin"):
+    if not is_admin(current_user):
         is_resident = await db.is_user_in_building(current_user.id, building_id)
         if not is_resident:
             raise HTTPException(status_code=403, detail="Not authorized")

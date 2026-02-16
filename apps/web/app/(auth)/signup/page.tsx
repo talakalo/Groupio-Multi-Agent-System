@@ -15,6 +15,8 @@ import {
   Check,
 } from "lucide-react";
 import { apiClient } from "@/lib/api/client";
+import { setAuthCookie } from "@/lib/auth/setAuthCookie";
+import { useAuthStore } from "@/lib/stores/authStore";
 import { cn } from "@/lib/utils/cn";
 
 const signupSchema = z.object({
@@ -96,6 +98,34 @@ export default function SignupPage() {
       });
 
       localStorage.setItem("auth_token", response.token);
+      useAuthStore.getState().setAccessToken(response.token);
+      let user: { role: string } | null = null;
+      try {
+        const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+        const meRes = await fetch(`${apiBase}/api/v1/auth/me`, {
+          headers: { Authorization: `Bearer ${response.token}` },
+        });
+        if (meRes.ok) {
+          const meData = await meRes.json();
+          user = { role: meData.role };
+          useAuthStore.getState().setUser({
+            id: meData.id,
+            email: meData.email,
+            fullName: meData.full_name ?? meData.fullName ?? "",
+            phone: meData.phone ?? "",
+            role: meData.role,
+            preferredLanguage: (meData.preferred_language ?? meData.preferredLanguage ?? "he") as "he" | "en",
+            avatarUrl: meData.avatar_url ?? meData.avatarUrl,
+            buildingId: meData.building_id ?? meData.buildingId,
+            contractorId: meData.contractor_id ?? meData.contractorId,
+            isVerified: meData.is_verified ?? meData.isVerified ?? false,
+          });
+        }
+      } catch {
+        // /me failed; use role from signup for cookie so middleware allows access
+        user = { role: selectedRole };
+      }
+      setAuthCookie(response.token, user);
       router.push(
         selectedRole === "resident"
           ? "/dashboard"

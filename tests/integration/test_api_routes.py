@@ -403,7 +403,10 @@ class TestContractorsAPI:
             "contact_name": "John Doe",
             "email": "john@acpro.com",
             "phone": "0501234567",
-            "description": "Professional AC installation and maintenance services for residential and commercial buildings in the Tel Aviv area",
+            "description": (
+                "Professional AC installation and maintenance services "
+                "for residential and commercial buildings in the Tel Aviv area"
+            ),
             "categories": ["ac_installation"],
             "regions": ["center", "tel_aviv"],
             "verification_status": "verified",
