@@ -1,0 +1,65 @@
+# Dependencies and env (huge – do not send to Docker)
+node_modules
+**/node_modules
+.pnpm-store
+venv
+.venv
+env
+.env
+.env.*
+!.env.example
+
+# Git and IDE
+.git
+.gitignore
+.cursor
+.vscode
+.idea
+*.swp
+*.swo
+
+# Build artifacts
+__pycache__
+**/__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+build
+dist
+*.egg-info
+.eggs
+*.egg
+
+# Test and tooling (not needed in runtime image)
+tests
+.pytest_cache
+.coverage
+htmlcov
+.mypy_cache
+.ruff_cache
+.tox
+nox
+
+# Docs and frontend apps (API/worker only need src + requirements)
+apps
+packages
+docs
+tasks
+*.md
+!README.md
+
+# Lockfiles and config not needed for pip install
+package.json
+package-lock.json
+pnpm-lock.yaml
+turbo.json
+uv.lock
+.eslintrc.js
+.prettierrc
+.pre-commit-config.yaml
+.github
+.trivyignore
+
+# Keep only what the Dockerfile copies
+# (src/, requirements*.txt, pyproject.toml)
