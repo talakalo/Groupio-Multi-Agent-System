@@ -6,6 +6,11 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 
+def _utcnow() -> datetime:
+    """Return timezone-aware UTC now."""
+    return datetime.now(UTC)
+
+
 class Message(BaseModel):
     """A single message in a conversation."""
 

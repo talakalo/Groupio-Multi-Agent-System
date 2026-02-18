@@ -55,9 +55,7 @@ async def test_support_handles_general_query(support_agent, sample_agent_state):
 async def test_support_escalates_legal_keywords(support_agent, sample_agent_state):
     """Test that legal keywords trigger escalation."""
     sample_agent_state["intent"] = "complaint"
-    sample_agent_state["messages"] = [
-        {"role": "user", "content": "אני הולך לעורך דין בגלל הנזק שנגרם"}
-    ]
+    sample_agent_state["messages"] = [{"role": "user", "content": "אני הולך לעורך דין בגלל הנזק שנגרם"}]
 
     result = await support_agent.run(sample_agent_state)
 
@@ -69,9 +67,7 @@ async def test_support_escalates_legal_keywords(support_agent, sample_agent_stat
 async def test_support_escalates_negative_sentiment(support_agent, sample_agent_state):
     """Test that very negative sentiment triggers escalation."""
     sample_agent_state["intent"] = "complaint"
-    sample_agent_state["messages"] = [
-        {"role": "user", "content": "This is the worst service I've ever experienced!"}
-    ]
+    sample_agent_state["messages"] = [{"role": "user", "content": "This is the worst service I've ever experienced!"}]
     # Set sentiment explicitly to trigger escalation
     sample_agent_state["sentiment_score"] = -0.8
 

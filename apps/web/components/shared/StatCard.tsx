@@ -1,6 +1,7 @@
 'use client';
 
 import { TrendingUp, TrendingDown, Briefcase, CheckCircle, DollarSign, Star } from 'lucide-react';
+
 import { cn } from '@/lib/utils/cn';
 
 // ---------------------------------------------------------------------------

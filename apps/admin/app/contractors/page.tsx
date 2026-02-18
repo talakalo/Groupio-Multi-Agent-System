@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useMemo, useCallback, Fragment } from "react";
+import React, { useState, useMemo, useCallback, Fragment, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import {
   Search,
@@ -171,7 +172,54 @@ export default function ContractorsPage() {
   const [detailContractor, setDetailContractor] =
     useState<ContractorListItem | null>(null);
 
+  const queryClient = useQueryClient();
   const { data: contractors = [], isLoading } = useContractors();
+  const [actionLoading, setActionLoading] = useState(false);
+
+  // ---- API helpers ----
+  const rawApiUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "") || "http://localhost:8000";
+  const API_BASE = rawApiUrl.endsWith("/api/v1") ? rawApiUrl : `${rawApiUrl}/api/v1`;
+
+  function getAuthHeaders(): Record<string, string> {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    return headers;
+  }
+
+  async function approveContractor(id: string) {
+    const res = await fetch(`${API_BASE}/contractors/${encodeURIComponent(id)}/verify`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ decision: "approved" }),
+    });
+    if (!res.ok) throw new Error(`Failed to approve contractor ${id}: ${res.status}`);
+    return res.json();
+  }
+
+  async function suspendContractor(id: string) {
+    const res = await fetch(`${API_BASE}/contractors/${encodeURIComponent(id)}`, {
+      method: "PUT",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ verification_status: "suspended" }),
+    });
+    if (!res.ok) throw new Error(`Failed to suspend contractor ${id}: ${res.status}`);
+    return res.json();
+  }
+
+  async function requestDocuments(id: string) {
+    const res = await fetch(`${API_BASE}/contractors/${encodeURIComponent(id)}/request-docs`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+    });
+    // Gracefully handle 404 (endpoint may not exist yet)
+    if (res.status === 404) {
+      console.warn(`request-docs endpoint not found for contractor ${id}`);
+      return null;
+    }
+    if (!res.ok) throw new Error(`Failed to request documents for contractor ${id}: ${res.status}`);
+    return res.json();
+  }
 
   // ---- Filtering ----
   const filtered = useMemo(() => {
@@ -288,19 +336,46 @@ export default function ContractorsPage() {
   };
 
   // ---- Bulk actions ----
-  const handleBulkApprove = () => {
-    // In production: POST to API
-    setSelectedIds(new Set());
+  const handleBulkApprove = async () => {
+    setActionLoading(true);
+    try {
+      const ids = Array.from(selectedIds);
+      await Promise.allSettled(ids.map((id) => approveContractor(id)));
+      await queryClient.invalidateQueries({ queryKey: ["admin", "contractors"] });
+      setSelectedIds(new Set());
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to approve contractors");
+    } finally {
+      setActionLoading(false);
+    }
   };
 
-  const handleBulkSuspend = () => {
-    // In production: POST to API
-    setSelectedIds(new Set());
+  const handleBulkSuspend = async () => {
+    setActionLoading(true);
+    try {
+      const ids = Array.from(selectedIds);
+      await Promise.allSettled(ids.map((id) => suspendContractor(id)));
+      await queryClient.invalidateQueries({ queryKey: ["admin", "contractors"] });
+      setSelectedIds(new Set());
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to suspend contractors");
+    } finally {
+      setActionLoading(false);
+    }
   };
 
-  const handleBulkRequestDocs = () => {
-    // In production: POST to API
-    setSelectedIds(new Set());
+  const handleBulkRequestDocs = async () => {
+    setActionLoading(true);
+    try {
+      const ids = Array.from(selectedIds);
+      await Promise.allSettled(ids.map((id) => requestDocuments(id)));
+      await queryClient.invalidateQueries({ queryKey: ["admin", "contractors"] });
+      setSelectedIds(new Set());
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to request documents");
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   return (
@@ -822,19 +897,66 @@ export default function ContractorsPage() {
               {/* Actions */}
               <div className="flex items-center gap-2 pt-2">
                 {!detailContractor.verified ? (
-                  <button className="btn-primary flex-1">
+                  <button
+                    className="btn-primary flex-1"
+                    disabled={actionLoading}
+                    onClick={async () => {
+                      setActionLoading(true);
+                      try {
+                        await approveContractor(detailContractor.id);
+                        await queryClient.invalidateQueries({ queryKey: ["admin", "contractors"] });
+                        setDetailContractor(null);
+                      } catch (err) {
+                        alert(err instanceof Error ? err.message : "Failed to approve contractor");
+                      } finally {
+                        setActionLoading(false);
+                      }
+                    }}
+                  >
                     <CheckCircle2 className="w-4 h-4" />
-                    Approve
+                    {actionLoading ? "Approving..." : "Approve"}
                   </button>
                 ) : (
-                  <button className="btn-danger flex-1">
+                  <button
+                    className="btn-danger flex-1"
+                    disabled={actionLoading}
+                    onClick={async () => {
+                      setActionLoading(true);
+                      try {
+                        await suspendContractor(detailContractor.id);
+                        await queryClient.invalidateQueries({ queryKey: ["admin", "contractors"] });
+                        setDetailContractor(null);
+                      } catch (err) {
+                        alert(err instanceof Error ? err.message : "Failed to suspend contractor");
+                      } finally {
+                        setActionLoading(false);
+                      }
+                    }}
+                  >
                     <ShieldOff className="w-4 h-4" />
-                    Suspend
+                    {actionLoading ? "Suspending..." : "Suspend"}
                   </button>
                 )}
-                <button className="btn-secondary flex-1">
+                <button
+                  className="btn-secondary flex-1"
+                  disabled={actionLoading}
+                  onClick={async () => {
+                    setActionLoading(true);
+                    try {
+                      const result = await requestDocuments(detailContractor.id);
+                      if (result === null) {
+                        alert("Document request endpoint is not available yet. Please try again later.");
+                      }
+                      await queryClient.invalidateQueries({ queryKey: ["admin", "contractors"] });
+                    } catch (err) {
+                      alert(err instanceof Error ? err.message : "Failed to request documents");
+                    } finally {
+                      setActionLoading(false);
+                    }
+                  }}
+                >
                   <FileText className="w-4 h-4" />
-                  Request Documents
+                  {actionLoading ? "Requesting..." : "Request Documents"}
                 </button>
               </div>
             </div>

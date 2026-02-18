@@ -51,7 +51,7 @@ module.exports = {
         varsIgnorePattern: '^_',
       },
     ],
-    '@typescript-eslint/no-explicit-any': 'warn',
+    '@typescript-eslint/no-explicit-any': 'error',
     '@typescript-eslint/explicit-module-boundary-types': 'off',
     '@typescript-eslint/no-non-null-assertion': 'warn',
 
@@ -100,9 +100,6 @@ module.exports = {
       files: ['**/*.test.ts', '**/*.test.tsx', '**/*.spec.ts', '**/*.spec.tsx'],
       env: {
         jest: true,
-      },
-      rules: {
-        '@typescript-eslint/no-explicit-any': 'off',
       },
     },
     // Config files

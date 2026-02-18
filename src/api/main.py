@@ -4,22 +4,20 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
-from src.api.middleware.auth import get_admin_user
 from src.api.middleware.logging import RequestLoggingMiddleware
+from src.api.middleware.security import SecurityHeadersMiddleware
 from src.api.routes import api_router
 from src.config.settings import get_settings
 from src.databases.graph_store import get_graph_store
 from src.databases.postgres import get_postgres_client
 from src.databases.redis_client import get_redis_client
 from src.databases.vector_store import get_vector_store
-from src.models.user import UserInDB
 from src.orchestration.graph import get_orchestrator
-from src.rag.pipeline import get_rag_pipeline
 from src.utils.monitoring import init_monitoring
 from src.utils.validators import sanitize_input, validate_message_request
 
@@ -121,11 +119,19 @@ app.add_middleware(
     expose_headers=["Authorization"],
 )
 
-# Request logging middleware
+# Security headers middleware (HSTS, CSP, X-Frame-Options, etc.)
+app.add_middleware(SecurityHeadersMiddleware, environment=settings.ENVIRONMENT)
+
+# Request logging middleware (with PII redaction)
 app.add_middleware(RequestLoggingMiddleware)
 
 # Include API routes (auth, offers, contractors, buildings, etc.)
 app.include_router(api_router, prefix="/api/v1")
+
+# WebSocket routes (mounted separately – no prefix collision with REST routes)
+from src.api.routes.websocket import router as ws_router
+
+app.include_router(ws_router, prefix="/api/v1")
 
 
 # -- Request/Response Models --
@@ -151,7 +157,17 @@ class MessageResponse(BaseModel):
 # -- Endpoints --
 
 
-@app.post("/api/v1/message", response_model=MessageResponse)
+@app.post(
+    "/api/v1/message",
+    response_model=MessageResponse,
+    summary="Process user message",
+    description=(
+        "Main endpoint for processing user messages through the "
+        "multi-agent system. Validates input, checks rate limits, "
+        "routes through the agent orchestrator, and returns the "
+        "AI response."
+    ),
+)
 async def send_message(
     request: MessageRequest,
     background_tasks: BackgroundTasks,
@@ -204,49 +220,21 @@ async def send_message(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@app.post("/api/v1/webhooks/whatsapp")
-async def whatsapp_webhook(
-    payload: dict[str, Any],
-    background_tasks: BackgroundTasks,
-) -> dict[str, str]:
-    """Handle incoming WhatsApp messages."""
-    try:
-        message = _parse_whatsapp_message(payload)
-
-        if not message:
-            return {"status": "ignored"}
-
-        db = get_postgres_client()
-        building_id = await db.get_building_by_phone(message["phone_number"])
-
-        orchestrator = get_orchestrator()
-        result = await orchestrator.run(
-            user_message=message["text"],
-            user_id=message["phone_number"],
-            building_id=building_id,
-        )
-
-        # Queue response send (in production, use BullMQ)
-        background_tasks.add_task(
-            _send_whatsapp_response,
-            to=message["phone_number"],
-            message=result["response"].get("message", ""),
-        )
-
-        return {"status": "processed"}
-
-    except Exception as e:
-        logger.error("WhatsApp webhook error: %s", e, exc_info=True)
-        return {"status": "error"}
-
-
-@app.get("/api/v1/health/live")
+@app.get(
+    "/api/v1/health/live",
+    summary="Liveness probe",
+    description="Simple liveness check — returns 200 if the process is running. No external calls.",
+)
 async def health_live() -> dict[str, str]:
     """Liveness probe: process is up. No DB or external calls."""
     return {"status": "ok"}
 
 
-@app.get("/api/v1/health")
+@app.get(
+    "/api/v1/health",
+    summary="Readiness probe",
+    description="Checks connectivity to all backend services (PostgreSQL, Redis, Qdrant, Neo4j).",
+)
 async def health_check() -> dict[str, Any]:
     """Readiness probe: all services (DB, Redis, vector, graph) checked."""
     services: dict[str, bool] = {}
@@ -283,47 +271,15 @@ async def health_check() -> dict[str, Any]:
     }
 
 
-# -- Admin Endpoints --
+@app.get("/metrics")
+async def prometheus_metrics() -> Response:
+    """Expose Prometheus metrics in standard text format for scraping."""
+    from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
-
-@app.post("/api/v1/admin/agents/{agent_name}/reload")
-async def reload_agent(
-    agent_name: str,
-    current_user: UserInDB = Depends(get_admin_user),
-) -> dict[str, str]:
-    """Reload an agent's configuration without restarting. Requires admin access."""
-    orchestrator = get_orchestrator()
-    agent = orchestrator.agents.get(agent_name)
-    if not agent:
-        raise HTTPException(status_code=404, detail=f"Agent '{agent_name}' not found")
-
-    await agent.reload_config()
-    logger.info("Agent %s reloaded by admin %s", agent_name, current_user.email)
-    return {"status": "reloaded", "agent": agent_name}
-
-
-@app.get("/api/v1/admin/metrics")
-async def get_metrics(
-    current_user: UserInDB = Depends(get_admin_user),
-) -> dict[str, Any]:
-    """Get system metrics for all agents and services. Requires admin access."""
-    orchestrator = get_orchestrator()
-
-    agent_metrics = {}
-    for name, agent in orchestrator.agents.items():
-        agent_metrics[name] = await agent.get_metrics()
-
-    rag_metrics = {}
-    try:
-        rag = get_rag_pipeline()
-        rag_metrics = await rag.get_metrics()
-    except Exception:
-        pass
-
-    return {
-        "agents": agent_metrics,
-        "rag": rag_metrics,
-    }
+    return Response(
+        content=generate_latest(),
+        media_type=CONTENT_TYPE_LATEST,
+    )
 
 
 # -- Helper Functions --
@@ -341,63 +297,3 @@ async def _log_conversation(
         await db.log_conversation(user_id, message, response, metadata)
     except Exception:
         logger.warning("Failed to log conversation for user %s", user_id)
-
-
-def _parse_whatsapp_message(payload: dict) -> dict[str, str] | None:
-    """Parse incoming WhatsApp webhook payload."""
-    try:
-        entry = payload.get("entry", [{}])[0]
-        changes = entry.get("changes", [{}])[0]
-        value = changes.get("value", {})
-        messages = value.get("messages", [])
-
-        if not messages:
-            return None
-
-        msg = messages[0]
-        return {
-            "phone_number": msg.get("from", ""),
-            "text": msg.get("text", {}).get("body", ""),
-            "type": msg.get("type", "text"),
-        }
-    except (IndexError, KeyError):
-        return None
-
-
-async def _send_whatsapp_response(to: str, message: str) -> None:
-    """Send a WhatsApp message using Meta WhatsApp Business API."""
-    settings = get_settings()
-
-    if not settings.WHATSAPP_API_TOKEN or not settings.WHATSAPP_PHONE_ID:
-        logger.warning("WhatsApp not configured - message not sent to %s", to)
-        return
-
-    try:
-        import httpx
-
-        url = f"https://graph.facebook.com/v18.0/{settings.WHATSAPP_PHONE_ID}/messages"
-        headers = {
-            "Authorization": f"Bearer {settings.WHATSAPP_API_TOKEN}",
-            "Content-Type": "application/json",
-        }
-        payload = {
-            "messaging_product": "whatsapp",
-            "recipient_type": "individual",
-            "to": to,
-            "type": "text",
-            "text": {"preview_url": False, "body": message},
-        }
-
-        async with httpx.AsyncClient() as client:
-            response = await client.post(url, headers=headers, json=payload, timeout=30.0)
-
-            if response.status_code == 200:
-                logger.info("WhatsApp message sent to %s", to)
-            else:
-                logger.error(
-                    "WhatsApp API error: %s - %s",
-                    response.status_code,
-                    response.text,
-                )
-    except Exception as e:
-        logger.error("Failed to send WhatsApp message to %s: %s", to, e)

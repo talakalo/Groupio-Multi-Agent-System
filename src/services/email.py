@@ -1,5 +1,6 @@
 """Email service for sending verification and notification emails."""
 
+import asyncio
 import logging
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -19,9 +20,18 @@ class EmailService:
 
     def _is_configured(self) -> bool:
         """Check if email service is properly configured."""
-        return bool(
-            self.settings.SMTP_HOST and self.settings.SMTP_USER and self.settings.SMTP_PASSWORD
-        )
+        return bool(self.settings.SMTP_HOST and self.settings.SMTP_USER and self.settings.SMTP_PASSWORD)
+
+    def _send_sync(self, msg: MIMEMultipart, to_email: str) -> None:
+        """Synchronous SMTP send (run inside a thread)."""
+        with smtplib.SMTP(self.settings.SMTP_HOST, self.settings.SMTP_PORT) as server:
+            server.starttls()
+            server.login(self.settings.SMTP_USER, self.settings.SMTP_PASSWORD)
+            server.sendmail(
+                self.settings.SMTP_FROM_EMAIL,
+                to_email,
+                msg.as_string(),
+            )
 
     async def send_email(
         self,

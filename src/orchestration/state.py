@@ -7,6 +7,11 @@ from src.models.agent_state import AgentState
 from src.utils.monitoring import generate_conversation_id
 
 
+def _utcnow() -> datetime:
+    """Return timezone-aware UTC now."""
+    return datetime.now(UTC)
+
+
 def create_initial_state(
     user_message: str,
     user_id: str,
@@ -25,6 +30,9 @@ def create_initial_state(
         user_profile={},
         building_context={},
         active_offers=[],
+        entities=None,
+        last_agent_handoff=None,
+        context_for_next_agent=None,
         rag_results=[],
         actions_taken=[],
         needs_human=False,

@@ -1,90 +1,60 @@
 # Contributing to Groupio Multi-Agent System
 
-Thank you for your interest in contributing to Groupio! This document provides guidelines and instructions for contributing.
+Thank you for your interest in contributing! This guide will help you get started.
 
-## Table of Contents
+## Prerequisites
 
-- [Code of Conduct](#code-of-conduct)
-- [Getting Started](#getting-started)
-- [Development Setup](#development-setup)
-- [Project Structure](#project-structure)
-- [Making Changes](#making-changes)
-- [Commit Guidelines](#commit-guidelines)
-- [Pull Request Process](#pull-request-process)
-- [Testing](#testing)
-- [Code Style](#code-style)
+- **Python 3.11+** — backend API and agent system
+- **Node.js 20+** with **pnpm 9+** — frontend apps
+- **Docker** and **Docker Compose** — for local services
+- **Redis 7+**, **PostgreSQL 15+**, **Qdrant**, **Neo4j** — databases (Docker recommended)
 
-## Code of Conduct
+## Local Development Setup
 
-We are committed to providing a welcoming and inclusive environment. Please be respectful and professional in all interactions.
-
-## Getting Started
-
-1. Fork the repository
-2. Clone your fork locally
-3. Set up the development environment (see below)
-4. Create a new branch for your feature/fix
-5. Make your changes
-6. Submit a pull request
-
-## Development Setup
-
-### Prerequisites
-
-- Python 3.11+
-- Node.js 18+
-- pnpm 8+
-- Docker & Docker Compose
-- PostgreSQL 15+
-- Redis 7+
-
-### Backend Setup
+### 1. Clone the repository
 
 ```bash
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # or `venv\Scripts\activate` on Windows
+git clone https://github.com/talakalo/Groupio-Multi-Agent-System.git
+cd Groupio-Multi-Agent-System
+```
+
+### 2. Backend setup
+
+```bash
+# Create a virtual environment
+python -m venv .venv
+source .venv/bin/activate  # or .venv\Scripts\activate on Windows
 
 # Install dependencies
-pip install -r requirements.txt
-pip install -r requirements-dev.txt
+pip install -e ".[dev]"
 
-# Set up environment
+# Copy environment template
 cp .env.example .env
-# Edit .env with your local settings
-
-# Run database migrations
-alembic upgrade head
-
-# Seed test data
-python scripts/seed_test_data.py
-
-# Start the backend server
-uvicorn src.main:app --reload --port 8000
+# Edit .env with your API keys and database URLs
 ```
 
-### Frontend Setup
+### 3. Start infrastructure services
 
 ```bash
-# Install dependencies
+docker compose -f docker/docker-compose.yml up -d
+```
+
+This starts Redis, PostgreSQL, Qdrant, and Neo4j.
+
+### 4. Frontend setup
+
+```bash
 pnpm install
-
-# Set up environment for each app
-cp apps/web/.env.example apps/web/.env.local
-cp apps/admin/.env.example apps/admin/.env.local
-
-# Start development servers
-pnpm dev
 ```
 
-### Docker Setup (Recommended)
+### 5. Run the application
 
 ```bash
-# Start all services
-docker-compose up -d
+# Backend
+uvicorn src.api.main:app --reload --port 8000
 
-# View logs
-docker-compose logs -f
+# Frontend (in another terminal)
+pnpm --filter @groupio/web dev
 ```
 
 ## Project Structure
@@ -210,78 +180,66 @@ How were these changes tested?
 ### Backend Tests
 
 ```bash
-# Run all tests
-pytest
+# Backend unit tests
+pytest tests/unit/ -v
 
-# Run with coverage
-pytest --cov=src --cov-report=html
+# Backend integration tests (requires Docker services)
+pytest tests/integration/ -v --timeout=30
 
-# Run specific test file
-pytest tests/unit/test_matching_agent.py
+# Frontend tests
+pnpm turbo test
 
-# Run integration tests
-pytest tests/integration/
+# E2E tests
+pnpm --filter @groupio/web exec playwright test
 ```
 
-### Frontend Tests
+## Code Quality
+
+We enforce code quality through:
+
+- **Ruff** for Python linting and formatting
+- **ESLint** + **Prettier** for TypeScript/JavaScript
+- **mypy** for Python type checking
+- **TypeScript strict mode** for frontend apps
+- **`@typescript-eslint/no-explicit-any`** set to error — never use `any`
+
+### Pre-commit hooks
 
 ```bash
-# Run all tests
-pnpm test
-
-# Run tests for specific app
-pnpm --filter @groupio/web test
-
-# Run with coverage
-pnpm test:coverage
-
-# Run E2E tests
-pnpm test:e2e
+pip install pre-commit
+pre-commit install
 ```
 
-## Code Style
+## Branch Strategy
 
-### Python
+- `main` — production branch, protected
+- `dev` — integration branch
+- Feature branches: `feature/<name>`
+- Bug fixes: `fix/<name>`
 
-- Follow PEP 8
-- Use type hints
-- Format with Black
-- Sort imports with isort
-- Lint with Ruff
+## Pull Request Guidelines
+
+1. Create a feature branch from `dev`
+2. Make your changes with clear, atomic commits
+3. Ensure all CI checks pass (lint, typecheck, tests, security scan)
+4. Write or update tests for your changes
+5. Open a PR targeting `dev` with a clear description
+
+## Common Issues
+
+### Database connection errors
+
+Make sure Docker services are running:
+```bash
+docker compose -f docker/docker-compose.yml ps
+```
+
+### API key errors
+
+Ensure `.env` has valid `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` values (use test keys for local dev).
+
+### pnpm lockfile issues
 
 ```bash
-# Format code
-black src/ tests/
-isort src/ tests/
-
-# Lint
-ruff src/ tests/
+pnpm install --frozen-lockfile
 ```
-
-### TypeScript/JavaScript
-
-- Use TypeScript for all new code
-- Follow the ESLint configuration
-- Format with Prettier
-
-```bash
-# Lint and format
-pnpm lint
-pnpm format
-```
-
-### CSS
-
-- Use Tailwind CSS utilities
-- Follow the design system in `packages/ui`
-- Support RTL (Hebrew) layouts
-
-## Questions?
-
-- Open a [GitHub Issue](https://github.com/groupio/groupio-multi-agent/issues)
-- Join our [Discord community](https://discord.gg/groupio)
-- Email: developers@groupio.co.il
-
----
-
-Thank you for contributing to Groupio! 🙏

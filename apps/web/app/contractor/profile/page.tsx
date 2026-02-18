@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useTranslations } from 'next-intl';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import type { Contractor, ServiceCategory, Region } from '@groupio/types';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useTranslations } from 'next-intl';
+import { useState, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
 
 const profileSchema = z.object({
   businessName: z.string().min(2, 'Business name is required'),
@@ -40,14 +40,29 @@ export default function ContractorProfilePage() {
     resolver: zodResolver(profileSchema),
   });
 
+  const [contractorId, setContractorId] = useState<string | null>(null);
+
   useEffect(() => {
     async function fetchProfile() {
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       try {
-        const res = await fetch('/api/contractor/profile');
-        if (res.ok) {
-          const data = await res.json();
-          setContractor(data);
-          reset(data);
+        const meRes = await fetch(`${apiBase}/api/v1/auth/me`, { headers });
+        if (!meRes.ok) throw new Error('Not authenticated');
+        const me = await meRes.json();
+        const cid = me.contractor_id;
+        setContractorId(cid);
+
+        if (cid) {
+          const res = await fetch(`${apiBase}/api/v1/contractors/${cid}`, { headers });
+          if (res.ok) {
+            const data = await res.json();
+            setContractor(data);
+            reset(data);
+          }
         }
       } catch (error) {
         console.error('Failed to fetch profile:', error);
@@ -60,11 +75,17 @@ export default function ContractorProfilePage() {
   }, [reset]);
 
   async function onSubmit(data: ProfileForm) {
+    if (!contractorId) return;
     setIsSaving(true);
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
     try {
-      const res = await fetch('/api/contractor/profile', {
+      const res = await fetch(`${apiBase}/api/v1/contractors/${contractorId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(data),
       });
 

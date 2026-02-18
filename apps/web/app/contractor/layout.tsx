@@ -18,6 +18,12 @@ import {
   PlusCircle,
   ClipboardList,
 } from 'lucide-react';
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
+import { useEffect, useState } from 'react';
+
+import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
 import { useAuthStore } from '@/lib/stores/authStore';
 
@@ -99,6 +105,7 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
           type="button"
           onClick={handleLogout}
           className="flex items-center gap-3 w-full text-start text-sm text-gray-600 hover:text-gray-900 transition-colors"
+          aria-label={t('logout')}
         >
           <div className="w-8 h-8 rounded-full bg-accent-100 flex items-center justify-center">
             <UserCircle className="h-5 w-5 text-accent-600" />

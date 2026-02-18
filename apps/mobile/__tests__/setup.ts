@@ -1,5 +1,6 @@
-import { vi, afterEach } from 'vitest';
+/* eslint-disable @typescript-eslint/no-require-imports, import/first, @typescript-eslint/no-explicit-any */
 import React from 'react';
+import { afterEach, vi } from 'vitest';
 
 // Mock @testing-library/react-native (it fails to load RN host components in Node)
 vi.mock('@testing-library/react-native', () => {

@@ -5,7 +5,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
-from src.api.middleware.auth import get_current_user
+from src.api.middleware.auth import get_current_user, is_admin
 from src.databases.graph_store import get_graph_store
 from src.databases.postgres import get_postgres_client
 from src.databases.redis_client import get_redis_client
@@ -156,9 +156,8 @@ async def search_contractors(
         results = await vs.search(
             collection="contractors",
             query_vector=query_embedding,
-            filters=filters,
-            limit=request.page_size,
-            offset=(request.page - 1) * request.page_size,
+            filters=filters if filters else None,
+            top_k=request.page_size,
         )
 
         contractor_ids = [r["id"] for r in results]
@@ -219,10 +218,7 @@ async def update_contractor(
         raise HTTPException(status_code=404, detail="Contractor not found")
 
     # Only the contractor or admin can update
-    if current_user.contractor_id != contractor_id and current_user.role not in (
-        "admin",
-        "super_admin",
-    ):
+    if current_user.contractor_id != contractor_id and not is_admin(current_user):
         raise HTTPException(status_code=403, detail="Not authorized")
 
     update_data = request.model_dump(exclude_unset=True)
@@ -292,9 +288,7 @@ async def add_review(
         raise HTTPException(status_code=404, detail="Contractor not found")
 
     # Verify user completed an offer with this contractor
-    has_completed = await db.has_user_completed_offer_with_contractor(
-        current_user.id, contractor_id
-    )
+    has_completed = await db.has_user_completed_offer_with_contractor(current_user.id, contractor_id)
     if not has_completed:
         raise HTTPException(
             status_code=403,
@@ -320,10 +314,7 @@ async def get_contractor_stats(
     current_user: UserInDB = Depends(get_current_user),
 ) -> ContractorStats:
     """Get contractor statistics (contractor or admin only)."""
-    if current_user.contractor_id != contractor_id and current_user.role not in (
-        "admin",
-        "super_admin",
-    ):
+    if current_user.contractor_id != contractor_id and not is_admin(current_user):
         raise HTTPException(status_code=403, detail="Not authorized")
 
     db = get_postgres_client()
@@ -346,7 +337,7 @@ async def verify_contractor(
     current_user: UserInDB = Depends(get_current_user),
 ) -> ContractorResponse:
     """Verify or reject a contractor (admin only)."""
-    if current_user.role not in ("admin", "super_admin"):
+    if not is_admin(current_user):
         raise HTTPException(status_code=403, detail="Admin access required")
 
     db = get_postgres_client()
@@ -371,7 +362,7 @@ async def recalculate_trust_score(
     current_user: UserInDB = Depends(get_current_user),
 ) -> dict:
     """Trigger trust score recalculation (admin only)."""
-    if current_user.role not in ("admin", "super_admin"):
+    if not is_admin(current_user):
         raise HTTPException(status_code=403, detail="Admin access required")
 
     db = get_postgres_client()

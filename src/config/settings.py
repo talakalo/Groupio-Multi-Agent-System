@@ -66,6 +66,8 @@ class Settings(BaseSettings):
     SENTIMENT_ESCALATION_THRESHOLD: float = -0.5
     MAX_SUPPORT_ATTEMPTS_BEFORE_ESCALATION: int = 3
     HUMAN_ESCALATION_ENABLED: bool = True
+    SENTIMENT_ESCALATION_THRESHOLD: float = -0.5
+    MAX_SUPPORT_ATTEMPTS_BEFORE_ESCALATION: int = 3
 
     # Feature Flags
     ENABLE_WEB_SEARCH: bool = True
@@ -81,7 +83,7 @@ class Settings(BaseSettings):
     RATE_LIMIT_WINDOW: int = 60  # seconds
 
     # JWT Authentication
-    JWT_SECRET_KEY: str = "your-secret-key-change-in-production"
+    JWT_SECRET_KEY: str = secrets.token_urlsafe(32)
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
@@ -141,4 +143,7 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     """Get cached settings instance."""
-    return Settings()
+    s = Settings()
+    if s.ENVIRONMENT == "production" and len(s.JWT_SECRET_KEY) < 32:
+        raise ValueError("JWT_SECRET_KEY must be set to a secure value (>= 32 chars) in production.")
+    return s

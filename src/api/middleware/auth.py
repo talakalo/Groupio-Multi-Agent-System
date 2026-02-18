@@ -17,6 +17,11 @@ api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
 
 
+def _utcnow() -> datetime:
+    """Return timezone-aware UTC now (replaces deprecated datetime.utcnow())."""
+    return datetime.now(UTC)
+
+
 def hash_password(password: str) -> str:
     """Hash a password using bcrypt."""
     salt = bcrypt.gensalt()
@@ -215,3 +220,16 @@ def require_roles(*roles: UserRole):
         return current_user
 
     return role_checker
+
+
+# Convenience: checks admin, super_admin, buildings_manager (same as get_admin_user)
+ADMIN_ROLES = frozenset({UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.BUILDINGS_MANAGER})
+
+
+def is_admin(user: UserInDB) -> bool:
+    """Return True if user has any admin-level role.
+
+    Prefer using ``get_admin_user`` as a dependency.  This helper exists for
+    inline checks where a dependency isn't convenient.
+    """
+    return user.role in ADMIN_ROLES

@@ -274,5 +274,80 @@
     "escrowProtection": "Payment held in escrow until work completion",
     "payNow": "Pay Now",
     "total": "Total"
+  },
+  "contractorNav": {
+    "dashboard": "Dashboard",
+    "activeOffers": "Active Offers",
+    "createOffer": "Create Offer",
+    "projects": "Projects",
+    "profile": "Profile",
+    "contractorBadge": "Contractor",
+    "newOffer": "New Offer",
+    "myBusiness": "My Business",
+    "logout": "Log out"
+  },
+  "contractor": {
+    "offers": {
+      "create": {
+        "fields": {
+          "buildingId": "Building ID"
+        },
+        "placeholders": {
+          "buildingId": "Enter building ID"
+        }
+      }
+    }
+  },
+  "residentNav": {
+    "dashboard": "Dashboard",
+    "offers": "Offers",
+    "contractors": "Contractors",
+    "architecture": "My Home Plan",
+    "building": "Building",
+    "profile": "Profile",
+    "aiAssistant": "AI Assistant",
+    "myAccount": "My Account"
+  },
+  "architecture": {
+    "title": "My Home Plan",
+    "subtitle": "Upload your floor plan and get AI-powered renovation suggestions",
+    "uploading": "Uploading...",
+    "dropzone": {
+      "title": "Upload your floor plan",
+      "subtitle": "Drag and drop a file or click to browse",
+      "button": "Choose File",
+      "formats": "PDF, PNG, JPG, HEIC (max 20MB)"
+    },
+    "analyzing": {
+      "title": "Analyzing your floor plan...",
+      "subtitle": "Our AI is identifying rooms and suggesting services",
+      "steps": {
+        "rooms": "Detecting rooms",
+        "services": "Finding services",
+        "pricing": "Estimating prices"
+      }
+    },
+    "results": {
+      "title": "Analysis Complete",
+      "roomsDetected": "Rooms Detected",
+      "sqm": "sqm",
+      "totalArea": "Total area",
+      "suggestions": "Recommended Services",
+      "matchingOffers": "{count} active offer(s) available",
+      "joinOffer": "Join Offer",
+      "findContractor": "Find Contractor"
+    },
+    "priority": {
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low"
+    },
+    "errors": {
+      "uploadFailed": "Upload failed. Please try again.",
+      "analysisFailed": "Analysis failed. Try a clearer image.",
+      "timeout": "Analysis took too long. Please try again."
+    },
+    "tryAgain": "Try again",
+    "uploadAnother": "Upload another plan"
   }
 }

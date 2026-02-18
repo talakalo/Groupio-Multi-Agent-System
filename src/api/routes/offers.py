@@ -5,7 +5,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from src.api.middleware.auth import get_current_user
+from src.api.middleware.auth import get_current_user, is_admin
 from src.databases.postgres import get_postgres_client
 from src.databases.vector_store import get_vector_store
 from src.models.offer import (
@@ -143,7 +143,7 @@ async def update_offer(
         raise HTTPException(status_code=404, detail="Offer not found")
 
     # Only creator or admin can update
-    if offer.created_by != current_user.id and current_user.role not in ("admin", "super_admin"):
+    if offer.created_by != current_user.id and not is_admin(current_user):
         raise HTTPException(status_code=403, detail="Not authorized to update this offer")
 
     # Cannot update completed/cancelled offers
@@ -168,7 +168,7 @@ async def delete_offer(
     if not offer:
         raise HTTPException(status_code=404, detail="Offer not found")
 
-    if offer.created_by != current_user.id and current_user.role not in ("admin", "super_admin"):
+    if offer.created_by != current_user.id and not is_admin(current_user):
         raise HTTPException(status_code=403, detail="Not authorized to delete this offer")
 
     if offer.status not in (OfferStatus.DRAFT, OfferStatus.PENDING):
@@ -302,7 +302,7 @@ async def match_contractor(
     current_user: UserInDB = Depends(get_current_user),
 ) -> OfferResponse:
     """Match offer with a contractor (admin only)."""
-    if current_user.role not in ("admin", "super_admin"):
+    if not is_admin(current_user):
         raise HTTPException(status_code=403, detail="Admin access required")
 
     db = get_postgres_client()

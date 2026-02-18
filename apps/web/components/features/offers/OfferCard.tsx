@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import type { Offer, PricingTier, ServiceCategory } from '@groupio/types';
 import {
   Users,
   Tag,
@@ -9,7 +9,8 @@ import {
   BadgeCheck,
   TrendingDown,
 } from 'lucide-react';
-import type { Offer, PricingTier, ServiceCategory } from '@groupio/types';
+import { useMemo } from 'react';
+
 import { cn } from '@/lib/utils/cn';
 
 // ---------------------------------------------------------------------------
@@ -120,6 +121,7 @@ export function OfferCard({
 
   return (
     <div
+      data-testid="offer-card"
       className={cn(
         'card group flex flex-col gap-4 overflow-hidden',
         'hover:border-primary-200 transition-all duration-200',
@@ -188,7 +190,7 @@ export function OfferCard({
 
       {/* ---- Next tier progress ---- */}
       {nextTier && neededForNext > 0 && (
-        <div className="rounded-xl bg-primary-50 px-3.5 py-2.5">
+        <div data-testid="tier-progress" className="rounded-xl bg-primary-50 px-3.5 py-2.5">
           <div className="flex items-center justify-between text-xs">
             <span className="text-primary-700 font-medium">
               עוד {neededForNext} שכנים ל-{nextTier.discount}% הנחה

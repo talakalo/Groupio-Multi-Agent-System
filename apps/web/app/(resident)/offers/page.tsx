@@ -1,9 +1,8 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { useTranslations } from 'next-intl';
+import type { Offer, ServiceCategory, OfferStatus } from '@groupio/types';
+import { formatPrice } from '@groupio/utils';
 import { useQuery } from '@tanstack/react-query';
-import Link from 'next/link';
 import {
   Search,
   Filter,
@@ -14,10 +13,11 @@ import {
   SlidersHorizontal,
   X,
 } from 'lucide-react';
+import Link from 'next/link';
+import { useTranslations } from 'next-intl';
+import { useState, useMemo } from 'react';
+
 import { cn } from '@/lib/utils/cn';
-import { apiClient } from '@/lib/api/client';
-import { formatPrice } from '@groupio/utils';
-import type { Offer, ServiceCategory, OfferStatus } from '@groupio/types';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -178,38 +178,46 @@ export default function OffersListPage() {
     priceMax: null,
   });
 
-  const offersQuery = useQuery<{ offers: Offer[] }>({
+  const accessToken = typeof window !== 'undefined'
+    ? (window as unknown as { __auth_store?: { getState: () => { accessToken: string | null } } }).__auth_store?.getState()?.accessToken
+      ?? localStorage.getItem('auth_token')
+    : null;
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+  const offersQuery = useQuery<{ items: Offer[]; total: number }>({
     queryKey: ['resident', 'offers', filters.category, filters.status],
     queryFn: async () => {
       const params: Record<string, string> = {};
       if (filters.category !== 'all') params.category = filters.category;
       if (filters.status !== 'all') params.status = filters.status;
       const searchParams = new URLSearchParams(params);
-      const res = await fetch(`/api/v1/offers?${searchParams.toString()}`);
+      const headers: Record<string, string> = {};
+      if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+      const res = await fetch(`${apiBase}/api/v1/offers?${searchParams.toString()}`, { headers });
       if (!res.ok) throw new Error('Failed to fetch offers');
       return res.json();
     },
   });
 
   const filteredOffers = useMemo(() => {
-    let results = offersQuery.data?.offers ?? [];
+    let results = offersQuery.data?.items ?? [];
 
     if (filters.search.trim()) {
       const q = filters.search.toLowerCase();
       results = results.filter(
-        (o) =>
+        (o: Offer) =>
           o.contractor?.businessName?.toLowerCase().includes(q) ||
           o.category.toLowerCase().includes(q)
       );
     }
     if (filters.priceMin !== null) {
-      results = results.filter((o) => {
+      results = results.filter((o: Offer) => {
         const price = o.tiers[o.currentTier]?.price ?? o.basePrice;
         return price >= (filters.priceMin ?? 0);
       });
     }
     if (filters.priceMax !== null) {
-      results = results.filter((o) => {
+      results = results.filter((o: Offer) => {
         const price = o.tiers[o.currentTier]?.price ?? o.basePrice;
         return price <= (filters.priceMax ?? Infinity);
       });
@@ -417,7 +425,7 @@ export default function OffersListPage() {
         </div>
       ) : filteredOffers.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {filteredOffers.map((offer) => (
+          {filteredOffers.map((offer: Offer) => (
             <OfferCard key={offer.id} offer={offer} />
           ))}
         </div>
