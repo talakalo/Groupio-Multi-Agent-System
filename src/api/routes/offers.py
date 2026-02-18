@@ -62,17 +62,15 @@ async def create_offer(
         vs = get_vector_store()
         await vs.upsert(
             collection="offers",
-            points=[
+            ids=[offer_id],
+            vectors=[embedding],
+            payloads=[
                 {
-                    "id": offer_id,
-                    "vector": embedding,
-                    "payload": {
-                        "title": offer.title,
-                        "category": offer.category.value,
-                        "building_id": offer.building_id,
-                        "status": offer.status.value,
-                    },
-                }
+                    "title": offer.title,
+                    "category": offer.category.value,
+                    "building_id": offer.building_id,
+                    "status": offer.status.value,
+                },
             ],
         )
     except Exception as e:

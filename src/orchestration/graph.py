@@ -12,6 +12,7 @@ from src.agents.pricing import PricingAgent
 from src.agents.router import RouterAgent
 from src.agents.support import SupportAgent
 from src.agents.vetting import VettingAgent
+from src.config.settings import get_settings
 from src.databases.postgres import get_postgres_client
 from src.models.agent_state import AgentState
 from src.orchestration.state import (
@@ -179,7 +180,8 @@ class GroupioOrchestrator:
             return "human"
 
         # Low confidence or clarification needed
-        if state.get("confidence", 0) < 0.7:
+        settings = get_settings()
+        if state.get("confidence", 0) < settings.ROUTER_CONFIDENCE_THRESHOLD:
             # Check if router already provided a clarification response
             actions = state.get("actions_taken", [])
             if actions and actions[-1].get("action") == "clarification_needed":

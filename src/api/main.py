@@ -46,6 +46,11 @@ async def lifespan(app: FastAPI):
     # Shutdown
     logger.info("Groupio Agent API shutting down")
     try:
+        db = get_postgres_client()
+        await db.close()
+    except Exception:
+        pass
+    try:
         redis = get_redis_client()
         await redis.close()
     except Exception:
@@ -65,14 +70,28 @@ app = FastAPI(
 )
 
 
+def _is_db_connection_error(exc: Exception) -> bool:
+    """True if exception is due to DB (e.g. PostgreSQL) not reachable."""
+    if isinstance(exc, ConnectionRefusedError):
+        return True
+    if isinstance(exc, OSError) and getattr(exc, "errno", None) == 61:
+        return True
+    return False
+
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Ensure CORS headers on error responses so browser shows real error, not CORS."""
     logger.exception("Unhandled exception: %s", exc)
-    show_detail = get_settings().ENVIRONMENT == "development"
-    content = {"detail": str(exc) if show_detail else "Internal server error"}
-    response = JSONResponse(status_code=500, content=content)
-    # Add CORS headers so browser doesn't mask 500 as CORS error
+    if _is_db_connection_error(exc):
+        status_code = 503
+        content = {"detail": "Database unavailable. Please try again later."}
+    else:
+        status_code = 500
+        show_detail = get_settings().ENVIRONMENT == "development"
+        content = {"detail": str(exc) if show_detail else "Internal server error"}
+    response = JSONResponse(status_code=status_code, content=content)
+    # Add CORS headers so browser doesn't mask error as CORS
     origin = request.headers.get("origin")
     if origin:
         response.headers["Access-Control-Allow-Origin"] = origin

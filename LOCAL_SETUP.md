@@ -130,15 +130,26 @@ ENVIRONMENT=development
 
 **Option A: Local PostgreSQL** (default `postgresql://postgres:postgres@localhost:5432/groupio`)
 
-Create the database first if it doesn't exist:
-```bash
-# Using the provided script (recommended)
-./scripts/create-db.sh
+Ensure PostgreSQL is running. If Homebrew’s service fails (e.g. launchctl bootstrap error), use Docker instead:
 
-# Or manually:
-createdb -U postgres groupio
-# Or: psql -U postgres -c "CREATE DATABASE groupio;"
+```bash
+cd docker
+docker compose up -d postgres
 ```
+
+Then **from the project root** (not from `docker/`) run migrations. The Docker Postgres container creates the `groupio` database automatically.
+
+```bash
+cd /path/to/Groupio-Multi-Agent-System   # project root, where alembic.ini lives
+alembic upgrade head
+```
+
+If you use a local PostgreSQL install (not Docker), create the database first:
+```bash
+./scripts/create-db.sh
+# Or: createdb -U postgres groupio
+```
+Then run `alembic upgrade head` from the project root.
 
 **Option B: Local PostgreSQL with Supabase URL set**
 
@@ -156,15 +167,32 @@ DATABASE_URL=postgresql://postgres.[project-ref]:[password]@aws-0-[region].poole
 ```
 Get this from Supabase Dashboard → Project Settings → Database → Connection string.
 
-Then run migrations:
+Then run migrations **from the project root** (where `alembic.ini` is):
 ```bash
 alembic upgrade head
 ```
 
+### 4b. Seed predefined user accounts (optional)
+
+To create the standard demo accounts (Buildings Manager, Resident, Contractor, Super Admin):
+
+- **With Supabase** (no `USE_LOCAL_POSTGRES`): ensure `SUPABASE_URL` and `SUPABASE_KEY` are set, then:
+  ```bash
+  python scripts/seed_user_accounts.py
+  ```
+- **With local PostgreSQL**: ensure PostgreSQL is running and migrations are applied, then:
+  ```bash
+  USE_LOCAL_POSTGRES=1 python scripts/seed_user_accounts.py
+  ```
+
+If you see "Connection refused" on port 5432, start PostgreSQL (e.g. `brew services start postgresql@14`) or use Supabase instead.
+
 ### 5. Start the Backend API
 
+**The web app login and all API calls require the backend to be running.** If you see "Connection refused" or "לא ניתן להתחבר לשרת" on login, start the API:
+
 ```bash
-# Development mode with auto-reload
+# From project root
 python -m uvicorn src.api.main:app --reload --port 8000
 
 # Or using the Makefile

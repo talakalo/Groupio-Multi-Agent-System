@@ -2,7 +2,8 @@
 
 import json
 import logging
-from datetime import datetime
+import re
+from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
@@ -10,6 +11,9 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 from src.config.settings import get_settings
 from src.models.user import UserInDB
+
+# Regex for safe SQL column names (letters, digits, underscores)
+_SAFE_COLUMN_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 
 logger = logging.getLogger(__name__)
 
@@ -29,8 +33,8 @@ def _row_to_user(row: dict) -> dict:
         "building_id": row.get("building_id"),
         "contractor_id": row.get("contractor_id"),
         "last_login": row.get("last_login"),
-        "created_at": row.get("created_at") or datetime.utcnow(),
-        "updated_at": row.get("updated_at") or datetime.utcnow(),
+        "created_at": row.get("created_at") or datetime.now(timezone.utc),
+        "updated_at": row.get("updated_at") or datetime.now(timezone.utc),
     }
 
 
@@ -94,6 +98,36 @@ class PostgresClient:
         async with pool.acquire() as conn:
             rows = await conn.fetch(query, *args)
             return [dict(r) for r in rows]
+
+    @staticmethod
+    def _build_safe_update(
+        table: str, filtered: dict[str, Any], id_column: str, id_value: Any
+    ) -> tuple[str, list[Any]]:
+        """Build a safe parameterised UPDATE query.
+
+        Validates that all column names are safe identifiers to prevent
+        any SQL injection through column names.
+
+        Returns:
+            (query_string, args_list)
+        """
+        set_parts: list[str] = []
+        args: list[Any] = []
+        for i, (col, val) in enumerate(filtered.items(), 1):
+            if not _SAFE_COLUMN_RE.match(col):
+                raise ValueError(f"Unsafe column name: {col!r}")
+            set_parts.append(f'"{col}" = ${i}')
+            args.append(val)
+        args.append(id_value)
+        where_pos = len(args)
+        query = f'UPDATE {table} SET {", ".join(set_parts)} WHERE "{id_column}" = ${where_pos}'
+        return query, args
+
+    async def close(self) -> None:
+        """Gracefully close the database connection pool."""
+        if self._asyncpg_pool is not None:
+            await self._asyncpg_pool.close()
+            self._asyncpg_pool = None
 
     async def _pg_execute(self, query: str, *args: Any) -> None:
         """Execute query via asyncpg."""
@@ -239,19 +273,8 @@ class PostgresClient:
             result = await client.table("users").update(filtered).eq("id", user_id).execute()
             row = result.data[0] if result.data else None
         else:
-            # Build SET clause for asyncpg
-            set_parts = []
-            args: list[Any] = []
-            for i, (k, v) in enumerate(filtered.items(), 1):
-                set_parts.append(f'"{k}" = ${i}')
-                args.append(v)
-            args.append(user_id)
-            where_pos = len(args)
-            set_clause = ", ".join(set_parts)
-            await self._pg_execute(
-                f"UPDATE users SET {set_clause} WHERE id = ${where_pos}",
-                *args,
-            )
+            query, args = self._build_safe_update("users", filtered, "id", user_id)
+            await self._pg_execute(query, *args)
             row = await self._pg_fetch_one("SELECT * FROM users WHERE id = $1", user_id)
         if row:
             return UserInDB(**_row_to_user(row))
@@ -447,16 +470,8 @@ class PostgresClient:
             client = await self._get_client()
             await client.table("buildings").update(filtered).eq("id", building_id).execute()
         else:
-            set_parts = []
-            args: list[Any] = []
-            for i, (k, v) in enumerate(filtered.items(), 1):
-                set_parts.append(f'"{k}" = ${i}')
-                args.append(v)
-            args.append(building_id)
-            await self._pg_execute(
-                "UPDATE buildings SET " + ", ".join(set_parts) + " WHERE id = $%d" % (len(args),),
-                *args,
-            )
+            query, args = self._build_safe_update("buildings", filtered, "id", building_id)
+            await self._pg_execute(query, *args)
         return await self.get_building(building_id) or {}
 
     async def delete_building(self, building_id: str) -> None:
@@ -820,16 +835,8 @@ class PostgresClient:
             client = await self._get_client()
             await client.table("offers").update(filtered).eq("id", offer_id).execute()
         else:
-            set_parts = []
-            args: list[Any] = []
-            for i, (k, v) in enumerate(filtered.items(), 1):
-                set_parts.append(f'"{k}" = ${i}')
-                args.append(v)
-            args.append(offer_id)
-            await self._pg_execute(
-                "UPDATE offers SET " + ", ".join(set_parts) + " WHERE id = $%d" % (len(args),),
-                *args,
-            )
+            query, args = self._build_safe_update("offers", filtered, "id", offer_id)
+            await self._pg_execute(query, *args)
         return await self.get_offer(offer_id) or {}
 
     async def has_user_joined_offer(self, user_id: str, offer_id: str) -> bool:
@@ -1234,16 +1241,10 @@ class PostgresClient:
             client = await self._get_client()
             await client.table("contractors").update(filtered).eq("id", contractor_id).execute()
         else:
-            set_parts = []
-            args: list[Any] = []
-            for i, (k, v) in enumerate(filtered.items(), 1):
-                set_parts.append(f'"{k}" = ${i}')
-                args.append(v)
-            args.append(contractor_id)
-            await self._pg_execute(
-                "UPDATE contractors SET " + ", ".join(set_parts) + " WHERE id = $%d" % (len(args),),
-                *args,
+            query, args = self._build_safe_update(
+                "contractors", filtered, "id", contractor_id
             )
+            await self._pg_execute(query, *args)
         return await self.get_contractor(contractor_id) or {}
 
     async def get_contractor_reviews(
@@ -1487,16 +1488,10 @@ class PostgresClient:
             client = await self._get_client()
             await client.table("escalations").update(filtered).eq("id", escalation_id).execute()
         else:
-            set_parts = []
-            args: list[Any] = []
-            for i, (k, v) in enumerate(filtered.items(), 1):
-                set_parts.append(f'"{k}" = ${i}')
-                args.append(v)
-            args.append(escalation_id)
-            await self._pg_execute(
-                "UPDATE escalations SET " + ", ".join(set_parts) + " WHERE id = $%d" % (len(args),),
-                *args,
+            query, args = self._build_safe_update(
+                "escalations", filtered, "id", escalation_id
             )
+            await self._pg_execute(query, *args)
         return await self.get_escalation(escalation_id) or {}
 
     async def get_escalation_stats(self) -> dict[str, Any]:

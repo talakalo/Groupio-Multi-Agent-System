@@ -3,11 +3,12 @@
 import logging
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from src.api.middleware.auth import get_current_user
 from src.databases.graph_store import get_graph_store
 from src.databases.postgres import get_postgres_client
+from src.databases.redis_client import get_redis_client
 from src.databases.vector_store import get_vector_store
 from src.models.contractor import (
     ContractorCreate,
@@ -32,8 +33,21 @@ router = APIRouter(tags=["contractors"])
 @router.post("/", response_model=ContractorResponse)
 async def create_contractor(
     request: ContractorCreate,
+    req: Request,
 ) -> ContractorResponse:
-    """Register a new contractor."""
+    """Register a new contractor (public, rate-limited)."""
+    # Rate-limit registrations by IP: max 5 per 10 minutes
+    client_ip = req.client.host if req.client else "unknown"
+    redis = get_redis_client()
+    allowed = await redis.check_rate_limit(
+        user_id=f"reg:{client_ip}", limit=5, window=600
+    )
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many registration attempts. Please try again later.",
+        )
+
     db = get_postgres_client()
 
     # Check if email already exists
@@ -57,17 +71,15 @@ async def create_contractor(
         vs = get_vector_store()
         await vs.upsert(
             collection="contractors",
-            points=[
+            ids=[contractor_id],
+            vectors=[embedding],
+            payloads=[
                 {
-                    "id": contractor_id,
-                    "vector": embedding,
-                    "payload": {
-                        "business_name": contractor.business_name,
-                        "categories": [c.value for c in contractor.categories],
-                        "regions": [r.value for r in contractor.regions],
-                        "trust_score": contractor.trust_score,
-                    },
-                }
+                    "business_name": contractor.business_name,
+                    "categories": [c.value for c in contractor.categories],
+                    "regions": [r.value for r in contractor.regions],
+                    "trust_score": contractor.trust_score,
+                },
             ],
         )
     except Exception as e:
@@ -225,17 +237,15 @@ async def update_contractor(
         vs = get_vector_store()
         await vs.upsert(
             collection="contractors",
-            points=[
+            ids=[contractor_id],
+            vectors=[embedding],
+            payloads=[
                 {
-                    "id": contractor_id,
-                    "vector": embedding,
-                    "payload": {
-                        "business_name": updated.business_name,
-                        "categories": [c.value for c in updated.categories],
-                        "regions": [r.value for r in updated.regions],
-                        "trust_score": updated.trust_score,
-                    },
-                }
+                    "business_name": updated.business_name,
+                    "categories": [c.value for c in updated.categories],
+                    "regions": [r.value for r in updated.regions],
+                    "trust_score": updated.trust_score,
+                },
             ],
         )
     except Exception as e:

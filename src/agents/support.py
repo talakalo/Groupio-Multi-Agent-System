@@ -5,6 +5,7 @@ from typing import Any
 
 from src.agents.base import AgentConfig, BaseAgent
 from src.config.prompts.support import SUPPORT_SYSTEM_PROMPT
+from src.config.settings import get_settings
 from src.databases.postgres import get_postgres_client
 from src.databases.redis_client import get_redis_client
 from src.models.agent_state import AgentState
@@ -192,9 +193,10 @@ class SupportAgent(BaseAgent):
             return True
 
         # Sentiment check
+        settings = get_settings()
         try:
             sentiment = await self.llm_client.analyze_sentiment(user_message)
-            if sentiment < -0.5:
+            if sentiment < settings.SENTIMENT_ESCALATION_THRESHOLD:
                 return True
         except Exception:
             pass
@@ -202,7 +204,7 @@ class SupportAgent(BaseAgent):
         # Too many resolution attempts
         actions = state.get("actions_taken", [])
         support_attempts = sum(1 for a in actions if a.get("agent") == "support")
-        if support_attempts >= 3:
+        if support_attempts >= settings.MAX_SUPPORT_ATTEMPTS_BEFORE_ESCALATION:
             return True
 
         return False
@@ -260,7 +262,7 @@ class SupportAgent(BaseAgent):
         """Generate support response using LLM with retrieved context."""
         # Build system prompt with context
         system_prompt = self._build_system_prompt(state)
-        if context:
+        if context and self.rag is not None:
             system_prompt = await self.rag.augment_prompt(
                 query=user_message,
                 context_docs=context,
