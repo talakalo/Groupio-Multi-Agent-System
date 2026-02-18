@@ -59,7 +59,8 @@ export default function LoginPage() {
 
       const response = await apiClient.login(credentials);
       localStorage.setItem("auth_token", response.token);
-      useAuthStore.getState().setAccessToken(response.token);
+      const refreshToken = response.refresh_token ?? "";
+      useAuthStore.getState().setTokens(response.token, refreshToken);
       let user: { role: string } | null = null;
       try {
         const meRes = await fetch(
