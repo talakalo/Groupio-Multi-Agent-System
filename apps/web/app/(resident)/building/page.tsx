@@ -1,9 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-import { useTranslations } from 'next-intl';
+import type { Building, Offer, Resident } from '@groupio/types';
+import { formatPrice, formatDate } from '@groupio/utils';
 import { useQuery } from '@tanstack/react-query';
-import Link from 'next/link';
 import {
   Building2,
   Users,
@@ -20,9 +19,13 @@ import {
   Home,
   Settings,
 } from 'lucide-react';
+import Link from 'next/link';
+import { useTranslations } from 'next-intl';
+import { useState } from 'react';
+
+import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
-import { formatPrice, formatDate } from '@groupio/utils';
-import type { Building, Offer, Resident } from '@groupio/types';
+
 
 // ---------------------------------------------------------------------------
 // Types
@@ -119,13 +122,29 @@ export default function BuildingPage() {
   const [copiedCode, setCopiedCode] = useState(false);
   const [activeTab, setActiveTab] = useState<'neighbors' | 'offers' | 'settings'>('neighbors');
 
+  const accessToken = useAuthStore((s) => s.accessToken);
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
   const buildingQuery = useQuery<BuildingProfile>({
     queryKey: ['building', 'profile'],
     queryFn: async () => {
-      const res = await fetch('/api/v1/resident/building');
-      if (!res.ok) throw new Error('Failed to fetch building');
-      return res.json();
+      const res = await fetch(`${apiBase}/api/v1/buildings/me`, {
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+      });
+      if (!res.ok) {
+        if (res.status === 404) throw new Error('No building associated with your account');
+        throw new Error('Failed to fetch building');
+      }
+      const data = await res.json();
+      return {
+        ...data,
+        residents: data.residents ?? [],
+        activeOffers: data.activeOffers ?? [],
+        totalSavings: data.totalSavings ?? data.total_savings ?? 0,
+        inviteCode: data.inviteCode ?? data.invite_code ?? '',
+      } as BuildingProfile;
     },
+    enabled: !!accessToken,
   });
 
   const building = buildingQuery.data;

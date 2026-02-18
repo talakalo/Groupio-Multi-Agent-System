@@ -2,7 +2,7 @@
 
 import logging
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
@@ -79,7 +79,7 @@ class MockPaymentProvider(PaymentProvider):
             "currency": currency,
             "customer_id": customer_id,
             "metadata": metadata or {},
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
         }
 
     async def refund(
@@ -99,7 +99,7 @@ class MockPaymentProvider(PaymentProvider):
             "transaction_id": transaction_id,
             "status": "refunded",
             "amount": amount,
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
         }
 
     async def get_status(self, transaction_id: str) -> dict[str, Any]:
@@ -107,7 +107,7 @@ class MockPaymentProvider(PaymentProvider):
         return {
             "transaction_id": transaction_id,
             "status": "succeeded",
-            "checked_at": datetime.now(timezone.utc).isoformat(),
+            "checked_at": datetime.now(UTC).isoformat(),
         }
 
     async def create_customer(self, user_id: str, email: str) -> str:
@@ -131,10 +131,24 @@ _payment_provider: PaymentProvider | None = None
 def get_payment_provider() -> PaymentProvider:
     """Get or create the singleton PaymentProvider instance.
 
-    Returns ``MockPaymentProvider`` by default.  Replace the factory body
-    to wire up a real provider (e.g. Stripe) when ready.
+    .. warning::
+        Currently returns ``MockPaymentProvider`` — all charges succeed
+        immediately without real payment processing.  Replace the factory
+        body to wire up a real provider (e.g. Stripe, PayPlus) before
+        going to production.
+
+    Returns ``MockPaymentProvider`` by default.
     """
     global _payment_provider
     if _payment_provider is None:
+        from src.config.settings import get_settings
+
+        settings = get_settings()
+        if settings.ENVIRONMENT == "production":
+            logger.warning(
+                "⚠️  MOCK PAYMENT PROVIDER active in PRODUCTION. "
+                "All charges will succeed without real processing. "
+                "Integrate a real PSP (Stripe/PayPlus) immediately."
+            )
         _payment_provider = MockPaymentProvider()
     return _payment_provider

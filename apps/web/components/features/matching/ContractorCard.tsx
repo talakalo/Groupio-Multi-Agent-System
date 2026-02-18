@@ -1,5 +1,6 @@
 'use client';
 
+import type { ContractorMatch, ServiceCategory } from '@groupio/types';
 import {
   Star,
   BadgeCheck,
@@ -9,7 +10,7 @@ import {
   Phone,
   ChevronLeft,
 } from 'lucide-react';
-import type { ContractorMatch, ServiceCategory } from '@groupio/types';
+
 import { cn } from '@/lib/utils/cn';
 
 // ---------------------------------------------------------------------------

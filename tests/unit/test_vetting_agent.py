@@ -122,9 +122,7 @@ async def test_vetting_agent_manual_review_escalates(vetting_agent, sample_agent
     vetting_agent._graph_store.get_contractor_reputation = AsyncMock(
         return_value={"total_projects": 1, "avg_review_rating": 3.0}
     )
-    vetting_agent._graph_store.detect_suspicious_patterns = AsyncMock(
-        return_value={"suspicious": False}
-    )
+    vetting_agent._graph_store.detect_suspicious_patterns = AsyncMock(return_value={"suspicious": False})
     vetting_agent._graph_store.get_contractor_building_history = AsyncMock(return_value=[])
     vetting_agent.rag.retrieve = AsyncMock(return_value=[])
     vetting_agent.llm_client.create_message = AsyncMock(

@@ -1,0 +1,22 @@
+# Runs code review validation (docs/COMPREHENSIVE_CODE_REVIEW.md) on every PR and push to main/dev.
+# Ensures critical fixes and patterns are present.
+name: Code review check
+
+on:
+  pull_request:
+    branches: [main, dev]
+  push:
+    branches: [main, dev]
+
+jobs:
+  validate:
+    name: Validate code review items
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run validation script
+        run: |
+          chmod +x scripts/validate_code_review.sh
+          ./scripts/validate_code_review.sh

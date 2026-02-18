@@ -1,5 +1,7 @@
-import { create } from 'zustand';
 import type { Offer, ServiceCategory, OfferStatus } from '@groupio/types';
+import { create } from 'zustand';
+
+import { useAuthStore } from '@/lib/stores/authStore';
 
 interface OfferFilters {
   category?: ServiceCategory;
@@ -55,13 +57,9 @@ interface CreateOfferData {
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 const getAuthHeader = (): Record<string, string> => {
-  // Get token from auth store
-  const authData = typeof window !== 'undefined' ? localStorage.getItem('groupio-auth') : null;
-  if (authData) {
-    const { state } = JSON.parse(authData);
-    if (state?.accessToken) {
-      return { Authorization: `Bearer ${state.accessToken}` };
-    }
+  const token = useAuthStore.getState().accessToken;
+  if (token) {
+    return { Authorization: `Bearer ${token}` };
   }
   return {};
 };

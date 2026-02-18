@@ -35,8 +35,6 @@ const mockOffer = {
   currentTier: 0,
   tiers: [{ min: 5, max: 20, discount: 15, price: 4250 }],
   expiresAt: '2025-12-31',
-  buildingId: 'building-1',
-  contractorId: 'contractor-1'
 } as unknown as Offer;
 
 describe('MobileOfferCard', () => {
@@ -93,9 +91,14 @@ describe('MobileOfferCard', () => {
   });
 
   it('calls onJoin when join button is pressed', () => {
+    const activeOffer = {
+      ...mockOffer,
+      status: 'active',
+      expiresAt: '2099-12-31',
+    } as unknown as Offer;
     const onJoin = vi.fn();
     const { getByTestId } = render(
-      <MobileOfferCard offer={mockOffer} onJoin={onJoin} />
+      <MobileOfferCard offer={activeOffer} onJoin={onJoin} />
     );
     fireEvent.press(getByTestId('join-button'));
     expect(onJoin).toHaveBeenCalledWith('offer-123');
@@ -113,8 +116,13 @@ describe('MobileOfferCard', () => {
   });
 
   it('shows join text when offer is active', () => {
+    const activeOffer = {
+      ...mockOffer,
+      status: 'active',
+      expiresAt: '2099-12-31',
+    } as unknown as Offer;
     const { getByText } = render(
-      <MobileOfferCard offer={mockOffer} onPress={vi.fn()} />
+      <MobileOfferCard offer={activeOffer} onPress={vi.fn()} />
     );
     // "הצטרף להצעה" = Join offer
     expect(getByText(/הצטרף/)).toBeTruthy();
@@ -147,8 +155,17 @@ describe('MobileOfferCard', () => {
   });
 
   it('shows next tier hint when more tiers exist', () => {
+    const multiTierOffer = {
+      ...mockOffer,
+      tiers: [
+        { min: 5, max: 10, discount: 10, price: 4500 },
+        { min: 11, max: 20, discount: 20, price: 4000 },
+      ],
+      currentTier: 0,
+      participants: 10,
+    } as unknown as Offer;
     const { getByText } = render(
-      <MobileOfferCard offer={mockOffer} onPress={vi.fn()} />
+      <MobileOfferCard offer={multiTierOffer} onPress={vi.fn()} />
     );
     // Next tier needs 11 min, current participants is 10, so 1 more needed
     // "עוד 1 להנחה נוספת!" = 1 more for additional discount!

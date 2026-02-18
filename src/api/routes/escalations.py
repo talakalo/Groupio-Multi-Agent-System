@@ -1,13 +1,13 @@
 """Escalation API routes."""
 
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from src.api.middleware.auth import get_current_user
+from src.api.middleware.auth import get_current_user, is_admin
 from src.databases.postgres import get_postgres_client
 from src.models.escalation import (
     EscalationCreate,
@@ -69,7 +69,7 @@ async def list_escalations(
     current_user: UserInDB = Depends(get_current_user),
 ) -> EscalationListResponse:
     """List escalations (admin only)."""
-    if current_user.role not in ("admin", "super_admin"):
+    if not is_admin(current_user):
         raise HTTPException(status_code=403, detail="Admin access required")
 
     db = get_postgres_client()
@@ -105,7 +105,7 @@ async def filter_escalations(
     current_user: UserInDB = Depends(get_current_user),
 ) -> EscalationListResponse:
     """Filter escalations with advanced criteria (admin only)."""
-    if current_user.role not in ("admin", "super_admin"):
+    if not is_admin(current_user):
         raise HTTPException(status_code=403, detail="Admin access required")
 
     db = get_postgres_client()
@@ -146,7 +146,7 @@ async def get_escalation_stats(
     current_user: UserInDB = Depends(get_current_user),
 ) -> EscalationStats:
     """Get escalation statistics (admin only)."""
-    if current_user.role not in ("admin", "super_admin"):
+    if not is_admin(current_user):
         raise HTTPException(status_code=403, detail="Admin access required")
 
     db = get_postgres_client()
@@ -162,7 +162,7 @@ async def get_my_escalations(
     current_user: UserInDB = Depends(get_current_user),
 ) -> EscalationListResponse:
     """Get escalations assigned to current admin."""
-    if current_user.role not in ("admin", "super_admin"):
+    if not is_admin(current_user):
         raise HTTPException(status_code=403, detail="Admin access required")
 
     db = get_postgres_client()
@@ -192,7 +192,7 @@ async def get_escalation(
     current_user: UserInDB = Depends(get_current_user),
 ) -> EscalationResponse:
     """Get escalation by ID (admin only)."""
-    if current_user.role not in ("admin", "super_admin"):
+    if not is_admin(current_user):
         raise HTTPException(status_code=403, detail="Admin access required")
 
     db = get_postgres_client()
@@ -211,7 +211,7 @@ async def update_escalation(
     current_user: UserInDB = Depends(get_current_user),
 ) -> EscalationResponse:
     """Update an escalation (admin only)."""
-    if current_user.role not in ("admin", "super_admin"):
+    if not is_admin(current_user):
         raise HTTPException(status_code=403, detail="Admin access required")
 
     db = get_postgres_client()
@@ -223,11 +223,8 @@ async def update_escalation(
     update_data = request.model_dump(exclude_unset=True)
 
     # Track resolution time
-    if (
-        request.status == EscalationStatus.RESOLVED
-        and escalation.status != EscalationStatus.RESOLVED
-    ):
-        update_data["resolved_at"] = datetime.utcnow()
+    if request.status == EscalationStatus.RESOLVED and escalation.status != EscalationStatus.RESOLVED:
+        update_data["resolved_at"] = datetime.now(UTC)
 
     updated = await db.update_escalation(escalation_id, update_data)
 
@@ -243,7 +240,7 @@ async def assign_escalation(
     current_user: UserInDB = Depends(get_current_user),
 ) -> EscalationResponse:
     """Assign escalation to an admin."""
-    if current_user.role not in ("admin", "super_admin"):
+    if not is_admin(current_user):
         raise HTTPException(status_code=403, detail="Admin access required")
 
     db = get_postgres_client()
@@ -254,7 +251,7 @@ async def assign_escalation(
 
     # Verify admin exists
     admin = await db.get_user(admin_id)
-    if not admin or admin.role not in ("admin", "super_admin"):
+    if not admin or not is_admin(admin):
         raise HTTPException(status_code=400, detail="Invalid admin ID")
 
     updated = await db.update_escalation(
@@ -277,7 +274,7 @@ async def reply_to_escalation(
     current_user: UserInDB = Depends(get_current_user),
 ) -> EscalationResponse:
     """Reply to an escalation (admin only)."""
-    if current_user.role not in ("admin", "super_admin"):
+    if not is_admin(current_user):
         raise HTTPException(status_code=403, detail="Admin access required")
 
     db = get_postgres_client()
@@ -300,7 +297,7 @@ async def reply_to_escalation(
     update_data = {}
     if request.resolve:
         update_data["status"] = EscalationStatus.RESOLVED
-        update_data["resolved_at"] = datetime.utcnow()
+        update_data["resolved_at"] = datetime.now(UTC)
         if request.resolution_notes:
             update_data["resolution_notes"] = request.resolution_notes
 
@@ -319,7 +316,7 @@ async def resolve_escalation(
     current_user: UserInDB = Depends(get_current_user),
 ) -> EscalationResponse:
     """Resolve an escalation (admin only). Accepts resolution_notes in JSON body."""
-    if current_user.role not in ("admin", "super_admin"):
+    if not is_admin(current_user):
         raise HTTPException(status_code=403, detail="Admin access required")
 
     db = get_postgres_client()
@@ -334,7 +331,7 @@ async def resolve_escalation(
     notes = body.resolution_notes if body else None
     update_data = {
         "status": EscalationStatus.RESOLVED,
-        "resolved_at": datetime.utcnow(),
+        "resolved_at": datetime.now(UTC),
     }
     if notes:
         update_data["resolution_notes"] = notes
@@ -353,7 +350,7 @@ async def reopen_escalation(
     current_user: UserInDB = Depends(get_current_user),
 ) -> EscalationResponse:
     """Reopen a resolved escalation (admin only)."""
-    if current_user.role not in ("admin", "super_admin"):
+    if not is_admin(current_user):
         raise HTTPException(status_code=403, detail="Admin access required")
 
     db = get_postgres_client()
@@ -394,7 +391,7 @@ async def get_escalation_messages(
     current_user: UserInDB = Depends(get_current_user),
 ) -> dict:
     """Get all messages for an escalation (admin only)."""
-    if current_user.role not in ("admin", "super_admin"):
+    if not is_admin(current_user):
         raise HTTPException(status_code=403, detail="Admin access required")
 
     db = get_postgres_client()

@@ -72,8 +72,7 @@ async def test_router_low_confidence_asks_clarification(router_agent, sample_age
             "entities": {},
             "confidence": 0.4,
             "clarifying_question": (
-                "היי! איך אוכל לעזור לך? האם אתה מחפש קבלן, מעוניין במידע על מחירים, "
-                "או צריך עזרה בנושא אחר?"
+                "היי! איך אוכל לעזור לך? האם אתה מחפש קבלן, מעוניין במידע על מחירים, או צריך עזרה בנושא אחר?"
             ),
             "suggested_agent": "support",
         }

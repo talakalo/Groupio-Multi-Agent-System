@@ -13,6 +13,7 @@ from src.agents.pricing import PricingAgent
 from src.agents.router import RouterAgent
 from src.agents.support import SupportAgent
 from src.agents.vetting import VettingAgent
+from src.config.settings import get_settings
 from src.databases.postgres import get_postgres_client
 from src.models.agent_state import AgentState
 from src.orchestration.state import (
@@ -62,6 +63,7 @@ class GroupioOrchestrator:
         # Payment agent imported lazily to avoid circular imports during Phase 3
         try:
             from src.agents.payment import PaymentAgent
+
             self.agents["payment"] = PaymentAgent()
         except ImportError:
             pass
@@ -76,8 +78,15 @@ class GroupioOrchestrator:
             try:
                 return await self.agents[agent_name].run(state)
             except Exception as exc:
-                logger.exception("Agent %s failed: %s", agent_name, exc)
-                err_msg = str(exc)[:200] if str(exc) else "unknown error"
+                is_transient = isinstance(exc, (TimeoutError, ConnectionError, OSError))
+                log_fn = logger.warning if is_transient else logger.exception
+                log_fn(
+                    "Agent %s failed (%s): %s",
+                    agent_name,
+                    "transient" if is_transient else "permanent",
+                    exc,
+                )
+                err_msg = f"[{'transient' if is_transient else 'permanent'}] {str(exc)[:180]}"
                 # Append single error action (reducer will merge with existing actions_taken)
                 state["actions_taken"] = [
                     {
@@ -247,8 +256,9 @@ class GroupioOrchestrator:
         if state.get("needs_human"):
             return "human"
 
-        # Low confidence or clarification needed
-        if state.get("confidence", 0) < 0.7:
+        # Low confidence or clarification needed (threshold from settings)
+        settings = get_settings()
+        if state.get("confidence", 0) < settings.ROUTER_CONFIDENCE_THRESHOLD:
             # Check if router already provided a clarification response
             actions = state.get("actions_taken", [])
             if actions and actions[-1].get("action") == "clarification_needed":
@@ -262,9 +272,16 @@ class GroupioOrchestrator:
             user_message = ""
             for msg in reversed(state.get("messages", [])):
                 if msg.get("role") == "user":
-                    user_message = (msg.get("content") or "")
+                    user_message = msg.get("content") or ""
                     break
-            is_short = len(user_message.strip()) <= 30 or user_message.strip().lower() in ("yes", "no", "כן", "לא", "ok", "בסדר")
+            is_short = len(user_message.strip()) <= 30 or user_message.strip().lower() in (
+                "yes",
+                "no",
+                "כן",
+                "לא",
+                "ok",
+                "בסדר",
+            )
             confidence = state.get("confidence", 0)
             if is_short or (0.5 <= confidence <= 0.75):
                 return suggested
@@ -329,9 +346,7 @@ class GroupioOrchestrator:
                 "details": {"ticket_id": ticket_id},
                 "response": {
                     "type": "handoff",
-                    "message": (
-                        f"העברתי אותך לנציג אנושי שיטפל בבקשתך בהקדם. מספר פנייה: {ticket_id}"
-                    ),
+                    "message": (f"העברתי אותך לנציג אנושי שיטפל בבקשתך בהקדם. מספר פנייה: {ticket_id}"),
                 },
                 "requires_followup": False,
             }
@@ -430,9 +445,7 @@ class GroupioOrchestrator:
             "metadata": {
                 "intent": final_state.get("intent"),
                 "confidence": final_state.get("confidence", 0),
-                "agents_used": [
-                    a.get("agent", "unknown") for a in final_state.get("actions_taken", [])
-                ],
+                "agents_used": [a.get("agent", "unknown") for a in final_state.get("actions_taken", [])],
                 "tokens_used": final_state.get("tokens_used", 0),
                 "duration_ms": calculate_duration_ms(final_state["start_time"]),
                 "needs_human": final_state.get("needs_human", False),

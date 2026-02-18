@@ -1,5 +1,7 @@
 import type { MessageRequest, MessageResponse } from "@groupio/types";
 
+import { useAuthStore } from "@/lib/stores/authStore";
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 interface RequestOptions {
@@ -30,14 +32,7 @@ class ApiClient {
   }
 
   private getAuthToken(): string | null {
-    if (typeof window === "undefined") return null;
-    return localStorage.getItem("auth_token");
-  }
-
-  private setAuthToken(token: string): void {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("auth_token", token);
-    }
+    return useAuthStore.getState().accessToken;
   }
 
   private async request<T>(
@@ -61,13 +56,13 @@ class ApiClient {
       method,
       headers: requestHeaders,
       body: body ? JSON.stringify(body) : undefined,
+      credentials: 'include', // send HTTP-only cookies (refresh token)
       signal,
     });
 
     if (response.status === 401 && this.on401Retry && !isRetry) {
       const newToken = await this.on401Retry();
       if (newToken) {
-        this.setAuthToken(newToken);
         return this.request<T>(endpoint, options, true);
       }
     }
@@ -157,7 +152,7 @@ class ApiClient {
     if (params?.category) searchParams.set("category", params.category);
     if (params?.region) searchParams.set("region", params.region);
 
-    return this.request<{ contractors: import("@groupio/types").Contractor[] }>(
+    return this.request<{ items: import("@groupio/types").Contractor[]; total: number; page: number; page_size: number; has_more: boolean }>(
       `/api/v1/contractors?${searchParams.toString()}`
     );
   }
@@ -201,7 +196,7 @@ class ApiClient {
     const url = buildingId
       ? `${this.baseUrl}/api/v1/uploads/architecture?building_id=${encodeURIComponent(buildingId)}`
       : `${this.baseUrl}/api/v1/uploads/architecture`;
-    const res = await fetch(url, { method: "POST", headers, body: formData });
+    const res = await fetch(url, { method: "POST", headers, body: formData, credentials: 'include' });
     if (!res.ok) {
       const err = await res.json().catch(() => null);
       throw new ApiError(res.status, err?.detail || res.statusText, err);

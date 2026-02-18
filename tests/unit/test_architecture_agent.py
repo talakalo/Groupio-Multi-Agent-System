@@ -70,9 +70,7 @@ async def test_run_with_file_id_success(architecture_agent, architecture_state):
     mock_pg.return_value = mock_db
 
     mock_storage_svc = AsyncMock()
-    mock_storage_svc.get_signed_url = AsyncMock(
-        return_value="https://storage.example.com/signed/plan.png"
-    )
+    mock_storage_svc.get_signed_url = AsyncMock(return_value="https://storage.example.com/signed/plan.png")
     mock_storage.return_value = mock_storage_svc
 
     analysis_result = json.dumps(
@@ -163,15 +161,11 @@ async def test_run_analysis_failure(architecture_agent, architecture_state):
     mock_pg.return_value = mock_db
 
     mock_storage_svc = AsyncMock()
-    mock_storage_svc.get_signed_url = AsyncMock(
-        return_value="https://storage.example.com/signed/bad.png"
-    )
+    mock_storage_svc.get_signed_url = AsyncMock(return_value="https://storage.example.com/signed/bad.png")
     mock_storage.return_value = mock_storage_svc
 
     # Make the LLM call fail
-    agent.llm_client.create_message = AsyncMock(
-        side_effect=RuntimeError("Vision API unavailable")
-    )
+    agent.llm_client.create_message = AsyncMock(side_effect=RuntimeError("Vision API unavailable"))
 
     result = await agent.run(architecture_state)
 
@@ -197,17 +191,13 @@ async def test_run_no_file_id_falls_back_to_text(architecture_agent, architectur
 
     # Ensure there is NO architecture_file_id
     architecture_state.pop("architecture_file_id", None)
-    architecture_state["messages"] = [
-        {"role": "user", "content": "אני רוצה לשפץ את הסלון"}
-    ]
+    architecture_state["messages"] = [{"role": "user", "content": "אני רוצה לשפץ את הסלון"}]
 
     agent.llm_client.create_structured_output = AsyncMock(
         return_value={
             "rooms_detected": [],
             "total_area_sqm": None,
-            "suggestions": [
-                {"category": "renovation", "description": "Living room renovation"}
-            ],
+            "suggestions": [{"category": "renovation", "description": "Living room renovation"}],
             "summary_he": "המלצות לשיפוץ סלון",
         }
     )
@@ -231,9 +221,7 @@ async def test_analyse_image_parses_json(architecture_agent, architecture_state)
     agent, _, mock_storage = architecture_agent
 
     mock_storage_svc = AsyncMock()
-    mock_storage_svc.get_signed_url = AsyncMock(
-        return_value="https://storage.example.com/signed/plan.png"
-    )
+    mock_storage_svc.get_signed_url = AsyncMock(return_value="https://storage.example.com/signed/plan.png")
     mock_storage.return_value = mock_storage_svc
 
     expected = {
@@ -246,9 +234,7 @@ async def test_analyse_image_parses_json(architecture_agent, architecture_state)
 
     agent.llm_client.create_message = AsyncMock(
         return_value={
-            "content": [
-                {"type": "text", "text": f"```json\n{json.dumps(expected)}\n```"}
-            ],
+            "content": [{"type": "text", "text": f"```json\n{json.dumps(expected)}\n```"}],
             "usage": {"input_tokens": 100, "output_tokens": 80},
         }
     )
@@ -277,9 +263,7 @@ async def test_analyse_image_fallback_on_bad_json(architecture_agent, architectu
     agent, _, mock_storage = architecture_agent
 
     mock_storage_svc = AsyncMock()
-    mock_storage_svc.get_signed_url = AsyncMock(
-        return_value="https://storage.example.com/signed/plan.png"
-    )
+    mock_storage_svc.get_signed_url = AsyncMock(return_value="https://storage.example.com/signed/plan.png")
     mock_storage.return_value = mock_storage_svc
 
     agent.llm_client.create_message = AsyncMock(
@@ -334,9 +318,7 @@ async def test_cross_references_active_offers(architecture_agent, architecture_s
     mock_pg.return_value = mock_db
 
     mock_storage_svc = AsyncMock()
-    mock_storage_svc.get_signed_url = AsyncMock(
-        return_value="https://storage.example.com/signed/full.png"
-    )
+    mock_storage_svc.get_signed_url = AsyncMock(return_value="https://storage.example.com/signed/full.png")
     mock_storage.return_value = mock_storage_svc
 
     analysis_json = json.dumps(

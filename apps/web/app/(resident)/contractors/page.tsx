@@ -1,7 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { useTranslations } from 'next-intl';
+import type { Contractor, ServiceCategory, Region, ContractorMatch } from '@groupio/types';
 import { useQuery } from '@tanstack/react-query';
 import {
   Search,
@@ -14,9 +13,12 @@ import {
   ChevronUp,
   SlidersHorizontal,
 } from 'lucide-react';
-import { cn } from '@/lib/utils/cn';
+import { useTranslations } from 'next-intl';
+import { useState, useMemo } from 'react';
+
 import { apiClient } from '@/lib/api/client';
-import type { Contractor, ServiceCategory, Region, ContractorMatch } from '@groupio/types';
+import { cn } from '@/lib/utils/cn';
+
 
 // ---------------------------------------------------------------------------
 // Types
@@ -233,7 +235,7 @@ export default function ContractorsPage() {
 
   const [showFilters, setShowFilters] = useState(false);
 
-  const contractorsQuery = useQuery<{ contractors: ContractorWithScore[] }>({
+  const contractorsQuery = useQuery<{ items: ContractorWithScore[]; total: number }>({
     queryKey: ['contractors', filters.category, filters.region],
     queryFn: async () => {
       const params: Record<string, string> = {};
@@ -244,7 +246,7 @@ export default function ContractorsPage() {
   });
 
   const sortedContractors = useMemo(() => {
-    let results = contractorsQuery.data?.contractors ?? [];
+    let results = contractorsQuery.data?.items ?? [];
 
     if (filters.search.trim()) {
       const q = filters.search.toLowerCase();

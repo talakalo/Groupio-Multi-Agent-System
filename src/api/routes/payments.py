@@ -1,8 +1,7 @@
 """Payment API routes."""
 
 import logging
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -78,7 +77,7 @@ async def get_my_payments(
             currency=p.get("currency", "ILS"),
             status=p.get("status", "unknown"),
             transaction_id=p.get("transaction_id"),
-            created_at=p.get("created_at", datetime.now(timezone.utc).isoformat()),
+            created_at=p.get("created_at", datetime.now(UTC).isoformat()),
         )
         for p in payments
     ]
@@ -124,7 +123,7 @@ async def initiate_payment(
             "amount": amount,
             "currency": "ILS",
             "status": "pending",
-            "issued_at": datetime.now(timezone.utc).isoformat(),
+            "issued_at": datetime.now(UTC).isoformat(),
             "items": [
                 {
                     "description": offer.get("title", "Group offer"),
@@ -149,7 +148,7 @@ async def initiate_payment(
         "currency": "ILS",
         "status": "processing",
         "payment_method_id": request.payment_method_id,
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
     }
 
     # Call payment provider

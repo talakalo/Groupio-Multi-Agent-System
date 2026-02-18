@@ -72,9 +72,7 @@ class TestOutreachAgent:
     async def test_run_with_campaign(self, outreach_agent, sample_state):
         """Test running outreach agent with a campaign context."""
         # Set up context that triggers a campaign
-        sample_state["actions_taken"] = [
-            {"trigger": "new_building_registered", "building_id": "b1"}
-        ]
+        sample_state["actions_taken"] = [{"trigger": "new_building_registered", "building_id": "b1"}]
 
         result = await outreach_agent.run(sample_state)
 

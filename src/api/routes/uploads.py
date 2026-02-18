@@ -1,7 +1,6 @@
 """File upload API routes."""
 
 import logging
-from typing import Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
@@ -20,10 +19,11 @@ router = APIRouter(tags=["uploads"])
 # Upload architecture plan
 # ------------------------------------------------------------------
 
+
 @router.post("/architecture")
 async def upload_architecture_plan(
     file: UploadFile = File(...),
-    building_id: Optional[str] = Query(None),
+    building_id: str | None = Query(None),
     current_user: UserInDB = Depends(get_current_user),
 ) -> dict:
     """Upload a floor plan / architecture document for AI analysis."""
@@ -77,6 +77,7 @@ async def upload_architecture_plan(
 # Upload contractor document
 # ------------------------------------------------------------------
 
+
 @router.post("/contractor-docs")
 async def upload_contractor_doc(
     file: UploadFile = File(...),
@@ -101,16 +102,18 @@ async def upload_contractor_doc(
 
     db = get_postgres_client()
     file_id = str(uuid4())
-    await db.create_file_upload({
-        "id": file_id,
-        "user_id": current_user.id,
-        "bucket": "contractor-docs",
-        "file_name": file.filename or "unknown",
-        "file_type": file.content_type or "application/octet-stream",
-        "file_size": len(data),
-        "storage_path": result["storage_path"],
-        "analysis_status": "pending",
-    })
+    await db.create_file_upload(
+        {
+            "id": file_id,
+            "user_id": current_user.id,
+            "bucket": "contractor-docs",
+            "file_name": file.filename or "unknown",
+            "file_type": file.content_type or "application/octet-stream",
+            "file_size": len(data),
+            "storage_path": result["storage_path"],
+            "analysis_status": "pending",
+        }
+    )
 
     return {"id": file_id, "storage_path": result["storage_path"]}
 
@@ -118,6 +121,7 @@ async def upload_contractor_doc(
 # ------------------------------------------------------------------
 # Upload avatar
 # ------------------------------------------------------------------
+
 
 @router.post("/avatar")
 async def upload_avatar(
@@ -152,6 +156,7 @@ async def upload_avatar(
 # Get file metadata / signed URL
 # ------------------------------------------------------------------
 
+
 @router.get("/{file_id}")
 async def get_file(
     file_id: str,
@@ -176,6 +181,7 @@ async def get_file(
 # ------------------------------------------------------------------
 # Delete
 # ------------------------------------------------------------------
+
 
 @router.delete("/{file_id}")
 async def delete_file(
@@ -202,10 +208,11 @@ async def delete_file(
 # List user uploads
 # ------------------------------------------------------------------
 
+
 @router.get("/")
 async def list_uploads(
-    bucket: Optional[str] = None,
-    building_id: Optional[str] = None,
+    bucket: str | None = None,
+    building_id: str | None = None,
     current_user: UserInDB = Depends(get_current_user),
 ) -> dict:
     """List the current user's uploads, optionally filtered by bucket/building."""

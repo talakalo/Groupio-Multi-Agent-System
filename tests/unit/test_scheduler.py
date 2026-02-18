@@ -35,6 +35,7 @@ def mock_redis():
 
 def test_register_task(scheduler):
     """register() decorator adds a ScheduledTask to scheduler.tasks."""
+
     @scheduler.register("my_task", interval_seconds=60)
     async def my_task():
         pass
@@ -47,6 +48,7 @@ def test_register_task(scheduler):
 
 def test_scheduled_task_properties():
     """ScheduledTask initialises with correct attrs and last_run=None."""
+
     async def noop():
         pass
 
@@ -82,7 +84,7 @@ async def test_try_run_task_skips_if_too_recent(scheduler, mock_redis):
 async def test_try_run_task_runs_if_due(scheduler, mock_redis):
     """If no last_run recorded and lock acquired, the task function is called."""
     mock_redis.get = AsyncMock(return_value=None)  # No last_run
-    mock_redis.set = AsyncMock(return_value=True)   # Lock acquired
+    mock_redis.set = AsyncMock(return_value=True)  # Lock acquired
 
     func = AsyncMock()
     task = ScheduledTask("check", interval_seconds=3600, func=func)
@@ -98,8 +100,8 @@ async def test_try_run_task_runs_if_due(scheduler, mock_redis):
 @pytest.mark.asyncio
 async def test_try_run_task_skips_if_locked(scheduler, mock_redis):
     """If another worker holds the lock (set nx=True returns False), skip."""
-    mock_redis.get = AsyncMock(return_value=None)   # No last_run → eligible
-    mock_redis.set = AsyncMock(return_value=False)   # Lock NOT acquired
+    mock_redis.get = AsyncMock(return_value=None)  # No last_run → eligible
+    mock_redis.set = AsyncMock(return_value=False)  # Lock NOT acquired
 
     func = AsyncMock()
     task = ScheduledTask("check", interval_seconds=3600, func=func)

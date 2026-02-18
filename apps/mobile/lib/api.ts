@@ -142,7 +142,11 @@ function buildUrl(
   path: string,
   params?: Record<string, string | number | boolean | undefined>,
 ): string {
-  const url = new URL(path, API_BASE_URL);
+  // Concatenate base + path so that API_BASE_URL (e.g. .../api/v1) is preserved.
+  // new URL(path, base) would replace the path when path is absolute.
+  const base = API_BASE_URL.replace(/\/$/, "");
+  const pathPart = path.startsWith("/") ? path : `/${path}`;
+  const url = new URL(`${base}${pathPart}`);
 
   if (params) {
     Object.entries(params).forEach(([key, value]) => {

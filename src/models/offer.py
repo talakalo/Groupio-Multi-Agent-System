@@ -1,12 +1,12 @@
 """Offer Pydantic models."""
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class OfferStatus(str, Enum):
+class OfferStatus(StrEnum):
     """Offer status enum."""
 
     DRAFT = "draft"
@@ -18,7 +18,7 @@ class OfferStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
-class ServiceCategory(str, Enum):
+class ServiceCategory(StrEnum):
     """Service category enum."""
 
     AC_INSTALLATION = "ac_installation"

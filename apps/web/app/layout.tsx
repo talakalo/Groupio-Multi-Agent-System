@@ -1,6 +1,7 @@
 import { Inter, Heebo } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
+
 import { Providers } from "./providers";
 import "@/styles/globals.css";
 
@@ -23,9 +24,10 @@ export default async function RootLayout({
 }) {
   const locale = await getLocale();
   const messages = await getMessages();
+  const dir = locale === "he" ? "rtl" : "ltr";
 
   return (
-    <html lang={locale} dir="rtl" className={`${inter.variable} ${heebo.variable}`}>
+    <html lang={locale} dir={dir} className={`${inter.variable} ${heebo.variable}`}>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />

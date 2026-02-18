@@ -1,7 +1,7 @@
 """Authentication API routes."""
 
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -20,13 +20,13 @@ from src.config.settings import get_settings
 from src.databases.postgres import get_postgres_client
 from src.databases.redis_client import get_redis_client
 from src.models.user import (
+    LoginRequest,
     PasswordChange,
     PasswordReset,
     PasswordResetConfirm,
     TokenResponse,
     UserCreate,
     UserInDB,
-    UserLogin,
     UserResponse,
     UserRole,
     UserUpdate,
@@ -204,7 +204,7 @@ async def login(
     )
 
     # Update last login
-    await db.update_user(user.id, {"last_login": datetime.utcnow()})
+    await db.update_user(user.id, {"last_login": datetime.now(UTC)})
 
     # Set refresh token as HTTP-only cookie
     response.set_cookie(
@@ -214,6 +214,7 @@ async def login(
         secure=True,
         samesite="lax",
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+        path="/",
     )
 
     logger.info("User logged in: %s", user.email)
@@ -227,13 +228,17 @@ async def login(
 
 @router.post("/login/json", response_model=TokenResponse)
 async def login_json(
-    request: UserLogin,
+    request: LoginRequest,
     response: Response,
 ) -> TokenResponse:
-    """Login with JSON body."""
+    """Login with JSON body (email or phone)."""
     db = get_postgres_client()
 
-    user = await db.get_user_by_email(request.email)
+    if request.email:
+        user = await db.get_user_by_email(request.email)
+    else:
+        assert request.phone is not None  # validated by LoginRequest
+        user = await db.get_user_by_phone(request.phone)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
@@ -260,7 +265,7 @@ async def login_json(
         ex=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
     )
 
-    await db.update_user(user.id, {"last_login": datetime.utcnow()})
+    await db.update_user(user.id, {"last_login": datetime.now(UTC)})
 
     response.set_cookie(
         key="refresh_token",
@@ -269,6 +274,7 @@ async def login_json(
         secure=True,
         samesite="lax",
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+        path="/",
     )
 
     return TokenResponse(
@@ -332,6 +338,7 @@ async def refresh_token(
         secure=True,
         samesite="lax",
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+        path="/",
     )
 
     return TokenResponse(
@@ -346,11 +353,14 @@ async def logout(
     response: Response,
     current_user: UserInDB = Depends(get_current_user),
 ) -> dict[str, str]:
-    """Logout and invalidate tokens."""
+    """Logout and invalidate tokens.
+
+    Clears refresh_token cookie so middleware no longer treats user as authenticated.
+    """
     redis = get_redis_client()
     await redis.delete(f"refresh_token:{current_user.id}")
 
-    response.delete_cookie("refresh_token")
+    response.delete_cookie("refresh_token", path="/")
 
     logger.info("User logged out: %s", current_user.email)
 

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import {
   Users,
   TrendingDown,
@@ -8,6 +7,7 @@ import {
   Building2,
   Star,
 } from "lucide-react";
+import Link from "next/link";
 
 const VALUE_PROPS = [
   {

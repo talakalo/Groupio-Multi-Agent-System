@@ -57,9 +57,7 @@ class TestAnalyticsAgent:
         analytics_agent.rag.retrieve = AsyncMock(return_value=[])
         # Mock SQL generation
         analytics_agent._nl_to_sql = MagicMock()
-        analytics_agent._nl_to_sql.generate_sql = AsyncMock(
-            return_value="SELECT category FROM offers LIMIT 1"
-        )
+        analytics_agent._nl_to_sql.generate_sql = AsyncMock(return_value="SELECT category FROM offers LIMIT 1")
         analytics_agent._db = MagicMock()
         analytics_agent._db.execute_query = AsyncMock(
             return_value=[{"category": "ac_installation", "total_revenue": 150000}]
@@ -92,9 +90,7 @@ class TestAnalyticsAgent:
     async def test_trend_analysis(self, analytics_agent, sample_state):
         """Test trend analysis functionality."""
         sample_state["user_message"] = "Show me offer trends for the past 6 months"
-        sample_state["messages"] = [
-            {"role": "user", "content": "Show me offer trends for the past 6 months"}
-        ]
+        sample_state["messages"] = [{"role": "user", "content": "Show me offer trends for the past 6 months"}]
 
         analytics_agent.llm_client.create_message = AsyncMock(
             return_value={
@@ -127,9 +123,7 @@ class TestAnalyticsAgent:
         analytics_agent.rag.retrieve = AsyncMock(return_value=[])
         # Mock NL to SQL to return safe query
         analytics_agent._nl_to_sql = MagicMock()
-        analytics_agent._nl_to_sql.generate_sql = AsyncMock(
-            return_value="SELECT * FROM offers LIMIT 10"
-        )
+        analytics_agent._nl_to_sql.generate_sql = AsyncMock(return_value="SELECT * FROM offers LIMIT 10")
         analytics_agent._db = MagicMock()
         analytics_agent._db.execute_query = AsyncMock(return_value=[])
 
@@ -142,9 +136,7 @@ class TestAnalyticsAgent:
     async def test_complex_aggregation(self, analytics_agent, sample_state):
         """Test complex aggregation queries."""
         sample_state["user_message"] = "What's the average discount by region and category?"
-        sample_state["messages"] = [
-            {"role": "user", "content": "What's the average discount by region and category?"}
-        ]
+        sample_state["messages"] = [{"role": "user", "content": "What's the average discount by region and category?"}]
 
         analytics_agent.llm_client.create_message = AsyncMock(
             return_value={
@@ -171,9 +163,7 @@ class TestAnalyticsAgent:
     async def test_export_data(self, analytics_agent, sample_state):
         """Test data export functionality."""
         sample_state["user_message"] = "Export contractor performance data"
-        sample_state["messages"] = [
-            {"role": "user", "content": "Export contractor performance data"}
-        ]
+        sample_state["messages"] = [{"role": "user", "content": "Export contractor performance data"}]
 
         analytics_agent.llm_client.create_message = AsyncMock(
             return_value={
