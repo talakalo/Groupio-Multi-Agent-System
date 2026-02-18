@@ -2,7 +2,7 @@
 
 import json
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
@@ -29,8 +29,8 @@ def _row_to_user(row: dict) -> dict:
         "building_id": row.get("building_id"),
         "contractor_id": row.get("contractor_id"),
         "last_login": row.get("last_login"),
-        "created_at": row.get("created_at") or datetime.now(datetime.UTC),
-        "updated_at": row.get("updated_at") or datetime.now(datetime.UTC),
+        "created_at": row.get("created_at") or datetime.now(UTC),
+        "updated_at": row.get("updated_at") or datetime.now(UTC),
     }
 
 

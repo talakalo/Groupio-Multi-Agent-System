@@ -1,6 +1,6 @@
 """State management utilities for the LangGraph orchestration."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from src.models.agent_state import AgentState
@@ -9,7 +9,7 @@ from src.utils.monitoring import generate_conversation_id
 
 def _utcnow() -> datetime:
     """Return timezone-aware UTC now."""
-    return datetime.now(datetime.UTC)
+    return datetime.now(UTC)
 
 
 def create_initial_state(
@@ -48,7 +48,7 @@ def calculate_duration_ms(start_time: str) -> int:
     start = datetime.fromisoformat(start_time)
     # Ensure start is timezone-aware for comparison
     if start.tzinfo is None:
-        start = start.replace(tzinfo=datetime.UTC)
+        start = start.replace(tzinfo=UTC)
     duration = _utcnow() - start
     return int(duration.total_seconds() * 1000)
 
