@@ -266,7 +266,6 @@ async def health_check() -> dict[str, Any]:
     }
 
 
-
 @app.get("/metrics")
 async def prometheus_metrics() -> Response:
     """Expose Prometheus metrics in standard text format for scraping."""
@@ -276,7 +275,6 @@ async def prometheus_metrics() -> Response:
         content=generate_latest(),
         media_type=CONTENT_TYPE_LATEST,
     )
-
 
 
 # -- Helper Functions --
@@ -294,5 +292,3 @@ async def _log_conversation(
         await db.log_conversation(user_id, message, response, metadata)
     except Exception:
         logger.warning("Failed to log conversation for user %s", user_id)
-
-

@@ -1,5 +1,6 @@
-import { create } from 'zustand';
 import type { Offer, ServiceCategory, OfferStatus } from '@groupio/types';
+import { create } from 'zustand';
+
 import { useAuthStore } from '@/lib/stores/authStore';
 
 interface OfferFilters {

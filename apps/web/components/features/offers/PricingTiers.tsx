@@ -1,8 +1,9 @@
 'use client';
 
-import { useMemo } from 'react';
-import { Users, Check, TrendingDown, Sparkles } from 'lucide-react';
 import type { PricingTier } from '@groupio/types';
+import { Users, Check, TrendingDown, Sparkles } from 'lucide-react';
+import { useMemo } from 'react';
+
 import { cn } from '@/lib/utils/cn';
 
 // ---------------------------------------------------------------------------

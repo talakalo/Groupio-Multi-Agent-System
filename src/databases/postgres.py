@@ -2,7 +2,7 @@
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 from uuid import uuid4
 
@@ -29,8 +29,8 @@ def _row_to_user(row: dict) -> dict:
         "building_id": row.get("building_id"),
         "contractor_id": row.get("contractor_id"),
         "last_login": row.get("last_login"),
-        "created_at": row.get("created_at") or datetime.now(timezone.utc),
-        "updated_at": row.get("updated_at") or datetime.now(timezone.utc),
+        "created_at": row.get("created_at") or datetime.now(datetime.UTC),
+        "updated_at": row.get("updated_at") or datetime.now(datetime.UTC),
     }
 
 
@@ -112,8 +112,8 @@ class PostgresClient:
         async with pool.acquire() as conn:
             await conn.execute(query, *args)
 
-    from contextlib import asynccontextmanager as _acm
     from collections.abc import AsyncIterator as _AsyncIterator
+    from contextlib import asynccontextmanager as _acm
 
     @_acm
     async def transaction(self) -> "_AsyncIterator[Any]":

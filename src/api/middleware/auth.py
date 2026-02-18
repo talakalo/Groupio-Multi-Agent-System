@@ -1,7 +1,7 @@
 """Authentication middleware for the API."""
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 import bcrypt
 import jwt
@@ -19,7 +19,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=F
 
 def _utcnow() -> datetime:
     """Return timezone-aware UTC now (replaces deprecated datetime.utcnow())."""
-    return datetime.now(timezone.utc)
+    return datetime.now(datetime.UTC)
 
 
 def hash_password(password: str) -> str:

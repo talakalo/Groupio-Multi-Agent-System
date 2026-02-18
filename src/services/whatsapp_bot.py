@@ -201,7 +201,7 @@ class WhatsAppBotService:
 
         # Get or create conversation session
         session_id = f"whatsapp:{message.from_number}"
-        conversation_history = await self.redis.get_conversation_context(session_id)
+        _conversation_history = await self.redis.get_conversation_context(session_id)
 
         # Create user context
         user_context = {
@@ -226,11 +226,7 @@ class WhatsAppBotService:
 
             # Extract response from orchestrator result
             response_obj = result.get("response", {})
-            response_text = (
-                response_obj.get("message", "")
-                if isinstance(response_obj, dict)
-                else str(response_obj)
-            )
+            response_text = response_obj.get("message", "") if isinstance(response_obj, dict) else str(response_obj)
             if not response_text:
                 response_text = (
                     "מצטערים, לא הצלחנו לעבד את הבקשה שלך. אנא נסה שוב."

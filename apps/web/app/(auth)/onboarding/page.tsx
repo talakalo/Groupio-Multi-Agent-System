@@ -1,8 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import type { ServiceCategory, Region, BuildingType } from '@groupio/types';
 import { useMutation } from '@tanstack/react-query';
 import {
   Building2,
@@ -17,9 +15,13 @@ import {
   Home,
   Shield,
 } from 'lucide-react';
-import { cn } from '@/lib/utils/cn';
+import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
+import { useState, useCallback } from 'react';
+
 import { apiClient } from '@/lib/api/client';
-import type { ServiceCategory, Region, BuildingType } from '@groupio/types';
+import { cn } from '@/lib/utils/cn';
+
 
 // ---------------------------------------------------------------------------
 // Types

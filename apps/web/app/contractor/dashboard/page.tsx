@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useTranslations } from 'next-intl';
-import { StatCard } from '@/components/shared/StatCard';
-import { OfferCard } from '@/components/features/offers/OfferCard';
-import { AIChat } from '@/components/features/chat/AIChat';
 import type { Offer, ContractorStats } from '@groupio/types';
+import { useTranslations } from 'next-intl';
+import { useState, useEffect } from 'react';
+
+import { AIChat } from '@/components/features/chat/AIChat';
+import { OfferCard } from '@/components/features/offers/OfferCard';
+import { StatCard } from '@/components/shared/StatCard';
+
 
 export default function ContractorDashboardPage() {
   const t = useTranslations('contractor.dashboard');

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import type { Offer, PricingTier, ServiceCategory } from '@groupio/types';
 import {
   Users,
   Tag,
@@ -9,7 +9,8 @@ import {
   BadgeCheck,
   TrendingDown,
 } from 'lucide-react';
-import type { Offer, PricingTier, ServiceCategory } from '@groupio/types';
+import { useMemo } from 'react';
+
 import { cn } from '@/lib/utils/cn';
 
 // ---------------------------------------------------------------------------

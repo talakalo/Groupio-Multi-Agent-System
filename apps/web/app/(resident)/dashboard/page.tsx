@@ -1,8 +1,8 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
+import type { Offer, ServiceCategory } from '@groupio/types';
+import { formatPrice } from '@groupio/utils';
 import { useQuery } from '@tanstack/react-query';
-import Link from 'next/link';
 import {
   Tag,
   Users,
@@ -16,10 +16,11 @@ import {
   Star,
   ChevronLeft,
 } from 'lucide-react';
-import { cn } from '@/lib/utils/cn';
+import Link from 'next/link';
+import { useTranslations } from 'next-intl';
+
 import { useAuthStore } from '@/lib/stores/authStore';
-import type { Offer, ServiceCategory } from '@groupio/types';
-import { formatPrice } from '@groupio/utils';
+import { cn } from '@/lib/utils/cn';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -197,13 +198,14 @@ export default function ResidentDashboardPage() {
 
   const accessToken = useAuthStore((s) => s.accessToken);
   const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-  const authHeaders = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+  const headers: Record<string, string> = {};
+  if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
 
   // Fetch dashboard stats from building endpoint
   const statsQuery = useQuery<DashboardStats>({
     queryKey: ['resident', 'dashboard', 'stats'],
     queryFn: async () => {
-      const res = await fetch(`${apiBase}/api/v1/buildings/me`, { headers: authHeaders });
+      const res = await fetch(`${apiBase}/api/v1/buildings/me`, { headers });
       if (!res.ok) {
         return { activeOffers: 0, neighborsJoined: 0, totalSavings: 0, buildingName: '-' };
       }
@@ -222,7 +224,7 @@ export default function ResidentDashboardPage() {
   const offersQuery = useQuery<{ items: Offer[] }>({
     queryKey: ['resident', 'offers', 'active'],
     queryFn: async () => {
-      const res = await fetch(`${apiBase}/api/v1/offers?status=active&page_size=4`, { headers: authHeaders });
+      const res = await fetch(`${apiBase}/api/v1/offers?status=active&page_size=4`, { headers });
       if (!res.ok) throw new Error('Failed to fetch offers');
       return res.json();
     },

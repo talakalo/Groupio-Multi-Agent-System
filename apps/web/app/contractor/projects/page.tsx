@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useTranslations } from 'next-intl';
 import type { Offer } from '@groupio/types';
+import { useTranslations } from 'next-intl';
+import { useState, useEffect } from 'react';
 
 type ProjectStatus = 'all' | 'in_progress' | 'completed' | 'cancelled';
 

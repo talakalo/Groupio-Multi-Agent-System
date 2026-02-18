@@ -116,14 +116,11 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def _validate_jwt_secret(self) -> "Settings":
         """Refuse to start in production with an insecure JWT secret."""
-        if (
-            self.ENVIRONMENT not in ("development", "test")
-            and self.JWT_SECRET_KEY in _INSECURE_JWT_DEFAULTS
-        ):
+        if self.ENVIRONMENT not in ("development", "test") and self.JWT_SECRET_KEY in _INSECURE_JWT_DEFAULTS:
             raise ValueError(
                 "JWT_SECRET_KEY must be set to a secure, random value in "
                 f"non-development environments (current: ENVIRONMENT={self.ENVIRONMENT}). "
-                "Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(64))\""
+                'Generate one with: python -c "import secrets; print(secrets.token_urlsafe(64))"'
             )
         if self.JWT_SECRET_KEY in _INSECURE_JWT_DEFAULTS:
             logger.warning(

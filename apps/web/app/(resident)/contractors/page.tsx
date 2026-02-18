@@ -1,7 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { useTranslations } from 'next-intl';
+import type { Contractor, ServiceCategory, Region, ContractorMatch } from '@groupio/types';
 import { useQuery } from '@tanstack/react-query';
 import {
   Search,
@@ -14,9 +13,12 @@ import {
   ChevronUp,
   SlidersHorizontal,
 } from 'lucide-react';
-import { cn } from '@/lib/utils/cn';
+import { useTranslations } from 'next-intl';
+import { useState, useMemo } from 'react';
+
 import { apiClient } from '@/lib/api/client';
-import type { Contractor, ServiceCategory, Region, ContractorMatch } from '@groupio/types';
+import { cn } from '@/lib/utils/cn';
+
 
 // ---------------------------------------------------------------------------
 // Types

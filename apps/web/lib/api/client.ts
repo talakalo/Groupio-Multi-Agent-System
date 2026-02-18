@@ -1,4 +1,5 @@
 import type { MessageRequest, MessageResponse } from "@groupio/types";
+
 import { useAuthStore } from "@/lib/stores/authStore";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";

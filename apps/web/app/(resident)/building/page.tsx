@@ -1,10 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-import { useTranslations } from 'next-intl';
+import type { Building, Offer, Resident } from '@groupio/types';
+import { formatPrice, formatDate } from '@groupio/utils';
 import { useQuery } from '@tanstack/react-query';
-import Link from 'next/link';
-import { useAuthStore } from '@/lib/stores/authStore';
 import {
   Building2,
   Users,
@@ -21,9 +19,13 @@ import {
   Home,
   Settings,
 } from 'lucide-react';
+import Link from 'next/link';
+import { useTranslations } from 'next-intl';
+import { useState } from 'react';
+
+import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
-import { formatPrice, formatDate } from '@groupio/utils';
-import type { Building, Offer, Resident } from '@groupio/types';
+
 
 // ---------------------------------------------------------------------------
 // Types

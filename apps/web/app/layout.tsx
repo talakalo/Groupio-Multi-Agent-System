@@ -1,6 +1,7 @@
 import { Inter, Heebo } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
+
 import { Providers } from "./providers";
 import "@/styles/globals.css";
 

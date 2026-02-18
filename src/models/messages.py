@@ -1,6 +1,6 @@
 """Data models for messages and conversations."""
 
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 def _utcnow() -> datetime:
     """Return timezone-aware UTC now."""
-    return datetime.now(timezone.utc)
+    return datetime.now(datetime.UTC)
 
 
 class Message(BaseModel):
