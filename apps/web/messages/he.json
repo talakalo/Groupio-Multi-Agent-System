@@ -56,7 +56,7 @@
     "findContractor": "מצא קבלן",
     "viewOffers": "צפה בהצעות",
     "askQuestion": "שאל שאלה",
-    "thisMonth": "החודש",
+    "thisMonth": "החודש {percent}+",
     "viewAll": "הצג הכל",
     "noActiveOffers": "אין הצעות פעילות",
     "browseOffers": "עיין בהצעות",
