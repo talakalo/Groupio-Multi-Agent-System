@@ -39,9 +39,7 @@ async def create_contractor(
     # Rate-limit registrations by IP: max 5 per 10 minutes
     client_ip = req.client.host if req.client else "unknown"
     redis = get_redis_client()
-    allowed = await redis.check_rate_limit(
-        user_id=f"reg:{client_ip}", limit=5, window=600
-    )
+    allowed = await redis.check_rate_limit(user_id=f"reg:{client_ip}", limit=5, window=600)
     if not allowed:
         raise HTTPException(
             status_code=429,

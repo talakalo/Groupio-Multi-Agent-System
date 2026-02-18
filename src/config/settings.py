@@ -125,13 +125,11 @@ class Settings(BaseSettings):
                 )
             if len(self.JWT_SECRET_KEY) < 32:
                 raise ValueError(
-                    "JWT_SECRET_KEY must be at least 32 characters in "
-                    f"{self.ENVIRONMENT} for adequate security."
+                    f"JWT_SECRET_KEY must be at least 32 characters in {self.ENVIRONMENT} for adequate security."
                 )
         elif self.JWT_SECRET_KEY in _INSECURE_JWT_SECRETS:
             warnings.warn(
-                "JWT_SECRET_KEY is using an insecure default. "
-                "Set a strong secret before deploying.",
+                "JWT_SECRET_KEY is using an insecure default. Set a strong secret before deploying.",
                 UserWarning,
                 stacklevel=2,
             )

@@ -34,11 +34,14 @@ def _verify_whatsapp_signature(body: bytes, signature_header: str | None) -> Non
     if not signature_header:
         raise HTTPException(status_code=403, detail="Missing X-Hub-Signature-256 header")
 
-    expected = "sha256=" + hmac.new(
-        key=secret.encode(),
-        msg=body,
-        digestmod=hashlib.sha256,
-    ).hexdigest()
+    expected = (
+        "sha256="
+        + hmac.new(
+            key=secret.encode(),
+            msg=body,
+            digestmod=hashlib.sha256,
+        ).hexdigest()
+    )
 
     if not hmac.compare_digest(expected, signature_header):
         raise HTTPException(status_code=403, detail="Invalid webhook signature")

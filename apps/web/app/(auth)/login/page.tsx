@@ -1,12 +1,14 @@
 "use client";
 
+import { useState } from "react";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Building2, Mail, Phone, Loader2, ArrowLeft } from "lucide-react";
+import { z } from "zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Building2, Mail, Phone, Loader2, ArrowLeft } from "lucide-react";
 import { apiClient, ApiError } from "@/lib/api/client";
-import { useAuthStore } from "@/lib/stores/authStore";
+import { useAuthStore, type AuthState } from "@/lib/stores/authStore";
 import { cn } from "@/lib/utils/cn";
 
 const AUTH_COOKIE_NAME = "groupio-auth";
@@ -46,6 +48,8 @@ type LoginMethod = "email" | "phone";
 
 export default function LoginPage() {
   const router = useRouter();
+  const setTokens = (useAuthStore.getState() as AuthState).setTokens;
+  const setUser = (useAuthStore.getState() as AuthState).setUser;
   const [loginMethod, setLoginMethod] = useState<LoginMethod>("email");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -74,7 +78,7 @@ export default function LoginPage() {
       const response = await apiClient.login(credentials);
       localStorage.setItem("auth_token", response.token);
       const refreshToken = response.refresh_token ?? "";
-      useAuthStore.getState().setTokens(response.token, refreshToken);
+      setTokens(response.token, refreshToken);
       let user: { role: string } | null = null;
       try {
         const meRes = await fetch(
@@ -84,7 +88,7 @@ export default function LoginPage() {
         if (meRes.ok) {
           const meData = await meRes.json();
           user = { role: meData.role };
-          useAuthStore.getState().setUser({
+          setUser({
             id: meData.id,
             email: meData.email,
             fullName: meData.full_name ?? meData.fullName ?? "",

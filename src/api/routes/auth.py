@@ -354,7 +354,7 @@ async def logout(
     redis = get_redis_client()
     await redis.delete(f"refresh_token:{current_user.id}")
 
-    response.delete_cookie("refresh_token")
+    response.delete_cookie("refresh_token", path="/")
 
     logger.info("User logged out: %s", current_user.email)
 

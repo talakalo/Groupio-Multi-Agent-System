@@ -176,9 +176,7 @@ class WhatsAppBotService:
             statuses=statuses,
         )
 
-    async def handle_message(
-        self, message: WhatsAppMessage, contact: WhatsAppContact | None
-    ) -> None:
+    async def handle_message(self, message: WhatsAppMessage, contact: WhatsAppContact | None) -> None:
         """
         Handle an incoming WhatsApp message.
 
@@ -380,9 +378,7 @@ class WhatsAppBotService:
             {
                 "id": contractor["id"],
                 "title": contractor.get("name", "קבלן")[:24],
-                "description": f"⭐ {contractor.get('rating', 0):.1f} - {contractor.get('category', '')}"[
-                    :72
-                ],
+                "description": f"⭐ {contractor.get('rating', 0):.1f} - {contractor.get('category', '')}"[:72],
             }
             for contractor in contractors[:10]
         ]
@@ -441,9 +437,7 @@ class WhatsAppBotService:
                 "components": [
                     {
                         "type": "body",
-                        "parameters": [
-                            {"type": "text", "text": param} for param in template_params
-                        ],
+                        "parameters": [{"type": "text", "text": param} for param in template_params],
                     }
                 ],
             },
