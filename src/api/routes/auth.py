@@ -355,8 +355,8 @@ async def logout(
 ) -> dict[str, str]:
     """Logout and invalidate tokens.
 
-Clears refresh_token cookie so middleware no longer treats user as authenticated.
-"""
+    Clears refresh_token cookie so middleware no longer treats user as authenticated.
+    """
     redis = get_redis_client()
     await redis.delete(f"refresh_token:{current_user.id}")
 

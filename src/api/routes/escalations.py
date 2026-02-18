@@ -223,10 +223,7 @@ async def update_escalation(
     update_data = request.model_dump(exclude_unset=True)
 
     # Track resolution time
-    if (
-        request.status == EscalationStatus.RESOLVED
-        and escalation.status != EscalationStatus.RESOLVED
-    ):
+    if request.status == EscalationStatus.RESOLVED and escalation.status != EscalationStatus.RESOLVED:
         update_data["resolved_at"] = datetime.now(UTC)
 
     updated = await db.update_escalation(escalation_id, update_data)

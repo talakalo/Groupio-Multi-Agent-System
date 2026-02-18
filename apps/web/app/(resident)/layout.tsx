@@ -21,7 +21,6 @@ import { useEffect, useState } from 'react';
 
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
-import { useAuthStore } from '@/lib/stores/authStore';
 
 interface NavItem {
   href: string;
