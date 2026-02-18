@@ -103,6 +103,7 @@ export const useAuthStore = create<AuthState>()(
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, password }),
+            credentials: 'include',
           });
 
           if (!response.ok) {
@@ -145,6 +146,7 @@ export const useAuthStore = create<AuthState>()(
               headers: {
                 Authorization: `Bearer ${accessToken}`,
               },
+              credentials: 'include',
             }).catch(() => {});
           }
         } finally {
@@ -156,16 +158,14 @@ export const useAuthStore = create<AuthState>()(
       refreshAccessToken: async () => {
         const { refreshToken } = get();
 
-        if (!refreshToken) {
-          get().clearAuth();
-          return false;
-        }
-
         try {
           const response = await fetch(`${API_URL}/api/v1/auth/refresh`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ refresh_token: refreshToken }),
+            body: refreshToken
+              ? JSON.stringify({ refresh_token: refreshToken })
+              : undefined,
+            credentials: 'include',
           });
 
           if (!response.ok) {
@@ -173,14 +173,19 @@ export const useAuthStore = create<AuthState>()(
             return false;
           }
 
-      const data = await response.json();
-      if (typeof window !== 'undefined') window.localStorage.setItem('auth_token', data.access_token);
-      set({
-        accessToken: data.access_token,
-        refreshToken: data.refresh_token,
-      });
+          const data = await response.json();
+          if (!data?.access_token) {
+            get().clearAuth();
+            return false;
+          }
+          if (typeof window !== 'undefined')
+            window.localStorage.setItem('auth_token', data.access_token);
+          set({
+            accessToken: data.access_token,
+            refreshToken: data.refresh_token ?? get().refreshToken ?? '',
+          });
 
-      return true;
+          return true;
         } catch {
           get().clearAuth();
           return false;
