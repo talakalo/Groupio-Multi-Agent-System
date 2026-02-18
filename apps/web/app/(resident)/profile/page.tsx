@@ -20,13 +20,9 @@ import {
   Camera,
   Trash2,
 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
-import { useState } from 'react';
 
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
-import { useAuthStore } from '@/lib/stores/authStore';
 import type { Resident } from '@groupio/types';
 
 // ---------------------------------------------------------------------------

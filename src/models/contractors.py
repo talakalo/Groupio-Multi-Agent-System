@@ -1,6 +1,6 @@
 """Data models for contractors."""
 
-from datetime import datetime, timezone
+from datetime import datetime
 
 from pydantic import BaseModel, Field
 
@@ -30,7 +30,7 @@ class Contractor(ContractorBase):
     rating: float = 0.0
     active: bool = True
     trust_score: float | None = None
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(datetime.UTC))
     updated_at: datetime | None = None
 
     model_config = {"from_attributes": True}
@@ -74,7 +74,7 @@ class ContractorDocument(BaseModel):
     file_url: str
     extracted_text: str | None = None
     verified: bool = False
-    uploaded_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    uploaded_at: datetime = Field(default_factory=lambda: datetime.now(datetime.UTC))
 
 
 class VettingResult(BaseModel):
@@ -90,4 +90,4 @@ class VettingResult(BaseModel):
     completion_rate: float | None = None
     red_flags: list[str] = Field(default_factory=list)
     notes: str = ""
-    reviewed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    reviewed_at: datetime = Field(default_factory=lambda: datetime.now(datetime.UTC))

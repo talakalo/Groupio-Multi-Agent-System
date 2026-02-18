@@ -1,7 +1,7 @@
 """Authentication API routes."""
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -204,7 +204,7 @@ async def login(
     )
 
     # Update last login
-    await db.update_user(user.id, {"last_login": datetime.now(timezone.utc)})
+    await db.update_user(user.id, {"last_login": datetime.now(datetime.UTC)})
 
     # Set refresh token as HTTP-only cookie
     response.set_cookie(
@@ -214,7 +214,6 @@ async def login(
         secure=True,
         samesite="lax",
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
-        path="/",
     )
 
     logger.info("User logged in: %s", user.email)
@@ -265,7 +264,7 @@ async def login_json(
         ex=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
     )
 
-    await db.update_user(user.id, {"last_login": datetime.now(timezone.utc)})
+    await db.update_user(user.id, {"last_login": datetime.now(datetime.UTC)})
 
     response.set_cookie(
         key="refresh_token",
@@ -274,7 +273,6 @@ async def login_json(
         secure=True,
         samesite="lax",
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
-        path="/",
     )
 
     return TokenResponse(
@@ -338,7 +336,6 @@ async def refresh_token(
         secure=True,
         samesite="lax",
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
-        path="/",
     )
 
     return TokenResponse(
@@ -353,14 +350,11 @@ async def logout(
     response: Response,
     current_user: UserInDB = Depends(get_current_user),
 ) -> dict[str, str]:
-    """Logout and invalidate tokens.
-
-    Clears refresh_token cookie so middleware no longer treats user as authenticated.
-    """
+    """Logout and invalidate tokens."""
     redis = get_redis_client()
     await redis.delete(f"refresh_token:{current_user.id}")
 
-    response.delete_cookie("refresh_token", path="/")
+    response.delete_cookie("refresh_token")
 
     logger.info("User logged out: %s", current_user.email)
 

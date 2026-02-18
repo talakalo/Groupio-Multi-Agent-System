@@ -48,7 +48,6 @@ def _verify_whatsapp_signature(body: bytes, signature_header: str | None) -> Non
 async def whatsapp_webhook(
     request: Request,
     background_tasks: BackgroundTasks,
-    x_hub_signature_256: str | None = Header(None),
 ) -> dict[str, str]:
     """Handle incoming WhatsApp Business API messages."""
     # Verify webhook signature
@@ -75,13 +74,10 @@ async def whatsapp_webhook(
             building_id=building_id,
         )
 
-        response_obj = result.get("response", {})
-        response_text = response_obj.get("message", "") if isinstance(response_obj, dict) else str(response_obj)
-
         background_tasks.add_task(
             _send_whatsapp_reply,
             phone=message["phone"],
-            text=response_text,
+            text=result["response"].get("message", ""),
         )
 
         return {"status": "processed"}

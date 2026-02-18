@@ -1,9 +1,8 @@
 'use client';
 
-import type { Message, MessageResponse, ServiceCategory } from '@groupio/types';
-import { Send, Bot, User, Loader2, Sparkles } from 'lucide-react';
 import { useState, useRef, useEffect, useCallback, type FormEvent } from 'react';
-
+import { Send, Bot, User, Loader2, Sparkles } from 'lucide-react';
+import type { Message, MessageResponse, ServiceCategory } from '@groupio/types';
 import { cn } from '@/lib/utils/cn';
 import { useAccessToken } from '@/lib/stores/authStore';
 
@@ -116,6 +115,7 @@ export function AIChat({
         },
       ]);
 
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
       try {
         const headers: Record<string, string> = {
           'Content-Type': 'application/json',
@@ -124,13 +124,16 @@ export function AIChat({
           headers['Authorization'] = `Bearer ${accessToken}`;
         }
 
+        const controller = new AbortController();
+        timeoutId = setTimeout(() => controller.abort(), 30000);
+
         const response = await fetch(`${baseUrl}/api/v1/message`, {
           method: 'POST',
           headers,
           body: JSON.stringify({
-            user_id: userId,
+            userId,
             message: text.trim(),
-            ...(buildingId ? { building_id: buildingId } : {}),
+            ...(buildingId ? { buildingId } : {}),
             channel: 'web',
             context,
             ...(category ? { category } : {}),
@@ -139,6 +142,7 @@ export function AIChat({
         });
 
         clearTimeout(timeoutId);
+        timeoutId = undefined;
 
         if (!response.ok) {
           throw new Error(`API error: ${response.status}`);
@@ -166,6 +170,7 @@ export function AIChat({
           ),
         );
       } finally {
+        if (timeoutId !== undefined) clearTimeout(timeoutId);
         setIsLoading(false);
       }
     },
@@ -184,7 +189,6 @@ export function AIChat({
   // ---- Render ----
   return (
     <div
-      data-testid="chat-widget"
       className={cn(
         'flex flex-col rounded-2xl border border-gray-200 bg-white shadow-sm',
         'h-[600px] max-h-[80vh]',
@@ -281,7 +285,6 @@ export function AIChat({
       >
         <input
           ref={inputRef}
-          data-testid="chat-input"
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -324,7 +327,7 @@ export function AIChat({
 
 function TypingIndicator() {
   return (
-    <div data-testid="typing-indicator" className="flex items-center gap-1 py-1" aria-label="חושב...">
+    <div className="flex items-center gap-1 py-1" aria-label="חושב...">
       <span className="h-2 w-2 animate-bounce rounded-full bg-gray-400 [animation-delay:0ms]" />
       <span className="h-2 w-2 animate-bounce rounded-full bg-gray-400 [animation-delay:150ms]" />
       <span className="h-2 w-2 animate-bounce rounded-full bg-gray-400 [animation-delay:300ms]" />
