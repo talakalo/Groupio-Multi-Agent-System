@@ -56,7 +56,7 @@
     "findContractor": "Find Contractor",
     "viewOffers": "View Offers",
     "askQuestion": "Ask a Question",
-    "thisMonth": "This month",
+    "thisMonth": "This month {percent}+",
     "viewAll": "View All",
     "noActiveOffers": "No active offers",
     "browseOffers": "Browse Offers",

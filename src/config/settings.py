@@ -1,7 +1,7 @@
 """Environment configuration for Groupio Multi-Agent System."""
 
 import logging
-import secrets
+import warnings
 from functools import lru_cache
 
 from pydantic import model_validator
@@ -9,7 +9,8 @@ from pydantic_settings import BaseSettings
 
 logger = logging.getLogger(__name__)
 
-_INSECURE_JWT_DEFAULTS = frozenset(
+# Insecure defaults that must not be used in production
+_INSECURE_JWT_SECRETS = frozenset(
     {
         "your-secret-key-change-in-production",
         "secret",
@@ -62,9 +63,9 @@ class Settings(BaseSettings):
 
     # Agent Settings
     ROUTER_CONFIDENCE_THRESHOLD: float = 0.7
-    HUMAN_ESCALATION_ENABLED: bool = True
     SENTIMENT_ESCALATION_THRESHOLD: float = -0.5
     MAX_SUPPORT_ATTEMPTS_BEFORE_ESCALATION: int = 3
+    HUMAN_ESCALATION_ENABLED: bool = True
 
     # Feature Flags
     ENABLE_WEB_SEARCH: bool = True
@@ -80,7 +81,7 @@ class Settings(BaseSettings):
     RATE_LIMIT_WINDOW: int = 60  # seconds
 
     # JWT Authentication
-    JWT_SECRET_KEY: str = secrets.token_urlsafe(32)
+    JWT_SECRET_KEY: str = "your-secret-key-change-in-production"
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
@@ -115,17 +116,22 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _validate_jwt_secret(self) -> "Settings":
-        """Refuse to start in production with an insecure JWT secret."""
-        if self.ENVIRONMENT not in ("development", "test") and self.JWT_SECRET_KEY in _INSECURE_JWT_DEFAULTS:
-            raise ValueError(
-                "JWT_SECRET_KEY must be set to a secure, random value in "
-                f"non-development environments (current: ENVIRONMENT={self.ENVIRONMENT}). "
-                'Generate one with: python -c "import secrets; print(secrets.token_urlsafe(64))"'
-            )
-        if self.JWT_SECRET_KEY in _INSECURE_JWT_DEFAULTS:
-            logger.warning(
-                "⚠️  JWT_SECRET_KEY is set to an insecure default. "
-                "This is acceptable in development but MUST be changed before deploying."
+        """Prevent insecure JWT secrets in production/staging."""
+        if self.ENVIRONMENT in ("production", "staging"):
+            if self.JWT_SECRET_KEY in _INSECURE_JWT_SECRETS:
+                raise ValueError(
+                    "JWT_SECRET_KEY must be set to a strong, unique value in "
+                    f"{self.ENVIRONMENT}. Current value is insecure."
+                )
+            if len(self.JWT_SECRET_KEY) < 32:
+                raise ValueError(
+                    f"JWT_SECRET_KEY must be at least 32 characters in {self.ENVIRONMENT} for adequate security."
+                )
+        elif self.JWT_SECRET_KEY in _INSECURE_JWT_SECRETS:
+            warnings.warn(
+                "JWT_SECRET_KEY is using an insecure default. Set a strong secret before deploying.",
+                UserWarning,
+                stacklevel=2,
             )
         return self
 
@@ -133,7 +139,4 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     """Get cached settings instance."""
-    s = Settings()
-    if s.ENVIRONMENT == "production" and len(s.JWT_SECRET_KEY) < 32:
-        raise ValueError("JWT_SECRET_KEY must be set to a secure value (>= 32 chars) in production.")
-    return s
+    return Settings()

@@ -1,7 +1,6 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-
 import { AIChat } from '@/components/features/chat/AIChat';
 import { useAuthStore } from '@/lib/stores/authStore';
 

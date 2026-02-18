@@ -101,9 +101,9 @@ class WhatsAppBotService:
             return False
 
         expected_signature = hmac.new(
-            settings.WHATSAPP_WEBHOOK_SECRET.encode(),
-            payload,
-            hashlib.sha256,
+            key=settings.WHATSAPP_WEBHOOK_SECRET.encode(),
+            msg=payload,
+            digestmod=hashlib.sha256,
         ).hexdigest()
 
         return hmac.compare_digest(f"sha256={expected_signature}", signature)
@@ -168,7 +168,7 @@ class WhatsAppBotService:
             statuses = value.get("statuses", [])
 
         except (KeyError, IndexError, TypeError) as e:
-            logger.error("Failed to parse webhook payload: %s", e)
+            logger.error(f"Failed to parse webhook payload: {e}")
 
         return WhatsAppWebhookPayload(
             messages=messages,
@@ -224,9 +224,8 @@ class WhatsAppBotService:
                 conversation_id=session_id,
             )
 
-            # Extract response from orchestrator result
-            response_obj = result.get("response", {})
-            response_text = response_obj.get("message", "") if isinstance(response_obj, dict) else str(response_obj)
+            # Extract response
+            response_text = result.get("response", "")
             if not response_text:
                 response_text = (
                     "מצטערים, לא הצלחנו לעבד את הבקשה שלך. אנא נסה שוב."
@@ -259,7 +258,7 @@ class WhatsAppBotService:
             )
 
         except Exception as e:
-            logger.exception("Error processing message: %s", e)
+            logger.exception(f"Error processing message: {e}")
             await self._send_text_message(
                 message.from_number,
                 "מצטערים, אירעה שגיאה. אנא נסה שוב מאוחר יותר."
@@ -281,12 +280,19 @@ class WhatsAppBotService:
             response = await self.http_client.post(self.api_url, json=payload)
             response.raise_for_status()
         except httpx.HTTPError as e:
-            logger.error("Failed to send WhatsApp message: %s", e)
+            logger.error(f"Failed to send WhatsApp message: {e}")
 
     async def _send_typing_indicator(self, to: str) -> None:
         """Send typing indicator."""
+        _payload = {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": to,
+            "type": "reaction",
+            "reaction": {"message_id": "", "emoji": ""},
+        }
         # Note: WhatsApp Business API doesn't have native typing indicator
-        # This is a placeholder for future implementation
+        # This is a placeholder for future implementation; _payload for future use
 
     async def _send_quick_replies(
         self,
@@ -322,7 +328,7 @@ class WhatsAppBotService:
             response = await self.http_client.post(self.api_url, json=payload)
             response.raise_for_status()
         except httpx.HTTPError as e:
-            logger.error("Failed to send quick replies: %s", e)
+            logger.error(f"Failed to send quick replies: {e}")
 
     async def _send_offers_list(self, to: str, offers: list[dict[str, Any]]) -> None:
         """Send a list of offers as an interactive list."""
@@ -360,7 +366,7 @@ class WhatsAppBotService:
             response = await self.http_client.post(self.api_url, json=payload)
             response.raise_for_status()
         except httpx.HTTPError as e:
-            logger.error("Failed to send offers list: %s", e)
+            logger.error(f"Failed to send offers list: {e}")
 
     async def _send_contractors_list(
         self,
@@ -402,7 +408,7 @@ class WhatsAppBotService:
             response = await self.http_client.post(self.api_url, json=payload)
             response.raise_for_status()
         except httpx.HTTPError as e:
-            logger.error("Failed to send contractors list: %s", e)
+            logger.error(f"Failed to send contractors list: {e}")
 
     async def send_notification(
         self,
@@ -440,9 +446,9 @@ class WhatsAppBotService:
         try:
             response = await self.http_client.post(self.api_url, json=payload)
             response.raise_for_status()
-            logger.info("Sent notification to %s: %s", to, template_name)
+            logger.info(f"Sent notification to {to}: {template_name}")
         except httpx.HTTPError as e:
-            logger.error("Failed to send notification: %s", e)
+            logger.error(f"Failed to send notification: {e}")
 
     async def close(self) -> None:
         """Close the HTTP client."""
@@ -453,7 +459,7 @@ class WhatsAppBotService:
 _whatsapp_bot: WhatsAppBotService | None = None
 
 
-async def get_whatsapp_bot() -> WhatsAppBotService:
+def get_whatsapp_bot() -> WhatsAppBotService:
     """Get or create the WhatsApp bot service instance."""
     global _whatsapp_bot
     if _whatsapp_bot is None:
@@ -461,7 +467,7 @@ async def get_whatsapp_bot() -> WhatsAppBotService:
         from src.orchestration.graph import get_orchestrator
 
         _whatsapp_bot = WhatsAppBotService(
-            orchestrator=await get_orchestrator(),
-            redis_client=await get_redis_client(),
+            orchestrator=get_orchestrator(),
+            redis_client=get_redis_client(),
         )
     return _whatsapp_bot

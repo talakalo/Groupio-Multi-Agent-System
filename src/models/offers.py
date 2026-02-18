@@ -1,6 +1,6 @@
 """Data models for offers and pricing."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from pydantic import BaseModel, Field
 
@@ -39,7 +39,7 @@ class Offer(OfferBase):
     tiers: list[PricingTier] = Field(default_factory=list)
     current_participants: int = 0
     current_tier_price: float | None = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     expires_at: datetime | None = None
 
     model_config = {"from_attributes": True}
@@ -53,7 +53,7 @@ class CompletedOffer(BaseModel):
     final_price: float
     participants: int
     satisfaction_score: float | None = None
-    completed_at: datetime = Field(default_factory=datetime.utcnow)
+    completed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class MarketData(BaseModel):

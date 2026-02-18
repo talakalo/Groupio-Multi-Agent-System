@@ -2,7 +2,7 @@
 
 import logging
 from abc import ABC, abstractmethod
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
@@ -79,7 +79,7 @@ class MockPaymentProvider(PaymentProvider):
             "currency": currency,
             "customer_id": customer_id,
             "metadata": metadata or {},
-            "created_at": datetime.now(UTC).isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
         }
 
     async def refund(
@@ -99,7 +99,7 @@ class MockPaymentProvider(PaymentProvider):
             "transaction_id": transaction_id,
             "status": "refunded",
             "amount": amount,
-            "created_at": datetime.now(UTC).isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
         }
 
     async def get_status(self, transaction_id: str) -> dict[str, Any]:
@@ -107,7 +107,7 @@ class MockPaymentProvider(PaymentProvider):
         return {
             "transaction_id": transaction_id,
             "status": "succeeded",
-            "checked_at": datetime.now(UTC).isoformat(),
+            "checked_at": datetime.now(timezone.utc).isoformat(),
         }
 
     async def create_customer(self, user_id: str, email: str) -> str:

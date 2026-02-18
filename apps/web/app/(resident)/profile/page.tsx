@@ -1,6 +1,8 @@
 'use client';
 
-import type { Resident } from '@groupio/types';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   UserCircle,
@@ -18,13 +20,10 @@ import {
   Camera,
   Trash2,
 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
-import { useState } from 'react';
 
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
-
+import type { Resident } from '@groupio/types';
 
 // ---------------------------------------------------------------------------
 // Types

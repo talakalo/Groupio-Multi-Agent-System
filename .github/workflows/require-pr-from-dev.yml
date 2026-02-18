@@ -1,0 +1,41 @@
+# Status check for branch protection: only PRs from dev may merge into main.
+# In GitHub: Settings → Branches → main → Require status checks → add "Require PR from dev".
+name: Require PR from dev
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  require-pr-from-dev:
+    name: Require PR from dev
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ensure PR is from dev
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const head = context.payload.pull_request.head.ref;
+            const base = context.payload.pull_request.base.ref;
+            if (base !== 'main') {
+              console.log('This check only applies to PRs targeting main. Skipping.');
+              return;
+            }
+            if (head !== 'dev') {
+              core.setFailed(
+                `Merging into main is only allowed from the dev branch. This PR is from "${head}". ` +
+                'Open a PR with base main and head dev (e.g. use the auto-created "Release: merge dev into main" PR).'
+              );
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                body: '❌ **Merge to main is only allowed from `dev`.** This PR is from `' + head + '`. Please use a PR that has **head branch = dev** and **base branch = main**.',
+              });
+            } else {
+              console.log('PR is from dev → main. Check passed.');
+            }

@@ -6,47 +6,42 @@ import { afterEach, vi } from 'vitest';
 vi.mock('@testing-library/react-native', () => {
   const { create, act } = require('react-test-renderer');
 
-  type TestNode = {
-    children?: TestNode[];
-    props?: Record<string, unknown>;
-    findByProps?: (props: Record<string, unknown>) => TestNode;
-  };
-
   /** Collect all text strings from a test-instance subtree. */
-  const collectText = (instance: unknown): string => {
+  const collectText = (instance: any): string => {
     if (typeof instance === 'string' || typeof instance === 'number') return String(instance);
-    if (!instance || typeof instance !== 'object') return '';
-    const node = instance as TestNode;
-    if (node.children) return node.children.map(collectText).join('');
+    if (!instance) return '';
+    if (instance.children) {
+      return instance.children.map(collectText).join('');
+    }
     return '';
   };
 
   /** Walk all instances depth-first. */
-  const walkAll = (instance: unknown, cb: (node: TestNode) => void) => {
+  const walkAll = (instance: any, cb: (node: any) => void) => {
     if (!instance || typeof instance !== 'object') return;
-    cb(instance as TestNode);
-    const node = instance as TestNode;
-    if (node.children) for (const child of node.children) walkAll(child, cb);
+    cb(instance);
+    if (instance.children) {
+      for (const child of instance.children) walkAll(child, cb);
+    }
   };
 
-  const render = (element: React.ReactElement) => {
-    let renderer!: { root: TestNode; unmount: () => void };
-    act(() => {
-      renderer = create(element) as { root: TestNode; unmount: () => void };
-    });
+  const render = (element: any) => {
+    let renderer: any;
+    act(() => { renderer = create(element); });
     const rootInstance = renderer.root;
 
     const getByText = (match: string | RegExp) => {
-      const nodes: TestNode[] = [];
-      walkAll(rootInstance, (node) => {
+      const nodes: any[] = [];
+      walkAll(rootInstance, (node: any) => {
         if (typeof node === 'string' || typeof node === 'number') return;
         const text = collectText(node);
         if (text && (typeof match === 'string' ? text.includes(match) : match.test(text))) {
-          nodes.push(node as TestNode);
+          nodes.push(node);
         }
       });
       if (!nodes.length) throw new Error(`Unable to find text: ${match}`);
-      return { props: (nodes[nodes.length - 1] as TestNode).props ?? {} };
+      // Return the deepest (most specific) match
+      return { props: nodes[nodes.length - 1].props || {} };
     };
 
     const queryByText = (match: string | RegExp) => {
@@ -54,9 +49,6 @@ vi.mock('@testing-library/react-native', () => {
     };
 
     const getByTestId = (id: string) => {
-      if (!rootInstance.findByProps) {
-        throw new Error(`Unable to find testID: ${id}`);
-      }
       try {
         return rootInstance.findByProps({ testID: id });
       } catch {
@@ -65,9 +57,9 @@ vi.mock('@testing-library/react-native', () => {
     };
 
     const getByLabelText = (match: string | RegExp) => {
-      const nodes: TestNode[] = [];
-      walkAll(rootInstance, (node) => {
-        const label = String(node.props?.accessibilityLabel ?? node.props?.['aria-label'] ?? '');
+      const nodes: any[] = [];
+      walkAll(rootInstance, (node: any) => {
+        const label = node.props?.accessibilityLabel || node.props?.['aria-label'] || '';
         if (label && (typeof match === 'string' ? label.includes(match) : match.test(label))) {
           nodes.push(node);
         }
@@ -77,8 +69,8 @@ vi.mock('@testing-library/react-native', () => {
     };
 
     const getByRole = (role: string) => {
-      const nodes: TestNode[] = [];
-      walkAll(rootInstance, (node) => {
+      const nodes: any[] = [];
+      walkAll(rootInstance, (node: any) => {
         if (node.props?.accessibilityRole === role || node.props?.role === role) {
           nodes.push(node);
         }
@@ -87,23 +79,12 @@ vi.mock('@testing-library/react-native', () => {
       return { props: nodes[0].props };
     };
 
-    return {
-      getByText,
-      queryByText,
-      getByTestId,
-      getByLabelText,
-      getByRole,
-      unmount: () => renderer.unmount(),
-    };
+    return { getByText, queryByText, getByTestId, getByLabelText, getByRole, unmount: () => renderer.unmount() };
   };
 
   const fireEvent = {
-    press: (node: { props?: { onPress?: () => void } }) => {
-      if (node.props?.onPress) node.props.onPress();
-    },
-    changeText: (node: { props?: { onChangeText?: (t: string) => void } }, text: string) => {
-      if (node.props?.onChangeText) node.props.onChangeText(text);
-    },
+    press: (node: any) => { if (node.props?.onPress) node.props.onPress(); },
+    changeText: (node: any, text: string) => { if (node.props?.onChangeText) node.props.onChangeText(text); },
   };
 
   return { render, fireEvent };
@@ -113,7 +94,7 @@ vi.mock('@testing-library/react-native', () => {
 vi.mock('react-native-paper', () => {
   const { createElement } = require('react');
   const wrap = (name: string) => {
-    const Comp = (props: Record<string, unknown>) => createElement(name, props, props.children);
+    const Comp = (props: any) => createElement(name, props, props.children);
     Comp.displayName = name;
     return Comp;
   };
@@ -161,7 +142,7 @@ vi.mock('react-native-paper', () => {
 // Mock react-native-vector-icons
 vi.mock('react-native-vector-icons/MaterialCommunityIcons', () => {
   const { createElement } = require('react');
-  const Icon = (props: Record<string, unknown>) => createElement('Icon', props);
+  const Icon = (props: any) => createElement('Icon', props);
   Icon.displayName = 'Icon';
   return { default: Icon };
 });
