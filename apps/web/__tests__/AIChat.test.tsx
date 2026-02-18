@@ -12,7 +12,10 @@ function renderWithProviders(ui: React.ReactElement) {
     defaultOptions: { queries: { retry: false } },
   });
   return render(
-    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
+    <QueryClientProvider client={queryClient}>
+      {/* Cast for React 18 vs 19 ReactNode type mismatch in test env */}
+      {ui as Parameters<typeof QueryClientProvider>[0]["children"]}
+    </QueryClientProvider>
   );
 }
 
