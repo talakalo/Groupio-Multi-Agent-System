@@ -1,7 +1,7 @@
 """Authentication middleware for the API."""
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import bcrypt
 import jwt
@@ -37,7 +37,7 @@ def create_access_token(
     """Create a JWT access token."""
     settings = get_settings()
 
-    now = datetime.now(datetime.UTC)
+    now = datetime.now(timezone.utc)
     if expires_delta:
         expire = now + expires_delta
     else:
@@ -59,7 +59,7 @@ def create_refresh_token(user_id: str) -> str:
     """Create a JWT refresh token."""
     settings = get_settings()
 
-    now = datetime.now(datetime.UTC)
+    now = datetime.now(timezone.utc)
     expire = now + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
 
     payload = {
@@ -90,8 +90,8 @@ def verify_access_token(token: str) -> TokenPayload | None:
             sub=payload["sub"],
             email=payload["email"],
             role=UserRole(payload["role"]),
-            exp=datetime.fromtimestamp(payload["exp"], tz=datetime.UTC),
-            iat=datetime.fromtimestamp(payload["iat"], tz=datetime.UTC),
+            exp=datetime.fromtimestamp(payload["exp"], tz=timezone.utc),
+            iat=datetime.fromtimestamp(payload["iat"], tz=timezone.utc),
         )
     except jwt.ExpiredSignatureError:
         logger.debug("Token expired")

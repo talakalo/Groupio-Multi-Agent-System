@@ -1,6 +1,6 @@
 """State management utilities for the LangGraph orchestration."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from src.models.agent_state import AgentState
@@ -30,7 +30,7 @@ def create_initial_state(
         needs_human=False,
         escalation_reason=None,
         final_response=None,
-        start_time=datetime.now(datetime.UTC).isoformat(),
+        start_time=datetime.now(timezone.utc).isoformat(),
         tokens_used=0,
     )
 
@@ -38,7 +38,7 @@ def create_initial_state(
 def calculate_duration_ms(start_time: str) -> int:
     """Calculate duration in milliseconds from ISO timestamp."""
     start = datetime.fromisoformat(start_time)
-    duration = datetime.now(datetime.UTC) - start
+    duration = datetime.now(timezone.utc) - start
     return int(duration.total_seconds() * 1000)
 
 

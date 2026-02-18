@@ -1,7 +1,7 @@
 """Authentication API routes."""
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -204,7 +204,7 @@ async def login(
     )
 
     # Update last login
-    await db.update_user(user.id, {"last_login": datetime.now(datetime.UTC)})
+    await db.update_user(user.id, {"last_login": datetime.now(timezone.utc)})
 
     # Set refresh token as HTTP-only cookie
     response.set_cookie(
@@ -264,7 +264,7 @@ async def login_json(
         ex=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
     )
 
-    await db.update_user(user.id, {"last_login": datetime.now(datetime.UTC)})
+    await db.update_user(user.id, {"last_login": datetime.now(timezone.utc)})
 
     response.set_cookie(
         key="refresh_token",

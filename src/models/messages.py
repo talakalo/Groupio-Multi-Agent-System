@@ -1,6 +1,6 @@
 """Data models for messages and conversations."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -11,7 +11,7 @@ class Message(BaseModel):
 
     role: str  # user, assistant, system
     content: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(datetime.UTC))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -25,7 +25,7 @@ class ConversationContext(BaseModel):
     entities: dict[str, Any] = Field(default_factory=dict)
     sentiment_score: float = 0.0
     resolution_attempts: int = 0
-    started_at: datetime = Field(default_factory=lambda: datetime.now(datetime.UTC))
+    started_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class RouterResult(BaseModel):
@@ -43,7 +43,7 @@ class AgentAction(BaseModel):
 
     agent: str
     action: str
-    timestamp: str = Field(default_factory=lambda: datetime.now(datetime.UTC).isoformat())
+    timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     details: dict[str, Any] = Field(default_factory=dict)
     response: dict[str, Any] | None = None
     requires_followup: bool = False
@@ -59,7 +59,7 @@ class SupportTicket(BaseModel):
     priority: str = "normal"  # low, normal, high, urgent
     context: dict[str, Any] = Field(default_factory=dict)
     status: str = "open"  # open, assigned, resolved, closed
-    created_at: datetime = Field(default_factory=lambda: datetime.now(datetime.UTC))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class CampaignMessage(BaseModel):

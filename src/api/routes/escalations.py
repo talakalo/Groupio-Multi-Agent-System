@@ -1,7 +1,7 @@
 """Escalation API routes."""
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import uuid4
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
@@ -223,8 +223,11 @@ async def update_escalation(
     update_data = request.model_dump(exclude_unset=True)
 
     # Track resolution time
-    if request.status == EscalationStatus.RESOLVED and escalation.status != EscalationStatus.RESOLVED:
-        update_data["resolved_at"] = datetime.now(datetime.UTC)
+    if (
+        request.status == EscalationStatus.RESOLVED
+        and escalation.status != EscalationStatus.RESOLVED
+    ):
+        update_data["resolved_at"] = datetime.now(timezone.utc)
 
     updated = await db.update_escalation(escalation_id, update_data)
 
@@ -297,7 +300,7 @@ async def reply_to_escalation(
     update_data = {}
     if request.resolve:
         update_data["status"] = EscalationStatus.RESOLVED
-        update_data["resolved_at"] = datetime.now(datetime.UTC)
+        update_data["resolved_at"] = datetime.now(timezone.utc)
         if request.resolution_notes:
             update_data["resolution_notes"] = request.resolution_notes
 
@@ -331,7 +334,7 @@ async def resolve_escalation(
     notes = body.resolution_notes if body else None
     update_data = {
         "status": EscalationStatus.RESOLVED,
-        "resolved_at": datetime.now(datetime.UTC),
+        "resolved_at": datetime.now(timezone.utc),
     }
     if notes:
         update_data["resolution_notes"] = notes
