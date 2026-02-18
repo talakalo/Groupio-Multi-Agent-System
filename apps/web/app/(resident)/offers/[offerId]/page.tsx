@@ -1,9 +1,8 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
+import type { Offer, PricingTier, Contractor } from '@groupio/types';
+import { formatPrice, formatDate } from '@groupio/utils';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
 import {
   ArrowRight,
   Users,
@@ -20,10 +19,12 @@ import {
   ChevronLeft,
   AlertCircle,
 } from 'lucide-react';
-import { cn } from '@/lib/utils/cn';
+import Link from 'next/link';
+import { useParams, useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
+
 import { apiClient } from '@/lib/api/client';
-import { formatPrice, formatDate } from '@groupio/utils';
-import type { Offer, PricingTier, Contractor } from '@groupio/types';
+import { cn } from '@/lib/utils/cn';
 
 // ---------------------------------------------------------------------------
 // Pricing Tier Card

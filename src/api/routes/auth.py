@@ -1,7 +1,7 @@
 """Authentication API routes."""
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -27,7 +27,6 @@ from src.models.user import (
     TokenResponse,
     UserCreate,
     UserInDB,
-    UserLogin,
     UserResponse,
     UserRole,
     UserUpdate,
@@ -205,7 +204,7 @@ async def login(
     )
 
     # Update last login
-    await db.update_user(user.id, {"last_login": datetime.now(timezone.utc)})
+    await db.update_user(user.id, {"last_login": datetime.now(UTC)})
 
     # Set refresh token as HTTP-only cookie
     response.set_cookie(
@@ -266,7 +265,7 @@ async def login_json(
         ex=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
     )
 
-    await db.update_user(user.id, {"last_login": datetime.now(timezone.utc)})
+    await db.update_user(user.id, {"last_login": datetime.now(UTC)})
 
     response.set_cookie(
         key="refresh_token",
@@ -354,7 +353,10 @@ async def logout(
     response: Response,
     current_user: UserInDB = Depends(get_current_user),
 ) -> dict[str, str]:
-    """Logout and invalidate tokens. Clears refresh_token cookie so middleware no longer treats user as authenticated."""
+    """Logout and invalidate tokens.
+
+    Clears refresh_token cookie so middleware no longer treats user as authenticated.
+    """
     redis = get_redis_client()
     await redis.delete(f"refresh_token:{current_user.id}")
 

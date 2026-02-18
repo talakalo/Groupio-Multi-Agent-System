@@ -1,6 +1,7 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import type { Offer } from '@groupio/types';
+import { useQueryClient } from '@tanstack/react-query';
+import { useEffect, useState, useCallback, useRef } from 'react';
+
 import { offerKeys } from './useOffers';
 
 // ---------------------------------------------------------------------------

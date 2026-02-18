@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback, type FormEvent } from 'react';
-import { Send, Bot, User, Loader2, Sparkles } from 'lucide-react';
 import type { Message, MessageResponse, ServiceCategory } from '@groupio/types';
+import { Send, Bot, User, Loader2, Sparkles } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback, type FormEvent } from 'react';
+
 import { cn } from '@/lib/utils/cn';
 
 // ---------------------------------------------------------------------------

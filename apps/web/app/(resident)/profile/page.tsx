@@ -1,8 +1,6 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import type { Resident } from '@groupio/types';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   UserCircle,
@@ -20,9 +18,13 @@ import {
   Camera,
   Trash2,
 } from 'lucide-react';
-import { cn } from '@/lib/utils/cn';
+import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
+import { useState } from 'react';
+
 import { useAuthStore } from '@/lib/stores/authStore';
-import type { Resident } from '@groupio/types';
+import { cn } from '@/lib/utils/cn';
+
 
 // ---------------------------------------------------------------------------
 // Types
@@ -30,7 +32,10 @@ import type { Resident } from '@groupio/types';
 
 interface ResidentProfile extends Resident {
   avatar?: string;
+  avatarUrl?: string;
+  fullName?: string;
   language: 'he' | 'en';
+  preferredLanguage?: string;
   notifications: NotificationPreferences;
 }
 
@@ -164,10 +169,10 @@ export default function ResidentProfilePage() {
         method: 'PUT',
         headers,
         body: JSON.stringify({
-          full_name: formData.fullName,
+          full_name: formData.fullName ?? formData.name,
           phone: formData.phone,
-          preferred_language: formData.preferredLanguage,
-          avatar_url: formData.avatarUrl,
+          preferred_language: formData.preferredLanguage ?? formData.language,
+          avatar_url: formData.avatarUrl ?? formData.avatar,
         }),
       });
       if (!res.ok) throw new Error('Failed to save profile');

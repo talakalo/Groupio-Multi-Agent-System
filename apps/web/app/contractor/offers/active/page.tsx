@@ -1,9 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useTranslations } from 'next-intl';
-import { OfferCard } from '@/components/features/offers/OfferCard';
 import type { Offer, ServiceCategory } from '@groupio/types';
+import { useTranslations } from 'next-intl';
+import { useState, useEffect } from 'react';
+
+import { OfferCard } from '@/components/features/offers/OfferCard';
+
 
 type OfferStatus = 'all' | 'pending' | 'accepted' | 'in_progress' | 'completed';
 

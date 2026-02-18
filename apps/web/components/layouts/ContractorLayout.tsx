@@ -1,8 +1,5 @@
 'use client';
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
   Tag,
@@ -14,6 +11,10 @@ import {
   X,
   ChevronLeft,
 } from 'lucide-react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { useState } from 'react';
+
 import { cn } from '@/lib/utils/cn';
 
 // ---------------------------------------------------------------------------

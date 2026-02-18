@@ -1,6 +1,6 @@
 "use client";
 
-import { Component, type ErrorInfo, type ReactNode, useState, useEffect } from "react";
+import React, { Component, type ErrorInfo, type ReactNode, useState, useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api/client";
 import { useAuthStore } from "@/lib/stores/authStore";
@@ -18,6 +18,9 @@ class AppErrorBoundary extends Component<
   { children: ReactNode },
   ErrorBoundaryState
 > {
+  // Satisfy React 19 Component type (refs is legacy but required by typings)
+  declare refs: Record<string, unknown>;
+
   constructor(props: { children: ReactNode }) {
     super(props);
     this.state = { hasError: false, error: null };
@@ -113,9 +116,13 @@ export function Providers({ children }: { children: React.ReactNode }) {
       })
   );
 
+  const ErrorBoundary = AppErrorBoundary as unknown as React.JSX.ElementType;
   return (
-    <AppErrorBoundary>
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    </AppErrorBoundary>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- React 19 ReactNode typing conflict */}
+        {children as any}
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }

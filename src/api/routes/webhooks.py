@@ -5,7 +5,7 @@ import hmac
 import logging
 from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Header, Request
+from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Request
 
 from src.config.settings import get_settings
 from src.databases.postgres import get_postgres_client
@@ -31,9 +31,7 @@ def _verify_whatsapp_signature(payload: bytes, signature: str | None) -> bool:
         logger.warning("Missing X-Hub-Signature-256 header")
         return False
 
-    expected = "sha256=" + hmac.new(
-        secret.encode(), payload, hashlib.sha256
-    ).hexdigest()
+    expected = "sha256=" + hmac.new(secret.encode(), payload, hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, signature)
 
 
@@ -53,6 +51,7 @@ async def whatsapp_webhook(
         raise HTTPException(status_code=403, detail="Invalid webhook signature")
 
     import json
+
     try:
         payload: dict[str, Any] = json.loads(raw_body)
     except json.JSONDecodeError:
@@ -75,11 +74,7 @@ async def whatsapp_webhook(
         )
 
         response_obj = result.get("response", {})
-        response_text = (
-            response_obj.get("message", "")
-            if isinstance(response_obj, dict)
-            else str(response_obj)
-        )
+        response_text = response_obj.get("message", "") if isinstance(response_obj, dict) else str(response_obj)
 
         background_tasks.add_task(
             _send_whatsapp_reply,

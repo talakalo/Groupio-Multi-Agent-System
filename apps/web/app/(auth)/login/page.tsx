@@ -1,32 +1,18 @@
 "use client";
 
-import { useState } from "react";
-import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import { Building2, Mail, Phone, Loader2, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Building2, Mail, Phone, Loader2, ArrowLeft } from "lucide-react";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+
 import { apiClient, ApiError } from "@/lib/api/client";
+import { setAuthCookie } from "@/lib/auth/setAuthCookie";
 import { useAuthStore } from "@/lib/stores/authStore";
 import { cn } from "@/lib/utils/cn";
 
-const AUTH_COOKIE_NAME = "groupio-auth";
-const AUTH_COOKIE_MAX_AGE_DAYS = 7;
-
-function setAuthCookie(accessToken: string, user: { role: string } | null) {
-  const value = encodeURIComponent(
-    JSON.stringify({
-      state: {
-        accessToken,
-        user: user ? { role: user.role } : null,
-        isAuthenticated: true,
-      },
-    })
-  );
-  const maxAge = AUTH_COOKIE_MAX_AGE_DAYS * 24 * 60 * 60;
-  document.cookie = `${AUTH_COOKIE_NAME}=${value}; path=/; max-age=${maxAge}; samesite=lax`;
-}
 
 const loginSchema = z.object({
   identifier: z
@@ -73,8 +59,7 @@ export default function LoginPage() {
 
       const response = await apiClient.login(credentials);
       localStorage.setItem("auth_token", response.token);
-      const refreshToken = response.refresh_token ?? "";
-      useAuthStore.getState().setTokens(response.token, refreshToken);
+      useAuthStore.getState().setAccessToken(response.token);
       let user: { role: string } | null = null;
       try {
         const meRes = await fetch(

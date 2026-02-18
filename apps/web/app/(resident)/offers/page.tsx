@@ -1,9 +1,8 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { useTranslations } from 'next-intl';
+import type { Offer, ServiceCategory, OfferStatus } from '@groupio/types';
+import { formatPrice } from '@groupio/utils';
 import { useQuery } from '@tanstack/react-query';
-import Link from 'next/link';
 import {
   Search,
   Filter,
@@ -14,9 +13,11 @@ import {
   SlidersHorizontal,
   X,
 } from 'lucide-react';
+import Link from 'next/link';
+import { useTranslations } from 'next-intl';
+import { useState, useMemo } from 'react';
+
 import { cn } from '@/lib/utils/cn';
-import { formatPrice } from '@groupio/utils';
-import type { Offer, ServiceCategory, OfferStatus } from '@groupio/types';
 
 // ---------------------------------------------------------------------------
 // Types
