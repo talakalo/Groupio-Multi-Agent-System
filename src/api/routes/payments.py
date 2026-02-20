@@ -6,6 +6,7 @@ from typing import Any, Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import Response
 from pydantic import BaseModel
 
 from src.api.middleware.auth import get_admin_user, get_current_user
@@ -386,11 +387,11 @@ async def get_invoice(
 async def download_invoice_pdf(
     invoice_id: str,
     current_user: UserInDB = Depends(get_current_user),
-) -> dict:
-    """Download invoice as PDF.
+) -> Response:
+    """Download invoice as a downloadable HTML document.
 
-    Currently returns a JSON placeholder. In production this will
-    generate and return a PDF binary using a template engine.
+    Generates a formatted invoice document that can be printed to PDF
+    from the browser. Uses HTML with print-friendly styles.
     """
     db = get_postgres_client()
     invoice = await db.get_invoice(invoice_id)
@@ -404,20 +405,103 @@ async def download_invoice_pdf(
     if not has_access:
         raise HTTPException(status_code=403, detail="Not authorized to access this invoice")
 
-    # Placeholder: return invoice data as JSON until PDF generation is implemented
-    return {
-        "message": "PDF generation not yet implemented",
-        "invoice_id": invoice_id,
-        "invoice_data": {
-            "id": invoice["id"],
-            "offer_id": invoice.get("offer_id"),
-            "amount": invoice.get("amount"),
-            "currency": invoice.get("currency", "ILS"),
-            "status": invoice.get("status"),
-            "issued_at": invoice.get("issued_at"),
-            "items": invoice.get("items", []),
+    # Build printable HTML invoice
+    items = invoice.get("items", [])
+    items_html = ""
+    for item in items:
+        desc = item.get("description", "Service")
+        qty = item.get("quantity", 1)
+        unit_price = item.get("unit_price", item.get("amount", 0))
+        total = item.get("total", unit_price * qty)
+        items_html += (
+            f"<tr><td>{desc}</td><td style='text-align:center'>{qty}</td>"
+            f"<td style='text-align:right'>{unit_price:,.2f} ILS</td>"
+            f"<td style='text-align:right'>{total:,.2f} ILS</td></tr>"
+        )
+
+    if not items_html:
+        amount = invoice.get("total", invoice.get("amount", 0))
+        items_html = (
+            f"<tr><td>Service payment</td><td style='text-align:center'>1</td>"
+            f"<td style='text-align:right'>{amount:,.2f} ILS</td>"
+            f"<td style='text-align:right'>{amount:,.2f} ILS</td></tr>"
+        )
+
+    total_amount = invoice.get("total", invoice.get("amount", 0))
+    currency = invoice.get("currency", "ILS")
+    issued_at = invoice.get("issued_at", invoice.get("created_at", ""))
+    offer_id = invoice.get("offer_id", "")
+    status = invoice.get("status", "")
+
+    html = f"""<!DOCTYPE html>
+<html dir="rtl" lang="he">
+<head>
+<meta charset="utf-8">
+<title>Invoice {invoice_id[:8]}</title>
+<style>
+  body {{ font-family: Arial, sans-serif; margin: 40px; color: #333; }}
+  .header {{ display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; }}
+  .logo {{ font-size: 28px; font-weight: bold; color: #1976D2; }}
+  .invoice-info {{ text-align: left; }}
+  .invoice-info h2 {{ margin: 0; color: #1976D2; }}
+  .invoice-info p {{ margin: 4px 0; color: #666; font-size: 14px; }}
+  table {{ width: 100%; border-collapse: collapse; margin: 24px 0; }}
+  th {{ background: #f5f5f5; padding: 12px; text-align: right; border-bottom: 2px solid #ddd; font-size: 14px; }}
+  td {{ padding: 12px; border-bottom: 1px solid #eee; font-size: 14px; }}
+  .total-row {{ font-weight: bold; font-size: 16px; border-top: 2px solid #333; }}
+  .status {{ display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: bold; }}
+  .status-paid {{ background: #e8f5e9; color: #2e7d32; }}
+  .status-pending {{ background: #fff3e0; color: #e65100; }}
+  .footer {{ margin-top: 60px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #999; text-align: center; }}
+  @media print {{ body {{ margin: 20px; }} }}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="logo">Groupio</div>
+  <div class="invoice-info">
+    <h2>Invoice</h2>
+    <p><strong>Invoice ID:</strong> {invoice_id[:12]}</p>
+    <p><strong>Date:</strong> {issued_at[:10] if issued_at else 'N/A'}</p>
+    <p><strong>Offer:</strong> {offer_id[:12] if offer_id else 'N/A'}</p>
+    <p><strong>Status:</strong> <span class="status status-{'paid' if status in ('paid', 'released') else 'pending'}">{status}</span></p>
+  </div>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Description</th>
+      <th style="text-align:center">Qty</th>
+      <th style="text-align:right">Unit Price</th>
+      <th style="text-align:right">Total</th>
+    </tr>
+  </thead>
+  <tbody>
+    {items_html}
+  </tbody>
+  <tfoot>
+    <tr class="total-row">
+      <td colspan="3" style="text-align:right">Total</td>
+      <td style="text-align:right">{total_amount:,.2f} {currency}</td>
+    </tr>
+  </tfoot>
+</table>
+
+<div class="footer">
+  <p>Groupio Platform &bull; group purchasing for building residents</p>
+  <p>This document was generated automatically and is valid without a signature.</p>
+</div>
+</body>
+</html>"""
+
+    return Response(
+        content=html,
+        media_type="text/html",
+        headers={
+            "Content-Disposition": f'attachment; filename="invoice-{invoice_id[:8]}.html"',
         },
-    }
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -481,7 +565,7 @@ async def _build_escrow_for_offer(db: Any, offer: dict) -> EscrowAccountResponse
     invoice = await db.get_invoice_by_offer(offer_id)
 
     # Get participants
-    participants = await db.get_offer_participants(offer_id) if hasattr(db, "get_offer_participants") else []
+    participants = await db.get_offer_participants(offer_id)
     total_participants = len(participants) if participants else offer.get("participants", 0)
 
     # Calculate totals from invoice + splits
@@ -508,7 +592,7 @@ async def _build_escrow_for_offer(db: Any, offer: dict) -> EscrowAccountResponse
     # Get contractor info
     contractor_id = offer.get("contractor_id")
     contractor_name = None
-    if contractor_id and hasattr(db, "get_contractor"):
+    if contractor_id:
         ctr = await db.get_contractor(contractor_id)
         if ctr:
             contractor_name = ctr.get("business_name", ctr.get("name"))
@@ -631,7 +715,7 @@ async def get_contractor_payouts(
     for inv in invoices:
         contractor_id = inv.get("contractor_id", "")
         contractor_name = "Unknown"
-        if contractor_id and hasattr(db, "get_contractor"):
+        if contractor_id:
             ctr = await db.get_contractor(contractor_id)
             if ctr:
                 contractor_name = ctr.get("business_name", ctr.get("name", "Unknown"))

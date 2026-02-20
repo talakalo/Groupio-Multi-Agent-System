@@ -41,6 +41,48 @@ export default function ContractorProfilePage() {
   });
 
   const [contractorId, setContractorId] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState<string | null>(null);
+
+  async function handleDocumentUpload(docType: 'license' | 'insurance' | 'certifications') {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.pdf,.jpg,.jpeg,.png,.doc,.docx';
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+
+      setIsUploading(docType);
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const res = await fetch(`${apiBase}/api/v1/uploads/contractor-docs`, {
+          method: 'POST',
+          headers,
+          body: formData,
+        });
+
+        if (res.ok) {
+          alert(t('documents.uploadSuccess'));
+          // Refresh profile to show updated documents
+          window.location.reload();
+        } else {
+          alert(t('documents.uploadError'));
+        }
+      } catch (error) {
+        console.error('Upload failed:', error);
+        alert(t('documents.uploadError'));
+      } finally {
+        setIsUploading(null);
+      }
+    };
+    input.click();
+  }
 
   useEffect(() => {
     async function fetchProfile() {
@@ -368,8 +410,12 @@ export default function ContractorProfilePage() {
                     : t('documents.notUploaded')}
                 </p>
               </div>
-              <button className="text-sky-600 hover:text-sky-700 font-medium">
-                {t('documents.upload')}
+              <button
+                onClick={() => handleDocumentUpload('license')}
+                disabled={isUploading === 'license'}
+                className="text-sky-600 hover:text-sky-700 font-medium disabled:opacity-50"
+              >
+                {isUploading === 'license' ? t('documents.uploading') : t('documents.upload')}
               </button>
             </div>
 
@@ -385,8 +431,12 @@ export default function ContractorProfilePage() {
                     : t('documents.notUploaded')}
                 </p>
               </div>
-              <button className="text-sky-600 hover:text-sky-700 font-medium">
-                {t('documents.upload')}
+              <button
+                onClick={() => handleDocumentUpload('insurance')}
+                disabled={isUploading === 'insurance'}
+                className="text-sky-600 hover:text-sky-700 font-medium disabled:opacity-50"
+              >
+                {isUploading === 'insurance' ? t('documents.uploading') : t('documents.upload')}
               </button>
             </div>
 
@@ -400,8 +450,12 @@ export default function ContractorProfilePage() {
                     : t('documents.notUploaded')}
                 </p>
               </div>
-              <button className="text-sky-600 hover:text-sky-700 font-medium">
-                {t('documents.upload')}
+              <button
+                onClick={() => handleDocumentUpload('certifications')}
+                disabled={isUploading === 'certifications'}
+                className="text-sky-600 hover:text-sky-700 font-medium disabled:opacity-50"
+              >
+                {isUploading === 'certifications' ? t('documents.uploading') : t('documents.upload')}
               </button>
             </div>
           </div>
