@@ -280,9 +280,12 @@ export type InvoiceStatus =
   | "draft"
   | "pending"
   | "paid"
+  | "released"
   | "overdue"
   | "cancelled"
   | "refunded";
+
+export type PaymentType = "escrow" | "direct";
 
 export type EscrowStatus =
   | "collecting"
@@ -355,10 +358,19 @@ export interface EscrowAccount {
   netPayoutAmount: number;
   currency: string;
   escrowStatus: EscrowStatus;
+  paymentType: PaymentType;
   participantsPaid: number;
   participantsTotal: number;
-  splits: PaymentSplit[];
+  splits?: PaymentSplit[];
   createdAt: string;
+}
+
+export interface EscrowConfig {
+  minEscrowParticipants: number;
+  minEscrowAmount: number;
+  trustedContractorThreshold: number;
+  highValueCategories: string[];
+  platformFeeRate: number;
 }
 
 export interface ContractorPayout {

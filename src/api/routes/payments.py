@@ -28,6 +28,7 @@ class PaymentInitiateRequest(BaseModel):
 
     offer_id: str
     payment_method_id: str | None = None
+    force_escrow: bool = False  # Resident can opt-in to escrow
 
 
 class PaymentResponse(BaseModel):
@@ -39,6 +40,7 @@ class PaymentResponse(BaseModel):
     amount: float
     currency: str
     status: str
+    payment_type: str = "direct"  # "escrow" or "direct"
     transaction_id: str | None = None
     created_at: str
 
@@ -47,14 +49,65 @@ class InvoiceResponse(BaseModel):
     """Standard invoice response."""
 
     id: str
-    user_id: str
     offer_id: str
     amount: float
     currency: str
     status: str
+    payment_type: str = "direct"
     issued_at: str
     due_date: str | None = None
     items: list[dict] = []
+
+
+# ---------------------------------------------------------------------------
+# Escrow decision logic
+# ---------------------------------------------------------------------------
+
+# Configurable thresholds (should move to system_settings table)
+MIN_ESCROW_PARTICIPANTS = 2
+MIN_ESCROW_AMOUNT = 5000  # ILS
+TRUSTED_CONTRACTOR_THRESHOLD = 80  # trust score out of 100
+HIGH_VALUE_CATEGORIES = {"renovations", "kitchen", "electrical", "plumbing", "ac_installation"}
+MIN_PAYMENT_AMOUNT = 1  # Minimum valid payment in ILS
+
+
+def determine_payment_type(
+    offer: dict,
+    contractor_trust_score: float | None = None,
+    force_escrow: bool = False,
+) -> str:
+    """Decide whether an offer's payments go through escrow or direct.
+
+    Returns "escrow" or "direct".
+
+    Escrow is used when ANY of:
+      1. Offer has >= MIN_ESCROW_PARTICIPANTS participants (group buying)
+      2. Offer total price >= MIN_ESCROW_AMOUNT (high value)
+      3. Contractor trust score < TRUSTED_CONTRACTOR_THRESHOLD (unverified)
+      4. Offer category is in HIGH_VALUE_CATEGORIES
+      5. Resident explicitly requested escrow (force_escrow=True)
+
+    Direct payment is used ONLY when ALL conditions are false.
+    """
+    if force_escrow:
+        return "escrow"
+
+    participants = offer.get("participants", 1)
+    if participants >= MIN_ESCROW_PARTICIPANTS:
+        return "escrow"
+
+    total_price = offer.get("base_price", 0) * participants
+    if total_price >= MIN_ESCROW_AMOUNT:
+        return "escrow"
+
+    category = offer.get("category", "")
+    if category in HIGH_VALUE_CATEGORIES:
+        return "escrow"
+
+    if contractor_trust_score is not None and contractor_trust_score < TRUSTED_CONTRACTOR_THRESHOLD:
+        return "escrow"
+
+    return "direct"
 
 
 # ---------------------------------------------------------------------------
@@ -112,18 +165,43 @@ async def initiate_payment(
                 detail="You are not a participant of this offer's building",
             )
 
+    # Determine escrow vs direct payment
+    contractor_trust = None
+    contractor_id = offer.get("contractor_id")
+    if contractor_id:
+        try:
+            ctr = await db.get_contractor(contractor_id)
+            if ctr:
+                contractor_trust = ctr.get("trust_score")
+        except Exception:
+            pass  # Contractor lookup failure doesn't block payment
+
+    payment_type = determine_payment_type(
+        offer,
+        contractor_trust_score=contractor_trust,
+        force_escrow=request.force_escrow,
+    )
+
     # Check for existing unpaid invoice or create one
     existing_invoice = await db.get_invoice_for_offer(current_user.id, request.offer_id)
     if not existing_invoice:
         invoice_id = str(uuid4())
         amount = offer.get("price_per_unit", 0)
+
+        # Validate payment amount
+        if amount < MIN_PAYMENT_AMOUNT:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Payment amount {amount} is below minimum ({MIN_PAYMENT_AMOUNT} ILS)",
+            )
+
         invoice_data = {
             "id": invoice_id,
-            "user_id": current_user.id,
             "offer_id": request.offer_id,
             "amount": amount,
             "currency": "ILS",
             "status": "pending",
+            "payment_type": payment_type,
             "issued_at": datetime.now(timezone.utc).isoformat(),
             "items": [
                 {
@@ -137,6 +215,7 @@ async def initiate_payment(
         existing_invoice = invoice_data
     else:
         amount = existing_invoice.get("amount", 0)
+        payment_type = existing_invoice.get("payment_type", "escrow")
 
     # Create payment record
     payment_id = str(uuid4())
@@ -172,8 +251,9 @@ async def initiate_payment(
 
     await db.create_payment(payment_data)
 
-    # Update invoice status if payment succeeded
-    if payment_data["status"] == "succeeded":
+    # For direct payments that succeeded, mark invoice as paid immediately
+    # For escrow payments, invoice stays pending until admin releases
+    if payment_data["status"] == "succeeded" and payment_type == "direct":
         await db.update_invoice(existing_invoice["id"], {"status": "paid"})
 
     return PaymentResponse(
@@ -183,6 +263,7 @@ async def initiate_payment(
         amount=payment_data["amount"],
         currency=payment_data["currency"],
         status=payment_data["status"],
+        payment_type=payment_type,
         transaction_id=payment_data.get("transaction_id"),
         created_at=payment_data["created_at"],
     )
@@ -271,24 +352,31 @@ async def get_invoice(
     invoice_id: str,
     current_user: UserInDB = Depends(get_current_user),
 ) -> InvoiceResponse:
-    """Get invoice details by ID."""
+    """Get invoice details by ID.
+
+    Access control: user must have a payment linked to this invoice,
+    since invoices are per-offer (not per-user).
+    """
     db = get_postgres_client()
     invoice = await db.get_invoice(invoice_id)
 
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
 
-    if invoice.get("user_id") != current_user.id:
+    # Invoices don't have user_id; verify access via payment_splits or payments
+    user_payments = await db.list_payments_for_user(current_user.id)
+    has_access = any(p.get("invoice_id") == invoice_id for p in user_payments)
+    if not has_access:
         raise HTTPException(status_code=403, detail="Not authorized to view this invoice")
 
     return InvoiceResponse(
         id=invoice["id"],
-        user_id=invoice["user_id"],
         offer_id=invoice.get("offer_id", ""),
-        amount=invoice.get("amount", 0),
+        amount=invoice.get("total", invoice.get("amount", 0)),
         currency=invoice.get("currency", "ILS"),
         status=invoice.get("status", "unknown"),
-        issued_at=invoice.get("issued_at", ""),
+        payment_type=invoice.get("payment_type", "escrow"),
+        issued_at=invoice.get("created_at", invoice.get("issued_at", "")),
         due_date=invoice.get("due_date"),
         items=invoice.get("items", []),
     )
@@ -310,7 +398,10 @@ async def download_invoice_pdf(
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
 
-    if invoice.get("user_id") != current_user.id:
+    # Invoices don't have user_id; verify access via payments
+    user_payments = await db.list_payments_for_user(current_user.id)
+    has_access = any(p.get("invoice_id") == invoice_id for p in user_payments)
+    if not has_access:
         raise HTTPException(status_code=403, detail="Not authorized to access this invoice")
 
     # Placeholder: return invoice data as JSON until PDF generation is implemented
@@ -319,7 +410,6 @@ async def download_invoice_pdf(
         "invoice_id": invoice_id,
         "invoice_data": {
             "id": invoice["id"],
-            "user_id": invoice["user_id"],
             "offer_id": invoice.get("offer_id"),
             "amount": invoice.get("amount"),
             "currency": invoice.get("currency", "ILS"),
@@ -348,6 +438,7 @@ class EscrowAccountResponse(BaseModel):
     net_payout_amount: float
     currency: str = "ILS"
     escrow_status: str
+    payment_type: str = "escrow"
     participants_paid: int
     participants_total: int
     created_at: str
@@ -422,6 +513,11 @@ async def _build_escrow_for_offer(db: Any, offer: dict) -> EscrowAccountResponse
         if ctr:
             contractor_name = ctr.get("business_name", ctr.get("name"))
 
+    # Determine payment type from invoice or offer
+    payment_type = "escrow"
+    if invoice:
+        payment_type = invoice.get("payment_type", "escrow")
+
     return EscrowAccountResponse(
         offer_id=offer_id,
         offer_title=offer.get("title"),
@@ -432,6 +528,7 @@ async def _build_escrow_for_offer(db: Any, offer: dict) -> EscrowAccountResponse
         platform_fee=platform_fee,
         net_payout_amount=net_payout,
         escrow_status=escrow_status,
+        payment_type=payment_type,
         participants_paid=participants_paid,
         participants_total=total_participants,
         created_at=offer.get("created_at", ""),
