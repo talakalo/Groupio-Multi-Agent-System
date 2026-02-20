@@ -2,7 +2,7 @@
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -452,7 +452,8 @@ async def download_invoice_pdf(
   .status {{ display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: bold; }}
   .status-paid {{ background: #e8f5e9; color: #2e7d32; }}
   .status-pending {{ background: #fff3e0; color: #e65100; }}
-  .footer {{ margin-top: 60px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #999; text-align: center; }}
+  .footer {{ margin-top: 60px; padding-top: 20px; border-top: 1px solid #eee;
+    font-size: 12px; color: #999; text-align: center; }}
   @media print {{ body {{ margin: 20px; }} }}
 </style>
 </head>
@@ -464,7 +465,9 @@ async def download_invoice_pdf(
     <p><strong>Invoice ID:</strong> {invoice_id[:12]}</p>
     <p><strong>Date:</strong> {issued_at[:10] if issued_at else 'N/A'}</p>
     <p><strong>Offer:</strong> {offer_id[:12] if offer_id else 'N/A'}</p>
-    <p><strong>Status:</strong> <span class="status status-{'paid' if status in ('paid', 'released') else 'pending'}">{status}</span></p>
+    <p><strong>Status:</strong> <span class="status status-{
+      'paid' if status in ('paid', 'released') else 'pending'
+    }">{status}</span></p>
   </div>
 </div>
 
