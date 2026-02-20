@@ -23,6 +23,8 @@ INTENT_AGENT_MAP = {
     "payment_query": "payment",
 }
 
+VALID_AGENTS = frozenset(INTENT_AGENT_MAP.values())
+
 
 class RouterAgent(BaseAgent):
     """Intent classification and routing agent.
@@ -52,10 +54,24 @@ class RouterAgent(BaseAgent):
             state["intent"] = "general_info"
             state["confidence"] = 0.0
             state["current_agent"] = "support"
+            state["entities"] = state.get("entities") or {}
             return state
 
         # Build context-aware system prompt
         system_prompt = self._build_system_prompt(state)
+
+        # Inject last_agent_handoff for follow-up routing
+        handoff = state.get("last_agent_handoff")
+        if handoff and (handoff.get("summary_for_next_agent") or handoff.get("suggested_next_intent")):
+            system_prompt += (
+                "\n\n[Follow-up context] The previous agent ({agent}) reported: {summary} "
+                "Suggested next intent: {suggested_next_intent}. "
+                "Route to the suggested intent/agent when the user message is a clear follow-up."
+            ).format(
+                agent=handoff.get("agent") or "unknown",
+                summary=handoff.get("summary_for_next_agent") or "(no summary)",
+                suggested_next_intent=handoff.get("suggested_next_intent") or "none",
+            )
 
         # Call LLM for intent classification
         result = await self._call_llm_structured(
@@ -75,22 +91,45 @@ class RouterAgent(BaseAgent):
             },
         )
 
-        # Handle parse errors
+        # Handle parse errors: default to support and optional clarification
         if result.get("parse_error"):
             logger.warning("Router parse error, defaulting to support")
             state["intent"] = "general_info"
             state["confidence"] = 0.5
             state["current_agent"] = "support"
+            state["entities"] = {}
+            state["actions_taken"] = [
+                {
+                    "agent": "router",
+                    "action": "clarification_needed",
+                    "response": {
+                        "type": "text",
+                        "message": "לא הבנתי את הבקשה. נסה לנסח שוב או לפרט יותר.",
+                    },
+                    "requires_followup": False,
+                }
+            ]
+            self._metrics["calls"] += 1
             return state
 
-        # Update state with classification results
-        state["intent"] = result.get("intent", "general_info")
-        state["confidence"] = float(result.get("confidence", 0.5))
+        # Validate and clamp intent
+        intent = result.get("intent") or "general_info"
+        state["intent"] = intent if intent in INTENT_AGENT_MAP else "general_info"
 
-        # Determine agent based on intent
-        suggested = result.get("suggested_agent", "")
-        intent = state["intent"]
-        state["current_agent"] = INTENT_AGENT_MAP.get(intent, suggested or "support")
+        # Clamp confidence to [0.0, 1.0]
+        try:
+            raw_conf = float(result.get("confidence", 0.5))
+            state["confidence"] = max(0.0, min(1.0, raw_conf))
+        except (TypeError, ValueError):
+            state["confidence"] = 0.5
+
+        # Validate suggested_agent: must be a known specialist
+        suggested = (result.get("suggested_agent") or "").strip().lower()
+        if suggested not in VALID_AGENTS:
+            suggested = "support"
+
+        # Determine agent from intent map, fallback to validated suggested_agent
+        state["current_agent"] = INTENT_AGENT_MAP.get(state["intent"], suggested)
 
         # If low confidence, add clarifying question as assistant message
         if state["confidence"] < 0.7 and result.get("clarifying_question"):
@@ -107,8 +146,10 @@ class RouterAgent(BaseAgent):
             ]
             state["current_agent"] = "support"
 
-        # Store extracted entities in state
-        entities = result.get("entities", {})
+        # Store extracted entities in state (single source of truth)
+        entities = result.get("entities") or {}
+        entities = {k: v for k, v in entities.items() if v is not None and v != ""}
+        state["entities"] = entities
         if entities.get("building_id") and not state.get("building_id"):
             state["building_id"] = entities["building_id"]
 

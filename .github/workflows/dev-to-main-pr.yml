@@ -1,0 +1,67 @@
+# After CI passes on dev, create or update a PR from dev → main for release.
+# Flow: feature PRs target dev → merge to dev → CI runs on dev → this workflow opens dev→main PR.
+name: Dev to Main PR
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [dev]
+
+concurrency:
+  group: dev-to-main-pr
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  create-dev-to-main-pr:
+    name: Create PR (dev → main)
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'success'
+
+    steps:
+      - name: Find or create dev → main PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const title = 'Release: merge dev into main';
+            const body = `CI has passed on \`dev\`. This PR is ready to merge into \`main\` for production.
+
+            **Triggered by:** CI success on \`dev\` (commit ${context.payload.workflow_run.head_sha})
+            **Workflow run:** [${context.payload.workflow_run.name} #${context.payload.workflow_run.id}](${context.payload.workflow_run.html_url})
+
+            Merge when ready for production release.`;
+
+            const { data: existing } = await github.rest.pulls.list({
+              owner,
+              repo,
+              state: 'open',
+              head: `${owner}:dev`,
+              base: 'main',
+            });
+
+            if (existing.length > 0) {
+              const pr = existing[0];
+              console.log(`Open PR already exists: #${pr.number} ${pr.html_url}`);
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: pr.number,
+                body: `✅ CI passed on \`dev\` again. Still ready to merge. (Run: [${context.payload.workflow_run.id}](${context.payload.workflow_run.html_url}))`,
+              });
+              return;
+            }
+
+            const { data: pr } = await github.rest.pulls.create({
+              owner,
+              repo,
+              title,
+              head: 'dev',
+              base: 'main',
+              body,
+            });
+            console.log(`Created PR: #${pr.number} ${pr.html_url}`);

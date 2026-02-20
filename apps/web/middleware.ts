@@ -26,16 +26,26 @@ export function middleware(request: NextRequest) {
     request.headers.get('accept-language')?.split(',')[0].split('-')[0] ||
     'he';
 
-  // Check for auth token in cookies
-  const authCookie = request.cookies.get('groupio-auth');
-  let isAuthenticated = false;
+  // Determine auth status from cookies.
+  // The HTTP-only `refresh_token` cookie (set by the backend) is the
+  // source of truth for "is the user logged in".  The Zustand-persisted
+  // `groupio-auth` cookie (localStorage mirror) provides the cached
+  // user profile / role for edge-middleware routing decisions.
+  const hasRefreshCookie = !!request.cookies.get('refresh_token');
+  let isAuthenticated = hasRefreshCookie;
   let userRole: string | null = null;
 
+  // Try to read cached user profile from Zustand persist cookie
+  const authCookie = request.cookies.get('groupio-auth');
   if (authCookie) {
     try {
       const authData = JSON.parse(authCookie.value);
-      isAuthenticated = !!authData?.state?.accessToken;
-      userRole = authData?.state?.user?.role;
+      userRole = authData?.state?.user?.role ?? null;
+      // If the Zustand cookie exists but there's no refresh cookie,
+      // the session has expired.
+      if (!hasRefreshCookie) {
+        isAuthenticated = false;
+      }
     } catch {
       // Invalid cookie format
     }

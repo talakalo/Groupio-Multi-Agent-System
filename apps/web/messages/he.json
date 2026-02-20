@@ -26,8 +26,28 @@
     "iAmContractor": "אני קבלן",
     "welcome": "ברוכים הבאים לגרופיו"
   },
+  "residentNav": {
+    "dashboard": "לוח בקרה",
+    "offers": "הצעות",
+    "contractors": "קבלנים",
+    "building": "הבניין",
+    "profile": "פרופיל",
+    "aiAssistant": "עוזר AI",
+    "myAccount": "החשבון שלי"
+  },
+  "contractorNav": {
+    "dashboard": "לוח בקרה",
+    "activeOffers": "הצעות פעילות",
+    "createOffer": "צור הצעה",
+    "projects": "פרויקטים",
+    "profile": "פרופיל",
+    "contractorBadge": "קבלן",
+    "newOffer": "הצעה חדשה",
+    "myBusiness": "העסק שלי"
+  },
   "dashboard": {
     "welcome": "שלום, {name}!",
+    "dashboardSubtitle": "הנה מה שקורה בבניין שלך",
     "activeOffers": "הצעות פעילות",
     "neighborsJoined": "שכנים הצטרפו",
     "totalSavings": "סך חיסכון",
@@ -35,7 +55,13 @@
     "quickActions": "פעולות מהירות",
     "findContractor": "מצא קבלן",
     "viewOffers": "צפה בהצעות",
-    "askQuestion": "שאל שאלה"
+    "askQuestion": "שאל שאלה",
+    "thisMonth": "החודש {percent}+",
+    "viewAll": "הצג הכל",
+    "noActiveOffers": "אין הצעות פעילות",
+    "browseOffers": "עיין בהצעות",
+    "recentActivity": "פעילות אחרונה",
+    "noRecentActivity": "אין פעילות אחרונה"
   },
   "offers": {
     "title": "הצעות",
@@ -53,7 +79,20 @@
     "yourPrice": "המחיר שלך",
     "pricingTiers": "מדרגות מחיר",
     "shareWithNeighbors": "שתף עם השכנים",
-    "noOffers": "אין הצעות פעילות כרגע"
+    "noOffers": "אין הצעות פעילות כרגע",
+    "offersCount": "{count} הצעות",
+    "status": "סטטוס",
+    "verifiedContractor": "קבלן מאומת",
+    "pending": "ממתינות",
+    "filterOffers": "סנן הצעות",
+    "clearFilters": "נקה מסננים",
+    "category": "קטגוריה",
+    "allCategories": "כל הקטגוריות",
+    "allStatuses": "כל הסטטוסים",
+    "priceMin": "מחיר מינימלי",
+    "priceMax": "מחיר מקסימלי",
+    "noLimit": "ללא הגבלה",
+    "noOffersDescription": "לא נמצאו הצעות התואמות לחיפוש שלך"
   },
   "contractors": {
     "title": "קבלנים",
@@ -63,7 +102,138 @@
     "experience": "{years} שנות ניסיון",
     "contactContractor": "צור קשר",
     "viewProfile": "צפה בפרופיל",
-    "noContractors": "לא נמצאו קבלנים"
+    "noContractors": "לא נמצאו קבלנים",
+    "trustScore": "ציון אמינות",
+    "showLess": "הצג פחות",
+    "showMore": "הצג עוד",
+    "contractorsCount": "{count} קבלנים",
+    "searchContractors": "חפש קבלנים",
+    "specialty": "התמחות",
+    "allSpecialties": "כל ההתמחויות",
+    "serviceArea": "אזור שירות",
+    "allRegions": "כל האזורים",
+    "minimumRating": "דירוג מינימלי",
+    "anyRating": "כל דירוג",
+    "stars": "כוכבים",
+    "sortBy": "מיין לפי",
+    "sortByRating": "לפי דירוג",
+    "sortByTrust": "לפי אמינות",
+    "sortByExperience": "לפי ניסיון",
+    "verifiedOnly": "מאומתים בלבד",
+    "noContractorsDescription": "לא נמצאו קבלנים התואמים לחיפוש שלך"
+  },
+  "profile": {
+    "title": "פרופיל",
+    "subtitle": "נהל את החשבון שלך",
+    "changeAvatar": "שנה תמונה",
+    "personalInfo": "מידע אישי",
+    "notifications": "התראות",
+    "security": "אבטחה",
+    "fullName": "שם מלא",
+    "email": "אימייל",
+    "phone": "טלפון",
+    "language": "שפה",
+    "hebrew": "עברית",
+    "english": "English",
+    "building": "בניין",
+    "notAssigned": "לא שויך",
+    "offerNotifications": "התראות הצעות",
+    "offerNotificationsDescription": "קבל עדכונים על הצעות חדשות",
+    "newOffers": "הצעות חדשות",
+    "newOffersDescription": "התראה כשיש הצעה חדשה בבניין",
+    "offerUpdates": "עדכוני הצעות",
+    "offerUpdatesDescription": "התראה כשהצעה מתעדכנת",
+    "neighborJoined": "שכן הצטרף",
+    "neighborJoinedDescription": "התראה כששכן מצטרף להצעה",
+    "tierReached": "מדרגת מחיר הושגה",
+    "tierReachedDescription": "התראה כשמדרגת מחיר חדשה מושגת",
+    "contractorMessages": "הודעות מקבלנים",
+    "contractorMessagesDescription": "התראה על הודעות מקבלנים",
+    "channels": "ערוצים",
+    "channelsDescription": "בחר איפה לקבל התראות",
+    "pushNotifications": "התראות דחיפה",
+    "pushNotificationsDescription": "התראות בדפדפן",
+    "emailNotifications": "התראות באימייל",
+    "emailNotificationsDescription": "קבל עדכונים לאימייל",
+    "whatsappNotifications": "התראות בוואטסאפ",
+    "whatsappNotificationsDescription": "קבל עדכונים בוואטסאפ",
+    "weeklyDigest": "סיכום שבועי",
+    "weeklyDigestDescription": "קבל סיכום שבועי של הפעילות",
+    "changePassword": "שנה סיסמה",
+    "currentPassword": "סיסמה נוכחית",
+    "newPassword": "סיסמה חדשה",
+    "confirmPassword": "אישור סיסמה",
+    "updatePassword": "עדכן סיסמה",
+    "dangerZone": "אזור מסוכן",
+    "deleteAccountWarning": "מחיקת החשבון היא פעולה בלתי הפיכה",
+    "deleteAccount": "מחק חשבון",
+    "logout": "התנתקות",
+    "saved": "נשמר בהצלחה"
+  },
+  "building": {
+    "title": "הבניין",
+    "committee": "ועד בית",
+    "apartment": "דירה",
+    "totalUnits": "סה\"כ דירות",
+    "activeResidents": "דיירים פעילים",
+    "activeOffers": "הצעות פעילות",
+    "totalSavings": "סך חיסכון",
+    "inviteCode": "קוד הזמנה",
+    "copyCode": "העתק קוד",
+    "copied": "הועתק!",
+    "neighbors": "שכנים",
+    "groupOffers": "הצעות קבוצתיות",
+    "buildingSettings": "הגדרות בניין",
+    "noNeighbors": "אין שכנים עדיין",
+    "inviteNeighbors": "הזמן שכנים",
+    "viewAll": "הצג הכל",
+    "noGroupOffers": "אין הצעות קבוצתיות",
+    "buildingAddress": "כתובת הבניין",
+    "city": "עיר",
+    "buildingAge": "גיל הבניין",
+    "yearsOld": "שנים",
+    "contactCommittee": "צור קשר עם ועד הבית"
+  },
+  "contractor": {
+    "dashboard": {
+      "title": "לוח בקרה",
+      "subtitle": "סקירת הפעילות שלך",
+      "stats": {
+        "activeOffers": "הצעות פעילות",
+        "completedProjects": "פרויקטים שהושלמו",
+        "totalRevenue": "סך הכנסות",
+        "rating": "דירוג"
+      },
+      "trustScore": {
+        "title": "ציון אמינות",
+        "license": "רישיון",
+        "insurance": "ביטוח",
+        "experience": "ניסיון",
+        "reputation": "מוניטין",
+        "completion": "השלמה",
+        "response": "תגובה"
+      },
+      "pendingOffers": {
+        "title": "הצעות ממתינות",
+        "empty": "אין הצעות ממתינות"
+      },
+      "assistant": {
+        "title": "עוזר AI",
+        "placeholder": "שאל אותי משהו..."
+      },
+      "activeProjects": {
+        "title": "פרויקטים פעילים",
+        "viewAll": "הצג הכל",
+        "empty": "אין פרויקטים פעילים"
+      }
+    }
+  },
+  "onboarding": {
+    "buildingInfo": "פרטי הבניין",
+    "buildingInfoDescription": "ספר לנו על הבניין שלך",
+    "buildingAddress": "כתובת הבניין",
+    "buildingAddressPlaceholder": "הכנס כתובת",
+    "buildingType": "סוג הבניין"
   },
   "chat": {
     "placeholder": "הקלד הודעה...",
@@ -119,8 +289,12 @@
   "contractor": {
     "offers": {
       "create": {
-        "fields": { "buildingId": "מזהה בניין" },
-        "placeholders": { "buildingId": "הזן מזהה בניין" }
+        "fields": {
+          "buildingId": "מזהה בניין"
+        },
+        "placeholders": {
+          "buildingId": "הזן מזהה בניין"
+        }
       }
     }
   },
@@ -130,7 +304,9 @@
     "contractors": "קבלנים",
     "architecture": "תוכנית הדירה",
     "building": "בניין",
-    "profile": "פרופיל"
+    "profile": "פרופיל",
+    "aiAssistant": "עוזר AI",
+    "myAccount": "החשבון שלי"
   },
   "architecture": {
     "title": "תוכנית הדירה שלי",

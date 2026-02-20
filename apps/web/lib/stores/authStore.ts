@@ -14,7 +14,7 @@ export interface User {
   isVerified: boolean;
 }
 
-interface AuthState {
+export interface AuthState {
   user: User | null;
   accessToken: string | null;
   refreshToken: string | null;
@@ -24,6 +24,7 @@ interface AuthState {
   // Actions
   setUser: (user: User | null) => void;
   setTokens: (accessToken: string, refreshToken: string) => void;
+  setAccessToken: (accessToken: string | null) => void;
   clearAuth: () => void;
   setLoading: (loading: boolean) => void;
 
@@ -69,8 +70,21 @@ export const useAuthStore = create<AuthState>()(
         });
       },
 
+      setAccessToken: (accessToken) => {
+        if (accessToken == null) {
+          get().clearAuth();
+          return;
+        }
+        const { refreshToken } = get();
+        get().setTokens(accessToken, refreshToken ?? '');
+      },
+
       clearAuth: () => {
-        if (typeof window !== 'undefined') window.localStorage.removeItem('auth_token');
+        if (typeof window !== 'undefined') {
+          window.localStorage.removeItem('auth_token');
+          // Clear the auth cookie for both http and https
+          document.cookie = 'groupio-auth=; path=/; max-age=0; samesite=lax';
+        }
         set({
           user: null,
           accessToken: null,
@@ -89,6 +103,7 @@ export const useAuthStore = create<AuthState>()(
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, password }),
+            credentials: 'include',
           });
 
           if (!response.ok) {
@@ -131,32 +146,26 @@ export const useAuthStore = create<AuthState>()(
               headers: {
                 Authorization: `Bearer ${accessToken}`,
               },
-            });
+              credentials: 'include',
+            }).catch(() => {});
           }
         } finally {
-          set({
-            user: null,
-            accessToken: null,
-            refreshToken: null,
-            isAuthenticated: false,
-            isLoading: false,
-          });
+          get().clearAuth();
+          set({ isLoading: false });
         }
       },
 
       refreshAccessToken: async () => {
         const { refreshToken } = get();
 
-        if (!refreshToken) {
-          get().clearAuth();
-          return false;
-        }
-
         try {
           const response = await fetch(`${API_URL}/api/v1/auth/refresh`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ refresh_token: refreshToken }),
+            body: refreshToken
+              ? JSON.stringify({ refresh_token: refreshToken })
+              : undefined,
+            credentials: 'include',
           });
 
           if (!response.ok) {
@@ -164,14 +173,19 @@ export const useAuthStore = create<AuthState>()(
             return false;
           }
 
-      const data = await response.json();
-      if (typeof window !== 'undefined') window.localStorage.setItem('auth_token', data.access_token);
-      set({
-        accessToken: data.access_token,
-        refreshToken: data.refresh_token,
-      });
+          const data = await response.json();
+          if (!data?.access_token) {
+            get().clearAuth();
+            return false;
+          }
+          if (typeof window !== 'undefined')
+            window.localStorage.setItem('auth_token', data.access_token);
+          set({
+            accessToken: data.access_token,
+            refreshToken: data.refresh_token ?? get().refreshToken ?? '',
+          });
 
-      return true;
+          return true;
         } catch {
           get().clearAuth();
           return false;

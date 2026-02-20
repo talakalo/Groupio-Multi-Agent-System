@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useTranslations } from 'next-intl';
 import type { Offer } from '@groupio/types';
+import { useTranslations } from 'next-intl';
+import { useState, useEffect } from 'react';
 
 type ProjectStatus = 'all' | 'in_progress' | 'completed' | 'cancelled';
 
@@ -27,14 +27,20 @@ export default function ContractorProjectsPage() {
   useEffect(() => {
     async function fetchProjects() {
       setIsLoading(true);
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       try {
         const params = new URLSearchParams();
         if (statusFilter !== 'all') params.set('status', statusFilter);
         params.set('year', year.toString());
 
-        const res = await fetch(`/api/contractor/projects?${params}`);
+        const res = await fetch(`${apiBase}/api/v1/offers?${params}`, { headers });
         if (res.ok) {
-          setProjects(await res.json());
+          const data = await res.json();
+          setProjects(data.items ?? data.offers ?? []);
         }
       } catch (error) {
         console.error('Failed to fetch projects:', error);

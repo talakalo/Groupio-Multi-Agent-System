@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback, type FormEvent } from 'react'
 import { Send, Bot, User, Loader2, Sparkles } from 'lucide-react';
 import type { Message, MessageResponse, ServiceCategory } from '@groupio/types';
 import { cn } from '@/lib/utils/cn';
+import { useAccessToken } from '@/lib/stores/authStore';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -61,6 +62,7 @@ export function AIChat({
   className,
 }: AIChatProps) {
   const baseUrl = apiUrl ?? API_BASE;
+  const accessToken = useAccessToken();
 
   // ---- State ----
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -113,10 +115,21 @@ export function AIChat({
         },
       ]);
 
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
       try {
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        };
+        if (accessToken) {
+          headers['Authorization'] = `Bearer ${accessToken}`;
+        }
+
+        const controller = new AbortController();
+        timeoutId = setTimeout(() => controller.abort(), 30000);
+
         const response = await fetch(`${baseUrl}/api/v1/message`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({
             userId,
             message: text.trim(),
@@ -125,7 +138,11 @@ export function AIChat({
             context,
             ...(category ? { category } : {}),
           }),
+          signal: controller.signal,
         });
+
+        clearTimeout(timeoutId);
+        timeoutId = undefined;
 
         if (!response.ok) {
           throw new Error(`API error: ${response.status}`);
@@ -153,10 +170,11 @@ export function AIChat({
           ),
         );
       } finally {
+        if (timeoutId !== undefined) clearTimeout(timeoutId);
         setIsLoading(false);
       }
     },
-    [baseUrl, buildingId, category, context, isLoading, userId],
+    [accessToken, baseUrl, buildingId, category, context, isLoading, userId],
   );
 
   const handleSubmit = (e: FormEvent) => {

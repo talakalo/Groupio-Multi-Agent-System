@@ -1,5 +1,6 @@
-import { vi, afterEach } from 'vitest';
+/* eslint-disable @typescript-eslint/no-require-imports, import/first, @typescript-eslint/no-explicit-any */
 import React from 'react';
+import { afterEach, vi } from 'vitest';
 
 // Mock @testing-library/react-native (it fails to load RN host components in Node)
 vi.mock('@testing-library/react-native', () => {
@@ -118,22 +119,16 @@ vi.mock('react-native-paper', () => {
     useTheme: () => ({
       colors: {
         primary: '#6200ee',
-        primaryContainer: '#bb86fc',
-        onPrimaryContainer: '#21005e',
         secondary: '#03DAC6',
         background: '#ffffff',
         surface: '#ffffff',
         surfaceVariant: '#f5f5f5',
-        onSurfaceVariant: '#666666',
         error: '#B00020',
         text: '#000000',
         onSurface: '#000000',
         onBackground: '#000000',
         onPrimary: '#ffffff',
         outline: '#cccccc',
-        outlineVariant: '#dddddd',
-        tertiary: '#7d5260',
-        tertiaryContainer: '#ffd8e4',
         elevation: { level0: '#fff', level1: '#fff', level2: '#fff', level3: '#fff' },
       },
       dark: false,
@@ -166,7 +161,6 @@ vi.mock('react-native', () => ({
   StyleSheet: {
     create: (styles: Record<string, object>) => styles,
     flatten: (style: object) => style,
-    hairlineWidth: 1,
   },
   View: 'View',
   Text: 'Text',

@@ -106,8 +106,7 @@ class NotificationAgent(BaseAgent):
                 },
                 "response": {
                     "type": "notification_summary",
-                    "message": f"Processed {len(notifications_sent)} notification(s) "
-                    f"of type '{notification_type}'.",
+                    "message": f"Processed {len(notifications_sent)} notification(s) of type '{notification_type}'.",
                     "notifications": notifications_sent,
                 },
                 "requires_followup": False,
@@ -181,11 +180,7 @@ class NotificationAgent(BaseAgent):
 
         content = result.get("content", "")
         if isinstance(content, list):
-            content = " ".join(
-                block.get("text", "")
-                for block in content
-                if block.get("type") == "text"
-            )
+            content = " ".join(block.get("text", "") for block in content if block.get("type") == "text")
 
         # Parse JSON from the response
         try:
@@ -211,10 +206,7 @@ class NotificationAgent(BaseAgent):
 
         user_profile = state.get("user_profile", {})
         if user_profile:
-            parts.append(
-                f"User: {user_profile.get('full_name', 'Unknown')} "
-                f"({user_profile.get('email', '')})"
-            )
+            parts.append(f"User: {user_profile.get('full_name', 'Unknown')} ({user_profile.get('email', '')})")
 
         active_offers = state.get("active_offers", [])
         if active_offers:
@@ -223,9 +215,7 @@ class NotificationAgent(BaseAgent):
 
         building = state.get("building_context", {})
         if building:
-            parts.append(
-                f"Building: {building.get('name', building.get('address', 'Unknown'))}"
-            )
+            parts.append(f"Building: {building.get('name', building.get('address', 'Unknown'))}")
 
         # Add recent actions for context
         for action in state.get("actions_taken", [])[-2:]:
@@ -244,39 +234,30 @@ class NotificationAgent(BaseAgent):
     ) -> None:
         """Dispatch a notification via the specified channel.
 
-        Email: delegates to EmailService for actual delivery.
-        WhatsApp/Push/In-app: logged for now (requires infra setup).
+        Currently logs the notification. The actual sending infrastructure
+        is available in:
+        - Email: src/services/email.py (EmailService)
+        - WhatsApp: src/services/whatsapp_bot.py (WhatsAppBotService)
         """
         user_email = user_profile.get("email", "unknown")
         user_name = user_profile.get("full_name", "User")
         body_preview = (message.get("body", ""))[:80]
 
-        if channel == "email":
-            from src.services.email import get_email_service
+        # Redact PII before logging
+        redacted_email = user_email[:3] + "***" if len(user_email) > 3 else "***"
+        redacted_phone = "***" + user_profile.get("phone", "")[-4:] if user_profile.get("phone") else "unknown"
 
-            email_svc = get_email_service()
-            subject = message.get("subject", "Groupio Notification")
-            body = message.get("body", "")
-            sent = await email_svc.send_email(
-                to_email=user_email,
-                subject=subject,
-                html_content=f"<div dir='rtl'>{body}</div>",
-                text_content=body,
+        if channel == "email":
+            logger.info(
+                "NOTIFICATION [email] to=%s subject='%s' body='%s...'",
+                redacted_email,
+                message.get("subject", ""),
+                body_preview,
             )
-            if sent:
-                logger.info("NOTIFICATION [email] sent to=%s subject='%s'", user_email, subject)
-            else:
-                logger.info(
-                    "NOTIFICATION [email] not configured, logged: to=%s subject='%s' body='%s...'",
-                    user_email,
-                    subject,
-                    body_preview,
-                )
         elif channel == "whatsapp":
-            phone = user_profile.get("phone", "unknown")
             logger.info(
                 "NOTIFICATION [whatsapp] to=%s body='%s...'",
-                phone,
+                redacted_phone,
                 body_preview,
             )
         elif channel == "push":

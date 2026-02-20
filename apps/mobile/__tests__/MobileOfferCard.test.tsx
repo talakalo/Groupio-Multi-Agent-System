@@ -1,14 +1,23 @@
-import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
+import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
+
 import MobileOfferCard from '../components/MobileOfferCard';
+
 import type { Offer } from '@groupio/types';
 
 const mockOffer = {
   id: 'offer-123',
   category: 'ac_installation',
   basePrice: 5000,
-  status: 'active',
+  currentParticipants: 10,
+  minParticipants: 5,
+  maxParticipants: 20,
+  status: 'pending',
+  discount: 15,
+  deadline: '2024-12-31',
+  buildingId: 'building-1',
+  contractorId: 'contractor-1',
   contractor: {
     id: 'contractor-1',
     businessName: 'AC Pro',
@@ -19,17 +28,13 @@ const mockOffer = {
     regions: ['center'],
   },
   participants: 10,
-  currentTier: 0,
-  tiers: [
-    { min: 5, max: 10, discount: 15, price: 4250 },
-    { min: 11, max: 20, discount: 20, price: 4000 },
-  ],
-  expiresAt: '2027-12-31',
   createdAt: '2024-01-01',
   updatedAt: '2024-01-01',
   createdBy: 'user-1',
-  buildingId: 'building-1',
-  contractorId: 'contractor-1',
+  pricingTiers: [],
+  currentTier: 0,
+  tiers: [{ min: 5, max: 20, discount: 15, price: 4250 }],
+  expiresAt: '2025-12-31',
 } as unknown as Offer;
 
 describe('MobileOfferCard', () => {
@@ -86,9 +91,14 @@ describe('MobileOfferCard', () => {
   });
 
   it('calls onJoin when join button is pressed', () => {
+    const activeOffer = {
+      ...mockOffer,
+      status: 'active',
+      expiresAt: '2099-12-31',
+    } as unknown as Offer;
     const onJoin = vi.fn();
     const { getByTestId } = render(
-      <MobileOfferCard offer={mockOffer} onJoin={onJoin} />
+      <MobileOfferCard offer={activeOffer} onJoin={onJoin} />
     );
     fireEvent.press(getByTestId('join-button'));
     expect(onJoin).toHaveBeenCalledWith('offer-123');
@@ -106,8 +116,13 @@ describe('MobileOfferCard', () => {
   });
 
   it('shows join text when offer is active', () => {
+    const activeOffer = {
+      ...mockOffer,
+      status: 'active',
+      expiresAt: '2099-12-31',
+    } as unknown as Offer;
     const { getByText } = render(
-      <MobileOfferCard offer={mockOffer} onPress={vi.fn()} />
+      <MobileOfferCard offer={activeOffer} onPress={vi.fn()} />
     );
     // "הצטרף להצעה" = Join offer
     expect(getByText(/הצטרף/)).toBeTruthy();
@@ -140,8 +155,17 @@ describe('MobileOfferCard', () => {
   });
 
   it('shows next tier hint when more tiers exist', () => {
+    const multiTierOffer = {
+      ...mockOffer,
+      tiers: [
+        { min: 5, max: 10, discount: 10, price: 4500 },
+        { min: 11, max: 20, discount: 20, price: 4000 },
+      ],
+      currentTier: 0,
+      participants: 10,
+    } as unknown as Offer;
     const { getByText } = render(
-      <MobileOfferCard offer={mockOffer} onPress={vi.fn()} />
+      <MobileOfferCard offer={multiTierOffer} onPress={vi.fn()} />
     );
     // Next tier needs 11 min, current participants is 10, so 1 more needed
     // "עוד 1 להנחה נוספת!" = 1 more for additional discount!

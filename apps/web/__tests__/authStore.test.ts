@@ -28,7 +28,6 @@ describe('Auth Store', () => {
     useAuthStore.setState({
       user: null,
       accessToken: null,
-      refreshToken: null,
       isAuthenticated: false,
       isLoading: false,
     });
@@ -60,13 +59,20 @@ describe('Auth Store', () => {
     });
   });
 
-  describe('setTokens', () => {
-    it('stores tokens and marks as authenticated', () => {
-      useAuthStore.getState().setTokens('access-token', 'refresh-token');
+  describe('setAccessToken', () => {
+    it('stores token and marks as authenticated', () => {
+      useAuthStore.getState().setAccessToken('access-token');
 
       expect(useAuthStore.getState().accessToken).toBe('access-token');
-      expect(useAuthStore.getState().refreshToken).toBe('refresh-token');
       expect(useAuthStore.getState().isAuthenticated).toBe(true);
+    });
+
+    it('clears auth when token is null', () => {
+      useAuthStore.getState().setAccessToken('access-token');
+      useAuthStore.getState().setAccessToken(null);
+
+      expect(useAuthStore.getState().accessToken).toBeNull();
+      expect(useAuthStore.getState().isAuthenticated).toBe(false);
     });
   });
 
@@ -81,25 +87,23 @@ describe('Auth Store', () => {
         preferredLanguage: 'he',
         isVerified: true,
       });
-      useAuthStore.getState().setTokens('access', 'refresh');
+      useAuthStore.getState().setAccessToken('access');
 
       useAuthStore.getState().clearAuth();
 
       expect(useAuthStore.getState().user).toBeNull();
       expect(useAuthStore.getState().accessToken).toBeNull();
-      expect(useAuthStore.getState().refreshToken).toBeNull();
       expect(useAuthStore.getState().isAuthenticated).toBe(false);
     });
   });
 
   describe('login', () => {
-    it('successfully logs in user', async () => {
+    it('successfully logs in user with credentials include', async () => {
       (global.fetch as ReturnType<typeof vi.fn>)
         .mockResolvedValueOnce({
           ok: true,
           json: async () => ({
             access_token: 'new-access-token',
-            refresh_token: 'new-refresh-token',
           }),
         })
         .mockResolvedValueOnce({
@@ -116,6 +120,10 @@ describe('Auth Store', () => {
 
       expect(useAuthStore.getState().isAuthenticated).toBe(true);
       expect(useAuthStore.getState().accessToken).toBe('new-access-token');
+
+      // Verify credentials: 'include' on the login fetch call
+      const loginCallOptions = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1];
+      expect(loginCallOptions.credentials).toBe('include');
     });
 
     it('throws error on invalid credentials', async () => {
@@ -141,7 +149,6 @@ describe('Auth Store', () => {
           ok: true,
           json: async () => ({
             access_token: 'token',
-            refresh_token: 'refresh',
           }),
         };
       });
@@ -158,8 +165,8 @@ describe('Auth Store', () => {
   });
 
   describe('logout', () => {
-    it('clears auth state on logout', async () => {
-      useAuthStore.getState().setTokens('access', 'refresh');
+    it('clears auth state and sends credentials include', async () => {
+      useAuthStore.getState().setAccessToken('access');
       useAuthStore.getState().setUser({
         id: 'user-123',
         email: 'test@example.com',
@@ -178,18 +185,19 @@ describe('Auth Store', () => {
 
       expect(useAuthStore.getState().user).toBeNull();
       expect(useAuthStore.getState().isAuthenticated).toBe(false);
+
+      // Verify credentials: 'include' on the logout fetch call
+      const logoutCallOptions = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1];
+      expect(logoutCallOptions.credentials).toBe('include');
     });
   });
 
   describe('refreshAccessToken', () => {
-    it('refreshes tokens successfully', async () => {
-      useAuthStore.getState().setTokens('old-access', 'old-refresh');
-
+    it('refreshes via HTTP-only cookie (no token in state needed)', async () => {
       (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
         ok: true,
         json: async () => ({
           access_token: 'new-access-token',
-          refresh_token: 'new-refresh-token',
         }),
       });
 
@@ -197,11 +205,13 @@ describe('Auth Store', () => {
 
       expect(result).toBe(true);
       expect(useAuthStore.getState().accessToken).toBe('new-access-token');
+
+      // Verify credentials: 'include' is set
+      const callOptions = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1];
+      expect(callOptions.credentials).toBe('include');
     });
 
     it('clears auth on refresh failure', async () => {
-      useAuthStore.getState().setTokens('old-access', 'old-refresh');
-
       (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
         ok: false,
       });
@@ -211,31 +221,23 @@ describe('Auth Store', () => {
       expect(result).toBe(false);
       expect(useAuthStore.getState().isAuthenticated).toBe(false);
     });
-
-    it('returns false when no refresh token exists', async () => {
-      const result = await useAuthStore.getState().refreshAccessToken();
-
-      expect(result).toBe(false);
-    });
   });
 
   describe('register', () => {
     it('registers and logs in user', async () => {
+      const mockJson = (data: object) => () => Promise.resolve(data);
       (global.fetch as ReturnType<typeof vi.fn>)
         .mockResolvedValueOnce({
           ok: true,
-          json: async () => ({ id: 'new-user-123' }),
+          json: mockJson({ id: 'new-user-123' }),
         })
         .mockResolvedValueOnce({
           ok: true,
-          json: async () => ({
-            access_token: 'access-token',
-            refresh_token: 'refresh-token',
-          }),
+          json: mockJson({ access_token: 'access-token', refresh_token: 'refresh-token' }),
         })
         .mockResolvedValueOnce({
           ok: true,
-          json: async () => ({
+          json: mockJson({
             id: 'new-user-123',
             email: 'new@example.com',
             full_name: 'New User',
@@ -251,6 +253,19 @@ describe('Auth Store', () => {
       });
 
       expect(useAuthStore.getState().isAuthenticated).toBe(true);
+    });
+  });
+
+  describe('persistence', () => {
+    it('does not persist accessToken to localStorage', () => {
+      useAuthStore.getState().setAccessToken('secret-token');
+
+      // The partialize function should exclude accessToken
+      const persisted = localStorageMock.store['groupio-auth'];
+      if (persisted) {
+        const parsed = JSON.parse(persisted);
+        expect(parsed.state).not.toHaveProperty('accessToken');
+      }
     });
   });
 });

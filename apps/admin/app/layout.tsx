@@ -3,7 +3,7 @@
 import "./globals.css";
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import {
@@ -15,13 +15,12 @@ import {
   Bell,
   Settings,
   ChevronLeft,
-  Menu,
   LogOut,
   Shield,
   Users,
   Tag,
-  Banknote,
 } from "lucide-react";
+import { useAdminUser } from "@/lib/hooks";
 
 const NAV_ITEMS = [
   {
@@ -58,11 +57,6 @@ const NAV_ITEMS = [
     label: "Offers",
     href: "/offers",
     icon: Tag,
-  },
-  {
-    label: "Payments",
-    href: "/payments",
-    icon: Banknote,
   },
   {
     label: "Settings",
@@ -182,6 +176,30 @@ function Sidebar({
 }
 
 function Header({ sidebarCollapsed }: { sidebarCollapsed: boolean }) {
+  const router = useRouter();
+  const { data: user } = useAdminUser();
+  const displayName = user?.full_name?.trim() || "Admin User";
+  const initials = displayName.split(/\s+/).map((s) => s[0]).join("").toUpperCase().slice(0, 2) || "AU";
+  const email = user?.email ?? "—";
+
+  async function handleLogout() {
+    const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
+    const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "") || "http://localhost:8000";
+    const url = baseUrl.endsWith("/api/v1") ? `${baseUrl.replace(/\/api\/v1$/, "")}/api/v1/auth/logout` : `${baseUrl}/api/v1/auth/logout`;
+    try {
+      await fetch(url, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        credentials: "include",
+      });
+    } finally {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("auth_token");
+        router.push("/login");
+      }
+    }
+  }
+
   return (
     <header
       className={clsx(
@@ -200,7 +218,6 @@ function Header({ sidebarCollapsed }: { sidebarCollapsed: boolean }) {
       </div>
 
       <div className="flex items-center gap-4">
-        {/* Notifications */}
         <button
           className="relative p-2 rounded-lg text-surface-500 hover:bg-surface-100 transition-colors"
           aria-label="Notifications"
@@ -209,27 +226,27 @@ function Header({ sidebarCollapsed }: { sidebarCollapsed: boolean }) {
           <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-danger-500" />
         </button>
 
-        {/* Settings */}
-        <button
+        <Link
+          href="/settings"
           className="p-2 rounded-lg text-surface-500 hover:bg-surface-100 transition-colors"
           aria-label="Settings"
         >
           <Settings className="w-5 h-5" />
-        </button>
+        </Link>
 
-        {/* Divider */}
         <div className="w-px h-8 bg-surface-200" />
 
-        {/* User info */}
         <div className="flex items-center gap-3">
           <div className="text-right">
-            <p className="text-sm font-medium text-surface-800">Admin User</p>
-            <p className="text-xs text-surface-500">admin@groupio.co.il</p>
+            <p className="text-sm font-medium text-surface-800">{displayName}</p>
+            <p className="text-xs text-surface-500">{email}</p>
           </div>
           <div className="flex items-center justify-center w-9 h-9 rounded-full bg-primary-100 text-primary-700 font-semibold text-sm">
-            AU
+            {initials}
           </div>
           <button
+            type="button"
+            onClick={handleLogout}
             className="p-1.5 rounded-lg text-surface-400 hover:text-danger-600 hover:bg-danger-50 transition-colors"
             aria-label="Sign out"
           >

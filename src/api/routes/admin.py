@@ -1,6 +1,7 @@
 """Admin API routes for system management."""
 
-from typing import Any, Optional
+import logging
+from typing import Any
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -8,17 +9,19 @@ from pydantic import BaseModel, EmailStr
 
 from src.api.middleware.auth import get_admin_user, hash_password
 from src.databases.postgres import get_postgres_client
-from src.models.user import UserInDB
 from src.databases.vector_store import get_vector_store
+from src.models.user import UserInDB
 from src.orchestration.graph import get_orchestrator
 from src.rag.pipeline import get_rag_pipeline
 
+logger = logging.getLogger(__name__)
 
 # --------------- Pydantic request models ---------------
 
+
 class AdminUserUpdate(BaseModel):
-    role: Optional[str] = None
-    is_active: Optional[bool] = None
+    role: str | None = None
+    is_active: bool | None = None
 
 
 class AdminUserCreate(BaseModel):
@@ -27,6 +30,7 @@ class AdminUserCreate(BaseModel):
     phone: str
     password: str
     role: str = "admin"
+
 
 router = APIRouter(
     tags=["admin"],
@@ -127,30 +131,24 @@ async def get_analytics() -> dict[str, Any]:
     try:
         stats = await db.get_escalation_stats()
         by_status = stats.get("by_status") or {}
-        open_tickets = sum(
-            c for s, c in by_status.items() if str(s).lower() not in ("resolved", "closed")
-        )
+        open_tickets = sum(c for s, c in by_status.items() if str(s).lower() not in ("resolved", "closed"))
         resolved_today = by_status.get("resolved", 0)
     except Exception:
-        pass
+        logger.debug("Could not fetch escalation stats for analytics")
 
     # --- Offer stats (active count + GMV) ---
     try:
-        offers, total_offers = await db.get_all_offers_admin(
-            page=1, page_size=1, status="active"
-        )
+        offers, total_offers = await db.get_all_offers_admin(page=1, page_size=1, status="active")
         active_offers = total_offers
     except Exception:
         pass
 
     try:
         # Sum the price of today's completed offers for GMV
-        from datetime import date, datetime
+        from datetime import date
 
         today_str = date.today().isoformat()
-        completed_offers, _ = await db.get_all_offers_admin(
-            page=1, page_size=1000, status="completed"
-        )
+        completed_offers, _ = await db.get_all_offers_admin(page=1, page_size=1000, status="completed")
         gmv_today = sum(
             float(o.get("price") or o.get("total_price") or 0)
             for o in completed_offers
@@ -163,7 +161,7 @@ async def get_analytics() -> dict[str, Any]:
     try:
         _, total_contractors = await db.list_contractors(filters={}, page=1, page_size=1)
     except Exception:
-        pass
+        logger.debug("Could not fetch contractor count for analytics")
 
     return {
         "gmvToday": gmv_today,
@@ -184,15 +182,13 @@ async def get_analytics() -> dict[str, Any]:
 async def list_users(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    role: Optional[str] = None,
-    is_active: Optional[bool] = None,
+    role: str | None = None,
+    is_active: bool | None = None,
     admin: UserInDB = Depends(get_admin_user),
 ) -> dict[str, Any]:
     """List users with pagination and optional filters."""
     db = get_postgres_client()
-    items, total = await db.get_admin_users(
-        page=page, page_size=page_size, role=role, is_active=is_active
-    )
+    items, total = await db.get_admin_users(page=page, page_size=page_size, role=role, is_active=is_active)
     return {"items": items, "total": total, "page": page, "page_size": page_size}
 
 
@@ -227,14 +223,16 @@ async def update_user(
         raise HTTPException(status_code=400, detail="No fields to update")
     # Allow role updates by extending the allowed set in update_user
     user = await db.update_user(user_id, update_data)
-    await db.create_audit_log({
-        "user_id": admin.id,
-        "action": "update_user",
-        "resource_type": "user",
-        "resource_id": user_id,
-        "details": update_data,
-        "ip_address": request.client.host if request.client else None,
-    })
+    await db.create_audit_log(
+        {
+            "user_id": admin.id,
+            "action": "update_user",
+            "resource_type": "user",
+            "resource_id": user_id,
+            "details": update_data,
+            "ip_address": request.client.host if request.client else None,
+        }
+    )
     return {"id": user.id, "role": user.role, "is_active": user.is_active}
 
 
@@ -259,14 +257,16 @@ async def create_admin_user(
         "is_verified": True,
     }
     user = await db.create_user(user_data)
-    await db.create_audit_log({
-        "user_id": admin.id,
-        "action": "create_user",
-        "resource_type": "user",
-        "resource_id": user_id,
-        "details": {"role": body.role, "email": body.email},
-        "ip_address": request.client.host if request.client else None,
-    })
+    await db.create_audit_log(
+        {
+            "user_id": admin.id,
+            "action": "create_user",
+            "resource_type": "user",
+            "resource_id": user_id,
+            "details": {"role": body.role, "email": body.email},
+            "ip_address": request.client.host if request.client else None,
+        }
+    )
     return {"id": user.id, "email": user.email, "role": user.role}
 
 
@@ -277,9 +277,9 @@ async def create_admin_user(
 async def list_offers_admin(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    status: Optional[str] = None,
-    category: Optional[str] = None,
-    flagged: Optional[bool] = None,
+    status: str | None = None,
+    category: str | None = None,
+    flagged: bool | None = None,
     admin: UserInDB = Depends(get_admin_user),
 ) -> dict[str, Any]:
     """List all offers (admin view) with pagination and filters."""
@@ -302,13 +302,15 @@ async def flag_offer(
     if not offer:
         raise HTTPException(status_code=404, detail="Offer not found")
     updated = await db.update_offer(offer_id, {"status": "flagged"})
-    await db.create_audit_log({
-        "user_id": admin.id,
-        "action": "flag_offer",
-        "resource_type": "offer",
-        "resource_id": offer_id,
-        "ip_address": request.client.host if request.client else None,
-    })
+    await db.create_audit_log(
+        {
+            "user_id": admin.id,
+            "action": "flag_offer",
+            "resource_type": "offer",
+            "resource_id": offer_id,
+            "ip_address": request.client.host if request.client else None,
+        }
+    )
     return updated
 
 
@@ -324,13 +326,15 @@ async def approve_offer(
     if not offer:
         raise HTTPException(status_code=404, detail="Offer not found")
     updated = await db.update_offer(offer_id, {"status": "active"})
-    await db.create_audit_log({
-        "user_id": admin.id,
-        "action": "approve_offer",
-        "resource_type": "offer",
-        "resource_id": offer_id,
-        "ip_address": request.client.host if request.client else None,
-    })
+    await db.create_audit_log(
+        {
+            "user_id": admin.id,
+            "action": "approve_offer",
+            "resource_type": "offer",
+            "resource_id": offer_id,
+            "ip_address": request.client.host if request.client else None,
+        }
+    )
     return updated
 
 
@@ -346,13 +350,15 @@ async def cancel_offer(
     if not offer:
         raise HTTPException(status_code=404, detail="Offer not found")
     updated = await db.update_offer(offer_id, {"status": "cancelled"})
-    await db.create_audit_log({
-        "user_id": admin.id,
-        "action": "cancel_offer",
-        "resource_type": "offer",
-        "resource_id": offer_id,
-        "ip_address": request.client.host if request.client else None,
-    })
+    await db.create_audit_log(
+        {
+            "user_id": admin.id,
+            "action": "cancel_offer",
+            "resource_type": "offer",
+            "resource_id": offer_id,
+            "ip_address": request.client.host if request.client else None,
+        }
+    )
     return updated
 
 
@@ -378,16 +384,16 @@ async def update_settings(
     """Update system settings (body: dict of key-value pairs)."""
     db = get_postgres_client()
     for key, value in body.items():
-        await db.upsert_system_setting(
-            key=key, value=value, updated_by=admin.id
-        )
-    await db.create_audit_log({
-        "user_id": admin.id,
-        "action": "update_settings",
-        "resource_type": "system_settings",
-        "details": {"keys": list(body.keys())},
-        "ip_address": request.client.host if request.client else None,
-    })
+        await db.upsert_system_setting(key=key, value=value, updated_by=admin.id)
+    await db.create_audit_log(
+        {
+            "user_id": admin.id,
+            "action": "update_settings",
+            "resource_type": "system_settings",
+            "details": {"keys": list(body.keys())},
+            "ip_address": request.client.host if request.client else None,
+        }
+    )
     # Return the refreshed settings
     rows = await db.get_system_settings()
     return {row["key"]: row["value"] for row in rows}
@@ -400,13 +406,11 @@ async def update_settings(
 async def list_audit_logs(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    action: Optional[str] = None,
-    resource_type: Optional[str] = None,
+    action: str | None = None,
+    resource_type: str | None = None,
     admin: UserInDB = Depends(get_admin_user),
 ) -> dict[str, Any]:
     """List audit logs with pagination and optional filters."""
     db = get_postgres_client()
-    items, total = await db.list_audit_logs(
-        page=page, page_size=page_size, action=action, resource_type=resource_type
-    )
+    items, total = await db.list_audit_logs(page=page, page_size=page_size, action=action, resource_type=resource_type)
     return {"items": items, "total": total, "page": page, "page_size": page_size}

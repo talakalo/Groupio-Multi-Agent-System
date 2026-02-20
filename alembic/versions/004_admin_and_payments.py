@@ -74,19 +74,18 @@ def upgrade() -> None:
             nullable=True,
         ),
         sa.Column("invoice_number", sa.String(50), unique=True, nullable=True),
-        sa.Column("status", sa.String(20), server_default="'pending'"),
+        sa.Column("type", sa.String(20), nullable=False),
+        sa.Column("status", sa.String(20), server_default="draft"),
         sa.Column("subtotal", sa.Float(), nullable=False),
         sa.Column("tax_rate", sa.Float(), server_default="0.17"),
-        sa.Column("tax", sa.Float(), server_default="0"),
+        sa.Column("tax_amount", sa.Float(), nullable=False),
         sa.Column("total", sa.Float(), nullable=False),
-        sa.Column("platform_fee_rate", sa.Float(), server_default="0.05"),
         sa.Column("platform_fee", sa.Float(), server_default="0"),
         sa.Column("currency", sa.String(3), server_default="'ILS'"),
         sa.Column("due_date", sa.DateTime(), nullable=True),
         sa.Column("paid_at", sa.DateTime(), nullable=True),
-        sa.Column("transaction_id", sa.String(255), nullable=True),
-        sa.Column("payment_method", sa.String(50), nullable=True),
         sa.Column("pdf_path", sa.String(500), nullable=True),
+        sa.Column("metadata", postgresql.JSONB(), server_default="{}"),
         sa.Column("created_at", sa.DateTime(), server_default=sa.func.now()),
         sa.Column(
             "updated_at",
@@ -103,24 +102,21 @@ def upgrade() -> None:
         "payments",
         sa.Column("id", sa.String(36), primary_key=True),
         sa.Column(
-            "invoice_id", sa.String(36), sa.ForeignKey("invoices.id"), nullable=True
+            "invoice_id", sa.String(36), sa.ForeignKey("invoices.id"), nullable=False
         ),
         sa.Column("user_id", sa.String(36), sa.ForeignKey("users.id"), nullable=False),
-        sa.Column(
-            "offer_id", sa.String(36), sa.ForeignKey("offers.id"), nullable=True
-        ),
         sa.Column("amount", sa.Float(), nullable=False),
         sa.Column("currency", sa.String(3), server_default="'ILS'"),
         sa.Column("status", sa.String(20), server_default="'pending'"),
-        sa.Column("transaction_id", sa.String(255), nullable=True),
-        sa.Column("payment_method", sa.String(50), nullable=True),
+        sa.Column("provider", sa.String(50), nullable=True),
+        sa.Column("provider_transaction_id", sa.String(255), nullable=True),
         sa.Column(
             "payment_method_id",
             sa.String(36),
             sa.ForeignKey("payment_methods.id"),
             nullable=True,
         ),
-        sa.Column("provider_data", postgresql.JSONB(), server_default="{}"),
+        sa.Column("metadata", postgresql.JSONB(), server_default="{}"),
         sa.Column("created_at", sa.DateTime(), server_default=sa.func.now()),
         sa.Column(
             "updated_at",
@@ -131,23 +127,21 @@ def upgrade() -> None:
     )
     op.create_index("idx_payments_user_id", "payments", ["user_id"])
     op.create_index("idx_payments_status", "payments", ["status"])
-    op.create_index("idx_payments_transaction_id", "payments", ["transaction_id"])
 
     # ---- payment_splits ----
     op.create_table(
         "payment_splits",
         sa.Column("id", sa.String(36), primary_key=True),
         sa.Column(
-            "invoice_id", sa.String(36), sa.ForeignKey("invoices.id"), nullable=False
+            "payment_id", sa.String(36), sa.ForeignKey("payments.id"), nullable=False
         ),
         sa.Column(
-            "user_id",
+            "participant_user_id",
             sa.String(36),
             sa.ForeignKey("users.id"),
             nullable=False,
         ),
         sa.Column("amount", sa.Float(), nullable=False),
-        sa.Column("unit_count", sa.Integer(), server_default="1"),
         sa.Column("status", sa.String(20), server_default="'pending'"),
         sa.Column("created_at", sa.DateTime(), server_default=sa.func.now()),
     )
@@ -163,7 +157,6 @@ def downgrade() -> None:
     # Drop tables in reverse order
     op.drop_table("payment_splits")
 
-    op.drop_index("idx_payments_transaction_id", "payments")
     op.drop_index("idx_payments_status", "payments")
     op.drop_index("idx_payments_user_id", "payments")
     op.drop_table("payments")

@@ -2,7 +2,6 @@
 
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Optional
 
 import bcrypt
 import jwt
@@ -59,6 +58,7 @@ def create_access_token(
 def create_refresh_token(user_id: str) -> str:
     """Create a JWT refresh token."""
     settings = get_settings()
+
     now = datetime.now(timezone.utc)
     expire = now + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
 
@@ -90,8 +90,8 @@ def verify_access_token(token: str) -> TokenPayload | None:
             sub=payload["sub"],
             email=payload["email"],
             role=UserRole(payload["role"]),
-            exp=datetime.fromtimestamp(payload["exp"]),
-            iat=datetime.fromtimestamp(payload["iat"]),
+            exp=datetime.fromtimestamp(payload["exp"], tz=timezone.utc),
+            iat=datetime.fromtimestamp(payload["iat"], tz=timezone.utc),
         )
     except jwt.ExpiredSignatureError:
         logger.debug("Token expired")
@@ -171,9 +171,14 @@ async def get_admin_user(
     current_user: UserInDB = Depends(get_current_user),
 ) -> UserInDB:
     """Get current user and verify they have admin privileges."""
-    if current_user.role not in (UserRole.ADMIN, UserRole.SUPER_ADMIN):
+    if not is_admin(current_user):
         raise HTTPException(status_code=403, detail="Admin access required")
     return current_user
+
+
+def is_admin(user: UserInDB) -> bool:
+    """Return True if the user has an admin-level role."""
+    return user.role in (UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.BUILDINGS_MANAGER)
 
 
 async def verify_api_key(

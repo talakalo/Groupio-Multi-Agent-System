@@ -120,9 +120,7 @@ class InvoiceService:
         """
         update: dict[str, Any] = {
             "status": "paid",
-            "paid_at": payment_data.get(
-                "paid_at", datetime.now(timezone.utc).isoformat()
-            ),
+            "paid_at": payment_data.get("paid_at", datetime.now(timezone.utc).isoformat()),
             "transaction_id": payment_data.get("transaction_id"),
             "payment_method": payment_data.get("payment_method"),
         }

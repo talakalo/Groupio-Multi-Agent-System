@@ -1,6 +1,5 @@
 """Unit tests for the MockPaymentProvider."""
 
-
 import pytest
 
 from src.services.payment import MockPaymentProvider

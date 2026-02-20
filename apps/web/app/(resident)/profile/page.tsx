@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -19,6 +20,8 @@ import {
   Camera,
   Trash2,
 } from 'lucide-react';
+
+import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
 import type { Resident } from '@groupio/types';
 
@@ -28,7 +31,10 @@ import type { Resident } from '@groupio/types';
 
 interface ResidentProfile extends Resident {
   avatar?: string;
+  avatarUrl?: string;
+  fullName?: string;
   language: 'he' | 'en';
+  preferredLanguage?: string;
   notifications: NotificationPreferences;
 }
 
@@ -97,16 +103,38 @@ export default function ResidentProfilePage() {
   const t = useTranslations('profile');
   const tCommon = useTranslations('common');
   const queryClient = useQueryClient();
+  const router = useRouter();
+  const logoutAction = useAuthStore((s) => s.logout);
+
+  const handleLogout = async () => {
+    await logoutAction();
+    router.push('/login');
+  };
 
   const [activeTab, setActiveTab] = useState<'personal' | 'notifications' | 'security'>('personal');
+
+  const accessToken = useAuthStore((s) => s.accessToken);
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
   const profileQuery = useQuery<ResidentProfile>({
     queryKey: ['resident', 'profile'],
     queryFn: async () => {
-      const res = await fetch('/api/v1/resident/profile');
+      const headers: Record<string, string> = {};
+      if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+      const res = await fetch(`${apiBase}/api/v1/auth/me`, { headers });
       if (!res.ok) throw new Error('Failed to fetch profile');
-      return res.json();
+      const data = await res.json();
+      return {
+        ...data,
+        fullName: data.full_name ?? data.fullName ?? '',
+        phone: data.phone ?? '',
+        preferredLanguage: data.preferred_language ?? data.preferredLanguage ?? 'he',
+        avatarUrl: data.avatar_url ?? data.avatarUrl ?? '',
+        buildingName: data.building_name ?? data.buildingName ?? '',
+        apartmentNumber: data.apartment_number ?? data.apartmentNumber ?? '',
+      } as ResidentProfile;
     },
+    enabled: !!accessToken,
   });
 
   const [formData, setFormData] = useState<Partial<ResidentProfile>>({});
@@ -132,12 +160,18 @@ export default function ResidentProfilePage() {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch('/api/v1/resident/profile', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+      const userId = profileQuery.data?.id;
+      if (!userId) throw new Error('No user ID');
+      const res = await fetch(`${apiBase}/api/v1/auth/me`, {
+        method: 'PUT',
+        headers,
         body: JSON.stringify({
-          ...formData,
-          notifications,
+          full_name: formData.fullName ?? formData.name,
+          phone: formData.phone,
+          preferred_language: formData.preferredLanguage ?? formData.language,
+          avatar_url: formData.avatarUrl ?? formData.avatar,
         }),
       });
       if (!res.ok) throw new Error('Failed to save profile');
@@ -400,7 +434,7 @@ export default function ResidentProfilePage() {
                 <Trash2 className="h-4 w-4" />
                 {t('deleteAccount')}
               </button>
-              <button type="button" className="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors text-sm font-medium">
+              <button type="button" onClick={handleLogout} className="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors text-sm font-medium">
                 <LogOut className="h-4 w-4" />
                 {t('logout')}
               </button>

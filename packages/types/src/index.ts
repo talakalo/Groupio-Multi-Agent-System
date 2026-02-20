@@ -373,6 +373,7 @@ export interface EscrowConfig {
   platformFeeRate: number;
 }
 
+
 export interface ContractorPayout {
   id: string;
   contractorId: string;

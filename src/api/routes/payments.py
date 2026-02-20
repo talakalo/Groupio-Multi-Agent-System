@@ -667,7 +667,7 @@ async def approve_contractor_payout(
     invoice_id: str,
     admin_user: UserInDB = Depends(get_admin_user),
 ) -> dict:
-    """Approve a contractor payout – marks the invoice as approved for release."""
+    """Approve a contractor payout -- marks the invoice as approved for release."""
     db = get_postgres_client()
 
     invoice = await db.get_invoice(invoice_id)

@@ -1,17 +1,18 @@
 """User Pydantic models."""
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
 
-class UserRole(str, Enum):
+class UserRole(StrEnum):
     """User role enum."""
 
     RESIDENT = "resident"
     CONTRACTOR = "contractor"
     ADMIN = "admin"
+    BUILDINGS_MANAGER = "buildings_manager"
     SUPER_ADMIN = "super_admin"
 
 
@@ -64,10 +65,26 @@ class UserResponse(UserInDB):
 
 
 class UserLogin(BaseModel):
-    """Login request."""
+    """Login request (email only, for backward compatibility)."""
 
     email: EmailStr
     password: str
+
+
+class LoginRequest(BaseModel):
+    """Login with email or phone."""
+
+    email: EmailStr | None = None
+    phone: str | None = Field(None, pattern=r"^0\d{8,9}$")
+    password: str = Field(..., min_length=1)
+
+    @model_validator(mode="after")
+    def require_email_or_phone(self) -> "LoginRequest":
+        if not self.email and not self.phone:
+            raise ValueError("Either email or phone is required")
+        if self.email and self.phone:
+            raise ValueError("Provide either email or phone, not both")
+        return self
 
 
 class TokenResponse(BaseModel):

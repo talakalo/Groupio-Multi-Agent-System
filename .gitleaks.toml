@@ -1,0 +1,13 @@
+# GitLeaks config for Groupio. Allowlist example env files (placeholders only, no real secrets).
+# See https://github.com/gitleaks/gitleaks#configuration
+title = "gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Allowlist .env.example files (placeholder values only)"
+paths = [
+  '''docker/\.env\.example$''',
+  '''apps/mobile/\.env\.example$''',
+]

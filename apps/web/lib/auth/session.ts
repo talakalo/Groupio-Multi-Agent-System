@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 
-const AUTH_COOKIE = 'groupio-auth';
+const AUTH_PERSIST_COOKIE = 'groupio-auth';
+const REFRESH_COOKIE = 'refresh_token';
 const TOKEN_REFRESH_THRESHOLD = 5 * 60 * 1000; // 5 minutes
 
 export interface Session {
@@ -12,71 +13,63 @@ export interface Session {
     buildingId?: string;
     contractorId?: string;
   } | null;
-  accessToken: string | null;
-  refreshToken: string | null;
+  /** True when the HTTP-only refresh cookie is present. */
+  hasRefreshToken: boolean;
   expiresAt: number | null;
 }
 
 /**
- * Get the current session from cookies (server-side)
+ * Get the current session from cookies (server-side).
+ *
+ * The access token is never stored in cookies – it lives in client
+ * memory only.  The HTTP-only `refresh_token` cookie (set by the
+ * backend) indicates the user is logged in, and the Zustand-persisted
+ * `groupio-auth` cookie provides the cached user profile.
  */
 export async function getSession(): Promise<Session> {
   const cookieStore = await cookies();
-  const authCookie = cookieStore.get(AUTH_COOKIE);
+  const refreshCookie = cookieStore.get(REFRESH_COOKIE);
+  const authCookie = cookieStore.get(AUTH_PERSIST_COOKIE);
 
   const emptySession: Session = {
     user: null,
-    accessToken: null,
-    refreshToken: null,
+    hasRefreshToken: false,
     expiresAt: null,
   };
 
-  if (!authCookie) {
+  if (!refreshCookie) {
     return emptySession;
   }
 
-  try {
-    const authData = JSON.parse(authCookie.value);
-    const state = authData?.state;
-
-    if (!state?.accessToken) {
-      return emptySession;
+  let user = null;
+  if (authCookie) {
+    try {
+      const authData = JSON.parse(authCookie.value);
+      user = authData?.state?.user ?? null;
+    } catch {
+      // Invalid cookie format – ignore
     }
-
-    return {
-      user: state.user,
-      accessToken: state.accessToken,
-      refreshToken: state.refreshToken,
-      expiresAt: state.expiresAt || null,
-    };
-  } catch {
-    return emptySession;
   }
+
+  return {
+    user,
+    hasRefreshToken: true,
+    expiresAt: null,
+  };
 }
 
 /**
- * Check if the session is valid and not expired
+ * Check if the session is valid (user present + refresh cookie exists).
  */
 export function isSessionValid(session: Session): boolean {
-  if (!session.accessToken || !session.user) {
-    return false;
-  }
-
-  if (session.expiresAt) {
-    const now = Date.now();
-    if (now >= session.expiresAt) {
-      return false;
-    }
-  }
-
-  return true;
+  return session.hasRefreshToken && !!session.user;
 }
 
 /**
- * Check if the session should be refreshed
+ * Check if the session should be refreshed.
  */
 export function shouldRefreshSession(session: Session): boolean {
-  if (!session.accessToken || !session.expiresAt) {
+  if (!session.hasRefreshToken || !session.expiresAt) {
     return false;
   }
 
@@ -87,7 +80,7 @@ export function shouldRefreshSession(session: Session): boolean {
 }
 
 /**
- * Decode a JWT token (without verification)
+ * Decode a JWT token payload (without signature verification).
  */
 export function decodeToken(token: string): Record<string, unknown> | null {
   try {
@@ -105,7 +98,7 @@ export function decodeToken(token: string): Record<string, unknown> | null {
 }
 
 /**
- * Get token expiration time
+ * Get token expiration time (ms since epoch).
  */
 export function getTokenExpiration(token: string): number | null {
   const decoded = decodeToken(token);
@@ -113,20 +106,7 @@ export function getTokenExpiration(token: string): number | null {
     return null;
   }
 
-  return decoded.exp * 1000; // Convert to milliseconds
-}
-
-/**
- * Authorization header helper
- */
-export function getAuthorizationHeader(session: Session): Record<string, string> {
-  if (!session.accessToken) {
-    return {};
-  }
-
-  return {
-    Authorization: `Bearer ${session.accessToken}`,
-  };
+  return decoded.exp * 1000;
 }
 
 /**

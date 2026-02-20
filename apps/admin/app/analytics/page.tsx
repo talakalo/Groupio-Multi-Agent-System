@@ -65,7 +65,7 @@ export default function AnalyticsPage() {
     const gmvToday = backendAnalytics.gmvToday ?? 0;
     const openTickets = backendAnalytics.openTickets ?? 0;
     const resolvedToday = backendAnalytics.resolvedToday ?? 0;
-    const totalContractors = (backendAnalytics as any).totalContractors ?? 0;
+    const totalContractors = backendAnalytics.totalContractors ?? 0;
 
     const insights: string[] = [];
     if (resolvedToday > 0) insights.push(`${resolvedToday} escalations resolved today`);

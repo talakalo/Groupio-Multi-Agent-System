@@ -1,5 +1,5 @@
-import { useState, useCallback, useRef } from 'react';
 import type { MessageResponse } from '@groupio/types';
+import { useState, useCallback, useRef } from 'react';
 
 // ---------------------------------------------------------------------------
 // Types

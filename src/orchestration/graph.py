@@ -13,6 +13,7 @@ from src.agents.pricing import PricingAgent
 from src.agents.router import RouterAgent
 from src.agents.support import SupportAgent
 from src.agents.vetting import VettingAgent
+from src.config.settings import get_settings
 from src.databases.postgres import get_postgres_client
 from src.models.agent_state import AgentState
 from src.orchestration.state import (
@@ -62,6 +63,7 @@ class GroupioOrchestrator:
         # Payment agent imported lazily to avoid circular imports during Phase 3
         try:
             from src.agents.payment import PaymentAgent
+
             self.agents["payment"] = PaymentAgent()
         except ImportError:
             pass
@@ -69,21 +71,56 @@ class GroupioOrchestrator:
         self._rag = get_rag_pipeline()
         self.graph = self._build_graph()
 
+    def _run_agent_safe(self, agent_name: str):
+        """Return a wrapper that runs an agent and catches exceptions; on error, set error action and return state."""
+
+        async def _run(state: AgentState) -> AgentState:
+            try:
+                return await self.agents[agent_name].run(state)
+            except Exception as exc:
+                is_transient = isinstance(exc, (TimeoutError, ConnectionError, OSError))
+                log_fn = logger.warning if is_transient else logger.exception
+                log_fn(
+                    "Agent %s failed (%s): %s",
+                    agent_name,
+                    "transient" if is_transient else "permanent",
+                    exc,
+                )
+                err_msg = f"[{'transient' if is_transient else 'permanent'}] {str(exc)[:180]}"
+                # Append single error action (reducer will merge with existing actions_taken)
+                state["actions_taken"] = [
+                    {
+                        "agent": agent_name,
+                        "action": "agent_error",
+                        "details": {"error": err_msg},
+                        "response": {
+                            "type": "text",
+                            "message": "משהו השתבש. אנא נסה שוב או פנה לתמיכה.",
+                        },
+                        "requires_followup": False,
+                        "summary_for_next_agent": f"Agent {agent_name} failed: {err_msg}.",
+                    }
+                ]
+                state["needs_human"] = False
+                return state
+
+        return _run
+
     def _build_graph(self) -> Any:
         """Build the LangGraph state machine."""
         workflow = StateGraph(AgentState)
 
-        # Add nodes
+        # Add nodes (specialists wrapped for exception handling)
         workflow.add_node("router", self._route_message)
-        workflow.add_node("support", self.agents["support"].run)
-        workflow.add_node("matching", self.agents["matching"].run)
-        workflow.add_node("pricing", self.agents["pricing"].run)
-        workflow.add_node("vetting", self.agents["vetting"].run)
-        workflow.add_node("outreach", self.agents["outreach"].run)
-        workflow.add_node("analytics", self.agents["analytics"].run)
-        workflow.add_node("architecture", self.agents["architecture"].run)
+        workflow.add_node("support", self._run_agent_safe("support"))
+        workflow.add_node("matching", self._run_agent_safe("matching"))
+        workflow.add_node("pricing", self._run_agent_safe("pricing"))
+        workflow.add_node("vetting", self._run_agent_safe("vetting"))
+        workflow.add_node("outreach", self._run_agent_safe("outreach"))
+        workflow.add_node("analytics", self._run_agent_safe("analytics"))
+        workflow.add_node("architecture", self._run_agent_safe("architecture"))
         if "payment" in self.agents:
-            workflow.add_node("payment", self.agents["payment"].run)
+            workflow.add_node("payment", self._run_agent_safe("payment"))
         workflow.add_node("human_handoff", self._handoff_to_human)
         workflow.add_node("final_response", self._format_final_response)
 
@@ -141,8 +178,28 @@ class GroupioOrchestrator:
 
         return workflow.compile()
 
+    def _normalize_last_agent_handoff(self, last_action: dict[str, Any]) -> dict[str, Any]:
+        """Build last_agent_handoff from the last actions_taken entry for router follow-up context."""
+        resp = last_action.get("response") or {}
+        msg = resp.get("message", "")
+        return {
+            "agent": last_action.get("agent"),
+            "summary_for_next_agent": last_action.get("summary_for_next_agent") or "",
+            "suggested_next_intent": last_action.get("suggested_next_intent") or "",
+            "entities_to_pass": last_action.get("entities_to_pass") or {},
+            "suggested_next_agent": last_action.get("suggested_next_agent") or "",
+            "response_preview": msg[:200] if isinstance(msg, str) else "",
+        }
+
     async def _route_message(self, state: AgentState) -> AgentState:
         """Initial routing: enrich context and classify intent."""
+        # Set last_agent_handoff when re-entering after a specialist (continue)
+        actions = state.get("actions_taken", [])
+        if actions:
+            state["last_agent_handoff"] = self._normalize_last_agent_handoff(actions[-1])
+        else:
+            state["last_agent_handoff"] = None
+
         user_id = state["user_id"]
         building_id = state.get("building_id")
 
@@ -200,12 +257,34 @@ class GroupioOrchestrator:
             return "human"
 
         # Low confidence or clarification needed
-        if state.get("confidence", 0) < 0.7:
+        settings = get_settings()
+        if state.get("confidence", 0) < settings.ROUTER_CONFIDENCE_THRESHOLD:
             # Check if router already provided a clarification response
             actions = state.get("actions_taken", [])
             if actions and actions[-1].get("action") == "clarification_needed":
                 return "end"
             return "support"
+
+        # Optional: use suggested_next_agent for short follow-up messages or middle-band confidence
+        handoff = state.get("last_agent_handoff") or {}
+        suggested = (handoff.get("suggested_next_agent") or "").strip()
+        if suggested and suggested in self.agents:
+            user_message = ""
+            for msg in reversed(state.get("messages", [])):
+                if msg.get("role") == "user":
+                    user_message = msg.get("content") or ""
+                    break
+            is_short = len(user_message.strip()) <= 30 or user_message.strip().lower() in (
+                "yes",
+                "no",
+                "כן",
+                "לא",
+                "ok",
+                "בסדר",
+            )
+            confidence = state.get("confidence", 0)
+            if is_short or (0.5 <= confidence <= 0.75):
+                return suggested
 
         # Route based on intent
         intent = state.get("intent", "general_info")
@@ -267,9 +346,7 @@ class GroupioOrchestrator:
                 "details": {"ticket_id": ticket_id},
                 "response": {
                     "type": "handoff",
-                    "message": (
-                        f"העברתי אותך לנציג אנושי שיטפל בבקשתך בהקדם. מספר פנייה: {ticket_id}"
-                    ),
+                    "message": (f"העברתי אותך לנציג אנושי שיטפל בבקשתך בהקדם. מספר פנייה: {ticket_id}"),
                 },
                 "requires_followup": False,
             }
@@ -368,9 +445,7 @@ class GroupioOrchestrator:
             "metadata": {
                 "intent": final_state.get("intent"),
                 "confidence": final_state.get("confidence", 0),
-                "agents_used": [
-                    a.get("agent", "unknown") for a in final_state.get("actions_taken", [])
-                ],
+                "agents_used": [a.get("agent", "unknown") for a in final_state.get("actions_taken", [])],
                 "tokens_used": final_state.get("tokens_used", 0),
                 "duration_ms": calculate_duration_ms(final_state["start_time"]),
                 "needs_human": final_state.get("needs_human", False),

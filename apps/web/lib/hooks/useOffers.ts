@@ -1,10 +1,11 @@
+import type { Offer, OfferStatus, ServiceCategory } from '@groupio/types';
 import {
   useQuery,
   useMutation,
   useQueryClient,
   type UseQueryOptions,
 } from '@tanstack/react-query';
-import type { Offer, OfferStatus, ServiceCategory } from '@groupio/types';
+
 import { apiClient } from '@/lib/api/client';
 
 // ---------------------------------------------------------------------------

@@ -1,0 +1,12 @@
+---
+description: Do not use TypeScript `any`; use proper types or `unknown`.
+globs: **/*.ts, **/*.tsx
+alwaysApply: false
+---
+
+# No explicit `any`
+
+- **Do not use the `any` type** in TypeScript/TSX. Use concrete types, generics, or `unknown` and narrow (e.g. `instanceof Error`, type guards).
+- For **catch** clauses use `catch (err: unknown)` and then narrow: `err instanceof Error ? err.message : 'Fallback'`.
+- For **API/JSON responses** define interfaces or use type assertions to a known shape; avoid `as any`.
+- ESLint rule `@typescript-eslint/no-explicit-any` is set to **error** in this project.

@@ -38,6 +38,8 @@ class VectorStore:
         self.client = AsyncQdrantClient(
             url=settings.QDRANT_URL,
             api_key=settings.QDRANT_API_KEY,
+            timeout=30,
+            prefer_grpc=True,
         )
         self._batch_size = 1000
 
@@ -71,8 +73,7 @@ class VectorStore:
     ) -> None:
         """Upsert vectors in batches with retry logic."""
         points = [
-            models.PointStruct(id=id_, vector=vec, payload=payload)
-            for id_, vec, payload in zip(ids, vectors, payloads)
+            models.PointStruct(id=id_, vector=vec, payload=payload) for id_, vec, payload in zip(ids, vectors, payloads)
         ]
 
         for i in range(0, len(points), self._batch_size):

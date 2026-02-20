@@ -1,10 +1,26 @@
 """Shared test fixtures for the Groupio test suite."""
 
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from src.models.agent_state import AgentState
+
+
+@pytest.fixture(autouse=True)
+def _disable_llm_cache():
+    """Disable the LLM response cache for all tests.
+
+    The module-level ``_llm_cache`` stores responses in Redis.  When Redis is
+    available (e.g. CI services) cached results leak between tests and cause
+    mocks to be bypassed.  Patching ``get`` to always return ``None`` and
+    ``set`` to no-op isolates every test from the cache.
+    """
+    with (
+        patch("src.agents.base._llm_cache.get", new_callable=AsyncMock, return_value=None),
+        patch("src.agents.base._llm_cache.set", new_callable=AsyncMock),
+    ):
+        yield
 
 
 @pytest.fixture
@@ -171,6 +187,9 @@ def sample_agent_state() -> AgentState:
             "units": 24,
         },
         active_offers=[],
+        entities=None,
+        last_agent_handoff=None,
+        context_for_next_agent=None,
         rag_results=[],
         actions_taken=[],
         needs_human=False,

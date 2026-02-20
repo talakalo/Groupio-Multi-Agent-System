@@ -101,9 +101,9 @@ class WhatsAppBotService:
             return False
 
         expected_signature = hmac.new(
-            settings.WHATSAPP_WEBHOOK_SECRET.encode(),
-            payload,
-            hashlib.sha256,
+            key=settings.WHATSAPP_WEBHOOK_SECRET.encode(),
+            msg=payload,
+            digestmod=hashlib.sha256,
         ).hexdigest()
 
         return hmac.compare_digest(f"sha256={expected_signature}", signature)
@@ -176,9 +176,7 @@ class WhatsAppBotService:
             statuses=statuses,
         )
 
-    async def handle_message(
-        self, message: WhatsAppMessage, contact: WhatsAppContact | None
-    ) -> None:
+    async def handle_message(self, message: WhatsAppMessage, contact: WhatsAppContact | None) -> None:
         """
         Handle an incoming WhatsApp message.
 
@@ -203,7 +201,7 @@ class WhatsAppBotService:
 
         # Get or create conversation session
         session_id = f"whatsapp:{message.from_number}"
-        conversation_history = await self.redis.get_conversation_history(session_id)
+        _conversation_history = await self.redis.get_conversation_context(session_id)
 
         # Create user context
         user_context = {
@@ -219,11 +217,11 @@ class WhatsAppBotService:
             await self._send_typing_indicator(message.from_number)
 
             # Process through orchestrator
-            result = await self.orchestrator.process_message(
-                message=user_message,
-                session_id=session_id,
-                conversation_history=conversation_history,
-                user_context=user_context,
+            result = await self.orchestrator.run(
+                user_message=user_message,
+                user_id=session_id,
+                building_id=user_context.get("building_id"),
+                conversation_id=session_id,
             )
 
             # Extract response
@@ -250,11 +248,11 @@ class WhatsAppBotService:
                 await self._send_text_message(message.from_number, response_text)
 
             # Update conversation history
-            await self.redis.add_to_conversation(
+            await self.redis.add_conversation_message(
                 session_id,
                 {"role": "user", "content": user_message},
             )
-            await self.redis.add_to_conversation(
+            await self.redis.add_conversation_message(
                 session_id,
                 {"role": "assistant", "content": response_text},
             )
@@ -286,7 +284,7 @@ class WhatsAppBotService:
 
     async def _send_typing_indicator(self, to: str) -> None:
         """Send typing indicator."""
-        payload = {
+        _payload = {
             "messaging_product": "whatsapp",
             "recipient_type": "individual",
             "to": to,
@@ -294,7 +292,7 @@ class WhatsAppBotService:
             "reaction": {"message_id": "", "emoji": ""},
         }
         # Note: WhatsApp Business API doesn't have native typing indicator
-        # This is a placeholder for future implementation
+        # This is a placeholder for future implementation; _payload for future use
 
     async def _send_quick_replies(
         self,
@@ -380,9 +378,7 @@ class WhatsAppBotService:
             {
                 "id": contractor["id"],
                 "title": contractor.get("name", "קבלן")[:24],
-                "description": f"⭐ {contractor.get('rating', 0):.1f} - {contractor.get('category', '')}"[
-                    :72
-                ],
+                "description": f"⭐ {contractor.get('rating', 0):.1f} - {contractor.get('category', '')}"[:72],
             }
             for contractor in contractors[:10]
         ]
@@ -441,9 +437,7 @@ class WhatsAppBotService:
                 "components": [
                     {
                         "type": "body",
-                        "parameters": [
-                            {"type": "text", "text": param} for param in template_params
-                        ],
+                        "parameters": [{"type": "text", "text": param} for param in template_params],
                     }
                 ],
             },
@@ -465,7 +459,7 @@ class WhatsAppBotService:
 _whatsapp_bot: WhatsAppBotService | None = None
 
 
-async def get_whatsapp_bot() -> WhatsAppBotService:
+def get_whatsapp_bot() -> WhatsAppBotService:
     """Get or create the WhatsApp bot service instance."""
     global _whatsapp_bot
     if _whatsapp_bot is None:
@@ -473,7 +467,7 @@ async def get_whatsapp_bot() -> WhatsAppBotService:
         from src.orchestration.graph import get_orchestrator
 
         _whatsapp_bot = WhatsAppBotService(
-            orchestrator=await get_orchestrator(),
-            redis_client=await get_redis_client(),
+            orchestrator=get_orchestrator(),
+            redis_client=get_redis_client(),
         )
     return _whatsapp_bot

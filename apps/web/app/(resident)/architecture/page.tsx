@@ -1,7 +1,5 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
-import { useTranslations } from 'next-intl';
 import {
   Upload,
   FileImage,
@@ -18,6 +16,9 @@ import {
   Droplets,
   ArrowRight,
 } from 'lucide-react';
+import { useTranslations } from 'next-intl';
+import { useState, useCallback, useRef } from 'react';
+
 import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
 

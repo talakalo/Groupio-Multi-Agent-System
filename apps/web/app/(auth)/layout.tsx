@@ -1,11 +1,8 @@
-import React from "react";
 import Link from "next/link";
 
-interface AuthLayoutProps {
-  children: React.ReactNode;
-}
-
-export default function AuthLayout({ children }: AuthLayoutProps) {
+// Use Next-generated LayoutProps so children type matches (avoids @types/react 19 vs build ReactNode mismatch)
+export default function AuthLayout(props: LayoutProps<"/">) {
+  const { children } = props;
   return (
     <div className="min-h-screen flex" dir="rtl">
       {/* Left Side - Branding */}
@@ -94,3 +91,4 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
     </div>
   );
 }
+

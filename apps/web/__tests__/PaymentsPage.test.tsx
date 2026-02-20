@@ -6,13 +6,17 @@ import React from "react";
 // The PaymentsPage uses apiClient.getMyPayments() which internally calls fetch
 global.fetch = vi.fn();
 
-// Mock the auth store (imported but not actively used by PaymentsPage)
-vi.mock("@/lib/stores/authStore", () => ({
-  useAuthStore: vi.fn(() => ({
+// Mock the auth store - apiClient uses useAuthStore.getState().accessToken
+vi.mock("@/lib/stores/authStore", () => {
+  const state = {
     user: { id: "user-123", name: "Test User" },
-    token: "test-token",
-  })),
-}));
+    accessToken: "test-token",
+    isAuthenticated: true,
+  };
+  const fn = (() => state) as ReturnType<typeof vi.fn> & { getState: () => typeof state };
+  fn.getState = () => state;
+  return { useAuthStore: fn };
+});
 
 import PaymentsPage from "../app/(resident)/payments/page";
 
