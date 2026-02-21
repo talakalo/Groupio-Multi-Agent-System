@@ -1363,44 +1363,6 @@ class PostgresClient:
         )
         return (rows or [], total)
 
-    async def create_payment(self, payment_data: dict[str, Any]) -> dict[str, Any]:
-        """Create a payment record. Stub for code review; implement when payments are added."""
-        if self._use_supabase_client():
-            client = await self._get_client()
-            result = await client.table("payments").insert(payment_data).execute()
-            return result.data[0] if result.data else payment_data
-        # Local PG: ensure payments table exists and insert
-        pid = payment_data.get("id") or str(__import__("uuid").uuid4())
-        await self._pg_execute(
-            "INSERT INTO payments (id, user_id, amount, currency, status) VALUES ($1, $2, $3, $4, $5)",
-            pid,
-            payment_data.get("user_id"),
-            payment_data.get("amount", 0),
-            payment_data.get("currency", "ILS"),
-            payment_data.get("status", "pending"),
-        )
-        return {**payment_data, "id": pid}
-
-    async def list_payments_for_user(self, user_id: str, limit: int = 50) -> list[dict[str, Any]]:
-        """List payments for a user. Stub for code review."""
-        if self._use_supabase_client():
-            client = await self._get_client()
-            result = (
-                await client.table("payments")
-                .select("*")
-                .eq("user_id", user_id)
-                .order("created_at", desc=True)
-                .limit(limit)
-                .execute()
-            )
-            return result.data or []
-        rows = await self._pg_fetch_all(
-            "SELECT * FROM payments WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2",
-            user_id,
-            limit,
-        )
-        return rows or []
-
     async def get_escalation(self, escalation_id: str) -> dict[str, Any] | None:
         """Get a single escalation by ID."""
         if self._use_supabase_client():
@@ -1904,7 +1866,13 @@ class PostgresClient:
             if not splits.data:
                 return []
             invoice_ids = list({s["invoice_id"] for s in splits.data})
-            result = await client.table("invoices").select("*").in_("id", invoice_ids).order("created_at", desc=True).execute()
+            result = await (
+                client.table("invoices")
+                .select("*")
+                .in_("id", invoice_ids)
+                .order("created_at", desc=True)
+                .execute()
+            )
             return result.data or []
         return await self._pg_fetch_all(
             """SELECT DISTINCT i.* FROM invoices i
@@ -1932,11 +1900,25 @@ class PostgresClient:
                 return None
             invoice = invoice_result.data[0]
             # Verify this user is a participant via payment_splits
-            splits = await client.table("payment_splits").select("id").eq("invoice_id", invoice["id"]).eq("user_id", user_id).limit(1).execute()
+            splits = await (
+                client.table("payment_splits")
+                .select("id")
+                .eq("invoice_id", invoice["id"])
+                .eq("user_id", user_id)
+                .limit(1)
+                .execute()
+            )
             if splits.data:
                 return invoice
             # Also return if user initiated the payment directly
-            payments = await client.table("payments").select("id").eq("invoice_id", invoice["id"]).eq("user_id", user_id).limit(1).execute()
+            payments = await (
+                client.table("payments")
+                .select("id")
+                .eq("invoice_id", invoice["id"])
+                .eq("user_id", user_id)
+                .limit(1)
+                .execute()
+            )
             return invoice if payments.data else None
         return await self._pg_fetch_one(
             """SELECT i.* FROM invoices i
@@ -2018,7 +2000,13 @@ class PostgresClient:
         """Get all payments for a user."""
         if self._use_supabase_client():
             client = await self._get_client()
-            result = await client.table("payments").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
+            result = await (
+                client.table("payments")
+                .select("*")
+                .eq("user_id", user_id)
+                .order("created_at", desc=True)
+                .execute()
+            )
             return result.data or []
         return await self._pg_fetch_all(
             "SELECT * FROM payments WHERE user_id = $1 ORDER BY created_at DESC",
@@ -2074,7 +2062,13 @@ class PostgresClient:
         """Query max invoice_number and return the next sequential value (zero-padded 5 digits)."""
         if self._use_supabase_client():
             client = await self._get_client()
-            result = await client.table("invoices").select("invoice_number").order("created_at", desc=True).limit(1).execute()
+            result = await (
+                client.table("invoices")
+                .select("invoice_number")
+                .order("created_at", desc=True)
+                .limit(1)
+                .execute()
+            )
             if result.data:
                 last = result.data[0]["invoice_number"]  # e.g. "INV-2026-00003"
                 try:

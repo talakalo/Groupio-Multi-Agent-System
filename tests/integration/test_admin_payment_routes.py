@@ -8,7 +8,6 @@ from fastapi.testclient import TestClient
 from src.api.main import app
 from src.api.middleware.auth import get_admin_user, get_current_user
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
