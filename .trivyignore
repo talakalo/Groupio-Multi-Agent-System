@@ -2,3 +2,13 @@
 # Requires upgrading to Next.js 15+. Tracked in issue #36.
 # This only affects App Router Server Components (DoS via crafted HTTP request).
 GHSA-h25m-26qc-wcjf
+
+# CVE-2026-26996 — minimatch 3.1.2 and 9.0.5 (HIGH)
+# Transitive dev-only dependency pulled in by eslint 8.x and @typescript-eslint 8.x.
+# Fix requires minimatch >=10.2.1, which is a breaking major version for both
+# eslint's internal glob usage and typescript-estree; cannot be force-overridden
+# without breaking the linting toolchain.
+# No production code path is affected (dev tooling only).
+# Upgrade path: resolve when eslint 9.x or @typescript-eslint 9.x ships a
+# compatible minimatch 10 dependency.
+CVE-2026-26996
