@@ -6,7 +6,6 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import {
   LayoutDashboard,
-  Tag,
   FolderKanban,
   UserCircle,
   Menu,

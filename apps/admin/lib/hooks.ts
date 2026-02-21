@@ -551,7 +551,7 @@ export function useAnalyticsQuery() {
     mutationFn: async (query: string) => {
       const client = getApiClient();
       const response = await client.sendMessage({
-        userId: "admin",
+        user_id: "admin",
         message: query,
         channel: "admin",
       });
