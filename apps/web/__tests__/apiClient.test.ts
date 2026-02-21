@@ -191,7 +191,7 @@ describe('ApiClient', () => {
       });
 
       await apiClient.sendMessage({
-        userId: 'user-1',
+        user_id: 'user-1',
         message: 'Hello',
         channel: 'web',
       });
@@ -201,7 +201,7 @@ describe('ApiClient', () => {
       expect(options.method).toBe('POST');
       const body = JSON.parse(options.body);
       expect(body.message).toBe('Hello');
-      expect(body.userId).toBe('user-1');
+      expect(body.user_id).toBe('user-1');
     });
   });
 
