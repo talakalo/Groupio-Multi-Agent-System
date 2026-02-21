@@ -19,6 +19,7 @@ import {
   Snackbar,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import type { Offer, OfferStatus, ServiceCategory } from "@groupio/types";
 
@@ -71,6 +72,7 @@ function tabToStatus(tab: TabKey): OfferStatus | undefined {
 
 export default function OffersScreen() {
   const theme = useTheme();
+  const router = useRouter();
 
   // Local state
   const [activeTab, setActiveTab] = useState<TabKey>("available");
@@ -124,9 +126,9 @@ export default function OffersScreen() {
     [joinMutation],
   );
 
-  const handleOfferPress = useCallback((_offer: Offer) => {
-    // Could navigate to offer detail screen
-  }, []);
+  const handleOfferPress = useCallback((offer: Offer) => {
+    router.push({ pathname: "/offer-detail", params: { id: offer.id } });
+  }, [router]);
 
   const handleCategoryPress = useCallback(
     (cat: ServiceCategory | "all") => {
@@ -294,7 +296,7 @@ export default function OffersScreen() {
         ]}
         color={theme.colors.onPrimary}
         onPress={() => {
-          // Navigate to create offer screen
+          router.push("/create-offer");
         }}
       />
 

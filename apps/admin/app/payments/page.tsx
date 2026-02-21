@@ -574,6 +574,21 @@ function PayoutsTable({
 
 type TabKey = "escrow" | "payouts";
 
+const API_BASE = "/api/v1";
+
+async function fetchApi<T>(path: string, options?: RequestInit): Promise<T | null> {
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      headers: { "Content-Type": "application/json" },
+      ...options,
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as T;
+  } catch {
+    return null;
+  }
+}
+
 export default function AdminPaymentsPage() {
   const [activeTab, setActiveTab] = useState<TabKey>("escrow");
   const [summary, setSummary] = useState<PaymentSummary>(MOCK_SUMMARY);
@@ -584,7 +599,27 @@ export default function AdminPaymentsPage() {
     "all"
   );
 
-  // In production, these would call the real API
+  // Fetch real data from API, falling back to mock data
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [summaryData, escrowData, payoutsData] = await Promise.all([
+        fetchApi<PaymentSummary>("/admin/payments/summary"),
+        fetchApi<EscrowAccount[]>("/admin/payments/escrow"),
+        fetchApi<ContractorPayout[]>("/admin/payments/payouts"),
+      ]);
+      if (summaryData) setSummary(summaryData);
+      if (escrowData && escrowData.length > 0) setEscrows(escrowData);
+      if (payoutsData && payoutsData.length > 0) setPayouts(payoutsData);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
   const handleRelease = useCallback(async (offerId: string) => {
     if (
       !window.confirm(
@@ -593,13 +628,21 @@ export default function AdminPaymentsPage() {
     ) {
       return;
     }
-    // TODO: call apiClient.releaseEscrow(offerId)
+    const result = await fetchApi<{ status: string }>(
+      `/admin/payments/escrow/${offerId}/release`,
+      { method: "POST" }
+    );
+    // Update local state optimistically
     setEscrows((prev) =>
       prev.map((e) =>
         e.offerId === offerId ? { ...e, escrowStatus: "released" as EscrowStatus } : e
       )
     );
-  }, []);
+    if (!result) {
+      // Revert on failure
+      loadData();
+    }
+  }, [loadData]);
 
   const handleApprovePayout = useCallback(async (payoutId: string) => {
     if (
@@ -607,7 +650,10 @@ export default function AdminPaymentsPage() {
     ) {
       return;
     }
-    // TODO: call apiClient.approveContractorPayout(payoutId)
+    const result = await fetchApi<{ status: string }>(
+      `/admin/payments/payouts/${payoutId}/approve`,
+      { method: "POST" }
+    );
     setPayouts((prev) =>
       prev.map((p) =>
         p.id === payoutId
@@ -619,7 +665,10 @@ export default function AdminPaymentsPage() {
           : p
       )
     );
-  }, []);
+    if (!result) {
+      loadData();
+    }
+  }, [loadData]);
 
   const filteredEscrows =
     escrowFilter === "all"
@@ -639,10 +688,11 @@ export default function AdminPaymentsPage() {
           </p>
         </div>
         <button
-          onClick={() => setLoading(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-surface-100 text-surface-700 text-sm font-medium rounded-lg hover:bg-surface-200 transition-colors"
+          onClick={loadData}
+          disabled={loading}
+          className="flex items-center gap-2 px-4 py-2 bg-surface-100 text-surface-700 text-sm font-medium rounded-lg hover:bg-surface-200 transition-colors disabled:opacity-50"
         >
-          <RefreshCw className="w-4 h-4" />
+          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           Refresh
         </button>
       </div>

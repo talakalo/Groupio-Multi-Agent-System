@@ -301,9 +301,10 @@ class TestPaymentWebhook:
 class TestGetInvoice:
     """Tests for GET /api/v1/payments/invoices/{invoice_id}."""
 
-    def test_get_invoice(self, client, mock_db, mock_invoice):
+    def test_get_invoice(self, client, mock_db, mock_invoice, mock_payment_record):
         """Owner can fetch invoice details."""
         mock_db.get_invoice = AsyncMock(return_value=mock_invoice)
+        mock_db.list_payments_for_user = AsyncMock(return_value=[mock_payment_record])
 
         response = client.get(
             "/api/v1/payments/invoices/inv-001",
@@ -335,9 +336,10 @@ class TestGetInvoice:
 class TestDownloadInvoicePdf:
     """Tests for GET /api/v1/payments/invoices/{invoice_id}/pdf."""
 
-    def test_download_invoice_pdf(self, client, mock_db, mock_invoice):
-        """PDF endpoint returns placeholder response with invoice data."""
+    def test_download_invoice_pdf(self, client, mock_db, mock_invoice, mock_payment_record):
+        """PDF endpoint returns downloadable HTML invoice."""
         mock_db.get_invoice = AsyncMock(return_value=mock_invoice)
+        mock_db.list_payments_for_user = AsyncMock(return_value=[mock_payment_record])
 
         response = client.get(
             "/api/v1/payments/invoices/inv-001/pdf",
@@ -345,7 +347,5 @@ class TestDownloadInvoicePdf:
         )
 
         assert response.status_code == 200
-        data = response.json()
-        assert "invoice_id" in data
-        assert data["invoice_id"] == "inv-001"
-        assert "invoice_data" in data
+        assert "text/html" in response.headers.get("content-type", "")
+        assert "inv-001" in response.text

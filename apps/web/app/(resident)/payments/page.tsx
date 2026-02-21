@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect, useCallback } from 'react';
 import {
   CreditCard,
   FileText,
@@ -15,8 +16,6 @@ import {
   TrendingUp,
   Loader2,
 } from 'lucide-react';
-import { useState, useEffect, useCallback } from 'react';
-
 import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
 
