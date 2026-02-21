@@ -233,7 +233,9 @@ describe('Auth Store', () => {
         })
         .mockResolvedValueOnce({
           ok: true,
-          json: mockJson({ access_token: 'access-token', refresh_token: 'refresh-token' }),
+          json: async () => ({
+            access_token: 'access-token',
+          }),
         })
         .mockResolvedValueOnce({
           ok: true,

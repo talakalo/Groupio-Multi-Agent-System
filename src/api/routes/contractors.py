@@ -33,19 +33,9 @@ router = APIRouter(tags=["contractors"])
 @router.post("/", response_model=ContractorResponse)
 async def create_contractor(
     request: ContractorCreate,
-    req: Request,
+    current_user: UserInDB = Depends(get_current_user),
 ) -> ContractorResponse:
-    """Register a new contractor (public, rate-limited)."""
-    # Rate-limit registrations by IP: max 5 per 10 minutes
-    client_ip = req.client.host if req.client else "unknown"
-    redis = get_redis_client()
-    allowed = await redis.check_rate_limit(user_id=f"reg:{client_ip}", limit=5, window=600)
-    if not allowed:
-        raise HTTPException(
-            status_code=429,
-            detail="Too many registration attempts. Please try again later.",
-        )
-
+    """Register a new contractor (requires authentication)."""
     db = get_postgres_client()
 
     # Check if email already exists

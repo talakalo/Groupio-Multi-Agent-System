@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from src.databases.postgres import get_postgres_client
 from src.databases.redis_client import get_redis_client
@@ -61,7 +61,7 @@ class TaskScheduler:
         last_run_str = await redis.get(last_run_key)
         if last_run_str:
             last_run = datetime.fromisoformat(last_run_str)
-            if (datetime.now(timezone.utc) - last_run).total_seconds() < task.interval_seconds:
+            if (datetime.now(UTC) - last_run).total_seconds() < task.interval_seconds:
                 return
 
         # Try to acquire lock
@@ -69,7 +69,7 @@ class TaskScheduler:
         if not acquired:
             return
 
-        idempotency_key = f"scheduler:idempotent:{task.name}:{datetime.now(timezone.utc).strftime('%Y%m%d%H%M')}"
+        idempotency_key = f"scheduler:idempotent:{task.name}:{datetime.now(UTC).strftime('%Y%m%d%H%M')}"
         try:
             # Check idempotency to prevent double-processing on restart
             already_ran = await redis.get(idempotency_key)
@@ -84,7 +84,7 @@ class TaskScheduler:
             await task.func()
             # Mark as completed with TTL matching the task interval
             await redis.set(idempotency_key, "done", ex=task.interval_seconds)
-            await redis.set(last_run_key, datetime.now(timezone.utc).isoformat())
+            await redis.set(last_run_key, datetime.now(UTC).isoformat())
             logger.info("Task %s completed successfully", task.name)
         finally:
             await redis.delete(lock_key)
@@ -103,7 +103,7 @@ async def check_expired_offers():
     """Close offers past their deadline."""
     db = get_postgres_client()
     # Get all pending/matching offers past deadline
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     expired_offers = (
         await db.execute_query(
             "SELECT id FROM offers WHERE deadline < $1 AND status IN ('pending', 'matching', 'draft')",
@@ -158,10 +158,10 @@ async def generate_daily_analytics():
         )
 
         summary = {
-            "date": datetime.now(timezone.utc).date().isoformat(),
+            "date": datetime.now(UTC).date().isoformat(),
             "active_offers": total_offers,
             "active_contractors": total_contractors,
-            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "generated_at": datetime.now(UTC).isoformat(),
         }
 
         await redis.set("analytics:daily_summary", str(summary), ex=86400)
