@@ -131,12 +131,10 @@ export function AIChat({
           method: 'POST',
           headers,
           body: JSON.stringify({
-            userId,
+            user_id: userId,
             message: text.trim(),
-            ...(buildingId ? { buildingId } : {}),
+            ...(buildingId ? { building_id: buildingId } : {}),
             channel: 'web',
-            context,
-            ...(category ? { category } : {}),
           }),
           signal: controller.signal,
         });
@@ -174,7 +172,7 @@ export function AIChat({
         setIsLoading(false);
       }
     },
-    [accessToken, baseUrl, buildingId, category, context, isLoading, userId],
+    [accessToken, baseUrl, buildingId, isLoading, userId],
   );
 
   const handleSubmit = (e: FormEvent) => {
