@@ -2070,6 +2070,15 @@ class PostgresClient:
             or []
         )
 
+    async def get_payment_by_transaction(self, transaction_id: str) -> dict[str, Any] | None:
+        """Look up a payment by its provider transaction ID."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            result = await client.table("payments").select("*").eq("transaction_id", transaction_id).limit(1).execute()
+            return result.data[0] if result.data else None
+        return await self._pg_fetch_one("SELECT * FROM payments WHERE transaction_id = $1", transaction_id)
+
+
     # ------------------------------------------------------------------
     # Payment Splits
     # ------------------------------------------------------------------
@@ -2112,12 +2121,17 @@ class PostgresClient:
         """Query max invoice_number and return the next sequential value (zero-padded 5 digits)."""
         if self._use_supabase_client():
             client = await self._get_client()
+<<<<<<< HEAD
+            result = await (
+                client.table("invoices").select("invoice_number").order("created_at", desc=True).limit(1).execute()
+=======
             result = (
                 await client.table("invoices")
                 .select("invoice_number")
                 .order("created_at", desc=True)
                 .limit(1)
                 .execute()
+>>>>>>> origin/dev
             )
             if result.data:
                 last = result.data[0]["invoice_number"]  # e.g. "INV-2026-00003"

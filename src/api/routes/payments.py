@@ -1,7 +1,8 @@
 """Payment API routes – resident payments + admin escrow/payout management."""
 
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timezone
+from typing import Any
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -201,6 +202,7 @@ async def initiate_payment(
             "amount": amount,
             "currency": "ILS",
             "status": "pending",
+            "payment_type": payment_type,
             "issued_at": datetime.now(UTC).isoformat(),
             "items": [
                 {
