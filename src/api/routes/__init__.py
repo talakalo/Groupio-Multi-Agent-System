@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter
 
+from src.api.routes.activity import router as activity_router
 from src.api.routes.admin import router as admin_router
 from src.api.routes.agents import router as agents_router
 from src.api.routes.auth import router as auth_router
@@ -81,6 +82,12 @@ api_router.include_router(
     webhooks_router,
     prefix="/webhooks",
     tags=["Webhooks"],
+)
+
+api_router.include_router(
+    activity_router,
+    prefix="/activity",
+    tags=["Activity"],
 )
 
 __all__ = ["api_router"]

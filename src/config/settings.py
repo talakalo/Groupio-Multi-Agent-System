@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     # Neo4j
     NEO4J_URI: str = "bolt://localhost:7687"
     NEO4J_USER: str = "neo4j"
-    NEO4J_PASSWORD: str = "testpassword"
+    NEO4J_PASSWORD: str = ""
 
     # Supabase / PostgreSQL
     SUPABASE_URL: str = ""
@@ -105,6 +105,9 @@ class Settings(BaseSettings):
     SMTP_FROM_EMAIL: str = "noreply@groupio.co.il"
     SMTP_FROM_NAME: str = "Groupio"
 
+    # Payment provider ("mock" for dev/demos, future: "stripe", "payplus")
+    PAYMENT_PROVIDER: str = "mock"
+
     # Environment
     ENVIRONMENT: str = "development"
 
@@ -115,9 +118,12 @@ class Settings(BaseSettings):
     }
 
     @model_validator(mode="after")
-    def _validate_jwt_secret(self) -> "Settings":
-        """Prevent insecure JWT secrets in production/staging."""
-        if self.ENVIRONMENT in ("production", "staging"):
+    def _validate_production_config(self) -> "Settings":
+        """Prevent insecure defaults in production/staging."""
+        is_prod = self.ENVIRONMENT in ("production", "staging")
+
+        # --- JWT secret ---
+        if is_prod:
             if self.JWT_SECRET_KEY in _INSECURE_JWT_SECRETS:
                 raise ValueError(
                     "JWT_SECRET_KEY must be set to a strong, unique value in "
@@ -133,6 +139,21 @@ class Settings(BaseSettings):
                 UserWarning,
                 stacklevel=2,
             )
+
+        # --- Required secrets in production ---
+        if is_prod:
+            if not self.ANTHROPIC_API_KEY and not self.OPENAI_API_KEY:
+                raise ValueError(
+                    f"At least one LLM API key (ANTHROPIC_API_KEY or OPENAI_API_KEY) must be set in {self.ENVIRONMENT}."
+                )
+            if not self.API_KEYS:
+                raise ValueError(f"API_KEYS must be configured for service-to-service auth in {self.ENVIRONMENT}.")
+            placeholder_patterns = ("change-me", "your-", "generate-a-")
+            if self.DATABASE_URL and any(p in self.DATABASE_URL for p in placeholder_patterns):
+                raise ValueError(
+                    f"DATABASE_URL contains a placeholder value. Set a real connection string in {self.ENVIRONMENT}."
+                )
+
         return self
 
 
