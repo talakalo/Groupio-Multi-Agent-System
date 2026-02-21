@@ -2,6 +2,7 @@
 
 import logging
 from datetime import UTC, datetime
+from typing import Any
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -201,6 +202,7 @@ async def initiate_payment(
             "amount": amount,
             "currency": "ILS",
             "status": "pending",
+            "payment_type": payment_type,
             "issued_at": datetime.now(UTC).isoformat(),
             "items": [
                 {
@@ -797,7 +799,7 @@ async def release_escrow(
         invoice["id"],
         {
             "status": "released",
-            "paid_at": datetime.now(timezone.utc).isoformat(),
+            "paid_at": datetime.now(UTC).isoformat(),
         },
     )
 

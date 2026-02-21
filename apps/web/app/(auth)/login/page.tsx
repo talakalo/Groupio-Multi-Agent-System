@@ -32,8 +32,6 @@ type LoginMethod = "email" | "phone";
 
 export default function LoginPage() {
   const router = useRouter();
-  const setTokens = (useAuthStore.getState() as AuthState).setTokens;
-  const setUser = (useAuthStore.getState() as AuthState).setUser;
   const [loginMethod, setLoginMethod] = useState<LoginMethod>("email");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

@@ -3,12 +3,11 @@
 import logging
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from src.api.middleware.auth import get_current_user, is_admin
 from src.databases.graph_store import get_graph_store
 from src.databases.postgres import get_postgres_client
-from src.databases.redis_client import get_redis_client
 from src.databases.vector_store import get_vector_store
 from src.models.contractor import (
     ContractorCreate,

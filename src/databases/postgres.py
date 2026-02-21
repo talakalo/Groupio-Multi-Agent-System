@@ -2,6 +2,7 @@
 
 import json
 import logging
+import re
 from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
@@ -2069,6 +2070,14 @@ class PostgresClient:
             )
             or []
         )
+
+    async def get_payment_by_transaction(self, transaction_id: str) -> dict[str, Any] | None:
+        """Look up a payment by its provider transaction ID."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            result = await client.table("payments").select("*").eq("transaction_id", transaction_id).limit(1).execute()
+            return result.data[0] if result.data else None
+        return await self._pg_fetch_one("SELECT * FROM payments WHERE transaction_id = $1", transaction_id)
 
     # ------------------------------------------------------------------
     # Payment Splits

@@ -2,10 +2,9 @@
 
 import asyncio
 import logging
+import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-
-import aiosmtplib
 
 from src.config.settings import get_settings
 

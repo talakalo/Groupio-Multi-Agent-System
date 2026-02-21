@@ -95,8 +95,8 @@ def verify_access_token(token: str) -> TokenPayload | None:
             sub=payload["sub"],
             email=payload["email"],
             role=UserRole(payload["role"]),
-            exp=datetime.fromtimestamp(payload["exp"], tz=timezone.utc),
-            iat=datetime.fromtimestamp(payload["iat"], tz=timezone.utc),
+            exp=datetime.fromtimestamp(payload["exp"], tz=UTC),
+            iat=datetime.fromtimestamp(payload["iat"], tz=UTC),
         )
     except jwt.ExpiredSignatureError:
         logger.debug("Token expired")
@@ -179,11 +179,6 @@ async def get_admin_user(
     if current_user.role not in (UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.BUILDINGS_MANAGER):
         raise HTTPException(status_code=403, detail="Admin access required")
     return current_user
-
-
-def is_admin(user: UserInDB) -> bool:
-    """Return True if the user has an admin-level role."""
-    return user.role in (UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.BUILDINGS_MANAGER)
 
 
 async def verify_api_key(

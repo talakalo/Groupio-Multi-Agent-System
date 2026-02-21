@@ -60,6 +60,35 @@ global.IntersectionObserver = class IntersectionObserver {
 // Mock fetch
 global.fetch = vi.fn();
 
+// Prevent jsdom "Not implemented: navigation" from CSV download anchor clicks.
+// When handleExportCSV creates an <a href="blob:..."> and calls a.click(), jsdom
+// throws "Not implemented: navigation (except hash changes)". Mocking the prototype
+// stops jsdom from attempting the navigation while createObjectURL calls still work.
+HTMLAnchorElement.prototype.click = vi.fn();
+
+// Suppress jsdom "Not implemented: navigation (except hash changes)" errors.
+// jsdom throws this when anything triggers window.location navigation (e.g.
+// Next.js router internals that bypass the vi.mock). Replace assign/replace/reload
+// with no-ops so tests don't produce spurious error output.
+const _originalLocation = window.location;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+delete (window as any).location;
+Object.defineProperty(window, 'location', {
+  configurable: true,
+  writable: true,
+  value: {
+    ..._originalLocation,
+    href: 'http://localhost/',
+    pathname: '/',
+    search: '',
+    hash: '',
+    origin: 'http://localhost',
+    assign: vi.fn(),
+    replace: vi.fn(),
+    reload: vi.fn(),
+  },
+});
+
 // Clean up after each test
 afterEach(() => {
   vi.clearAllMocks();

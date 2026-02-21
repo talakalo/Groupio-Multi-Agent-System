@@ -114,8 +114,102 @@ export default function ResidentProfilePage() {
 
   const [activeTab, setActiveTab] = useState<'personal' | 'notifications' | 'security'>('personal');
 
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({
+    current: '',
+    newPassword: '',
+    confirm: '',
+  });
+  const [passwordStatus, setPasswordStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+
   const accessToken = useAuthStore((s) => s.accessToken);
   const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+  const handleAvatarUpload = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+
+      setIsUploadingAvatar(true);
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const headers: Record<string, string> = {};
+        if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+
+        const res = await fetch(`${apiBase}/api/v1/uploads/avatar`, {
+          method: 'POST',
+          headers,
+          body: formData,
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          setFormData((prev) => ({ ...prev, avatar: data.avatar_url, avatarUrl: data.avatar_url }));
+          queryClient.invalidateQueries({ queryKey: ['resident', 'profile'] });
+        }
+      } catch (error) {
+        console.error('Avatar upload failed:', error);
+      } finally {
+        setIsUploadingAvatar(false);
+      }
+    };
+    input.click();
+  };
+
+  const handlePasswordChange = async () => {
+    if (!passwordForm.newPassword || passwordForm.newPassword !== passwordForm.confirm) return;
+    setPasswordStatus('loading');
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+
+      const res = await fetch(`${apiBase}/api/v1/auth/password-reset`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          current_password: passwordForm.current,
+          new_password: passwordForm.newPassword,
+        }),
+      });
+
+      if (res.ok) {
+        setPasswordStatus('success');
+        setPasswordForm({ current: '', newPassword: '', confirm: '' });
+        setTimeout(() => setPasswordStatus('idle'), 3000);
+      } else {
+        setPasswordStatus('error');
+        setTimeout(() => setPasswordStatus('idle'), 3000);
+      }
+    } catch {
+      setPasswordStatus('error');
+      setTimeout(() => setPasswordStatus('idle'), 3000);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    const confirmed = window.confirm(t('deleteAccountConfirm'));
+    if (!confirmed) return;
+
+    try {
+      const headers: Record<string, string> = {};
+      if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+
+      await fetch(`${apiBase}/api/v1/auth/me`, {
+        method: 'DELETE',
+        headers,
+      });
+
+      await logoutAction();
+      router.push('/login');
+    } catch (error) {
+      console.error('Failed to delete account:', error);
+    }
+  };
 
   const profileQuery = useQuery<ResidentProfile>({
     queryKey: ['resident', 'profile'],

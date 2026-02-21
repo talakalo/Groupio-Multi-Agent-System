@@ -1,6 +1,6 @@
 """Unit tests for the InvoiceService."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -84,7 +84,7 @@ async def test_generate_invoice_number(invoice_svc, mock_db):
     """Invoice number follows INV-{year}-{seq} format."""
     number = await invoice_svc.generate_invoice_number()
 
-    year = datetime.now(timezone.utc).year
+    year = datetime.now(UTC).year
     assert number == f"INV-{year}-00042"
     mock_db.get_next_invoice_number.assert_called_once()
 

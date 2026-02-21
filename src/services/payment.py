@@ -131,24 +131,32 @@ _payment_provider: PaymentProvider | None = None
 def get_payment_provider() -> PaymentProvider:
     """Get or create the singleton PaymentProvider instance.
 
-    .. warning::
-        Currently returns ``MockPaymentProvider`` — all charges succeed
-        immediately without real payment processing.  Replace the factory
-        body to wire up a real provider (e.g. Stripe, PayPlus) before
-        going to production.
+    In production, this will refuse to start with the mock provider.
+    Set ``PAYMENT_PROVIDER=mock`` explicitly to override (e.g. for staging demos).
 
-    Returns ``MockPaymentProvider`` by default.
+    Returns ``MockPaymentProvider`` in development/test.
     """
     global _payment_provider
     if _payment_provider is None:
         from src.config.settings import get_settings
 
         settings = get_settings()
-        if settings.ENVIRONMENT == "production":
-            logger.warning(
-                "⚠️  MOCK PAYMENT PROVIDER active in PRODUCTION. "
-                "All charges will succeed without real processing. "
-                "Integrate a real PSP (Stripe/PayPlus) immediately."
+
+        # In production, block mock provider unless explicitly overridden
+        allow_mock = getattr(settings, "PAYMENT_PROVIDER", "") == "mock"
+        if settings.ENVIRONMENT == "production" and not allow_mock:
+            raise RuntimeError(
+                "Cannot use MockPaymentProvider in production. "
+                "Integrate a real PSP (Stripe/PayPlus) or set PAYMENT_PROVIDER=mock "
+                "to explicitly allow mock payments for demo purposes."
             )
+
+        if settings.ENVIRONMENT in ("production", "staging") and allow_mock:
+            logger.warning(
+                "MOCK PAYMENT PROVIDER active in %s (PAYMENT_PROVIDER=mock). "
+                "All charges will succeed without real processing.",
+                settings.ENVIRONMENT,
+            )
+
         _payment_provider = MockPaymentProvider()
     return _payment_provider

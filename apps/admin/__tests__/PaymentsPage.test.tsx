@@ -4,6 +4,110 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 import PaymentsPage from '../app/payments/page';
 
+// ---- Mock fetch responses for payment endpoints ----
+
+const MOCK_SUMMARY = {
+  totalCollected: 150000,
+  totalInEscrow: 80000,
+  totalReleasedToContractors: 50000,
+  totalPlatformFees: 7500,
+  totalRefunded: 2000,
+  pendingPayouts: 2,
+  currency: 'ILS',
+};
+
+const MOCK_ESCROWS = [
+  {
+    offerId: 'offer-1',
+    offerTitle: 'AC Installation - Building A',
+    contractorId: 'c-1',
+    contractorName: 'Cool Air Ltd.',
+    totalCollected: 45000,
+    totalExpected: 45000,
+    platformFee: 2250,
+    netPayoutAmount: 42750,
+    currency: 'ILS',
+    escrowStatus: 'released',
+    participantsPaid: 12,
+    participantsTotal: 12,
+    createdAt: '2026-01-10T10:00:00Z',
+  },
+  {
+    offerId: 'offer-2',
+    offerTitle: 'Kitchen Renovation - Building B',
+    contractorName: 'Master Kitchen Ltd.',
+    totalCollected: 60000,
+    totalExpected: 60000,
+    platformFee: 3000,
+    netPayoutAmount: 57000,
+    currency: 'ILS',
+    escrowStatus: 'held',
+    participantsPaid: 8,
+    participantsTotal: 8,
+    createdAt: '2026-01-15T10:00:00Z',
+  },
+  {
+    offerId: 'offer-3',
+    offerTitle: 'Plumbing Upgrade - Building C',
+    contractorName: 'AquaFix Pro',
+    totalCollected: 12000,
+    totalExpected: 20000,
+    platformFee: 1000,
+    netPayoutAmount: 19000,
+    currency: 'ILS',
+    escrowStatus: 'disputed',
+    participantsPaid: 6,
+    participantsTotal: 10,
+    createdAt: '2026-01-20T10:00:00Z',
+  },
+];
+
+const MOCK_PAYOUTS = [
+  {
+    id: 'payout-1',
+    contractorId: 'c-2',
+    contractorName: 'AquaFix Pro',
+    offerId: 'offer-3',
+    offerTitle: 'Plumbing Upgrade - Building C',
+    grossAmount: 19000,
+    platformFee: 1000,
+    netAmount: 18000,
+    currency: 'ILS',
+    status: 'pending',
+    createdAt: '2026-01-21T10:00:00Z',
+  },
+  {
+    id: 'payout-2',
+    contractorId: 'c-1',
+    contractorName: 'Cool Air Ltd.',
+    offerId: 'offer-1',
+    offerTitle: 'AC Installation - Building A',
+    grossAmount: 42750,
+    platformFee: 2250,
+    netAmount: 40500,
+    currency: 'ILS',
+    status: 'completed',
+    paidAt: '2026-01-12T10:00:00Z',
+    createdAt: '2026-01-11T10:00:00Z',
+  },
+];
+
+function mockFetch(url: string) {
+  if (url.includes('/admin/payments/summary')) {
+    return Promise.resolve({ ok: true, json: () => Promise.resolve(MOCK_SUMMARY) });
+  }
+  if (url.includes('/admin/payments/escrow') && !url.includes('/release')) {
+    return Promise.resolve({ ok: true, json: () => Promise.resolve(MOCK_ESCROWS) });
+  }
+  if (url.includes('/admin/payments/payouts') && !url.includes('/approve')) {
+    return Promise.resolve({ ok: true, json: () => Promise.resolve(MOCK_PAYOUTS) });
+  }
+  if (url.includes('/release') || url.includes('/approve')) {
+    return Promise.resolve({ ok: true, json: () => Promise.resolve({ status: 'success' }) });
+  }
+  return Promise.resolve({ ok: false, json: () => Promise.resolve(null) });
+}
+
 function createWrapper() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -18,6 +122,7 @@ function createWrapper() {
 describe('PaymentsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation(mockFetch);
   });
 
   afterEach(() => {
