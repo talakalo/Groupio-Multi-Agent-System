@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback, type FormEvent } from 'react';
 import { Send, Bot, User, Loader2, Sparkles } from 'lucide-react';
-import type { Message, MessageResponse, ServiceCategory } from '@groupio/types';
+import type { MessageResponse, ServiceCategory } from '@groupio/types';
 import { cn } from '@/lib/utils/cn';
 import { useAccessToken } from '@/lib/stores/authStore';
 
@@ -55,7 +55,7 @@ export function AIChat({
   buildingId,
   context = 'resident',
   suggestions = [],
-  category,
+  category: _category,
   userId = 'anonymous',
   apiUrl,
   placeholder,
