@@ -122,6 +122,9 @@ export function AIChat({
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30_000);
 
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+
         const response = await fetch(`${baseUrl}/api/v1/message`, {
           method: 'POST',
           headers,

@@ -1,7 +1,7 @@
 """Payment API routes – resident payments + admin escrow/payout management."""
 
 import logging
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
@@ -799,7 +799,7 @@ async def release_escrow(
         invoice["id"],
         {
             "status": "released",
-            "paid_at": datetime.now(timezone.utc).isoformat(),
+            "paid_at": datetime.now(UTC).isoformat(),
         },
     )
 

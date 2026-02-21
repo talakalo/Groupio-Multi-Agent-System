@@ -1,6 +1,6 @@
 """Unit tests for the TaskScheduler and ScheduledTask."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -68,7 +68,7 @@ def test_scheduled_task_properties():
 @pytest.mark.asyncio
 async def test_try_run_task_skips_if_too_recent(scheduler, mock_redis):
     """If Redis reports a recent last_run, the task is NOT executed."""
-    recent = (datetime.now(timezone.utc) - timedelta(seconds=5)).isoformat()
+    recent = (datetime.now(UTC) - timedelta(seconds=5)).isoformat()
     mock_redis.get = AsyncMock(return_value=recent)
 
     func = AsyncMock()

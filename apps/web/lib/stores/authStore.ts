@@ -64,15 +64,6 @@ export const useAuthStore = create<AuthState>()(
         set({ accessToken, isAuthenticated: !!accessToken });
       },
 
-      setAccessToken: (accessToken) => {
-        if (accessToken == null) {
-          get().clearAuth();
-          return;
-        }
-        const { refreshToken } = get();
-        get().setTokens(accessToken, refreshToken ?? '');
-      },
-
       clearAuth: () => {
         if (typeof window !== 'undefined') {
           window.localStorage.removeItem('auth_token');
@@ -96,7 +87,6 @@ export const useAuthStore = create<AuthState>()(
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include', // receive HTTP-only refresh cookie
             body: JSON.stringify({ email, password }),
-            credentials: 'include',
           });
 
           if (!response.ok) {
