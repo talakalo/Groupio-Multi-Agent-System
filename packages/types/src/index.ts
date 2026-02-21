@@ -118,9 +118,9 @@ export interface MarketData {
 // ---- API Types ----
 
 export interface MessageRequest {
-  userId: string;
+  user_id: string;
   message: string;
-  buildingId?: string;
+  building_id?: string;
   channel: Channel;
 }
 
