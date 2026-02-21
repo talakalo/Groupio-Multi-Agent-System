@@ -4,6 +4,7 @@ import React, { Component, type ErrorInfo, type ReactNode, useState, useEffect }
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api/client";
 import { useAuthStore } from "@/lib/stores/authStore";
+import { ToastContainer } from "@/components/shared/ToastContainer";
 
 // ---------------------------------------------------------------------------
 // Error boundary (class component, as required by React)

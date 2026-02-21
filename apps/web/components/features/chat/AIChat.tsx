@@ -1,10 +1,11 @@
 'use client';
 
-import type { Message, MessageResponse, ServiceCategory } from '@groupio/types';
+import type { MessageResponse, ServiceCategory } from '@groupio/types';
 import { Send, Bot, User, Loader2, Sparkles } from 'lucide-react';
 import { useState, useRef, useEffect, useCallback, type FormEvent } from 'react';
 
 import { cn } from '@/lib/utils/cn';
+import { useAccessToken } from '@/lib/stores/authStore';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -55,13 +56,14 @@ export function AIChat({
   buildingId,
   context = 'resident',
   suggestions = [],
-  category,
+  category: _category,
   userId = 'anonymous',
   apiUrl,
   placeholder,
   className,
 }: AIChatProps) {
   const baseUrl = apiUrl ?? API_BASE;
+  const accessToken = useAccessToken();
 
   // ---- State ----
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -114,21 +116,23 @@ export function AIChat({
         },
       ]);
 
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
       try {
         // Use AbortController to enforce a 30-second timeout
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30_000);
 
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+
         const response = await fetch(`${baseUrl}/api/v1/message`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({
             user_id: userId,
             message: text.trim(),
             ...(buildingId ? { building_id: buildingId } : {}),
             channel: 'web',
-            context,
-            ...(category ? { category } : {}),
           }),
           signal: controller.signal,
         });
@@ -161,10 +165,11 @@ export function AIChat({
           ),
         );
       } finally {
+        if (timeoutId !== undefined) clearTimeout(timeoutId);
         setIsLoading(false);
       }
     },
-    [baseUrl, buildingId, category, context, isLoading, userId],
+    [accessToken, baseUrl, buildingId, isLoading, userId],
   );
 
   const handleSubmit = (e: FormEvent) => {

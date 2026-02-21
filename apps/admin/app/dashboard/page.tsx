@@ -24,6 +24,7 @@ import {
   useEscalations,
   useHealthStatus,
   useAdminAnalyticsDashboard,
+  useActivityLog,
 } from "@/lib/hooks";
 
 // ---------------------------------------------------------------------------
@@ -41,7 +42,7 @@ const AGENTS = [
 ] as const;
 
 // ---------------------------------------------------------------------------
-// Mock activity log entries
+// Activity log entries (sourced from audit logs API)
 // ---------------------------------------------------------------------------
 
 interface ActivityLogEntry {
@@ -49,60 +50,6 @@ interface ActivityLogEntry {
   timestamp: string;
   type: "agent" | "escalation" | "contractor" | "system";
   message: string;
-}
-
-function generateActivityLog(): ActivityLogEntry[] {
-  const now = Date.now();
-  return [
-    {
-      id: "act-1",
-      timestamp: new Date(now - 2 * 60_000).toISOString(),
-      type: "agent",
-      message: "Router agent routed pricing inquiry to Pricing agent",
-    },
-    {
-      id: "act-2",
-      timestamp: new Date(now - 5 * 60_000).toISOString(),
-      type: "escalation",
-      message: "Escalation ESC-003 created: contractor license expired",
-    },
-    {
-      id: "act-3",
-      timestamp: new Date(now - 8 * 60_000).toISOString(),
-      type: "contractor",
-      message: 'New contractor "Sharon Kitchen Design" verified',
-    },
-    {
-      id: "act-4",
-      timestamp: new Date(now - 12 * 60_000).toISOString(),
-      type: "agent",
-      message: "Matching agent processed 14 match requests (avg 280ms)",
-    },
-    {
-      id: "act-5",
-      timestamp: new Date(now - 18 * 60_000).toISOString(),
-      type: "system",
-      message: "Vector DB reindexing completed for contractors collection",
-    },
-    {
-      id: "act-6",
-      timestamp: new Date(now - 25 * 60_000).toISOString(),
-      type: "agent",
-      message: "Support agent handled 6 conversations, 1 escalated",
-    },
-    {
-      id: "act-7",
-      timestamp: new Date(now - 35 * 60_000).toISOString(),
-      type: "escalation",
-      message: "Escalation ESC-002 assigned to human operator",
-    },
-    {
-      id: "act-8",
-      timestamp: new Date(now - 42 * 60_000).toISOString(),
-      type: "contractor",
-      message: "Trust score recalculated for 12 contractors",
-    },
-  ];
 }
 
 const ACTIVITY_TYPE_ICON: Record<
@@ -125,8 +72,7 @@ export default function DashboardPage() {
   const { data: escalationsData } = useEscalations();
   const { data: health } = useHealthStatus();
   const { data: analyticsData } = useAdminAnalyticsDashboard();
-
-  const activityLog = useMemo(() => generateActivityLog(), []);
+  const { data: activityLog = [] } = useActivityLog();
 
   // Derive agent summary data from system status
   const agentSummary = useMemo(() => {
@@ -144,7 +90,7 @@ export default function DashboardPage() {
     });
   }, [systemStatus]);
 
-  // Build chart series from system status
+  // Build chart series from system status (single snapshot per agent)
   const chartSeries: AgentChartSeries[] = useMemo(() => {
     const colors = [
       "#4f46e5",
@@ -155,27 +101,20 @@ export default function DashboardPage() {
       "#06b6d4",
       "#ec4899",
     ];
+    const now = new Date().toISOString();
     return AGENTS.map((agent, idx) => {
-      const now = Date.now();
-      const data = Array.from({ length: 24 }, (_, i) => ({
-        timestamp: new Date(now - (23 - i) * 3_600_000).toISOString(),
-        calls: Math.round(15 + Math.sin(i * 0.5 + idx) * 10 + Math.random() * 8),
-        avgLatencyMs: Math.round(
-          200 + Math.sin(i * 0.3 + idx) * 60 + Math.random() * 30
-        ),
-        errorRate: Math.max(
-          0,
-          +(Math.sin(i * 0.4 + idx) * 2 + Math.random()).toFixed(2)
-        ),
-      }));
+      const sysAgent = systemStatus?.agents?.[agent.key];
+      const calls = sysAgent?.calls ?? 0;
+      const errors = sysAgent?.errors ?? 0;
+      const errorRate = calls > 0 ? +((errors / calls) * 100).toFixed(2) : 0;
       return {
         agentKey: agent.key,
         label: agent.name,
         color: colors[idx % colors.length],
-        data,
+        data: [{ timestamp: now, calls, avgLatencyMs: 0, errorRate }],
       };
     });
-  }, []);
+  }, [systemStatus]);
 
   // Recent escalations (up to 5)
   const recentEscalations = useMemo(() => {
@@ -193,13 +132,9 @@ export default function DashboardPage() {
   const allServicesUp = Object.values(healthServices).every(Boolean);
   const uptimePercent = allServicesUp ? 99.97 : 98.5;
 
-  // Sparkline data (simulated)
-  const gmvSparkline = Array.from({ length: 14 }, (_, i) => ({
-    value: 30_000 + Math.sin(i * 0.6) * 8_000 + Math.random() * 5_000,
-  }));
-  const offersSparkline = Array.from({ length: 14 }, (_, i) => ({
-    value: 20 + Math.sin(i * 0.5) * 8 + Math.random() * 6,
-  }));
+  // Sparkline data (omitted until historical data endpoint is available)
+  const gmvSparkline: { value: number }[] = [];
+  const offersSparkline: { value: number }[] = [];
 
   return (
     <div className="space-y-6">

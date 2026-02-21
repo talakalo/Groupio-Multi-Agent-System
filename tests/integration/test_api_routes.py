@@ -787,7 +787,10 @@ class TestWhatsAppWebhook:
     def test_whatsapp_webhook_processed(self, client, mock_db):
         """Test WhatsApp webhook with valid payload returns processed."""
         mock_db.get_building_by_phone = AsyncMock(return_value="building-123")
-        with patch("src.api.routes.webhooks.get_orchestrator") as mock_get_orch:
+        with (
+            patch("src.api.routes.webhooks._verify_whatsapp_signature"),
+            patch("src.api.routes.webhooks.get_orchestrator") as mock_get_orch,
+        ):
             mock_orch = MagicMock()
             mock_orch.run = AsyncMock(
                 return_value={
@@ -824,12 +827,14 @@ class TestWhatsAppWebhook:
     def test_whatsapp_webhook_ignored_no_message(self, client):
         """Test WhatsApp webhook with no message body returns ignored."""
         payload = {"entry": [{"changes": [{"value": {"messages": []}}]}]}
-        response = client.post("/api/v1/webhooks/whatsapp", json=payload)
+        with patch("src.api.routes.webhooks._verify_whatsapp_signature"):
+            response = client.post("/api/v1/webhooks/whatsapp", json=payload)
         assert response.status_code == 200
         assert response.json()["status"] == "ignored"
 
     def test_whatsapp_webhook_invalid_payload(self, client):
         """Test WhatsApp webhook with invalid payload returns ignored or error."""
-        response = client.post("/api/v1/webhooks/whatsapp", json={})
+        with patch("src.api.routes.webhooks._verify_whatsapp_signature"):
+            response = client.post("/api/v1/webhooks/whatsapp", json={})
         assert response.status_code == 200
         assert response.json()["status"] in ("ignored", "error")
