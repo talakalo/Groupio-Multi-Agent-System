@@ -1575,9 +1575,9 @@ class PostgresClient:
                 q = q.eq("role", role)
             if is_active is not None:
                 q = q.eq("is_active", is_active)
-            result = await q.order("created_at", desc=True).range(
-                (page - 1) * page_size, page * page_size - 1
-            ).execute()
+            result = (
+                await q.order("created_at", desc=True).range((page - 1) * page_size, page * page_size - 1).execute()
+            )
             total = result.count if hasattr(result, "count") and result.count is not None else len(result.data or [])
             return (result.data or [], total)
 
@@ -1590,16 +1590,12 @@ class PostgresClient:
             args.append(is_active)
             where_parts.append("is_active = $%d" % len(args))
         where_sql = " AND ".join(where_parts) if where_parts else "1=1"
-        count_row = await self._pg_fetch_one(
-            "SELECT COUNT(*) AS c FROM users WHERE " + where_sql, *args
-        )
+        count_row = await self._pg_fetch_one("SELECT COUNT(*) AS c FROM users WHERE " + where_sql, *args)
         total = count_row["c"] if count_row else 0
         args.extend([page_size, (page - 1) * page_size])
         n1, n2 = len(args) - 1, len(args)
         rows = await self._pg_fetch_all(
-            "SELECT * FROM users WHERE "
-            + where_sql
-            + " ORDER BY created_at DESC LIMIT $%d OFFSET $%d" % (n1, n2),
+            "SELECT * FROM users WHERE " + where_sql + " ORDER BY created_at DESC LIMIT $%d OFFSET $%d" % (n1, n2),
             *args,
         )
         return (rows or [], total)
@@ -1622,9 +1618,9 @@ class PostgresClient:
                 q = q.eq("category", category)
             if flagged is True:
                 q = q.eq("status", "flagged")
-            result = await q.order("created_at", desc=True).range(
-                (page - 1) * page_size, page * page_size - 1
-            ).execute()
+            result = (
+                await q.order("created_at", desc=True).range((page - 1) * page_size, page * page_size - 1).execute()
+            )
             total = result.count if hasattr(result, "count") and result.count is not None else len(result.data or [])
             return (result.data or [], total)
 
@@ -1639,16 +1635,12 @@ class PostgresClient:
         if flagged is True:
             where_parts.append("status = 'flagged'")
         where_sql = " AND ".join(where_parts) if where_parts else "1=1"
-        count_row = await self._pg_fetch_one(
-            "SELECT COUNT(*) AS c FROM offers WHERE " + where_sql, *args
-        )
+        count_row = await self._pg_fetch_one("SELECT COUNT(*) AS c FROM offers WHERE " + where_sql, *args)
         total = count_row["c"] if count_row else 0
         args.extend([page_size, (page - 1) * page_size])
         n1, n2 = len(args) - 1, len(args)
         rows = await self._pg_fetch_all(
-            "SELECT * FROM offers WHERE "
-            + where_sql
-            + " ORDER BY created_at DESC LIMIT $%d OFFSET $%d" % (n1, n2),
+            "SELECT * FROM offers WHERE " + where_sql + " ORDER BY created_at DESC LIMIT $%d OFFSET $%d" % (n1, n2),
             *args,
         )
         return (rows or [], total)
@@ -1659,9 +1651,7 @@ class PostgresClient:
             client = await self._get_client()
             result = await client.table("system_settings").select("*").execute()
             return result.data or []
-        return await self._pg_fetch_all(
-            "SELECT * FROM system_settings ORDER BY key"
-        )
+        return await self._pg_fetch_all("SELECT * FROM system_settings ORDER BY key")
 
     async def upsert_system_setting(
         self,
@@ -1694,9 +1684,7 @@ class PostgresClient:
             res = await client.table("system_settings").insert(insert_payload).execute()
             return res.data[0] if res.data else insert_payload
 
-        existing = await self._pg_fetch_one(
-            "SELECT * FROM system_settings WHERE key = $1", key
-        )
+        existing = await self._pg_fetch_one("SELECT * FROM system_settings WHERE key = $1", key)
         if existing:
             set_parts = ['"value" = $1']
             args: list[Any] = [json.dumps(value)]
@@ -1708,14 +1696,10 @@ class PostgresClient:
                 set_parts.append('"updated_by" = $%d' % len(args))
             args.append(existing["id"])
             await self._pg_execute(
-                "UPDATE system_settings SET "
-                + ", ".join(set_parts)
-                + " WHERE id = $%d" % len(args),
+                "UPDATE system_settings SET " + ", ".join(set_parts) + " WHERE id = $%d" % len(args),
                 *args,
             )
-            return await self._pg_fetch_one(
-                "SELECT * FROM system_settings WHERE id = $1", existing["id"]
-            ) or existing
+            return await self._pg_fetch_one("SELECT * FROM system_settings WHERE id = $1", existing["id"]) or existing
         await self._pg_execute(
             """INSERT INTO system_settings (id, key, value, description, updated_by)
                VALUES ($1, $2, $3::jsonb, $4, $5)""",
@@ -1725,9 +1709,11 @@ class PostgresClient:
             description,
             updated_by,
         )
-        return await self._pg_fetch_one(
-            "SELECT * FROM system_settings WHERE id = $1", setting_id
-        ) or {"id": setting_id, "key": key, "value": value}
+        return await self._pg_fetch_one("SELECT * FROM system_settings WHERE id = $1", setting_id) or {
+            "id": setting_id,
+            "key": key,
+            "value": value,
+        }
 
     async def create_audit_log(self, data: dict[str, Any]) -> dict[str, Any]:
         """Insert an audit log entry."""
@@ -1764,9 +1750,9 @@ class PostgresClient:
                 q = q.eq("action", action)
             if resource_type:
                 q = q.eq("resource_type", resource_type)
-            result = await q.order("created_at", desc=True).range(
-                (page - 1) * page_size, page * page_size - 1
-            ).execute()
+            result = (
+                await q.order("created_at", desc=True).range((page - 1) * page_size, page * page_size - 1).execute()
+            )
             total = result.count if hasattr(result, "count") and result.count is not None else len(result.data or [])
             return (result.data or [], total)
 
@@ -1779,16 +1765,12 @@ class PostgresClient:
             args.append(resource_type)
             where_parts.append("resource_type = $%d" % len(args))
         where_sql = " AND ".join(where_parts) if where_parts else "1=1"
-        count_row = await self._pg_fetch_one(
-            "SELECT COUNT(*) AS c FROM audit_logs WHERE " + where_sql, *args
-        )
+        count_row = await self._pg_fetch_one("SELECT COUNT(*) AS c FROM audit_logs WHERE " + where_sql, *args)
         total = count_row["c"] if count_row else 0
         args.extend([page_size, (page - 1) * page_size])
         n1, n2 = len(args) - 1, len(args)
         rows = await self._pg_fetch_all(
-            "SELECT * FROM audit_logs WHERE "
-            + where_sql
-            + " ORDER BY created_at DESC LIMIT $%d OFFSET $%d" % (n1, n2),
+            "SELECT * FROM audit_logs WHERE " + where_sql + " ORDER BY created_at DESC LIMIT $%d OFFSET $%d" % (n1, n2),
             *args,
         )
         return (rows or [], total)
@@ -1867,20 +1849,19 @@ class PostgresClient:
                 return []
             invoice_ids = list({s["invoice_id"] for s in splits.data})
             result = await (
-                client.table("invoices")
-                .select("*")
-                .in_("id", invoice_ids)
-                .order("created_at", desc=True)
-                .execute()
+                client.table("invoices").select("*").in_("id", invoice_ids).order("created_at", desc=True).execute()
             )
             return result.data or []
-        return await self._pg_fetch_all(
-            """SELECT DISTINCT i.* FROM invoices i
+        return (
+            await self._pg_fetch_all(
+                """SELECT DISTINCT i.* FROM invoices i
                JOIN payment_splits ps ON ps.invoice_id = i.id
                WHERE ps.user_id = $1
                ORDER BY i.created_at DESC""",
-            user_id,
-        ) or []
+                user_id,
+            )
+            or []
+        )
 
     async def get_invoice_by_offer(self, offer_id: str) -> dict[str, Any] | None:
         """Get the invoice for a specific offer."""
@@ -1939,11 +1920,25 @@ class PostgresClient:
         if self._use_supabase_client():
             client = await self._get_client()
             # Filter to only columns that exist in the payments table
-            insert_data = {k: v for k, v in data.items() if k in {
-                "id", "invoice_id", "user_id", "offer_id", "amount", "currency",
-                "status", "transaction_id", "payment_method", "payment_method_id",
-                "provider_data", "created_at",
-            }}
+            insert_data = {
+                k: v
+                for k, v in data.items()
+                if k
+                in {
+                    "id",
+                    "invoice_id",
+                    "user_id",
+                    "offer_id",
+                    "amount",
+                    "currency",
+                    "status",
+                    "transaction_id",
+                    "payment_method",
+                    "payment_method_id",
+                    "provider_data",
+                    "created_at",
+                }
+            }
             result = await client.table("payments").insert(insert_data).execute()
             return result.data[0] if result.data else data
         await self._pg_execute(
@@ -2001,17 +1996,16 @@ class PostgresClient:
         if self._use_supabase_client():
             client = await self._get_client()
             result = await (
-                client.table("payments")
-                .select("*")
-                .eq("user_id", user_id)
-                .order("created_at", desc=True)
-                .execute()
+                client.table("payments").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
             )
             return result.data or []
-        return await self._pg_fetch_all(
-            "SELECT * FROM payments WHERE user_id = $1 ORDER BY created_at DESC",
-            user_id,
-        ) or []
+        return (
+            await self._pg_fetch_all(
+                "SELECT * FROM payments WHERE user_id = $1 ORDER BY created_at DESC",
+                user_id,
+            )
+            or []
+        )
 
     async def get_payment_by_transaction(self, transaction_id: str) -> dict[str, Any] | None:
         """Look up a payment by its provider transaction ID."""
@@ -2019,9 +2013,7 @@ class PostgresClient:
             client = await self._get_client()
             result = await client.table("payments").select("*").eq("transaction_id", transaction_id).limit(1).execute()
             return result.data[0] if result.data else None
-        return await self._pg_fetch_one(
-            "SELECT * FROM payments WHERE transaction_id = $1", transaction_id
-        )
+        return await self._pg_fetch_one("SELECT * FROM payments WHERE transaction_id = $1", transaction_id)
 
     # ------------------------------------------------------------------
     # Payment Splits
@@ -2053,21 +2045,20 @@ class PostgresClient:
             client = await self._get_client()
             result = await client.table("payment_splits").select("*").eq("invoice_id", payment_id).execute()
             return result.data or []
-        return await self._pg_fetch_all(
-            "SELECT * FROM payment_splits WHERE invoice_id = $1",
-            payment_id,
-        ) or []
+        return (
+            await self._pg_fetch_all(
+                "SELECT * FROM payment_splits WHERE invoice_id = $1",
+                payment_id,
+            )
+            or []
+        )
 
     async def get_next_invoice_number(self) -> str:
         """Query max invoice_number and return the next sequential value (zero-padded 5 digits)."""
         if self._use_supabase_client():
             client = await self._get_client()
             result = await (
-                client.table("invoices")
-                .select("invoice_number")
-                .order("created_at", desc=True)
-                .limit(1)
-                .execute()
+                client.table("invoices").select("invoice_number").order("created_at", desc=True).limit(1).execute()
             )
             if result.data:
                 last = result.data[0]["invoice_number"]  # e.g. "INV-2026-00003"
@@ -2078,9 +2069,7 @@ class PostgresClient:
             else:
                 seq = 1
         else:
-            row = await self._pg_fetch_one(
-                "SELECT invoice_number FROM invoices ORDER BY created_at DESC LIMIT 1"
-            )
+            row = await self._pg_fetch_one("SELECT invoice_number FROM invoices ORDER BY created_at DESC LIMIT 1")
             if row:
                 try:
                     seq = int(row["invoice_number"].rsplit("-", 1)[-1]) + 1

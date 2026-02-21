@@ -156,14 +156,9 @@ class TestEscrowAccounts:
         """Returns escrow account data for offers with invoices."""
         mock_db.execute_query = AsyncMock(return_value=[mock_offer])
         mock_db.get_invoice_by_offer = AsyncMock(return_value=mock_invoice)
-        mock_db.get_offer_participants = AsyncMock(
-            return_value=[{"user_id": f"u{i}"} for i in range(10)]
-        )
+        mock_db.get_offer_participants = AsyncMock(return_value=[{"user_id": f"u{i}"} for i in range(10)])
         mock_db.list_payment_splits = AsyncMock(
-            return_value=[
-                {"user_id": f"u{i}", "amount": 5000, "status": "paid"}
-                for i in range(7)
-            ]
+            return_value=[{"user_id": f"u{i}", "amount": 5000, "status": "paid"} for i in range(7)]
         )
         mock_db.get_contractor = AsyncMock(return_value=mock_contractor)
 
@@ -185,14 +180,9 @@ class TestEscrowAccounts:
         """Escrow status is 'held' when all participants have paid."""
         mock_db.execute_query = AsyncMock(return_value=[mock_offer])
         mock_db.get_invoice_by_offer = AsyncMock(return_value=mock_invoice)
-        mock_db.get_offer_participants = AsyncMock(
-            return_value=[{"user_id": f"u{i}"} for i in range(10)]
-        )
+        mock_db.get_offer_participants = AsyncMock(return_value=[{"user_id": f"u{i}"} for i in range(10)])
         mock_db.list_payment_splits = AsyncMock(
-            return_value=[
-                {"user_id": f"u{i}", "amount": 5000, "status": "paid"}
-                for i in range(10)
-            ]
+            return_value=[{"user_id": f"u{i}", "amount": 5000, "status": "paid"} for i in range(10)]
         )
         mock_db.get_contractor = AsyncMock(return_value=mock_contractor)
 
@@ -215,14 +205,9 @@ class TestEscrowAccounts:
         }
         mock_db.execute_query = AsyncMock(return_value=[completed_offer])
         mock_db.get_invoice_by_offer = AsyncMock(return_value=mock_invoice)
-        mock_db.get_offer_participants = AsyncMock(
-            return_value=[{"user_id": f"u{i}"} for i in range(5)]
-        )
+        mock_db.get_offer_participants = AsyncMock(return_value=[{"user_id": f"u{i}"} for i in range(5)])
         mock_db.list_payment_splits = AsyncMock(
-            return_value=[
-                {"user_id": f"u{i}", "amount": 10000, "status": "paid"}
-                for i in range(5)
-            ]
+            return_value=[{"user_id": f"u{i}", "amount": 10000, "status": "paid"} for i in range(5)]
         )
         mock_db.get_contractor = AsyncMock(return_value=mock_contractor)
 
@@ -334,9 +319,7 @@ class TestApproveContractorPayout:
 
     def test_approve_payout_wrong_status(self, admin_client, mock_db):
         """Returns 400 when invoice is not in 'paid' status."""
-        mock_db.get_invoice = AsyncMock(
-            return_value={"id": "inv-draft", "status": "draft"}
-        )
+        mock_db.get_invoice = AsyncMock(return_value={"id": "inv-draft", "status": "draft"})
 
         response = admin_client.post("/api/v1/admin/payments/payouts/inv-draft/approve")
 
@@ -387,9 +370,7 @@ class TestReleaseEscrow:
 
     def test_release_escrow_already_released(self, admin_client, mock_db):
         """Returns 400 when invoice is already released."""
-        mock_db.get_invoice_by_offer = AsyncMock(
-            return_value={"id": "inv-done", "status": "released", "total": 10000}
-        )
+        mock_db.get_invoice_by_offer = AsyncMock(return_value={"id": "inv-done", "status": "released", "total": 10000})
 
         response = admin_client.post("/api/v1/admin/payments/escrow/offer-done/release")
 

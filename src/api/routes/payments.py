@@ -463,11 +463,11 @@ async def download_invoice_pdf(
   <div class="invoice-info">
     <h2>Invoice</h2>
     <p><strong>Invoice ID:</strong> {invoice_id[:12]}</p>
-    <p><strong>Date:</strong> {issued_at[:10] if issued_at else 'N/A'}</p>
-    <p><strong>Offer:</strong> {offer_id[:12] if offer_id else 'N/A'}</p>
-    <p><strong>Status:</strong> <span class="status status-{
-      'paid' if status in ('paid', 'released') else 'pending'
-    }">{status}</span></p>
+    <p><strong>Date:</strong> {issued_at[:10] if issued_at else "N/A"}</p>
+    <p><strong>Offer:</strong> {offer_id[:12] if offer_id else "N/A"}</p>
+    <p><strong>Status:</strong> <span class="status status-{"paid" if status in ("paid", "released") else "pending"}">{
+        status
+    }</span></p>
   </div>
 </div>
 
@@ -630,29 +630,17 @@ async def get_payment_summary(
     db = get_postgres_client()
 
     # Get all invoices to compute totals
-    all_payments_query = await db.execute_query(
-        "SELECT status, amount FROM payments"
-    )
+    all_payments_query = await db.execute_query("SELECT status, amount FROM payments")
     payments = all_payments_query if all_payments_query else []
 
-    total_collected = sum(
-        p.get("amount", 0)
-        for p in payments
-        if p.get("status") in ("succeeded", "completed")
-    )
-    total_refunded = sum(
-        p.get("amount", 0) for p in payments if p.get("status") == "refunded"
-    )
+    total_collected = sum(p.get("amount", 0) for p in payments if p.get("status") in ("succeeded", "completed"))
+    total_refunded = sum(p.get("amount", 0) for p in payments if p.get("status") == "refunded")
 
     # Estimate escrow: payments succeeded on non-completed offers
-    all_invoices_query = await db.execute_query(
-        "SELECT id, total, status, offer_id FROM invoices"
-    )
+    all_invoices_query = await db.execute_query("SELECT id, total, status, offer_id FROM invoices")
     invoices = all_invoices_query if all_invoices_query else []
     paid_invoices = [i for i in invoices if i.get("status") == "paid"]
-    total_released = sum(
-        i.get("total", 0) for i in invoices if i.get("status") == "released"
-    )
+    total_released = sum(i.get("total", 0) for i in invoices if i.get("status") == "released")
     total_in_escrow = total_collected - total_released - total_refunded
 
     fee_rate = _platform_fee_rate()
@@ -797,9 +785,7 @@ async def release_escrow(
 
     invoice = await db.get_invoice_by_offer(offer_id)
     if not invoice:
-        raise HTTPException(
-            status_code=404, detail="No invoice found for this offer"
-        )
+        raise HTTPException(status_code=404, detail="No invoice found for this offer")
 
     current_status = invoice.get("status")
     if current_status not in ("paid", "pending"):
@@ -809,10 +795,13 @@ async def release_escrow(
         )
 
     # Mark as released
-    await db.update_invoice(invoice["id"], {
-        "status": "released",
-        "paid_at": datetime.now(timezone.utc).isoformat(),
-    })
+    await db.update_invoice(
+        invoice["id"],
+        {
+            "status": "released",
+            "paid_at": datetime.now(timezone.utc).isoformat(),
+        },
+    )
 
     # Update the offer status to completed
     await db.update_offer(offer_id, {"status": "completed"})

@@ -145,7 +145,6 @@ def get_settings() -> Settings:
     s = Settings()
     if s.ENVIRONMENT == "production" and s.JWT_SECRET_KEY == _DEFAULT_JWT_SECRET:
         raise ValueError(
-            "JWT_SECRET_KEY must be set to a secure value in production. "
-            "Do not use the default placeholder."
+            "JWT_SECRET_KEY must be set to a secure value in production. Do not use the default placeholder."
         )
     return s
