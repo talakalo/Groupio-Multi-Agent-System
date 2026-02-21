@@ -1,10 +1,15 @@
 """State management utilities for the LangGraph orchestration."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from src.models.agent_state import AgentState
 from src.utils.monitoring import generate_conversation_id
+
+
+def _utcnow() -> datetime:
+    """Return timezone-aware UTC now."""
+    return datetime.now(UTC)
 
 
 def create_initial_state(
@@ -30,7 +35,7 @@ def create_initial_state(
         needs_human=False,
         escalation_reason=None,
         final_response=None,
-        start_time=datetime.now(timezone.utc).isoformat(),
+        start_time=_utcnow().isoformat(),
         tokens_used=0,
     )
 
@@ -38,7 +43,10 @@ def create_initial_state(
 def calculate_duration_ms(start_time: str) -> int:
     """Calculate duration in milliseconds from ISO timestamp."""
     start = datetime.fromisoformat(start_time)
-    duration = datetime.now(timezone.utc) - start
+    # Ensure start is timezone-aware for comparison
+    if start.tzinfo is None:
+        start = start.replace(tzinfo=UTC)
+    duration = _utcnow() - start
     return int(duration.total_seconds() * 1000)
 
 

@@ -1,9 +1,5 @@
 'use client';
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
 import {
   LayoutDashboard,
   FolderKanban,
@@ -16,6 +12,10 @@ import {
   PlusCircle,
   ClipboardList,
 } from 'lucide-react';
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
+import { useEffect, useState } from 'react';
 
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
@@ -40,7 +40,19 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
   const router = useRouter();
   const t = useTranslations('contractorNav');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const token = useAuthStore((s) => s.accessToken);
   const logout = useAuthStore((s) => s.logout);
+
+  useEffect(() => {
+    if (!token) {
+      router.replace('/login');
+    }
+  }, [token, router]);
+
+  if (!token) {
+    return null;
+  }
+
 
   const handleLogout = async () => {
     await logout();

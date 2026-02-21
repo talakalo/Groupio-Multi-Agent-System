@@ -6,6 +6,12 @@ import { afterEach, vi } from 'vitest';
 vi.mock('@testing-library/react-native', () => {
   const { create, act } = require('react-test-renderer');
 
+  type TestNode = {
+    children?: TestNode[];
+    props?: Record<string, unknown>;
+    findByProps?: (props: Record<string, unknown>) => TestNode;
+  };
+
   /** Collect all text strings from a test-instance subtree. */
   const collectText = (instance: any): string => {
     if (typeof instance === 'string' || typeof instance === 'number') return String(instance);
@@ -25,9 +31,11 @@ vi.mock('@testing-library/react-native', () => {
     }
   };
 
-  const render = (element: any) => {
-    let renderer: any;
-    act(() => { renderer = create(element); });
+  const render = (element: React.ReactElement) => {
+    let renderer!: { root: TestNode; unmount: () => void };
+    act(() => {
+      renderer = create(element) as { root: TestNode; unmount: () => void };
+    });
     const rootInstance = renderer.root;
 
     const getByText = (match: string | RegExp) => {
@@ -49,6 +57,9 @@ vi.mock('@testing-library/react-native', () => {
     };
 
     const getByTestId = (id: string) => {
+      if (!rootInstance.findByProps) {
+        throw new Error(`Unable to find testID: ${id}`);
+      }
       try {
         return rootInstance.findByProps({ testID: id });
       } catch {
@@ -94,7 +105,7 @@ vi.mock('@testing-library/react-native', () => {
 vi.mock('react-native-paper', () => {
   const { createElement } = require('react');
   const wrap = (name: string) => {
-    const Comp = (props: any) => createElement(name, props, props.children);
+    const Comp = (props: Record<string, unknown>) => createElement(name, props, props.children);
     Comp.displayName = name;
     return Comp;
   };
@@ -142,7 +153,7 @@ vi.mock('react-native-paper', () => {
 // Mock react-native-vector-icons
 vi.mock('react-native-vector-icons/MaterialCommunityIcons', () => {
   const { createElement } = require('react');
-  const Icon = (props: any) => createElement('Icon', props);
+  const Icon = (props: Record<string, unknown>) => createElement('Icon', props);
   Icon.displayName = 'Icon';
   return { default: Icon };
 });

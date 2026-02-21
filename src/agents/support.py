@@ -193,7 +193,7 @@ class SupportAgent(BaseAgent):
         if state.get("intent") == "complaint" and user_profile.get("user_value") == "high":
             return True
 
-        # Sentiment check
+        # Sentiment check (threshold configurable via settings)
         settings = get_settings()
         try:
             sentiment = await self.llm_client.analyze_sentiment(user_message)
