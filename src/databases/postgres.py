@@ -2,8 +2,7 @@
 
 import json
 import logging
-import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
@@ -33,13 +32,26 @@ def _row_to_user(row: dict) -> dict:
         "building_id": row.get("building_id"),
         "contractor_id": row.get("contractor_id"),
         "last_login": row.get("last_login"),
-        "created_at": row.get("created_at") or datetime.now(timezone.utc),
-        "updated_at": row.get("updated_at") or datetime.now(timezone.utc),
+        "created_at": row.get("created_at") or datetime.now(UTC),
+        "updated_at": row.get("updated_at") or datetime.now(UTC),
     }
 
 
 class PostgresClient:
-    """PostgreSQL client - uses Supabase when configured, else local PostgreSQL via asyncpg."""
+    """PostgreSQL client with dual backend support.
+
+    Connects to **Supabase** (PostgREST) when ``SUPABASE_URL`` and
+    ``SUPABASE_KEY`` are set and ``USE_LOCAL_POSTGRES`` is not ``"1"``/``"true"``.
+    Otherwise falls back to a local **asyncpg** connection pool.
+
+    .. note::
+        **Production** currently uses Supabase.  The asyncpg path is
+        used in CI/testing and for local development.  Both paths are
+        exercised in integration tests.
+
+    Every public method contains an ``if self._use_supabase_client():``
+    branch.  When adding new queries, always implement both branches.
+    """
 
     def __init__(self) -> None:
         self._supabase_client: Any = None
@@ -132,6 +144,31 @@ class PostgresClient:
         pool = await self._get_client()
         async with pool.acquire() as conn:
             await conn.execute(query, *args)
+
+    from collections.abc import AsyncIterator as _AsyncIterator
+    from contextlib import asynccontextmanager as _acm
+
+    @_acm
+    async def transaction(self) -> "_AsyncIterator[Any]":
+        """Provide a transactional scope for multi-step DB operations.
+
+        Usage::
+
+            async with db.transaction() as conn:
+                await conn.execute("INSERT INTO ...", ...)
+                await conn.execute("UPDATE ...", ...)
+                # auto-committed on success, rolled back on exception
+        """
+        if self._use_supabase_client():
+            # Supabase client doesn't expose raw transactions; yield None
+            # so callers fall back to individual requests.
+            yield None
+            return
+
+        pool = await self._get_client()
+        async with pool.acquire() as conn:
+            async with conn.transaction():
+                yield conn
 
     @retry(
         stop=stop_after_attempt(3),
@@ -487,7 +524,8 @@ class PostgresClient:
             )
             return result.data[0] if result.data else {}
         await self._pg_execute(
-            "INSERT INTO building_residents (id, user_id, building_id, unit_number, floor, is_owner) "
+            "INSERT INTO building_residents "
+            "(id, user_id, building_id, unit_number, floor, is_owner) "
             "VALUES ($1, $2, $3, $4, $5, $6)",
             rid,
             user_id,
@@ -550,8 +588,10 @@ class PostgresClient:
         )
         total = total_row["c"] if total_row else 0
         rows = await self._pg_fetch_all(
-            "SELECT br.*, u.full_name, u.email, u.phone FROM building_residents br "
-            "JOIN users u ON u.id = br.user_id WHERE br.building_id = $1 "
+            "SELECT br.*, u.full_name, u.email, u.phone "
+            "FROM building_residents br "
+            "JOIN users u ON u.id = br.user_id "
+            "WHERE br.building_id = $1 "
             "ORDER BY br.joined_at DESC LIMIT $2 OFFSET $3",
             building_id,
             page_size,
@@ -657,7 +697,8 @@ class PostgresClient:
             )
             return result.data[0] if result.data else {}
         await self._pg_execute(
-            "INSERT INTO invitations (id, building_id, email, invited_by, status, expires_at) "
+            "INSERT INTO invitations "
+            "(id, building_id, email, invited_by, status, expires_at) "
             "VALUES ($1, $2, $3, $4, $5, $6)",
             inv_id,
             building_id,
@@ -897,8 +938,10 @@ class PostgresClient:
             return result.data or []
         return (
             await self._pg_fetch_all(
-                "SELECT op.*, u.full_name, u.email FROM offer_participants op "
-                "JOIN users u ON u.id = op.user_id WHERE op.offer_id = $1",
+                "SELECT op.*, u.full_name, u.email "
+                "FROM offer_participants op "
+                "JOIN users u ON u.id = op.user_id "
+                "WHERE op.offer_id = $1",
                 offer_id,
             )
             or []
@@ -1029,10 +1072,13 @@ class PostgresClient:
             result = await client.table("contractors").insert(row).execute()
             return result.data[0] if result.data else row
         await self._pg_execute(
-            "INSERT INTO contractors (id, user_id, business_name, contact_name, email, phone, "
-            "description, categories, regions, years_experience, employee_count, website, "
-            "verification_status, trust_score, license_number) "
-            "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)",
+            """INSERT INTO contractors
+               (id, user_id, business_name, contact_name, email,
+                phone, description, categories, regions,
+                years_experience, employee_count, website,
+                verification_status, trust_score, license_number)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9,
+                       $10, $11, $12, $13, $14, $15)""",
             row["id"],
             row["user_id"],
             row["business_name"],
@@ -1217,8 +1263,11 @@ class PostgresClient:
             )
             return bool(result.data)
         row = await self._pg_fetch_one(
-            "SELECT 1 FROM offer_participants op JOIN offers o ON o.id = op.offer_id "
-            "WHERE op.user_id = $1 AND o.matched_contractor_id = $2 AND o.status = 'completed' LIMIT 1",
+            "SELECT 1 FROM offer_participants op "
+            "JOIN offers o ON o.id = op.offer_id "
+            "WHERE op.user_id = $1 "
+            "AND o.matched_contractor_id = $2 "
+            "AND o.status = 'completed' LIMIT 1",
             user_id,
             contractor_id,
         )
@@ -1234,7 +1283,8 @@ class PostgresClient:
             result = await client.table("contractor_reviews").insert({**review_data, "id": rid}).execute()
             return result.data[0] if result.data else {**review_data, "id": rid}
         await self._pg_execute(
-            "INSERT INTO contractor_reviews (id, contractor_id, user_id, offer_id, rating, comment) "
+            "INSERT INTO contractor_reviews "
+            "(id, contractor_id, user_id, offer_id, rating, comment) "
             "VALUES ($1, $2, $3, $4, $5, $6)",
             rid,
             review_data["contractor_id"],
@@ -1297,9 +1347,13 @@ class PostgresClient:
             result = await client.table("escalations").insert(escalation_data).execute()
             return result.data[0] if result.data else escalation_data
         await self._pg_execute(
-            "INSERT INTO escalations (id, user_id, conversation_id, source_agent, reason, priority, "
-            "summary, status, assigned_to, context, agent_reasoning, resolution_notes, resolved_at) "
-            "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)",
+            """INSERT INTO escalations
+               (id, user_id, conversation_id, source_agent,
+                reason, priority, summary, status, assigned_to,
+                context, agent_reasoning, resolution_notes,
+                resolved_at)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9,
+                       $10, $11, $12, $13)""",
             escalation_data["id"],
             escalation_data["user_id"],
             escalation_data["conversation_id"],
@@ -1425,7 +1479,8 @@ class PostgresClient:
             )
         else:
             await self._pg_execute(
-                "INSERT INTO escalation_messages (id, escalation_id, sender_type, sender_id, content) "
+                "INSERT INTO escalation_messages "
+                "(id, escalation_id, sender_type, sender_id, content) "
                 "VALUES ($1, $2, $3, $4, $5)",
                 message_id,
                 escalation_id,
@@ -1848,8 +1903,12 @@ class PostgresClient:
             if not splits.data:
                 return []
             invoice_ids = list({s["invoice_id"] for s in splits.data})
-            result = await (
-                client.table("invoices").select("*").in_("id", invoice_ids).order("created_at", desc=True).execute()
+            result = (
+                await client.table("invoices")
+                .select("*")
+                .in_("id", invoice_ids)
+                .order("created_at", desc=True)
+                .execute()
             )
             return result.data or []
         return (
@@ -1995,8 +2054,12 @@ class PostgresClient:
         """Get all payments for a user."""
         if self._use_supabase_client():
             client = await self._get_client()
-            result = await (
-                client.table("payments").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
+            result = (
+                await client.table("payments")
+                .select("*")
+                .eq("user_id", user_id)
+                .order("created_at", desc=True)
+                .execute()
             )
             return result.data or []
         return (
@@ -2014,6 +2077,7 @@ class PostgresClient:
             result = await client.table("payments").select("*").eq("transaction_id", transaction_id).limit(1).execute()
             return result.data[0] if result.data else None
         return await self._pg_fetch_one("SELECT * FROM payments WHERE transaction_id = $1", transaction_id)
+
 
     # ------------------------------------------------------------------
     # Payment Splits
@@ -2057,8 +2121,17 @@ class PostgresClient:
         """Query max invoice_number and return the next sequential value (zero-padded 5 digits)."""
         if self._use_supabase_client():
             client = await self._get_client()
+<<<<<<< HEAD
             result = await (
                 client.table("invoices").select("invoice_number").order("created_at", desc=True).limit(1).execute()
+=======
+            result = (
+                await client.table("invoices")
+                .select("invoice_number")
+                .order("created_at", desc=True)
+                .limit(1)
+                .execute()
+>>>>>>> origin/dev
             )
             if result.data:
                 last = result.data[0]["invoice_number"]  # e.g. "INV-2026-00003"

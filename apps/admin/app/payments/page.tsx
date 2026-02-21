@@ -501,8 +501,8 @@ export default function AdminPaymentsPage() {
         fetchApi<ContractorPayout[]>("/admin/payments/payouts"),
       ]);
       if (summaryData) setSummary(summaryData);
-      if (escrowData) setEscrows(escrowData);
-      if (payoutsData) setPayouts(payoutsData);
+      if (escrowData && escrowData.length > 0) setEscrows(escrowData);
+      if (payoutsData && payoutsData.length > 0) setPayouts(payoutsData);
     } finally {
       setLoading(false);
     }

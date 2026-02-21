@@ -2,9 +2,3 @@
 # Requires upgrading to Next.js 15+. Tracked in issue #36.
 # This only affects App Router Server Components (DoS via crafted HTTP request).
 GHSA-h25m-26qc-wcjf
-
-# Ignore minimatch ReDoS (CVE-2026-26996): upgrading to 10.x breaks ESLint/jsx-a11y
-# - minimatch 10.x is ESM-only and has breaking API changes
-# - eslint-plugin-jsx-a11y expects minimatch(path, pattern) but v10 default export is Minimatch class
-# - Revert when: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y supports minimatch 10
-CVE-2026-26996

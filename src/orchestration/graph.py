@@ -256,7 +256,7 @@ class GroupioOrchestrator:
         if state.get("needs_human"):
             return "human"
 
-        # Low confidence or clarification needed
+        # Low confidence or clarification needed (threshold from settings)
         settings = get_settings()
         if state.get("confidence", 0) < settings.ROUTER_CONFIDENCE_THRESHOLD:
             # Check if router already provided a clarification response

@@ -2,7 +2,7 @@
 
 import logging
 import mimetypes
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -90,7 +90,7 @@ class StorageService:
 
         ext = Path(file_name).suffix
         unique_name = f"{uuid4().hex}{ext}"
-        prefix = datetime.now(timezone.utc).strftime("%Y/%m")
+        prefix = datetime.now(UTC).strftime("%Y/%m")
         storage_path = f"{prefix}/{unique_name}"
 
         if self._use_supabase:
