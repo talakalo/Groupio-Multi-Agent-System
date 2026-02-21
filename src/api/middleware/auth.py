@@ -95,8 +95,8 @@ def verify_access_token(token: str) -> TokenPayload | None:
             sub=payload["sub"],
             email=payload["email"],
             role=UserRole(payload["role"]),
-            exp=datetime.fromtimestamp(payload["exp"]),
-            iat=datetime.fromtimestamp(payload["iat"]),
+            exp=datetime.fromtimestamp(payload["exp"], tz=UTC),
+            iat=datetime.fromtimestamp(payload["iat"], tz=UTC),
         )
     except jwt.ExpiredSignatureError:
         logger.debug("Token expired")

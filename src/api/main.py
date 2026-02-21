@@ -44,6 +44,11 @@ async def lifespan(app: FastAPI):
     # Shutdown
     logger.info("Groupio Agent API shutting down")
     try:
+        db = get_postgres_client()
+        await db.close()
+    except Exception:
+        pass
+    try:
         redis = get_redis_client()
         await redis.close()
     except Exception:

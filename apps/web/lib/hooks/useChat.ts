@@ -125,9 +125,9 @@ export function useChat({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            userId,
+            user_id: userId,
             message: trimmed,
-            buildingId,
+            building_id: buildingId,
             channel: 'web',
           }),
           signal: controller.signal,

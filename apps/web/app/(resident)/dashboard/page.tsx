@@ -231,12 +231,15 @@ export default function ResidentDashboardPage() {
     enabled: !!accessToken,
   });
 
-  // Recent activity (not yet backed by a dedicated endpoint; uses empty fallback)
+  // Recent activity from the backend
   const activityQuery = useQuery<{ activities: RecentActivity[] }>({
     queryKey: ['resident', 'dashboard', 'activity'],
     queryFn: async () => {
-      return { activities: [] };
+      const res = await fetch(`${apiBase}/api/v1/activity/recent`, { headers });
+      if (!res.ok) return { activities: [] };
+      return res.json();
     },
+    enabled: !!accessToken,
   });
 
   const stats = statsQuery.data;

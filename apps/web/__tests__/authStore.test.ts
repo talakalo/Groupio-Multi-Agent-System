@@ -225,10 +225,11 @@ describe('Auth Store', () => {
 
   describe('register', () => {
     it('registers and logs in user', async () => {
+      const mockJson = (data: object) => () => Promise.resolve(data);
       (global.fetch as ReturnType<typeof vi.fn>)
         .mockResolvedValueOnce({
           ok: true,
-          json: async () => ({ id: 'new-user-123' }),
+          json: mockJson({ id: 'new-user-123' }),
         })
         .mockResolvedValueOnce({
           ok: true,
@@ -238,7 +239,7 @@ describe('Auth Store', () => {
         })
         .mockResolvedValueOnce({
           ok: true,
-          json: async () => ({
+          json: mockJson({
             id: 'new-user-123',
             email: 'new@example.com',
             full_name: 'New User',

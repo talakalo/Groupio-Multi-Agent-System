@@ -18,6 +18,8 @@ import {
   useSystemStatus,
   useAgentMetrics,
   useReloadAgent,
+  useEscalations,
+  useActivityLog,
 } from "@/lib/hooks";
 
 // ---------------------------------------------------------------------------
@@ -101,7 +103,7 @@ const CHART_COLORS = [
 ];
 
 // ---------------------------------------------------------------------------
-// Simulated recent activity for agents
+// Agent activity type (sourced from audit logs)
 // ---------------------------------------------------------------------------
 
 interface AgentActivity {
@@ -110,68 +112,6 @@ interface AgentActivity {
   agentName: string;
   action: string;
   timestamp: string;
-}
-
-function generateAgentActivity(): AgentActivity[] {
-  const now = Date.now();
-  return [
-    {
-      id: "aa-1",
-      agentKey: "router",
-      agentName: "Router",
-      action: 'Classified intent "pricing_inquiry" with 0.94 confidence',
-      timestamp: new Date(now - 1 * 60_000).toISOString(),
-    },
-    {
-      id: "aa-2",
-      agentKey: "matching",
-      agentName: "Matching",
-      action: "Returned 5 contractor matches for AC installation in Tel Aviv",
-      timestamp: new Date(now - 3 * 60_000).toISOString(),
-    },
-    {
-      id: "aa-3",
-      agentKey: "pricing",
-      agentName: "Pricing",
-      action: "Generated 3-tier pricing for kitchen renovations in Jerusalem",
-      timestamp: new Date(now - 6 * 60_000).toISOString(),
-    },
-    {
-      id: "aa-4",
-      agentKey: "support",
-      agentName: "Support",
-      action: "Escalated conversation conv-302 to human operator",
-      timestamp: new Date(now - 10 * 60_000).toISOString(),
-    },
-    {
-      id: "aa-5",
-      agentKey: "vetting",
-      agentName: "Vetting",
-      action: 'Completed license verification for "Southern Electric"',
-      timestamp: new Date(now - 14 * 60_000).toISOString(),
-    },
-    {
-      id: "aa-6",
-      agentKey: "outreach",
-      agentName: "Outreach",
-      action: "Sent onboarding follow-up to 3 pending contractors",
-      timestamp: new Date(now - 20 * 60_000).toISOString(),
-    },
-    {
-      id: "aa-7",
-      agentKey: "analytics",
-      agentName: "Analytics",
-      action: 'Processed NL query: "top performing category this month"',
-      timestamp: new Date(now - 28 * 60_000).toISOString(),
-    },
-    {
-      id: "aa-8",
-      agentKey: "router",
-      agentName: "Router",
-      action: "Processed 24 messages in last 30 min, 0 misroutes",
-      timestamp: new Date(now - 32 * 60_000).toISOString(),
-    },
-  ];
 }
 
 // ---------------------------------------------------------------------------
@@ -193,8 +133,34 @@ export default function AgentsPage() {
 
   // Fetch detailed metrics for the selected agent
   const { data: agentDetail } = useAgentMetrics(selectedAgent ?? "router");
+  const { data: escalationsData } = useEscalations();
+  const { data: auditActivity = [] } = useActivityLog();
 
-  const activity = useMemo(() => generateAgentActivity(), []);
+  // Map audit log entries to agent activity format
+  const activity: AgentActivity[] = useMemo(() => {
+    return auditActivity.map((entry) => ({
+      id: entry.id,
+      agentKey: "system",
+      agentName: "System",
+      action: entry.message,
+      timestamp: entry.timestamp,
+    }));
+  }, [auditActivity]);
+
+  // Map escalations to decision queue items
+  const pendingDecisions = useMemo(() => {
+    const escalations = escalationsData?.escalations ?? [];
+    return escalations
+      .filter((e) => e.status === "open")
+      .slice(0, 5)
+      .map((esc) => ({
+        id: esc.id,
+        agent: (esc.context?.actionsTaken?.[0]?.agent ?? "Support").replace(/^\w/, (c: string) => c.toUpperCase()),
+        action: esc.reason,
+        detail: esc.context?.actionsTaken?.map((a: { action: string }) => a.action).join(", ") ?? "",
+        priority: esc.priority as "high" | "medium" | "low",
+      }));
+  }, [escalationsData]);
 
   // Derive agent card data from system status
   const agentCards = useMemo(() => {
@@ -210,23 +176,15 @@ export default function AgentsPage() {
             ? "degraded"
             : "active";
 
-      // Generate deterministic trend data
-      const seed = def.key.length + idx;
-      const trendData = Array.from({ length: 12 }, (_, i) => {
-        return Math.round(
-          20 + Math.sin(i * 0.5 + seed) * 10 + Math.random() * 5
-        );
-      });
-
       return {
         ...def,
         calls,
         errors,
         errorRate,
         status,
-        avgResponseMs: Math.round(180 + seed * 15 + Math.random() * 50),
-        requestsPerMin: +(calls / 1440).toFixed(1) || 0.5,
-        trendData,
+        avgResponseMs: 0,
+        requestsPerMin: +(calls / 1440).toFixed(1) || 0,
+        trendData: [calls],
       };
     });
   }, [systemStatus, agentToggles]);
@@ -250,30 +208,21 @@ export default function AgentsPage() {
         },
       ];
     }
-    // All agents comparison
+    // All agents comparison (single data point per agent from current status)
+    const now = new Date().toISOString();
     return AGENT_DEFS.map((def, idx) => {
-      const now = Date.now();
-      const data = Array.from({ length: 24 }, (_, i) => ({
-        timestamp: new Date(now - (23 - i) * 3_600_000).toISOString(),
-        calls: Math.round(
-          15 + Math.sin(i * 0.5 + idx) * 10 + Math.random() * 8
-        ),
-        avgLatencyMs: Math.round(
-          200 + Math.sin(i * 0.3 + idx) * 60 + Math.random() * 30
-        ),
-        errorRate: Math.max(
-          0,
-          +(Math.sin(i * 0.4 + idx) * 2 + Math.random()).toFixed(2)
-        ),
-      }));
+      const sysAgent = systemStatus?.agents?.[def.key];
+      const calls = sysAgent?.calls ?? 0;
+      const errors = sysAgent?.errors ?? 0;
+      const errorRate = calls > 0 ? +((errors / calls) * 100).toFixed(2) : 0;
       return {
         agentKey: def.key,
         label: def.name,
         color: CHART_COLORS[idx % CHART_COLORS.length],
-        data,
+        data: [{ timestamp: now, calls, avgLatencyMs: 0, errorRate }],
       };
     });
-  }, [selectedAgent, agentDetail]);
+  }, [selectedAgent, agentDetail, systemStatus]);
 
   const handleReload = useCallback(
     (agentKey: string) => {
@@ -446,29 +395,12 @@ export default function AgentsPage() {
           Agent actions that require admin review or override
         </p>
         <div className="divide-y divide-surface-100">
-          {[
-            {
-              id: "d1",
-              agent: "Vetting",
-              action: "Manual review required",
-              detail: 'Contractor "Haifa Electric" scored 72 (threshold: 85 for auto-approve)',
-              priority: "medium",
-            },
-            {
-              id: "d2",
-              agent: "Matching",
-              action: "Low-confidence match",
-              detail: "Best match score 0.45 for plumbing in South region (threshold: 0.6)",
-              priority: "low",
-            },
-            {
-              id: "d3",
-              agent: "Support",
-              action: "Escalation review",
-              detail: "User reported legal issue in conversation conv-445",
-              priority: "high",
-            },
-          ].map((decision) => (
+          {pendingDecisions.length === 0 && (
+            <div className="py-6 text-center text-sm text-surface-400">
+              No pending decisions
+            </div>
+          )}
+          {pendingDecisions.map((decision) => (
             <div key={decision.id} className="flex items-center gap-3 py-3">
               <span
                 className={clsx(

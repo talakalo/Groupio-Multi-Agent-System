@@ -145,104 +145,7 @@ export function useEscalations(filters?: {
     queryKey: [...queryKeys.escalations, filters],
     queryFn: async () => {
       const client = getApiClient();
-      try {
-        return await client.getEscalations();
-      } catch {
-        // Fallback mock data when API is unavailable
-        return {
-          escalations: [
-            {
-              id: "esc-001",
-              userId: "user-101",
-              conversationId: "conv-201",
-              reason: "Contractor dispute - quality complaint",
-              priority: "urgent" as const,
-              status: "open" as const,
-              context: {
-                intent: "complaint",
-                actionsTaken: [
-                  { agent: "support", action: "Gathered complaint details" },
-                  { agent: "vetting", action: "Pulled contractor record" },
-                ],
-              },
-              createdAt: new Date(
-                Date.now() - 15 * 60 * 1000
-              ).toISOString(),
-            },
-            {
-              id: "esc-002",
-              userId: "user-202",
-              conversationId: "conv-302",
-              reason: "Payment not processed after 48 hours",
-              priority: "high" as const,
-              status: "assigned" as const,
-              context: {
-                intent: "payment_issue",
-                actionsTaken: [
-                  { agent: "support", action: "Verified payment status" },
-                ],
-              },
-              createdAt: new Date(
-                Date.now() - 2 * 60 * 60 * 1000
-              ).toISOString(),
-            },
-            {
-              id: "esc-003",
-              userId: "user-303",
-              conversationId: "conv-403",
-              reason: "Contractor license expired during active offer",
-              priority: "high" as const,
-              status: "open" as const,
-              context: {
-                intent: "compliance",
-                actionsTaken: [
-                  { agent: "vetting", action: "Flagged license expiry" },
-                  { agent: "outreach", action: "Attempted contractor contact" },
-                ],
-              },
-              createdAt: new Date(
-                Date.now() - 5 * 60 * 60 * 1000
-              ).toISOString(),
-            },
-            {
-              id: "esc-004",
-              userId: "user-404",
-              conversationId: "conv-504",
-              reason: "Complex multi-service pricing request",
-              priority: "normal" as const,
-              status: "open" as const,
-              context: {
-                intent: "pricing_complex",
-                actionsTaken: [
-                  { agent: "pricing", action: "Initial analysis" },
-                  { agent: "matching", action: "Found partial matches" },
-                ],
-              },
-              createdAt: new Date(
-                Date.now() - 12 * 60 * 60 * 1000
-              ).toISOString(),
-            },
-            {
-              id: "esc-005",
-              userId: "user-505",
-              conversationId: "conv-605",
-              reason: "Language barrier - Arabic support needed",
-              priority: "low" as const,
-              status: "resolved" as const,
-              context: {
-                intent: "language_support",
-                actionsTaken: [
-                  { agent: "support", action: "Identified language need" },
-                ],
-              },
-              createdAt: new Date(
-                Date.now() - 24 * 60 * 60 * 1000
-              ).toISOString(),
-            },
-          ] satisfies Escalation[],
-          total: 5,
-        };
-      }
+      return await client.getEscalations();
     },
     refetchInterval: 30_000,
   });
@@ -288,25 +191,7 @@ export function useSystemStatus() {
     queryKey: queryKeys.systemStatus,
     queryFn: async () => {
       const client = getApiClient();
-      try {
-        return await client.getSystemStatus();
-      } catch {
-        return {
-          agents: {
-            matching: { model: "gpt-4o-mini", calls: 1_247, errors: 3 },
-            pricing: { model: "gpt-4o", calls: 892, errors: 1 },
-            support: { model: "gpt-4o-mini", calls: 2_156, errors: 12 },
-            vetting: { model: "gpt-4o", calls: 431, errors: 0 },
-            outreach: { model: "gpt-4o-mini", calls: 678, errors: 5 },
-            analytics: { model: "gpt-4o", calls: 234, errors: 0 },
-          },
-          vectorCollections: {
-            contractors: { pointsCount: 1_842, status: "green" },
-            buildings: { pointsCount: 3_267, status: "green" },
-            conversations: { pointsCount: 15_432, status: "yellow" },
-          },
-        };
-      }
+      return await client.getSystemStatus();
     },
     refetchInterval: 60_000,
   });
@@ -317,19 +202,7 @@ export function useHealthStatus() {
     queryKey: queryKeys.health,
     queryFn: async () => {
       const client = getApiClient();
-      try {
-        return await client.getHealth();
-      } catch {
-        return {
-          status: "healthy" as const,
-          services: {
-            vector_db: true,
-            graph_db: true,
-            redis: true,
-            postgres: true,
-          },
-        };
-      }
+      return await client.getHealth();
     },
     refetchInterval: 30_000,
   });
@@ -378,37 +251,16 @@ export function useAgentMetrics(agentName: string) {
           history: generateHistory(agentName),
         };
       } catch {
-        const defaults: Record<
-          string,
-          { model: string; calls: number; errors: number }
-        > = {
-          matching: { model: "gpt-4o-mini", calls: 1_247, errors: 3 },
-          pricing: { model: "gpt-4o", calls: 892, errors: 1 },
-          support: { model: "gpt-4o-mini", calls: 2_156, errors: 12 },
-          vetting: { model: "gpt-4o", calls: 431, errors: 0 },
-          outreach: { model: "gpt-4o-mini", calls: 678, errors: 5 },
-          analytics: { model: "gpt-4o", calls: 234, errors: 0 },
-        };
-        const agent = defaults[agentName] ?? {
-          model: "unknown",
-          calls: 0,
-          errors: 0,
-        };
-        const errorRate =
-          agent.calls > 0
-            ? Number(((agent.errors / agent.calls) * 100).toFixed(2))
-            : 0;
-
         return {
           name: agentName,
-          model: agent.model,
-          totalCalls: agent.calls,
-          errorRate,
-          avgLatencyMs: 320,
-          successRate: 100 - errorRate,
-          callsToday: Math.round(agent.calls * 0.12),
-          tokensUsed: agent.calls * 850,
-          history: generateHistory(agentName),
+          model: "unknown",
+          totalCalls: 0,
+          errorRate: 0,
+          avgLatencyMs: 0,
+          successRate: 0,
+          callsToday: 0,
+          tokensUsed: 0,
+          history: [],
         };
       }
     },
@@ -530,17 +382,16 @@ export function useAdminAnalyticsDashboard() {
       const token = getAuthToken();
       const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "") || "http://localhost:8000";
       const backendUrl = baseUrl.endsWith("/api/v1") ? `${baseUrl.replace(/\/api\/v1$/, "")}/api/v1/admin/analytics` : `${baseUrl}/api/v1/admin/analytics`;
-      try {
-        const headers: Record<string, string> = {};
-        if (token) headers["Authorization"] = `Bearer ${token}`;
-        const res = await fetch(backendUrl, { headers });
-        if (res.ok) return res.json() as Promise<AdminAnalyticsDashboard>;
-      } catch {
-        // Fallback to Next.js mock route
-      }
-      const res = await fetch("/api/admin/analytics");
-      if (!res.ok) throw new Error("Failed to fetch analytics");
-      return res.json();
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+
+      // Try the backend first, fall back to the Next.js proxy route
+      const res = await fetch(backendUrl, { headers }).catch(() => null);
+      if (res?.ok) return res.json() as Promise<AdminAnalyticsDashboard>;
+
+      const proxyRes = await fetch("/api/admin/analytics", { headers });
+      if (!proxyRes.ok) throw new Error("Failed to fetch analytics");
+      return proxyRes.json();
     },
     refetchInterval: 60_000,
   });
@@ -551,12 +402,65 @@ export function useAnalyticsQuery() {
     mutationFn: async (query: string) => {
       const client = getApiClient();
       const response = await client.sendMessage({
-        userId: "admin",
+        user_id: "admin",
         message: query,
         channel: "admin",
       });
       return response;
     },
+  });
+}
+
+// ---- Activity Log (from audit logs) ----
+
+export interface ActivityLogEntry {
+  id: string;
+  timestamp: string;
+  type: "agent" | "escalation" | "contractor" | "system";
+  message: string;
+}
+
+export function useActivityLog() {
+  return useQuery<ActivityLogEntry[]>({
+    queryKey: ["admin", "activity-log"],
+    queryFn: async (): Promise<ActivityLogEntry[]> => {
+      const token = getAuthToken();
+      const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "") || "http://localhost:8000";
+      const url = baseUrl.endsWith("/api/v1")
+        ? `${baseUrl.replace(/\/api\/v1$/, "")}/api/v1/admin/audit-logs?page_size=10`
+        : `${baseUrl}/api/v1/admin/audit-logs?page_size=10`;
+
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+
+      const res = await fetch(url, { headers });
+      if (!res.ok) return [];
+
+      const data = await res.json();
+      const items: Array<Record<string, unknown>> = data.items ?? [];
+
+      const typeMap: Record<string, ActivityLogEntry["type"]> = {
+        create_user: "system",
+        update_user: "system",
+        flag_offer: "escalation",
+        approve_offer: "contractor",
+        cancel_offer: "system",
+        update_settings: "system",
+        create_escalation: "escalation",
+        resolve_escalation: "escalation",
+      };
+
+      return items.map((item, idx) => {
+        const action = String(item.action ?? "system");
+        return {
+          id: String(item.id ?? idx),
+          timestamp: String(item.created_at ?? new Date().toISOString()),
+          type: typeMap[action] ?? "system",
+          message: `${action.replace(/_/g, " ")} on ${item.resource_type ?? "resource"} ${String(item.resource_id ?? "").slice(0, 8)}`,
+        };
+      });
+    },
+    refetchInterval: 30_000,
   });
 }
 
