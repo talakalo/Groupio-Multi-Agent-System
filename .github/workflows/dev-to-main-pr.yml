@@ -56,12 +56,23 @@ jobs:
               return;
             }
 
-            const { data: pr } = await github.rest.pulls.create({
-              owner,
-              repo,
-              title,
-              head: 'dev',
-              base: 'main',
-              body,
-            });
+            let pr;
+            try {
+              ({ data: pr } = await github.rest.pulls.create({
+                owner,
+                repo,
+                title,
+                head: 'dev',
+                base: 'main',
+                body,
+              }));
+            } catch (err) {
+              const msg = err.message ?? String(err);
+              // "No commits between main and dev" — branches are already in sync; not an error.
+              if (msg.includes('No commits') || msg.includes('nothing to compare') || msg.includes('already exists')) {
+                console.log(`No PR needed: ${msg}`);
+                return;
+              }
+              throw err;
+            }
             console.log(`Created PR: #${pr.number} ${pr.html_url}`);
