@@ -18,7 +18,7 @@ vi.mock('@/lib/api/client', () => ({
   },
   ApiError: class ApiError extends Error {
     status: number;
-    constructor(message: string, status = 500) {
+    constructor(status = 500, message: string = '') {
       super(message);
       this.name = 'ApiError';
       this.status = status;
@@ -91,7 +91,7 @@ describe('Web LoginPage — navigation', () => {
 
   it('does NOT navigate when login credentials are wrong (401)', async () => {
     const { ApiError } = await import('@/lib/api/client');
-    mockApiLogin.mockRejectedValueOnce(new ApiError('Unauthorized', 401));
+    mockApiLogin.mockRejectedValueOnce(new ApiError(401, 'Unauthorized'));
 
     render(<LoginPage />);
 
