@@ -1,6 +1,4 @@
 'use client';
-
-import { useEffect } from 'react';
 import { CheckCircle, XCircle, AlertTriangle, Info, X } from 'lucide-react';
 import { useNotifications, useNotificationStore } from '@/lib/stores/notificationStore';
 import { cn } from '@/lib/utils/cn';
@@ -44,7 +42,7 @@ export function ToastContainer() {
             key={n.id}
             className={cn(
               'flex items-start gap-3 p-4 rounded-xl border shadow-lg pointer-events-auto',
-              'animate-in slide-in-from-right-4 fade-in duration-300',
+              'animate-slide-up',
               COLOR_MAP[n.type]
             )}
             role="alert"

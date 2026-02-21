@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -21,7 +21,6 @@ import {
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
 import { NotificationPanel } from '@/components/shared/NotificationPanel';
-import { ToastContainer } from '@/components/shared/ToastContainer';
 
 interface NavItem {
   href: string;
@@ -183,5 +182,6 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
         {/* Page content */}
         <main className="p-4 sm:p-6 lg:p-8">{children}</main>
       </div>
-      <ToastContainer />
+    </div>
+  );
 }

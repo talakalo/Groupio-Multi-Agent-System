@@ -21,7 +21,6 @@ import {
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
 import { NotificationPanel } from '@/components/shared/NotificationPanel';
-import { ToastContainer } from '@/components/shared/ToastContainer';
 
 interface NavItem {
   href: string;

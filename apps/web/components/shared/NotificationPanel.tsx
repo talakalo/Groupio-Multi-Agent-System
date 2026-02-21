@@ -166,7 +166,7 @@ export function NotificationPanel() {
           className={cn(
             'absolute top-full mt-2 end-0 z-50',
             'w-80 bg-white rounded-2xl shadow-xl border border-gray-100',
-            'animate-in fade-in slide-in-from-top-2 duration-200'
+            'animate-fade-in'
           )}
           role="dialog"
           aria-label="לוח התראות"
