@@ -14,7 +14,7 @@ export interface User {
   isVerified: boolean;
 }
 
-interface AuthState {
+export interface AuthState {
   user: User | null;
   /** In-memory only – never persisted to localStorage. */
   accessToken: string | null;

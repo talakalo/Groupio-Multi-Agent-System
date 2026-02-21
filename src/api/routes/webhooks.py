@@ -105,7 +105,13 @@ async def whatsapp_verify(
         if expected_token and hub_verify_token != expected_token:
             raise HTTPException(status_code=403, detail="Invalid verify token")
         return int(hub_challenge)
-    return {"status": "invalid"}
+
+    if hub_mode == "subscribe" and not expected_token:
+        # Dev fallback: accept when no secret is configured
+        logger.warning("WhatsApp verification token not configured - accepting in dev mode")
+        return int(hub_challenge)
+
+    raise HTTPException(status_code=403, detail="Verification failed")
 
 
 @router.post("/contractor-update")

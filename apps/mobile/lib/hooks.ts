@@ -297,9 +297,9 @@ export function useChat({
       setIsStreaming(true);
 
       const payload: MessageRequest = {
-        userId,
+        user_id: userId,
         message: text.trim(),
-        buildingId,
+        building_id: buildingId,
         channel: "app",
       };
 

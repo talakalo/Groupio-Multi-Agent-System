@@ -101,9 +101,9 @@ class WhatsAppBotService:
             return False
 
         expected_signature = hmac.new(
-            settings.WHATSAPP_WEBHOOK_SECRET.encode(),
-            payload,
-            hashlib.sha256,
+            key=settings.WHATSAPP_WEBHOOK_SECRET.encode(),
+            msg=payload,
+            digestmod=hashlib.sha256,
         ).hexdigest()
 
         return hmac.compare_digest(f"sha256={expected_signature}", signature)
@@ -286,7 +286,7 @@ class WhatsAppBotService:
     async def _send_typing_indicator(self, to: str) -> None:
         """Send typing indicator."""
         # Note: WhatsApp Business API doesn't have native typing indicator
-        # This is a placeholder for future implementation
+        # This is a placeholder for future implementation; _payload for future use
 
     async def _send_quick_replies(
         self,
@@ -453,7 +453,7 @@ class WhatsAppBotService:
 _whatsapp_bot: WhatsAppBotService | None = None
 
 
-async def get_whatsapp_bot() -> WhatsAppBotService:
+def get_whatsapp_bot() -> WhatsAppBotService:
     """Get or create the WhatsApp bot service instance."""
     global _whatsapp_bot
     if _whatsapp_bot is None:
@@ -461,7 +461,7 @@ async def get_whatsapp_bot() -> WhatsAppBotService:
         from src.orchestration.graph import get_orchestrator
 
         _whatsapp_bot = WhatsAppBotService(
-            orchestrator=await get_orchestrator(),
-            redis_client=await get_redis_client(),
+            orchestrator=get_orchestrator(),
+            redis_client=get_redis_client(),
         )
     return _whatsapp_bot

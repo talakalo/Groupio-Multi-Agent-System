@@ -1,6 +1,6 @@
 """Data models for residents and buildings."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field
 
@@ -24,7 +24,7 @@ class Resident(ResidentBase):
 
     id: str
     building_id: str
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     model_config = {"from_attributes": True}
 
@@ -40,7 +40,7 @@ class Building(BaseModel):
     age: int = 0
     building_type: str = "residential"
     coordinates: dict[str, float] | None = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     model_config = {"from_attributes": True}
 

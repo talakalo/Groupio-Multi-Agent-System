@@ -2,6 +2,7 @@
 
 import json
 import logging
+import re
 from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
@@ -10,6 +11,9 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 from src.config.settings import get_settings
 from src.models.user import UserInDB
+
+# Regex for safe SQL column names (letters, digits, underscores)
+_SAFE_COLUMN_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +110,36 @@ class PostgresClient:
             rows = await conn.fetch(query, *args)
             return [dict(r) for r in rows]
 
+    @staticmethod
+    def _build_safe_update(
+        table: str, filtered: dict[str, Any], id_column: str, id_value: Any
+    ) -> tuple[str, list[Any]]:
+        """Build a safe parameterised UPDATE query.
+
+        Validates that all column names are safe identifiers to prevent
+        any SQL injection through column names.
+
+        Returns:
+            (query_string, args_list)
+        """
+        set_parts: list[str] = []
+        args: list[Any] = []
+        for i, (col, val) in enumerate(filtered.items(), 1):
+            if not _SAFE_COLUMN_RE.match(col):
+                raise ValueError(f"Unsafe column name: {col!r}")
+            set_parts.append(f'"{col}" = ${i}')
+            args.append(val)
+        args.append(id_value)
+        where_pos = len(args)
+        query = f'UPDATE {table} SET {", ".join(set_parts)} WHERE "{id_column}" = ${where_pos}'
+        return query, args
+
+    async def close(self) -> None:
+        """Gracefully close the database connection pool."""
+        if self._asyncpg_pool is not None:
+            await self._asyncpg_pool.close()
+            self._asyncpg_pool = None
+
     async def _pg_execute(self, query: str, *args: Any) -> None:
         """Execute query via asyncpg."""
         pool = await self._get_client()
@@ -147,8 +181,13 @@ class PostgresClient:
             client = await self._get_client()
             result = await client.rpc("execute_sql", {"query": query, "params": params or {}}).execute()
             return result.data if result.data else []
-        # Local: not supported for generic RPC
-        return []
+        # Local PostgreSQL: execute with positional params
+        # Convert $1-style placeholders - the query already uses them
+        if params:
+            # params dict values as positional args in order
+            args = list(params.values())
+            return await self._pg_fetch_all(query, *args)
+        return await self._pg_fetch_all(query)
 
     async def get_user_profile(self, user_id: str) -> dict[str, Any] | None:
         """Get a user profile by ID."""
@@ -266,19 +305,8 @@ class PostgresClient:
             result = await client.table("users").update(filtered).eq("id", user_id).execute()
             row = result.data[0] if result.data else None
         else:
-            # Build SET clause for asyncpg
-            set_parts = []
-            args: list[Any] = []
-            for i, (k, v) in enumerate(filtered.items(), 1):
-                set_parts.append(f'"{k}" = ${i}')
-                args.append(v)
-            args.append(user_id)
-            where_pos = len(args)
-            set_clause = ", ".join(set_parts)
-            await self._pg_execute(
-                f"UPDATE users SET {set_clause} WHERE id = ${where_pos}",
-                *args,
-            )
+            query, args = self._build_safe_update("users", filtered, "id", user_id)
+            await self._pg_execute(query, *args)
             row = await self._pg_fetch_one("SELECT * FROM users WHERE id = $1", user_id)
         if row:
             return UserInDB(**_row_to_user(row))
@@ -453,16 +481,8 @@ class PostgresClient:
             client = await self._get_client()
             await client.table("buildings").update(filtered).eq("id", building_id).execute()
         else:
-            set_parts = []
-            args: list[Any] = []
-            for i, (k, v) in enumerate(filtered.items(), 1):
-                set_parts.append(f'"{k}" = ${i}')
-                args.append(v)
-            args.append(building_id)
-            await self._pg_execute(
-                "UPDATE buildings SET " + ", ".join(set_parts) + " WHERE id = $%d" % (len(args),),
-                *args,
-            )
+            query, args = self._build_safe_update("buildings", filtered, "id", building_id)
+            await self._pg_execute(query, *args)
         return await self.get_building(building_id) or {}
 
     async def delete_building(self, building_id: str) -> None:
@@ -818,16 +838,8 @@ class PostgresClient:
             client = await self._get_client()
             await client.table("offers").update(filtered).eq("id", offer_id).execute()
         else:
-            set_parts = []
-            args: list[Any] = []
-            for i, (k, v) in enumerate(filtered.items(), 1):
-                set_parts.append(f'"{k}" = ${i}')
-                args.append(v)
-            args.append(offer_id)
-            await self._pg_execute(
-                "UPDATE offers SET " + ", ".join(set_parts) + " WHERE id = $%d" % (len(args),),
-                *args,
-            )
+            query, args = self._build_safe_update("offers", filtered, "id", offer_id)
+            await self._pg_execute(query, *args)
         return await self.get_offer(offer_id) or {}
 
     async def has_user_joined_offer(self, user_id: str, offer_id: str) -> bool:
@@ -1197,16 +1209,8 @@ class PostgresClient:
             client = await self._get_client()
             await client.table("contractors").update(filtered).eq("id", contractor_id).execute()
         else:
-            set_parts = []
-            args: list[Any] = []
-            for i, (k, v) in enumerate(filtered.items(), 1):
-                set_parts.append(f'"{k}" = ${i}')
-                args.append(v)
-            args.append(contractor_id)
-            await self._pg_execute(
-                "UPDATE contractors SET " + ", ".join(set_parts) + " WHERE id = $%d" % (len(args),),
-                *args,
-            )
+            query, args = self._build_safe_update("contractors", filtered, "id", contractor_id)
+            await self._pg_execute(query, *args)
         return await self.get_contractor(contractor_id) or {}
 
     async def get_contractor_reviews(
@@ -1432,16 +1436,8 @@ class PostgresClient:
             client = await self._get_client()
             await client.table("escalations").update(filtered).eq("id", escalation_id).execute()
         else:
-            set_parts = []
-            args: list[Any] = []
-            for i, (k, v) in enumerate(filtered.items(), 1):
-                set_parts.append(f'"{k}" = ${i}')
-                args.append(v)
-            args.append(escalation_id)
-            await self._pg_execute(
-                "UPDATE escalations SET " + ", ".join(set_parts) + " WHERE id = $%d" % (len(args),),
-                *args,
-            )
+            query, args = self._build_safe_update("escalations", filtered, "id", escalation_id)
+            await self._pg_execute(query, *args)
         return await self.get_escalation(escalation_id) or {}
 
     async def get_escalation_stats(self) -> dict[str, Any]:
@@ -1935,6 +1931,46 @@ class PostgresClient:
             return result.data[0] if result.data else None
         return await self._pg_fetch_one("SELECT * FROM invoices WHERE offer_id = $1", offer_id)
 
+    async def get_invoice_for_offer(self, user_id: str, offer_id: str) -> dict[str, Any] | None:
+        """Get the invoice for a specific offer and user (via payment_splits)."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            # First find the invoice for this offer
+            invoice_result = await client.table("invoices").select("*").eq("offer_id", offer_id).limit(1).execute()
+            if not invoice_result.data:
+                return None
+            invoice = invoice_result.data[0]
+            # Verify this user is a participant via payment_splits
+            splits = await (
+                client.table("payment_splits")
+                .select("id")
+                .eq("invoice_id", invoice["id"])
+                .eq("user_id", user_id)
+                .limit(1)
+                .execute()
+            )
+            if splits.data:
+                return invoice
+            # Also return if user initiated the payment directly
+            payments = await (
+                client.table("payments")
+                .select("id")
+                .eq("invoice_id", invoice["id"])
+                .eq("user_id", user_id)
+                .limit(1)
+                .execute()
+            )
+            return invoice if payments.data else None
+        return await self._pg_fetch_one(
+            """SELECT i.* FROM invoices i
+               LEFT JOIN payment_splits ps ON ps.invoice_id = i.id AND ps.user_id = $1
+               LEFT JOIN payments p ON p.invoice_id = i.id AND p.user_id = $1
+               WHERE i.offer_id = $2 AND (ps.id IS NOT NULL OR p.id IS NOT NULL)
+               LIMIT 1""",
+            user_id,
+            offer_id,
+        )
+
     # ------------------------------------------------------------------
     # Payments
     # ------------------------------------------------------------------
@@ -1943,16 +1979,37 @@ class PostgresClient:
         """Insert a payment record."""
         if self._use_supabase_client():
             client = await self._get_client()
-            result = await client.table("payments").insert(data).execute()
+            # Filter to only columns that exist in the payments table
+            insert_data = {
+                k: v
+                for k, v in data.items()
+                if k
+                in {
+                    "id",
+                    "invoice_id",
+                    "user_id",
+                    "offer_id",
+                    "amount",
+                    "currency",
+                    "status",
+                    "transaction_id",
+                    "payment_method",
+                    "payment_method_id",
+                    "provider_data",
+                    "created_at",
+                }
+            }
+            result = await client.table("payments").insert(insert_data).execute()
             return result.data[0] if result.data else data
         await self._pg_execute(
             """INSERT INTO payments
-               (id, invoice_id, user_id, amount, currency, status,
+               (id, invoice_id, user_id, offer_id, amount, currency, status,
                 transaction_id, payment_method, provider_data, created_at)
-               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)""",
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)""",
             data["id"],
-            data["invoice_id"],
+            data.get("invoice_id"),
             data["user_id"],
+            data.get("offer_id"),
             data["amount"],
             data.get("currency", "ILS"),
             data.get("status", "pending"),
@@ -2013,6 +2070,14 @@ class PostgresClient:
             )
             or []
         )
+
+    async def get_payment_by_transaction(self, transaction_id: str) -> dict[str, Any] | None:
+        """Look up a payment by its provider transaction ID."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            result = await client.table("payments").select("*").eq("transaction_id", transaction_id).limit(1).execute()
+            return result.data[0] if result.data else None
+        return await self._pg_fetch_one("SELECT * FROM payments WHERE transaction_id = $1", transaction_id)
 
     # ------------------------------------------------------------------
     # Payment Splits

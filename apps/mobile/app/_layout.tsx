@@ -172,6 +172,21 @@ export default function RootLayout() {
               }}
             >
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen
+                name="create-offer"
+                options={{
+                  headerShown: false,
+                  presentation: "modal",
+                  animation: "slide_from_bottom",
+                }}
+              />
+              <Stack.Screen
+                name="offer-detail"
+                options={{
+                  headerShown: false,
+                  animation: "slide_from_right",
+                }}
+              />
             </Stack>
             <StatusBar style={isDark ? "light" : "dark"} />
           </ThemeProvider>
