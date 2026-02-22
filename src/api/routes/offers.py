@@ -56,7 +56,7 @@ async def create_offer(
     # Generate embedding for vector search
     try:
         embeddings = get_embedding_client()
-        text = f"{offer.title} {offer.description} {offer.category.value}"
+        text = f"{offer.get('title', '')} {offer.get('description', '')} {offer.get('category', '')}"
         embedding = await embeddings.embed_text(text)
 
         vs = get_vector_store()
@@ -66,10 +66,10 @@ async def create_offer(
             vectors=[embedding],
             payloads=[
                 {
-                    "title": offer.title,
-                    "category": offer.category.value,
-                    "building_id": offer.building_id,
-                    "status": offer.status.value,
+                    "title": offer.get("title", ""),
+                    "category": offer.get("category", ""),
+                    "building_id": offer.get("building_id", ""),
+                    "status": offer.get("status", "draft"),
                 },
             ],
         )
@@ -143,11 +143,11 @@ async def update_offer(
         raise HTTPException(status_code=404, detail="Offer not found")
 
     # Only creator or admin can update
-    if offer.created_by != current_user.id and not is_admin(current_user):
+    if offer.get("created_by") != current_user.id and not is_admin(current_user):
         raise HTTPException(status_code=403, detail="Not authorized to update this offer")
 
     # Cannot update completed/cancelled offers
-    if offer.status in (OfferStatus.COMPLETED, OfferStatus.CANCELLED):
+    if offer.get("status") in (OfferStatus.COMPLETED, OfferStatus.CANCELLED):
         raise HTTPException(status_code=400, detail="Cannot update completed or cancelled offer")
 
     update_data = request.model_dump(exclude_unset=True)
@@ -168,10 +168,10 @@ async def delete_offer(
     if not offer:
         raise HTTPException(status_code=404, detail="Offer not found")
 
-    if offer.created_by != current_user.id and not is_admin(current_user):
+    if offer.get("created_by") != current_user.id and not is_admin(current_user):
         raise HTTPException(status_code=403, detail="Not authorized to delete this offer")
 
-    if offer.status not in (OfferStatus.DRAFT, OfferStatus.PENDING):
+    if offer.get("status") not in (OfferStatus.DRAFT, OfferStatus.PENDING):
         raise HTTPException(status_code=400, detail="Can only cancel draft or pending offers")
 
     await db.update_offer(offer_id, {"status": OfferStatus.CANCELLED})
@@ -192,11 +192,11 @@ async def join_offer(
     if not offer:
         raise HTTPException(status_code=404, detail="Offer not found")
 
-    if offer.status not in (OfferStatus.PENDING, OfferStatus.MATCHING):
+    if offer.get("status") not in (OfferStatus.PENDING, OfferStatus.MATCHING):
         raise HTTPException(status_code=400, detail="Offer is not open for joining")
 
     # Verify user is in the building
-    is_resident = await db.is_user_in_building(current_user.id, offer.building_id)
+    is_resident = await db.is_user_in_building(current_user.id, offer["building_id"])
     if not is_resident:
         raise HTTPException(status_code=403, detail="Not a resident of this building")
 
@@ -206,7 +206,7 @@ async def join_offer(
         raise HTTPException(status_code=400, detail="Already joined this offer")
 
     # Check capacity
-    if offer.current_participants >= offer.max_participants:
+    if offer.get("current_participants", 0) >= offer.get("max_participants", 50):
         raise HTTPException(status_code=400, detail="Offer is at maximum capacity")
 
     await db.join_offer(current_user.id, offer_id, request.unit_count)
@@ -226,7 +226,7 @@ async def leave_offer(
     if not offer:
         raise HTTPException(status_code=404, detail="Offer not found")
 
-    if offer.status not in (OfferStatus.PENDING, OfferStatus.MATCHING):
+    if offer.get("status") not in (OfferStatus.PENDING, OfferStatus.MATCHING):
         raise HTTPException(status_code=400, detail="Cannot leave offer in current status")
 
     has_joined = await db.has_user_joined_offer(current_user.id, offer_id)
@@ -250,10 +250,10 @@ async def publish_offer(
     if not offer:
         raise HTTPException(status_code=404, detail="Offer not found")
 
-    if offer.created_by != current_user.id:
+    if offer.get("created_by") != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    if offer.status != OfferStatus.DRAFT:
+    if offer.get("status") != OfferStatus.DRAFT:
         raise HTTPException(status_code=400, detail="Only draft offers can be published")
 
     updated = await db.update_offer(offer_id, {"status": OfferStatus.PENDING})
@@ -272,13 +272,15 @@ async def start_matching(
     if not offer:
         raise HTTPException(status_code=404, detail="Offer not found")
 
-    if offer.status != OfferStatus.PENDING:
+    if offer.get("status") != OfferStatus.PENDING:
         raise HTTPException(status_code=400, detail="Offer must be pending to start matching")
 
-    if offer.current_participants < offer.min_participants:
+    current_participants = offer.get("current_participants", 0)
+    min_participants = offer.get("min_participants", 5)
+    if current_participants < min_participants:
         raise HTTPException(
             status_code=400,
-            detail=f"Need at least {offer.min_participants} participants",
+            detail=f"Need at least {min_participants} participants",
         )
 
     # Update status and trigger matching agent
@@ -289,7 +291,7 @@ async def start_matching(
     await orchestrator.run(
         user_message=f"Find contractors for offer {offer_id}",
         user_id="system",
-        building_id=offer.building_id,
+        building_id=offer["building_id"],
     )
 
     return {"status": "matching_started", "offer_id": offer_id}
@@ -330,7 +332,7 @@ async def match_contractor(
 async def get_participants(
     offer_id: str,
     current_user: UserInDB = Depends(get_current_user),
-) -> dict[str, list]:
+) -> dict:
     """Get offer participants."""
     db = get_postgres_client()
 
