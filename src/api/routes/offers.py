@@ -332,7 +332,7 @@ async def match_contractor(
 async def get_participants(
     offer_id: str,
     current_user: UserInDB = Depends(get_current_user),
-) -> dict[str, list]:
+) -> dict:
     """Get offer participants."""
     db = get_postgres_client()
 
