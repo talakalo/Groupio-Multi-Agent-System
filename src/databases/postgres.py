@@ -1507,7 +1507,9 @@ class PostgresClient:
                 if cnt:
                     by_source[src] = cnt
             # Resolution time (avg hours for resolved)
-            res_time_r = await client.table("escalations").select("created_at,resolved_at").eq("status", "resolved").execute()
+            res_time_r = (
+                await client.table("escalations").select("created_at,resolved_at").eq("status", "resolved").execute()
+            )
             avg_hours = _compute_avg_resolution_hours(res_time_r.data or [])
             return {
                 "total_open": getattr(open_r, "count", 0) or 0,
@@ -1529,15 +1531,11 @@ class PostgresClient:
             "SELECT AVG(EXTRACT(EPOCH FROM (resolved_at - created_at))/3600) AS avg_h "
             "FROM escalations WHERE status = 'resolved' AND resolved_at IS NOT NULL"
         )
-        priority_rows = await self._pg_fetch_all(
-            "SELECT priority, COUNT(*) AS c FROM escalations GROUP BY priority"
-        )
+        priority_rows = await self._pg_fetch_all("SELECT priority, COUNT(*) AS c FROM escalations GROUP BY priority")
         source_rows = await self._pg_fetch_all(
             "SELECT source_agent, COUNT(*) AS c FROM escalations GROUP BY source_agent"
         )
-        reason_rows = await self._pg_fetch_all(
-            "SELECT reason, COUNT(*) AS c FROM escalations GROUP BY reason"
-        )
+        reason_rows = await self._pg_fetch_all("SELECT reason, COUNT(*) AS c FROM escalations GROUP BY reason")
         return {
             "total_open": open_row["c"] if open_row else 0,
             "total_in_progress": in_progress_row["c"] if in_progress_row else 0,

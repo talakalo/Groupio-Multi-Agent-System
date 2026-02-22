@@ -378,10 +378,10 @@ async def recalculate_trust_score(
         )
         state["actions_taken"] = [{"details": {"entities": {"contractor_id": contractor_id}}}]
         result = await vetting_agent.run(state)
-        new_score = result.get("trust_score", contractor.trust_score)
+        new_score = result.get("trust_score", contractor.get("trust_score", 0))
 
         await db.update_contractor(contractor_id, {"trust_score": new_score})
 
         return {"contractor_id": contractor_id, "new_trust_score": new_score}
 
-    return {"contractor_id": contractor_id, "trust_score": contractor.trust_score}
+    return {"contractor_id": contractor_id, "trust_score": contractor.get("trust_score", 0)}
