@@ -223,7 +223,7 @@ async def update_escalation(
     update_data = request.model_dump(exclude_unset=True)
 
     # Track resolution time
-    if request.status == EscalationStatus.RESOLVED and escalation.status != EscalationStatus.RESOLVED:
+    if request.status == EscalationStatus.RESOLVED and escalation.get("status") != EscalationStatus.RESOLVED:
         update_data["resolved_at"] = datetime.now(UTC)
 
     updated = await db.update_escalation(escalation_id, update_data)
@@ -325,7 +325,7 @@ async def resolve_escalation(
     if not escalation:
         raise HTTPException(status_code=404, detail="Escalation not found")
 
-    if escalation.status == EscalationStatus.RESOLVED:
+    if escalation.get("status") == EscalationStatus.RESOLVED:
         raise HTTPException(status_code=400, detail="Escalation already resolved")
 
     notes = body.resolution_notes if body else None
@@ -359,7 +359,7 @@ async def reopen_escalation(
     if not escalation:
         raise HTTPException(status_code=404, detail="Escalation not found")
 
-    if escalation.status != EscalationStatus.RESOLVED:
+    if escalation.get("status") != EscalationStatus.RESOLVED:
         raise HTTPException(status_code=400, detail="Can only reopen resolved escalations")
 
     # Add message about reopening

@@ -390,9 +390,7 @@ async def invite_residents(
     invited = []
     for email in emails:
         # Create invitation record
-        invite_id = str(uuid4())
         await db.create_invitation(
-            invite_id=invite_id,
             building_id=building_id,
             email=email,
             invited_by=current_user.id,
