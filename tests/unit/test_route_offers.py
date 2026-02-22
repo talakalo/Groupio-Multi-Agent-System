@@ -3,15 +3,14 @@
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from fastapi.testclient import TestClient
 
 from src.models.user import UserInDB, UserRole
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_user(role: UserRole = UserRole.RESIDENT) -> UserInDB:
     now = datetime.now(UTC)
@@ -64,6 +63,7 @@ def _client(user: UserInDB, db: MagicMock):
 # Tests
 # ---------------------------------------------------------------------------
 
+
 class TestListOffers:
     def test_list_offers_returns_200(self):
         user = _make_user()
@@ -72,6 +72,7 @@ class TestListOffers:
 
         from src.api.main import app
         from src.api.middleware.auth import get_current_user
+
         app.dependency_overrides[get_current_user] = lambda: user
         try:
             with patch("src.api.routes.offers.get_postgres_client", return_value=db):
@@ -91,6 +92,7 @@ class TestListOffers:
 
         from src.api.main import app
         from src.api.middleware.auth import get_current_user
+
         app.dependency_overrides[get_current_user] = lambda: user
         try:
             with patch("src.api.routes.offers.get_postgres_client", return_value=db):
@@ -110,6 +112,7 @@ class TestGetOffer:
 
         from src.api.main import app
         from src.api.middleware.auth import get_current_user
+
         app.dependency_overrides[get_current_user] = lambda: user
         try:
             with patch("src.api.routes.offers.get_postgres_client", return_value=db):
@@ -127,6 +130,7 @@ class TestGetOffer:
 
         from src.api.main import app
         from src.api.middleware.auth import get_current_user
+
         app.dependency_overrides[get_current_user] = lambda: user
         try:
             with patch("src.api.routes.offers.get_postgres_client", return_value=db):
@@ -148,6 +152,7 @@ class TestUpdateOffer:
 
         from src.api.main import app
         from src.api.middleware.auth import get_current_user
+
         app.dependency_overrides[get_current_user] = lambda: user
         try:
             with patch("src.api.routes.offers.get_postgres_client", return_value=db):
@@ -165,6 +170,7 @@ class TestUpdateOffer:
 
         from src.api.main import app
         from src.api.middleware.auth import get_current_user
+
         app.dependency_overrides[get_current_user] = lambda: user
         try:
             with patch("src.api.routes.offers.get_postgres_client", return_value=db):
@@ -182,6 +188,7 @@ class TestUpdateOffer:
 
         from src.api.main import app
         from src.api.middleware.auth import get_current_user
+
         app.dependency_overrides[get_current_user] = lambda: user
         try:
             with patch("src.api.routes.offers.get_postgres_client", return_value=db):
@@ -198,6 +205,7 @@ class TestUpdateOffer:
 
         from src.api.main import app
         from src.api.middleware.auth import get_current_user
+
         app.dependency_overrides[get_current_user] = lambda: user
         try:
             with patch("src.api.routes.offers.get_postgres_client", return_value=db):
@@ -218,6 +226,7 @@ class TestDeleteOffer:
 
         from src.api.main import app
         from src.api.middleware.auth import get_current_user
+
         app.dependency_overrides[get_current_user] = lambda: user
         try:
             with patch("src.api.routes.offers.get_postgres_client", return_value=db):
@@ -236,6 +245,7 @@ class TestDeleteOffer:
 
         from src.api.main import app
         from src.api.middleware.auth import get_current_user
+
         app.dependency_overrides[get_current_user] = lambda: user
         try:
             with patch("src.api.routes.offers.get_postgres_client", return_value=db):
@@ -258,6 +268,7 @@ class TestJoinOffer:
 
         from src.api.main import app
         from src.api.middleware.auth import get_current_user
+
         app.dependency_overrides[get_current_user] = lambda: user
         try:
             with patch("src.api.routes.offers.get_postgres_client", return_value=db):
@@ -281,6 +292,7 @@ class TestJoinOffer:
 
         from src.api.main import app
         from src.api.middleware.auth import get_current_user
+
         app.dependency_overrides[get_current_user] = lambda: user
         try:
             with patch("src.api.routes.offers.get_postgres_client", return_value=db):
@@ -303,6 +315,7 @@ class TestJoinOffer:
 
         from src.api.main import app
         from src.api.middleware.auth import get_current_user
+
         app.dependency_overrides[get_current_user] = lambda: user
         try:
             with patch("src.api.routes.offers.get_postgres_client", return_value=db):
@@ -324,6 +337,7 @@ class TestJoinOffer:
 
         from src.api.main import app
         from src.api.middleware.auth import get_current_user
+
         app.dependency_overrides[get_current_user] = lambda: user
         try:
             with patch("src.api.routes.offers.get_postgres_client", return_value=db):
@@ -348,6 +362,7 @@ class TestLeaveOffer:
 
         from src.api.main import app
         from src.api.middleware.auth import get_current_user
+
         app.dependency_overrides[get_current_user] = lambda: user
         try:
             with patch("src.api.routes.offers.get_postgres_client", return_value=db):
@@ -367,6 +382,7 @@ class TestLeaveOffer:
 
         from src.api.main import app
         from src.api.middleware.auth import get_current_user
+
         app.dependency_overrides[get_current_user] = lambda: user
         try:
             with patch("src.api.routes.offers.get_postgres_client", return_value=db):
@@ -388,6 +404,7 @@ class TestPublishOffer:
 
         from src.api.main import app
         from src.api.middleware.auth import get_current_user
+
         app.dependency_overrides[get_current_user] = lambda: user
         try:
             with patch("src.api.routes.offers.get_postgres_client", return_value=db):
@@ -405,6 +422,7 @@ class TestPublishOffer:
 
         from src.api.main import app
         from src.api.middleware.auth import get_current_user
+
         app.dependency_overrides[get_current_user] = lambda: user
         try:
             with patch("src.api.routes.offers.get_postgres_client", return_value=db):
@@ -424,6 +442,7 @@ class TestGetParticipants:
 
         from src.api.main import app
         from src.api.middleware.auth import get_current_user
+
         app.dependency_overrides[get_current_user] = lambda: user
         try:
             with patch("src.api.routes.offers.get_postgres_client", return_value=db):

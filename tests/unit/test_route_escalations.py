@@ -7,10 +7,10 @@ from fastapi.testclient import TestClient
 
 from src.models.user import UserInDB, UserRole
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_user(role: UserRole = UserRole.ADMIN) -> UserInDB:
     now = datetime.now(UTC)
@@ -55,6 +55,7 @@ def _make_escalation(**kwargs) -> dict:
 # Tests
 # ---------------------------------------------------------------------------
 
+
 class TestListEscalations:
     def test_list_escalations_admin_ok(self):
         user = _make_user(UserRole.ADMIN)
@@ -63,6 +64,7 @@ class TestListEscalations:
 
         from src.api.main import app
         from src.api.middleware.auth import get_current_user
+
         app.dependency_overrides[get_current_user] = lambda: user
         try:
             with patch("src.api.routes.escalations.get_postgres_client", return_value=db):
@@ -81,6 +83,7 @@ class TestListEscalations:
 
         from src.api.main import app
         from src.api.middleware.auth import get_current_user
+
         app.dependency_overrides[get_current_user] = lambda: user
         try:
             with patch("src.api.routes.escalations.get_postgres_client", return_value=db):
@@ -97,6 +100,7 @@ class TestListEscalations:
 
         from src.api.main import app
         from src.api.middleware.auth import get_current_user
+
         app.dependency_overrides[get_current_user] = lambda: user
         try:
             with patch("src.api.routes.escalations.get_postgres_client", return_value=db):
@@ -117,6 +121,7 @@ class TestGetEscalation:
 
         from src.api.main import app
         from src.api.middleware.auth import get_current_user
+
         app.dependency_overrides[get_current_user] = lambda: user
         try:
             with patch("src.api.routes.escalations.get_postgres_client", return_value=db):
@@ -134,6 +139,7 @@ class TestGetEscalation:
 
         from src.api.main import app
         from src.api.middleware.auth import get_current_user
+
         app.dependency_overrides[get_current_user] = lambda: user
         try:
             with patch("src.api.routes.escalations.get_postgres_client", return_value=db):
@@ -155,6 +161,7 @@ class TestResolveEscalation:
 
         from src.api.main import app
         from src.api.middleware.auth import get_current_user
+
         app.dependency_overrides[get_current_user] = lambda: user
         try:
             with patch("src.api.routes.escalations.get_postgres_client", return_value=db):
@@ -175,6 +182,7 @@ class TestResolveEscalation:
 
         from src.api.main import app
         from src.api.middleware.auth import get_current_user
+
         app.dependency_overrides[get_current_user] = lambda: user
         try:
             with patch("src.api.routes.escalations.get_postgres_client", return_value=db):
@@ -197,6 +205,7 @@ class TestReopenEscalation:
 
         from src.api.main import app
         from src.api.middleware.auth import get_current_user
+
         app.dependency_overrides[get_current_user] = lambda: user
         try:
             with patch("src.api.routes.escalations.get_postgres_client", return_value=db):
@@ -214,6 +223,7 @@ class TestReopenEscalation:
 
         from src.api.main import app
         from src.api.middleware.auth import get_current_user
+
         app.dependency_overrides[get_current_user] = lambda: user
         try:
             with patch("src.api.routes.escalations.get_postgres_client", return_value=db):
@@ -235,6 +245,7 @@ class TestGetEscalationMessages:
 
         from src.api.main import app
         from src.api.middleware.auth import get_current_user
+
         app.dependency_overrides[get_current_user] = lambda: user
         try:
             with patch("src.api.routes.escalations.get_postgres_client", return_value=db):
@@ -265,6 +276,7 @@ class TestEscalationStats:
 
         from src.api.main import app
         from src.api.middleware.auth import get_current_user
+
         app.dependency_overrides[get_current_user] = lambda: user
         try:
             with patch("src.api.routes.escalations.get_postgres_client", return_value=db):
@@ -282,6 +294,7 @@ class TestEscalationStats:
 
         from src.api.main import app
         from src.api.middleware.auth import get_current_user
+
         app.dependency_overrides[get_current_user] = lambda: user
         try:
             with patch("src.api.routes.escalations.get_postgres_client", return_value=db):

@@ -258,9 +258,7 @@ async def test_list_escalations_with_list_filter(client):
             ],
         ) as mock_fetch_all,
     ):
-        items, total = await client.list_escalations(
-            {"status": ["open", "in_progress"]}, page=1, page_size=20
-        )
+        items, total = await client.list_escalations({"status": ["open", "in_progress"]}, page=1, page_size=20)
         assert total == 2
         assert len(items) == 2
         # The SQL query must use IN (...) for list filters
@@ -313,9 +311,9 @@ async def test_get_escalation_stats_shape(client):
             "_pg_fetch_one",
             new_callable=AsyncMock,
             side_effect=[
-                {"c": 3},   # open count
-                {"c": 1},   # in_progress count
-                {"c": 2},   # resolved today count
+                {"c": 3},  # open count
+                {"c": 1},  # in_progress count
+                {"c": 2},  # resolved today count
                 {"avg_h": 5.0},  # avg resolution hours
             ],
         ),
