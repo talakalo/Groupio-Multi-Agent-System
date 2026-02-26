@@ -12,3 +12,10 @@ GHSA-h25m-26qc-wcjf
 # Upgrade path: resolve when eslint 9.x or @typescript-eslint 9.x ships a
 # compatible minimatch 10 dependency.
 CVE-2026-26996
+
+# CVE-2024-21538 — cross-spawn 6.0.6 (HIGH) — Regular Expression DoS
+# Transitive dev-only dependency: internal-ip -> default-gateway -> execa@1.0.0 -> cross-spawn@6.0.6.
+# cross-spawn@7.0.6 (patched) is also present for all direct tooling; 6.x is pulled in only
+# by execa@1.0.0 which is itself a transitive dependency of the Playwright test runner (dev).
+# No production code path is affected. Upgrade path blocked until execa@1 is removed upstream.
+CVE-2024-21538
