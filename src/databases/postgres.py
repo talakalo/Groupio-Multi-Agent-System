@@ -18,6 +18,23 @@ _SAFE_COLUMN_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 logger = logging.getLogger(__name__)
 
 
+def _compute_avg_resolution_hours(rows: list[dict]) -> float:
+    """Compute average resolution time in hours from escalation rows."""
+    total_seconds = 0.0
+    count = 0
+    for row in rows:
+        created = row.get("created_at")
+        resolved = row.get("resolved_at")
+        if created and resolved:
+            try:
+                delta = resolved - created
+                total_seconds += delta.total_seconds()
+                count += 1
+            except Exception:
+                pass
+    return (total_seconds / count / 3600) if count else 0.0
+
+
 def _row_to_user(row: dict) -> dict:
     """Convert DB row to user dict (exclude hashed_password)."""
     return {
@@ -1374,18 +1391,27 @@ class PostgresClient:
     async def list_escalations(
         self, filters: dict[str, Any], page: int = 1, page_size: int = 20
     ) -> tuple[list[dict[str, Any]], int]:
-        """List escalations with filters. Returns (items, total)."""
+        """List escalations with filters. Returns (items, total).
+
+        Filter values may be a single string or a list of strings for
+        multi-value filtering (e.g. status=["open","in_progress"]).
+        """
         if self._use_supabase_client():
             client = await self._get_client()
             q = client.table("escalations").select("*", count="exact")
-            if filters.get("status"):
-                q = q.eq("status", filters["status"])
-            if filters.get("priority"):
-                q = q.eq("priority", filters["priority"])
-            if filters.get("source_agent"):
-                q = q.eq("source_agent", filters["source_agent"])
+            for col in ("status", "priority", "source_agent", "reason"):
+                val = filters.get(col)
+                if val:
+                    if isinstance(val, list):
+                        q = q.in_(col, val)
+                    else:
+                        q = q.eq(col, val)
             if filters.get("assigned_to"):
                 q = q.eq("assigned_to", filters["assigned_to"])
+            if filters.get("date_from"):
+                q = q.gte("created_at", filters["date_from"].isoformat())
+            if filters.get("date_to"):
+                q = q.lte("created_at", filters["date_to"].isoformat())
             result = (
                 await q.order("created_at", desc=True).range((page - 1) * page_size, page * page_size - 1).execute()
             )
@@ -1393,18 +1419,25 @@ class PostgresClient:
             return (result.data or [], total)
         where_parts = []
         args: list[Any] = []
-        if filters.get("status"):
-            args.append(filters["status"])
-            where_parts.append("status = $%d" % len(args))
-        if filters.get("priority"):
-            args.append(filters["priority"])
-            where_parts.append("priority = $%d" % len(args))
-        if filters.get("source_agent"):
-            args.append(filters["source_agent"])
-            where_parts.append("source_agent = $%d" % len(args))
+        for col in ("status", "priority", "source_agent", "reason"):
+            val = filters.get(col)
+            if val:
+                if isinstance(val, list):
+                    placeholders = ", ".join("$%d" % (len(args) + i + 1) for i in range(len(val)))
+                    args.extend(val)
+                    where_parts.append("%s IN (%s)" % (col, placeholders))
+                else:
+                    args.append(val)
+                    where_parts.append("%s = $%d" % (col, len(args)))
         if filters.get("assigned_to"):
             args.append(filters["assigned_to"])
             where_parts.append("assigned_to = $%d" % len(args))
+        if filters.get("date_from"):
+            args.append(filters["date_from"])
+            where_parts.append("created_at >= $%d" % len(args))
+        if filters.get("date_to"):
+            args.append(filters["date_to"])
+            where_parts.append("created_at <= $%d" % len(args))
         where_sql = " AND ".join(where_parts) if where_parts else "1=1"
         count_row = await self._pg_fetch_one("SELECT COUNT(*) AS c FROM escalations WHERE " + where_sql, *args)
         total = count_row["c"] if count_row else 0
@@ -1428,7 +1461,7 @@ class PostgresClient:
 
     async def update_escalation(self, escalation_id: str, update_data: dict[str, Any]) -> dict[str, Any]:
         """Update an escalation."""
-        allowed = {"status", "assigned_to", "context", "resolution_notes", "resolved_at"}
+        allowed = {"status", "priority", "assigned_to", "context", "resolution_notes", "resolved_at"}
         filtered = {k: v for k, v in update_data.items() if k in allowed}
         if not filtered:
             return await self.get_escalation(escalation_id) or {}
@@ -1441,22 +1474,76 @@ class PostgresClient:
         return await self.get_escalation(escalation_id) or {}
 
     async def get_escalation_stats(self) -> dict[str, Any]:
-        """Get escalation statistics."""
+        """Get escalation statistics matching the EscalationStats response model."""
+        from datetime import date
+
+        today_start = datetime.combine(date.today(), datetime.min.time()).replace(tzinfo=UTC)
+
         if self._use_supabase_client():
             client = await self._get_client()
             open_r = await client.table("escalations").select("id", count="exact").eq("status", "open").execute()
-            resolved_r = (
-                await client.table("escalations").select("id", count="exact").eq("status", "resolved").execute()
+            in_progress_r = (
+                await client.table("escalations").select("id", count="exact").eq("status", "in_progress").execute()
             )
+            resolved_today_r = (
+                await client.table("escalations")
+                .select("id", count="exact")
+                .eq("status", "resolved")
+                .gte("resolved_at", today_start.isoformat())
+                .execute()
+            )
+            # Priority breakdown
+            by_priority: dict[str, int] = {}
+            for prio in ("low", "medium", "high", "critical"):
+                r = await client.table("escalations").select("id", count="exact").eq("priority", prio).execute()
+                cnt = getattr(r, "count", 0) or 0
+                if cnt:
+                    by_priority[prio] = cnt
+            # Source breakdown
+            by_source: dict[str, int] = {}
+            for src in ("router", "matching", "pricing", "vetting", "support", "outreach", "analytics", "system"):
+                r = await client.table("escalations").select("id", count="exact").eq("source_agent", src).execute()
+                cnt = getattr(r, "count", 0) or 0
+                if cnt:
+                    by_source[src] = cnt
+            # Resolution time (avg hours for resolved)
+            res_time_r = (
+                await client.table("escalations").select("created_at,resolved_at").eq("status", "resolved").execute()
+            )
+            avg_hours = _compute_avg_resolution_hours(res_time_r.data or [])
             return {
-                "open": getattr(open_r, "count", 0) or 0,
-                "resolved": getattr(resolved_r, "count", 0) or 0,
+                "total_open": getattr(open_r, "count", 0) or 0,
+                "total_in_progress": getattr(in_progress_r, "count", 0) or 0,
+                "total_resolved_today": getattr(resolved_today_r, "count", 0) or 0,
+                "average_resolution_time_hours": avg_hours,
+                "by_priority": by_priority,
+                "by_source": by_source,
+                "by_reason": {},
             }
+        # asyncpg path
         open_row = await self._pg_fetch_one("SELECT COUNT(*) AS c FROM escalations WHERE status = 'open'")
-        resolved_row = await self._pg_fetch_one("SELECT COUNT(*) AS c FROM escalations WHERE status = 'resolved'")
+        in_progress_row = await self._pg_fetch_one("SELECT COUNT(*) AS c FROM escalations WHERE status = 'in_progress'")
+        resolved_today_row = await self._pg_fetch_one(
+            "SELECT COUNT(*) AS c FROM escalations WHERE status = 'resolved' AND resolved_at >= $1",
+            today_start,
+        )
+        avg_row = await self._pg_fetch_one(
+            "SELECT AVG(EXTRACT(EPOCH FROM (resolved_at - created_at))/3600) AS avg_h "
+            "FROM escalations WHERE status = 'resolved' AND resolved_at IS NOT NULL"
+        )
+        priority_rows = await self._pg_fetch_all("SELECT priority, COUNT(*) AS c FROM escalations GROUP BY priority")
+        source_rows = await self._pg_fetch_all(
+            "SELECT source_agent, COUNT(*) AS c FROM escalations GROUP BY source_agent"
+        )
+        reason_rows = await self._pg_fetch_all("SELECT reason, COUNT(*) AS c FROM escalations GROUP BY reason")
         return {
-            "open": open_row["c"] if open_row else 0,
-            "resolved": resolved_row["c"] if resolved_row else 0,
+            "total_open": open_row["c"] if open_row else 0,
+            "total_in_progress": in_progress_row["c"] if in_progress_row else 0,
+            "total_resolved_today": resolved_today_row["c"] if resolved_today_row else 0,
+            "average_resolution_time_hours": float(avg_row["avg_h"]) if avg_row and avg_row.get("avg_h") else 0.0,
+            "by_priority": {r["priority"]: r["c"] for r in priority_rows},
+            "by_source": {r["source_agent"]: r["c"] for r in source_rows},
+            "by_reason": {r["reason"]: r["c"] for r in reason_rows},
         }
 
     async def add_escalation_message(

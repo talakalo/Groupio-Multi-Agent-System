@@ -52,7 +52,10 @@ async def create_contractor(
     # Index in vector DB
     try:
         embeddings = get_embedding_client()
-        text = f"{contractor.business_name} {contractor.description} {' '.join(c.value for c in contractor.categories)}"
+        categories = contractor.get("categories") or []
+        regions = contractor.get("regions") or []
+        cat_str = " ".join(str(c) for c in categories)
+        text = f"{contractor.get('business_name', '')} {contractor.get('description', '')} {cat_str}"
         embedding = await embeddings.embed_text(text)
 
         vs = get_vector_store()
@@ -62,10 +65,10 @@ async def create_contractor(
             vectors=[embedding],
             payloads=[
                 {
-                    "business_name": contractor.business_name,
-                    "categories": [c.value for c in contractor.categories],
-                    "regions": [r.value for r in contractor.regions],
-                    "trust_score": contractor.trust_score,
+                    "business_name": contractor.get("business_name", ""),
+                    "categories": categories,
+                    "regions": regions,
+                    "trust_score": contractor.get("trust_score", 0),
                 },
             ],
         )
@@ -214,7 +217,10 @@ async def update_contractor(
     # Update vector DB
     try:
         embeddings = get_embedding_client()
-        text = f"{updated.business_name} {updated.description} {' '.join(c.value for c in updated.categories)}"
+        upd_categories = updated.get("categories") or []
+        upd_regions = updated.get("regions") or []
+        upd_cat_str = " ".join(str(c) for c in upd_categories)
+        text = f"{updated.get('business_name', '')} {updated.get('description', '')} {upd_cat_str}"
         embedding = await embeddings.embed_text(text)
 
         vs = get_vector_store()
@@ -224,10 +230,10 @@ async def update_contractor(
             vectors=[embedding],
             payloads=[
                 {
-                    "business_name": updated.business_name,
-                    "categories": [c.value for c in updated.categories],
-                    "regions": [r.value for r in updated.regions],
-                    "trust_score": updated.trust_score,
+                    "business_name": updated.get("business_name", ""),
+                    "categories": upd_categories,
+                    "regions": upd_regions,
+                    "trust_score": updated.get("trust_score", 0),
                 },
             ],
         )
@@ -257,7 +263,7 @@ async def get_contractor_reviews(
         "total": total,
         "page": page,
         "page_size": page_size,
-        "average_rating": contractor.average_rating,
+        "average_rating": contractor.get("average_rating", 0),
     }
 
 
@@ -372,10 +378,10 @@ async def recalculate_trust_score(
         )
         state["actions_taken"] = [{"details": {"entities": {"contractor_id": contractor_id}}}]
         result = await vetting_agent.run(state)
-        new_score = result.get("trust_score", contractor.trust_score)
+        new_score = result.get("trust_score", contractor.get("trust_score", 0))
 
         await db.update_contractor(contractor_id, {"trust_score": new_score})
 
         return {"contractor_id": contractor_id, "new_trust_score": new_score}
 
-    return {"contractor_id": contractor_id, "trust_score": contractor.trust_score}
+    return {"contractor_id": contractor_id, "trust_score": contractor.get("trust_score", 0)}
