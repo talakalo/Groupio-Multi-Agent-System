@@ -1,8 +1,7 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 
-// Use Next-generated LayoutProps so children type matches (avoids @types/react 19 vs build ReactNode mismatch)
-export default function AuthLayout(props: LayoutProps<"/">) {
-  const { children } = props;
+export default function AuthLayout({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen flex" dir="rtl">
       {/* Left Side - Branding */}

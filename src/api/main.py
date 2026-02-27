@@ -4,15 +4,17 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
+from src.api.middleware.auth import get_current_user
 from src.api.middleware.logging import RequestLoggingMiddleware
 from src.api.middleware.security import SecurityHeadersMiddleware
 from src.api.routes import api_router
 from src.config.settings import get_settings
+from src.models.user import UserInDB
 from src.databases.graph_store import get_graph_store
 from src.databases.postgres import get_postgres_client
 from src.databases.redis_client import get_redis_client
@@ -171,8 +173,13 @@ class MessageResponse(BaseModel):
 async def send_message(
     request: MessageRequest,
     background_tasks: BackgroundTasks,
+    current_user: UserInDB = Depends(get_current_user),
 ) -> MessageResponse:
     """Main endpoint for processing user messages through the agent system."""
+    # Override body-supplied user_id with the authenticated user's id
+    # to prevent impersonation attacks.
+    request.user_id = current_user.id
+
     # Validate request
     is_valid, reason = validate_message_request(request.model_dump())
     if not is_valid:
@@ -181,11 +188,11 @@ async def send_message(
     # Sanitize input
     sanitized_message = sanitize_input(request.message)
 
-    # Rate limiting
+    # Rate limiting (keyed on authenticated user id — not body-supplied)
     redis = get_redis_client()
     settings = get_settings()
     allowed = await redis.check_rate_limit(
-        request.user_id,
+        current_user.id,
         limit=settings.RATE_LIMIT_PER_USER,
         window=settings.RATE_LIMIT_WINDOW,
     )
@@ -196,14 +203,14 @@ async def send_message(
         orchestrator = get_orchestrator()
         result = await orchestrator.run(
             user_message=sanitized_message,
-            user_id=request.user_id,
+            user_id=current_user.id,
             building_id=request.building_id,
         )
 
         # Log conversation asynchronously
         background_tasks.add_task(
             _log_conversation,
-            user_id=request.user_id,
+            user_id=current_user.id,
             message=sanitized_message,
             response=result["response"],
             metadata=result["metadata"],

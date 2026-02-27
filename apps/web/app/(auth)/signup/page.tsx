@@ -98,7 +98,8 @@ export default function SignupPage() {
         buildingId: data.buildingId || undefined,
       });
 
-      localStorage.setItem("auth_token", response.token);
+      // Token lives only in the Zustand store (memory). Never write to localStorage —
+      // that would expose the JWT to any XSS payload on the page.
       useAuthStore.getState().setAccessToken(response.token);
       let user: { role: string } | null = null;
       try {

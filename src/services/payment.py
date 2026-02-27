@@ -121,6 +121,75 @@ class MockPaymentProvider(PaymentProvider):
         return customer_id
 
 
+class StripePaymentProvider(PaymentProvider):
+    """Stripe payment provider for production use.
+
+    Requires ``STRIPE_SECRET_KEY`` to be set in settings.
+    Install the Stripe SDK before use: ``pip install stripe>=7.0.0``.
+
+    TODO: Complete implementation before enabling in production.
+          The skeleton is in place; wire up real Stripe API calls below.
+    """
+
+    def __init__(self, secret_key: str) -> None:
+        try:
+            import stripe  # noqa: PLC0415
+        except ImportError as exc:
+            raise RuntimeError(
+                "stripe package is not installed. Add 'stripe>=7.0.0' to requirements-prod.txt"
+            ) from exc
+        self._stripe = stripe
+        self._stripe.api_key = secret_key
+
+    async def create_charge(
+        self,
+        amount: float,
+        currency: str,
+        customer_id: str,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Create a Stripe PaymentIntent.
+
+        TODO: Implement full create_charge → PaymentIntent flow.
+              See https://stripe.com/docs/api/payment_intents/create
+        """
+        raise NotImplementedError(
+            "StripePaymentProvider.create_charge is not yet implemented. "
+            "Complete the Stripe integration before enabling in production."
+        )
+
+    async def refund(
+        self,
+        transaction_id: str,
+        amount: float | None = None,
+    ) -> dict[str, Any]:
+        """Issue a Stripe refund.
+
+        TODO: Implement via stripe.Refund.create_async(payment_intent=transaction_id).
+        """
+        raise NotImplementedError(
+            "StripePaymentProvider.refund is not yet implemented."
+        )
+
+    async def get_status(self, transaction_id: str) -> dict[str, Any]:
+        """Retrieve the status of a Stripe PaymentIntent.
+
+        TODO: Implement via stripe.PaymentIntent.retrieve_async(transaction_id).
+        """
+        raise NotImplementedError(
+            "StripePaymentProvider.get_status is not yet implemented."
+        )
+
+    async def create_customer(self, user_id: str, email: str) -> str:
+        """Create a Stripe Customer record.
+
+        TODO: Implement via stripe.Customer.create_async(email=email, metadata={user_id}).
+        """
+        raise NotImplementedError(
+            "StripePaymentProvider.create_customer is not yet implemented."
+        )
+
+
 # ------------------------------------------------------------------
 # Singleton factory
 # ------------------------------------------------------------------
@@ -131,32 +200,43 @@ _payment_provider: PaymentProvider | None = None
 def get_payment_provider() -> PaymentProvider:
     """Get or create the singleton PaymentProvider instance.
 
-    In production, this will refuse to start with the mock provider.
-    Set ``PAYMENT_PROVIDER=mock`` explicitly to override (e.g. for staging demos).
+    Provider is selected by the ``PAYMENT_PROVIDER`` environment variable:
+    - ``mock``   — MockPaymentProvider (development / demo only)
+    - ``stripe`` — StripePaymentProvider (requires STRIPE_SECRET_KEY)
 
-    Returns ``MockPaymentProvider`` in development/test.
+    In production, the ``mock`` provider is blocked unless explicitly set to
+    ``PAYMENT_PROVIDER=mock`` (which logs a loud warning).
     """
     global _payment_provider
     if _payment_provider is None:
         from src.config.settings import get_settings
 
         settings = get_settings()
+        provider_name = settings.PAYMENT_PROVIDER.lower()
 
-        # In production, block mock provider unless explicitly overridden
-        allow_mock = getattr(settings, "PAYMENT_PROVIDER", "") == "mock"
-        if settings.ENVIRONMENT == "production" and not allow_mock:
+        if provider_name == "stripe":
+            if not settings.STRIPE_SECRET_KEY:
+                raise RuntimeError(
+                    "PAYMENT_PROVIDER=stripe but STRIPE_SECRET_KEY is not set. "
+                    "Set STRIPE_SECRET_KEY in your environment."
+                )
+            logger.info("Using StripePaymentProvider")
+            _payment_provider = StripePaymentProvider(secret_key=settings.STRIPE_SECRET_KEY)
+
+        elif provider_name == "mock":
+            is_prod = settings.ENVIRONMENT == "production"
+            if is_prod:
+                logger.warning(
+                    "MOCK PAYMENT PROVIDER is active in production (PAYMENT_PROVIDER=mock). "
+                    "All charges will succeed without real money movement. "
+                    "Set PAYMENT_PROVIDER=stripe and configure STRIPE_SECRET_KEY."
+                )
+            _payment_provider = MockPaymentProvider()
+
+        else:
             raise RuntimeError(
-                "Cannot use MockPaymentProvider in production. "
-                "Integrate a real PSP (Stripe/PayPlus) or set PAYMENT_PROVIDER=mock "
-                "to explicitly allow mock payments for demo purposes."
+                f"Unknown PAYMENT_PROVIDER={provider_name!r}. "
+                "Supported values: 'mock', 'stripe'."
             )
 
-        if settings.ENVIRONMENT in ("production", "staging") and allow_mock:
-            logger.warning(
-                "MOCK PAYMENT PROVIDER active in %s (PAYMENT_PROVIDER=mock). "
-                "All charges will succeed without real processing.",
-                settings.ENVIRONMENT,
-            )
-
-        _payment_provider = MockPaymentProvider()
     return _payment_provider
