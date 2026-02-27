@@ -44,7 +44,11 @@ class Settings(BaseSettings):
     USE_LOCAL_POSTGRES: str = ""
 
     # Redis
+    # In production, set REDIS_URL to include credentials, e.g.:
+    #   redis://:yourpassword@redis:6379/0
+    # Or set REDIS_PASSWORD separately (used when REDIS_URL has no password).
     REDIS_URL: str = "redis://localhost:6379"
+    REDIS_PASSWORD: str = ""
 
     # LLM Settings
     PRIMARY_MODEL: str = "claude-sonnet-4-20250514"
@@ -53,6 +57,9 @@ class Settings(BaseSettings):
     EMBEDDING_DIMENSIONS: int = 1536
     MAX_TOKENS: int = 4000
     TEMPERATURE: float = 0.7
+    # Timeout in seconds for a single LLM API call; 0 disables timeout.
+    # On timeout the client automatically retries with FALLBACK_MODEL.
+    LLM_TIMEOUT_SECONDS: float = 30.0
 
     # RAG Settings
     VECTOR_TOP_K: int = 10

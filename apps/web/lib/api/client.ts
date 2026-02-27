@@ -76,7 +76,7 @@ class ApiClient {
           : Array.isArray(detail)
             ? detail.map((e: { msg?: string }) => e?.msg).filter(Boolean).join(", ") || response.statusText
             : response.statusText;
-      throw new ApiError(response.status, message, errorBody);
+      throw new ApiError(message, response.status, errorBody);
     }
 
     return response.json();
@@ -199,7 +199,7 @@ class ApiClient {
     const res = await fetch(url, { method: "POST", headers, body: formData, credentials: 'include' });
     if (!res.ok) {
       const err = await res.json().catch(() => null);
-      throw new ApiError(res.status, err?.detail || res.statusText, err);
+      throw new ApiError(err?.detail || res.statusText, res.status, err);
     }
     return res.json() as Promise<{ id: string; file_name: string; analysis_status: string }>;
   }
@@ -267,8 +267,8 @@ class ApiClient {
 
 export class ApiError extends Error {
   constructor(
-    public status: number,
     message: string,
+    public status: number,
     public body?: unknown
   ) {
     super(message);

@@ -117,8 +117,13 @@ async def whatsapp_verify(
 @router.post("/contractor-update")
 async def contractor_update_webhook(
     payload: dict[str, Any],
+    x_api_key: str | None = Header(None, alias="X-API-Key"),
 ) -> dict[str, str]:
-    """Handle contractor profile update notifications."""
+    """Handle contractor profile update notifications — requires X-API-Key."""
+    settings = get_settings()
+    if settings.API_KEYS:
+        if not x_api_key or x_api_key not in settings.API_KEYS:
+            raise HTTPException(status_code=403, detail="Invalid or missing API key")
     contractor_id = payload.get("contractor_id")
     update_type = payload.get("type")
 

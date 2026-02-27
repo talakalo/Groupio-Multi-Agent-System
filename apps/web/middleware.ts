@@ -9,6 +9,8 @@ const protectedRoutes = [
   '/building',
   '/profile',
   '/chat',
+  '/architecture',
+  '/payments',
 ];
 
 // Routes only for unauthenticated users
@@ -28,26 +30,33 @@ export function middleware(request: NextRequest) {
 
   // Determine auth status from cookies.
   // The HTTP-only `refresh_token` cookie (set by the backend) is the
-  // source of truth for "is the user logged in".  The Zustand-persisted
-  // `groupio-auth` cookie (localStorage mirror) provides the cached
-  // user profile / role for edge-middleware routing decisions.
+  // authoritative source of truth for "is the user logged in?".
+  //
+  // SECURITY NOTE: The `groupio-auth` cookie is a non-HttpOnly Zustand
+  // persist cookie that can be written by client-side JavaScript — it MUST
+  // NOT be trusted for access control decisions.  It is used here ONLY for
+  // UX routing (redirect to the right dashboard, etc.).  Every API request
+  // is independently authenticated server-side via the JWT access token.
   const hasRefreshCookie = !!request.cookies.get('refresh_token');
   let isAuthenticated = hasRefreshCookie;
   let userRole: string | null = null;
 
-  // Try to read cached user profile from Zustand persist cookie
+  // Read UX-only role hint from the client-writable Zustand cookie.
+  // This is used purely for redirect decisions — never for access control.
   const authCookie = request.cookies.get('groupio-auth');
   if (authCookie) {
     try {
       const authData = JSON.parse(authCookie.value);
+      // Role is used for UX routing only — APIs enforce roles server-side.
       userRole = authData?.state?.user?.role ?? null;
-      // If the Zustand cookie exists but there's no refresh cookie,
-      // the session has expired.
+      // If the Zustand cookie exists but there is no refresh cookie,
+      // the session has expired — treat as unauthenticated.
       if (!hasRefreshCookie) {
         isAuthenticated = false;
+        userRole = null;
       }
     } catch {
-      // Invalid cookie format
+      // Invalid cookie format — ignore safely
     }
   }
 

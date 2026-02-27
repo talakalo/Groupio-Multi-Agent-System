@@ -17,6 +17,7 @@ import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useState, useMemo } from 'react';
 
+import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
 
 // ---------------------------------------------------------------------------
@@ -178,10 +179,7 @@ export default function OffersListPage() {
     priceMax: null,
   });
 
-  const accessToken = typeof window !== 'undefined'
-    ? (window as unknown as { __auth_store?: { getState: () => { accessToken: string | null } } }).__auth_store?.getState()?.accessToken
-      ?? localStorage.getItem('auth_token')
-    : null;
+  const accessToken = useAuthStore((s) => s.accessToken);
   const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
   const offersQuery = useQuery<{ items: Offer[]; total: number }>({
