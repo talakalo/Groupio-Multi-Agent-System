@@ -1,0 +1,73 @@
+# Prometheus configuration for Groupio production monitoring.
+#
+# Usage:
+#   docker run -p 9090:9090 \
+#     -v $(pwd)/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml \
+#     prom/prometheus
+#
+# Or via docker-compose (see docker/docker-compose.prod.yml).
+
+global:
+  scrape_interval: 15s      # How often to scrape targets
+  evaluation_interval: 15s  # How often to evaluate alerting rules
+  scrape_timeout: 10s
+
+  # Attach these labels to every time series collected from this Prometheus instance.
+  external_labels:
+    environment: production
+    app: groupio
+
+# Load alerting rules from the monitoring/ directory.
+rule_files:
+  - "alerts.yml"
+
+# Alertmanager integration — update the address to your Alertmanager instance.
+# Comment out if you have not deployed Alertmanager yet.
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+# Scrape configurations.
+scrape_configs:
+  # Prometheus scrapes itself for meta-monitoring.
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # FastAPI backend — exposes /metrics via prometheus-fastapi-instrumentator.
+  - job_name: groupio-api
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["api:8000"]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: groupio-api
+
+  # Next.js frontend — exposes /api/metrics if next-prometheus is configured.
+  # Remove this block if the frontend does not export metrics.
+  - job_name: groupio-frontend
+    metrics_path: /api/metrics
+    static_configs:
+      - targets: ["frontend:3000"]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: groupio-frontend
+
+  # Redis exporter — https://github.com/oliver006/redis_exporter
+  - job_name: redis
+    static_configs:
+      - targets: ["redis-exporter:9121"]
+
+  # Node exporter — host-level CPU, memory, disk, network metrics.
+  - job_name: node
+    static_configs:
+      - targets: ["node-exporter:9100"]
+
+  # PostgreSQL exporter — https://github.com/prometheus-community/postgres_exporter
+  - job_name: postgres
+    static_configs:
+      - targets: ["postgres-exporter:9187"]
