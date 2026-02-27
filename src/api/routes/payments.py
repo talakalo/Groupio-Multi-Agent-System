@@ -1,15 +1,18 @@
 """Payment API routes – resident payments + admin escrow/payout management."""
 
+import hashlib
+import hmac
 import logging
 from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.responses import Response
 from pydantic import BaseModel
 
 from src.api.middleware.auth import get_admin_user, get_current_user
+from src.config.settings import get_settings
 from src.databases.postgres import get_postgres_client
 from src.models.user import UserInDB
 from src.services.payment import get_payment_provider
@@ -298,13 +301,56 @@ async def get_payment(
 
 
 @router.post("/webhook")
-async def payment_webhook(request: Request) -> dict:
+async def payment_webhook(
+    request: Request,
+    x_payment_signature: str | None = Header(None, alias="X-Payment-Signature"),
+) -> dict:
     """Handle payment provider webhook callbacks.
 
-    No authentication required — the provider authenticates via
-    signature headers which should be verified in production.
+    Authenticates the request by verifying the HMAC-SHA256 signature
+    supplied in the ``X-Payment-Signature`` header against
+    ``PAYMENT_WEBHOOK_SECRET``.  Requests without a valid signature are
+    rejected with HTTP 403 to block fraudulent webhook forgery.
     """
-    body = await request.json()
+    raw_body = await request.body()
+
+    settings = get_settings()
+    webhook_secret = settings.PAYMENT_WEBHOOK_SECRET
+
+    if webhook_secret:
+        # Compute expected HMAC-SHA256 signature
+        expected_sig = "sha256=" + hmac.new(
+            webhook_secret.encode("utf-8"),
+            raw_body,
+            hashlib.sha256,
+        ).hexdigest()
+        incoming_sig = x_payment_signature or ""
+        if not hmac.compare_digest(expected_sig, incoming_sig):
+            logger.warning(
+                "Payment webhook signature mismatch — possible forgery attempt "
+                "(expected prefix=%s, got=%s)",
+                expected_sig[:20],
+                incoming_sig[:20],
+            )
+            raise HTTPException(status_code=403, detail="Invalid webhook signature")
+    elif settings.ENVIRONMENT != "development":
+        # In non-dev environments, refuse to process unsigned webhooks
+        logger.error(
+            "PAYMENT_WEBHOOK_SECRET is not configured in %s — "
+            "refusing unsigned webhook to prevent fraud.",
+            settings.ENVIRONMENT,
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="Webhook signature verification not configured",
+        )
+    else:
+        logger.warning(
+            "PAYMENT_WEBHOOK_SECRET not set — skipping signature check in development"
+        )
+
+    import json
+    body = json.loads(raw_body)
     logger.info("Payment webhook received: %s", body.get("event_type", "unknown"))
 
     transaction_id = body.get("transaction_id")

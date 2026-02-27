@@ -227,7 +227,7 @@ class ApiClient {
     buildingId?: string;
   }) {
     return this.request<{ token: string; user: import("@groupio/types").Resident }>(
-      "/api/v1/auth/signup",
+      "/api/v1/auth/register",
       {
         method: "POST",
         body: data,

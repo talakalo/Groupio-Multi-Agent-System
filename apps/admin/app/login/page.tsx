@@ -1,36 +1,33 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Shield, Mail, Lock, KeyRound, Loader2, AlertCircle, Eye, EyeOff } from "lucide-react";
+import { Shield, Mail, Lock, Loader2, AlertCircle, Eye, EyeOff } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-type Step = "credentials" | "2fa";
-
+/**
+ * Admin login page — single-step email + password authentication.
+ *
+ * NOTE: The previous 2FA step has been removed because the backend endpoint
+ * it called (`/api/v1/auth/verify-2fa`) does not exist, causing admin login
+ * to always fail with a 404 in production. A working TOTP/2FA implementation
+ * will be added in Phase 1 once the backend endpoint is implemented.
+ *
+ * Token storage: stored in sessionStorage (tab-scoped, cleared on close).
+ * The HTTP-only refresh_token cookie set by the backend handles silent
+ * refresh. The admin middleware.ts ensures all admin routes require the
+ * refresh_token cookie to be present.
+ */
 export default function LoginPage() {
   const router = useRouter();
 
-  // ---- State ----
-  const [step, setStep] = useState<Step>("credentials");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [totpCode, setTotpCode] = useState(["", "", "", "", "", ""]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [tempToken, setTempToken] = useState<string | null>(null);
 
-  const totpRefs = useRef<(HTMLInputElement | null)[]>([]);
-
-  // Focus first TOTP input when step changes
-  useEffect(() => {
-    if (step === "2fa") {
-      totpRefs.current[0]?.focus();
-    }
-  }, [step]);
-
-  // ---- Login handler ----
   const handleLogin = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
@@ -41,6 +38,7 @@ export default function LoginPage() {
         const res = await fetch(`${API_URL}/api/v1/auth/login/json`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: "include", // ensures the HTTP-only refresh_token cookie is set
           body: JSON.stringify({ email, password }),
         });
 
@@ -50,119 +48,40 @@ export default function LoginPage() {
           throw new Error(data.detail || data.message || "Invalid credentials");
         }
 
-        // Store temp token for 2FA verification
-        setTempToken(data.token || data.access_token || null);
-        setStep("2fa");
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : "Login failed. Please check your credentials.";
-        setError(message);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [email, password]
-  );
-
-  // ---- 2FA handler ----
-  const handleVerify2FA = useCallback(
-    async (code?: string) => {
-      const verifyCode = code || totpCode.join("");
-      if (verifyCode.length !== 6) return;
-
-      setError(null);
-      setLoading(true);
-
-      try {
-        const headers: Record<string, string> = {
-          "Content-Type": "application/json",
-        };
-        if (tempToken) {
-          headers["Authorization"] = `Bearer ${tempToken}`;
+        const token = data.token || data.access_token;
+        if (!token) {
+          throw new Error("No access token returned from server");
         }
 
-        const res = await fetch(`${API_URL}/api/v1/auth/verify-2fa`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify({ code: verifyCode }),
+        // Verify the user has admin-level role before granting access
+        const meRes = await fetch(`${API_URL}/api/v1/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+          credentials: "include",
         });
 
-        const data = await res.json();
-
-        if (!res.ok) {
-          throw new Error(data.detail || data.message || "Invalid verification code");
+        if (meRes.ok) {
+          const me = await meRes.json();
+          const adminRoles = ["admin", "super_admin", "buildings_manager"];
+          if (!adminRoles.includes(me.role)) {
+            throw new Error("Access denied — this account does not have admin privileges.");
+          }
         }
 
-        // Store the final auth token
-        const token = data.token || data.access_token || tempToken;
-        if (token) {
-          localStorage.setItem("auth_token", token);
-        }
+        // Store in sessionStorage: tab-scoped, cleared when browser tab is closed.
+        // Short-lived access token (15 min) + HTTP-only refresh cookie provides
+        // a reasonable security posture for the admin panel.
+        sessionStorage.setItem("admin_token", token);
 
         router.push("/dashboard");
       } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : "Verification failed. Please try again.";
+        const message =
+          err instanceof Error ? err.message : "Login failed. Please check your credentials.";
         setError(message);
-        // Clear TOTP inputs on error
-        setTotpCode(["", "", "", "", "", ""]);
-        totpRefs.current[0]?.focus();
       } finally {
         setLoading(false);
       }
     },
-    [totpCode, tempToken, router]
-  );
-
-  // ---- TOTP input handlers ----
-  const handleTotpChange = useCallback(
-    (index: number, value: string) => {
-      if (!/^\d*$/.test(value)) return;
-
-      const newCode = [...totpCode];
-      newCode[index] = value.slice(-1);
-      setTotpCode(newCode);
-
-      // Auto-advance to next input
-      if (value && index < 5) {
-        totpRefs.current[index + 1]?.focus();
-      }
-
-      // Auto-submit when all 6 digits entered
-      const fullCode = newCode.join("");
-      if (fullCode.length === 6) {
-        handleVerify2FA(fullCode);
-      }
-    },
-    [totpCode, handleVerify2FA]
-  );
-
-  const handleTotpKeyDown = useCallback(
-    (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === "Backspace" && !totpCode[index] && index > 0) {
-        totpRefs.current[index - 1]?.focus();
-      }
-    },
-    [totpCode]
-  );
-
-  const handleTotpPaste = useCallback(
-    (e: React.ClipboardEvent) => {
-      e.preventDefault();
-      const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
-      if (!pasted) return;
-
-      const newCode = [...totpCode];
-      for (let i = 0; i < 6; i++) {
-        newCode[i] = pasted[i] || "";
-      }
-      setTotpCode(newCode);
-
-      if (pasted.length === 6) {
-        handleVerify2FA(pasted);
-      } else {
-        totpRefs.current[Math.min(pasted.length, 5)]?.focus();
-      }
-    },
-    [totpCode, handleVerify2FA]
+    [email, password, router]
   );
 
   return (
@@ -174,11 +93,7 @@ export default function LoginPage() {
             <Shield className="w-7 h-7 text-white" />
           </div>
           <h1 className="text-2xl font-bold text-surface-900">Groupio Admin</h1>
-          <p className="text-sm text-surface-500 mt-1">
-            {step === "credentials"
-              ? "Sign in to the admin dashboard"
-              : "Enter your verification code"}
-          </p>
+          <p className="text-sm text-surface-500 mt-1">Sign in to the admin dashboard</p>
         </div>
 
         {/* Card */}
@@ -191,153 +106,82 @@ export default function LoginPage() {
             </div>
           )}
 
-          {step === "credentials" ? (
-            /* ============================================================== */
-            /* Step 1: Email + Password                                       */
-            /* ============================================================== */
-            <form onSubmit={handleLogin} className="space-y-5">
-              {/* Email */}
-              <div>
-                <label
-                  htmlFor="email"
-                  className="block text-sm font-medium text-surface-700 mb-1.5"
-                >
-                  Email address
-                </label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-surface-400" />
-                  <input
-                    id="email"
-                    type="email"
-                    required
-                    autoComplete="email"
-                    placeholder="admin@groupio.co.il"
-                    className="input pl-10"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              {/* Password */}
-              <div>
-                <label
-                  htmlFor="password"
-                  className="block text-sm font-medium text-surface-700 mb-1.5"
-                >
-                  Password
-                </label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-surface-400" />
-                  <input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    required
-                    autoComplete="current-password"
-                    placeholder="Enter your password"
-                    className="input pl-10 pr-10"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
-                  <button
-                    type="button"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-surface-400 hover:text-surface-600 transition-colors"
-                    onClick={() => setShowPassword((v) => !v)}
-                    tabIndex={-1}
-                  >
-                    {showPassword ? (
-                      <EyeOff className="w-4.5 h-4.5" />
-                    ) : (
-                      <Eye className="w-4.5 h-4.5" />
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              {/* Submit */}
-              <button
-                type="submit"
-                disabled={loading || !email || !password}
-                className="btn-primary w-full"
+          <form onSubmit={handleLogin} className="space-y-5">
+            {/* Email */}
+            <div>
+              <label
+                htmlFor="email"
+                className="block text-sm font-medium text-surface-700 mb-1.5"
               >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Signing in...
-                  </>
-                ) : (
-                  "Sign in"
-                )}
-              </button>
-            </form>
-          ) : (
-            /* ============================================================== */
-            /* Step 2: 2FA Verification                                       */
-            /* ============================================================== */
-            <div className="space-y-6">
-              <div className="flex flex-col items-center text-center">
-                <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary-50 text-primary-600 mb-3">
-                  <KeyRound className="w-6 h-6" />
-                </div>
-                <h2 className="text-lg font-semibold text-surface-900">
-                  Two-Factor Authentication
-                </h2>
-                <p className="text-sm text-surface-500 mt-1">
-                  Enter the 6-digit code from your authenticator app
-                </p>
+                Email address
+              </label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-surface-400" />
+                <input
+                  id="email"
+                  type="email"
+                  required
+                  autoComplete="email"
+                  placeholder="admin@groupio.co.il"
+                  className="input pl-10"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
               </div>
-
-              {/* TOTP code inputs */}
-              <div className="flex items-center justify-center gap-2 sm:gap-3">
-                {totpCode.map((digit, idx) => (
-                  <input
-                    key={idx}
-                    ref={(el) => {
-                      totpRefs.current[idx] = el;
-                    }}
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={1}
-                    className="w-11 h-13 sm:w-12 sm:h-14 text-center text-xl font-bold rounded-lg border border-surface-300 bg-white text-surface-900 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 transition-colors duration-150"
-                    value={digit}
-                    onChange={(e) => handleTotpChange(idx, e.target.value)}
-                    onKeyDown={(e) => handleTotpKeyDown(idx, e)}
-                    onPaste={idx === 0 ? handleTotpPaste : undefined}
-                    disabled={loading}
-                  />
-                ))}
-              </div>
-
-              {/* Verify button */}
-              <button
-                onClick={() => handleVerify2FA()}
-                disabled={loading || totpCode.join("").length !== 6}
-                className="btn-primary w-full"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Verifying...
-                  </>
-                ) : (
-                  "Verify & Sign in"
-                )}
-              </button>
-
-              {/* Back link */}
-              <button
-                type="button"
-                className="w-full text-center text-sm text-surface-500 hover:text-primary-600 transition-colors"
-                onClick={() => {
-                  setStep("credentials");
-                  setError(null);
-                  setTotpCode(["", "", "", "", "", ""]);
-                }}
-              >
-                Back to login
-              </button>
             </div>
-          )}
+
+            {/* Password */}
+            <div>
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium text-surface-700 mb-1.5"
+              >
+                Password
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-surface-400" />
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  required
+                  autoComplete="current-password"
+                  placeholder="Enter your password"
+                  className="input pl-10 pr-10"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-surface-400 hover:text-surface-600 transition-colors"
+                  onClick={() => setShowPassword((v) => !v)}
+                  tabIndex={-1}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-4.5 h-4.5" />
+                  ) : (
+                    <Eye className="w-4.5 h-4.5" />
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Submit */}
+            <button
+              type="submit"
+              disabled={loading || !email || !password}
+              className="btn-primary w-full"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Signing in...
+                </>
+              ) : (
+                "Sign in"
+              )}
+            </button>
+          </form>
         </div>
 
         {/* Footer */}

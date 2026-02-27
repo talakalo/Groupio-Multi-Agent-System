@@ -24,6 +24,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 
 import { apiClient } from '@/lib/api/client';
+import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
 
 // ---------------------------------------------------------------------------
@@ -142,6 +143,7 @@ export default function OfferDetailPage() {
   const t = useTranslations('offers');
   const tCat = useTranslations('categories');
   const tContractors = useTranslations('contractors');
+  const user = useAuthStore((s) => s.user);
 
   const offerId = params.offerId;
 
@@ -153,7 +155,8 @@ export default function OfferDetailPage() {
 
   const joinMutation = useMutation({
     mutationFn: async () => {
-      return apiClient.joinOffer(offerId, 'current-user');
+      if (!user?.id) throw new Error('Not authenticated');
+      return apiClient.joinOffer(offerId, user.id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['offer', offerId] });
@@ -273,7 +276,7 @@ export default function OfferDetailPage() {
         <button
           type="button"
           onClick={() => joinMutation.mutate()}
-          disabled={joinMutation.isPending || offer.status !== 'active'}
+          disabled={joinMutation.isPending || offer.status !== 'active' || !user?.id}
           className="btn-primary w-full flex items-center justify-center gap-2 text-lg py-3"
         >
           {joinMutation.isPending ? (
