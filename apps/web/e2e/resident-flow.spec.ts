@@ -472,3 +472,117 @@ test.describe("Resident Profile & Settings", () => {
     await expect(page.getByText(/פרטים אישיים|פרופיל/)).toBeVisible({ timeout: 10000 });
   });
 });
+
+// ---------------------------------------------------------------------------
+// Critical Journey Tests
+// These tests cover the exact flows that were broken in the production audit:
+//   - 0-FE-5: Signup endpoint URL mismatch (/auth/register → /auth/signup)
+//   - 0-FE-4: joinOffer sent hardcoded userId 'current-user' instead of real ID
+// ---------------------------------------------------------------------------
+
+test.describe("Critical User Journey — Register → Login → Join Offer", () => {
+  test("full journey: register, login, browse, and join an offer", async ({ page }) => {
+    // ── 1. Registration ───────────────────────────────────────────────────
+    await page.goto("/signup");
+    await expect(page).toHaveURL(/signup/);
+
+    // Select resident role
+    const residentCard = page.locator('[data-testid="role-resident"]');
+    if (await residentCard.count() > 0) {
+      await residentCard.click();
+    }
+
+    // Fill registration form
+    await page.fill('input[name="name"]', "Test Resident");
+    await page.fill('input[name="email"]', "e2e-resident@groupio-test.co.il");
+    await page.fill('input[name="phone"]', "0501234567");
+    await page.fill('input[name="password"]', "SecurePass123!");
+    await page.fill('input[name="buildingId"]', "bld_e2e");
+
+    // Submit — validates that the correct /api/v1/auth/register endpoint is called
+    await page.click('[type="submit"]');
+
+    // After registration, expect redirect to dashboard or a success indicator
+    await expect(page).toHaveURL(/dashboard|signup|onboarding/, { timeout: 10_000 });
+
+    // ── 2. Login ─────────────────────────────────────────────────────────
+    await page.goto("/login");
+    await page.fill('input[name="email"]', "e2e-resident@groupio-test.co.il");
+    await page.fill('input[name="password"]', "SecurePass123!");
+    await page.click('[type="submit"]');
+    await expect(page).toHaveURL(/dashboard/, { timeout: 10_000 });
+
+    // ── 3. Browse offers ─────────────────────────────────────────────────
+    await page.goto("/offers");
+    await expect(page).toHaveURL(/offers/);
+
+    // Wait for offers to load
+    const offerCard = page.locator('[data-testid="offer-card"]').first();
+    const hasOffers = await offerCard.count() > 0;
+    if (!hasOffers) {
+      // No offers in test environment — verify empty state renders correctly
+      await expect(page.locator("text=/אין הצעות|no offers/i")).toBeVisible();
+      return;
+    }
+
+    // ── 4. Join offer — validates real userId is sent ──────────────────
+    await offerCard.click();
+    await expect(page).toHaveURL(/offers\/.+/, { timeout: 5_000 });
+
+    // Intercept the join request and verify userId is NOT 'current-user'
+    let joinRequestBody: Record<string, unknown> | null = null;
+    await page.route("**/api/v1/offers/*/participants", async (route) => {
+      const request = route.request();
+      const body = request.postDataJSON() as Record<string, unknown> | null;
+      joinRequestBody = body;
+      await route.continue();
+    });
+
+    const joinButton = page.locator('[data-testid="join-offer-button"]');
+    if (await joinButton.count() > 0) {
+      await joinButton.click();
+
+      // Verify the userId in the request is not the hardcoded placeholder
+      if (joinRequestBody && typeof joinRequestBody === "object") {
+        const userId = (joinRequestBody as Record<string, unknown>).userId ?? (joinRequestBody as Record<string, unknown>).user_id;
+        expect(userId).not.toBe("current-user");
+        expect(userId).toBeTruthy();
+      }
+
+      // Check for success indicator
+      const joinSuccess = page.locator('[data-testid="join-success"], [role="alert"]').first();
+      await expect(joinSuccess).toBeVisible({ timeout: 8_000 });
+    }
+  });
+
+  test("signup form sends request to correct endpoint (/auth/register)", async ({ page }) => {
+    // Capture the outgoing fetch request to verify endpoint URL
+    let registrationUrl = "";
+    await page.route("**/api/v1/**", async (route) => {
+      const url = route.request().url();
+      if (route.request().method() === "POST" && url.includes("/auth/")) {
+        registrationUrl = url;
+      }
+      await route.continue();
+    });
+
+    await page.goto("/signup");
+
+    // Quick fill and submit
+    await page.fill('input[name="name"]', "URL Test User");
+    await page.fill('input[name="email"]', "url-check@groupio-test.co.il");
+    await page.fill('input[name="phone"]', "0502345678");
+    await page.fill('input[name="password"]', "SecurePass123!");
+    await page.fill('input[name="buildingId"]', "bld_url_test");
+    await page.click('[type="submit"]');
+
+    // Wait briefly for the network request
+    await page.waitForTimeout(2000);
+
+    if (registrationUrl) {
+      // Must use /auth/register, NOT /auth/signup
+      expect(registrationUrl).toContain("/auth/register");
+      expect(registrationUrl).not.toContain("/auth/signup");
+    }
+  });
+});

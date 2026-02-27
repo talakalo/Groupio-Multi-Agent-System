@@ -5,6 +5,8 @@ import hmac
 import logging
 from typing import Any
 
+import httpx
+
 from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Request
 
 from src.config.settings import get_settings
@@ -177,5 +179,43 @@ def _parse_whatsapp_payload(payload: dict) -> dict[str, str] | None:
 
 
 async def _send_whatsapp_reply(phone: str, text: str) -> None:
-    """Send a WhatsApp reply (stub - integrate with WhatsApp Business API)."""
-    logger.info("WhatsApp reply to %s: %s", phone, text[:100])
+    """Send a WhatsApp reply via the Meta WhatsApp Business Cloud API.
+
+    Requires WHATSAPP_API_TOKEN and WHATSAPP_PHONE_ID to be set in settings.
+    Falls back to logging only if either value is missing (development mode).
+    """
+    settings = get_settings()
+
+    if not settings.WHATSAPP_API_TOKEN or not settings.WHATSAPP_PHONE_ID:
+        logger.info(
+            "WhatsApp reply (dev — no credentials): to=%s text=%s",
+            phone,
+            text[:100],
+        )
+        return
+
+    url = f"https://graph.facebook.com/v17.0/{settings.WHATSAPP_PHONE_ID}/messages"
+    payload = {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": phone,
+        "type": "text",
+        "text": {"body": text},
+    }
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(
+                url,
+                headers={"Authorization": f"Bearer {settings.WHATSAPP_API_TOKEN}"},
+                json=payload,
+            )
+            response.raise_for_status()
+            logger.info("WhatsApp message sent to %s (status %d)", phone, response.status_code)
+    except httpx.HTTPStatusError as exc:
+        logger.error(
+            "WhatsApp API error: status=%d body=%s",
+            exc.response.status_code,
+            exc.response.text[:200],
+        )
+    except httpx.RequestError as exc:
+        logger.error("WhatsApp network error: %s", exc)

@@ -287,10 +287,12 @@ export default function SignupPage() {
                 type="text"
                 placeholder="ישראל ישראלי"
                 className="input-field"
+                aria-describedby={errors.name ? "name-error" : undefined}
+                aria-invalid={!!errors.name}
                 {...register("name")}
               />
               {errors.name && (
-                <p className="text-red-500 text-sm mt-1">
+                <p id="name-error" role="alert" className="text-red-500 text-sm mt-1">
                   {errors.name.message}
                 </p>
               )}
@@ -308,10 +310,12 @@ export default function SignupPage() {
                 type="email"
                 placeholder="your@email.com"
                 className="input-field"
+                aria-describedby={errors.email ? "email-error" : undefined}
+                aria-invalid={!!errors.email}
                 {...register("email")}
               />
               {errors.email && (
-                <p className="text-red-500 text-sm mt-1">
+                <p id="email-error" role="alert" className="text-red-500 text-sm mt-1">
                   {errors.email.message}
                 </p>
               )}

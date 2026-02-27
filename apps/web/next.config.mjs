@@ -57,7 +57,13 @@ const nextConfig = {
   },
 
   experimental: {
-    optimizePackageImports: ["lucide-react"],
+    optimizePackageImports: [
+      "lucide-react",
+      "recharts",          // used in admin charts; tree-shakes unused components
+      "date-fns",          // locale-aware date formatting
+      "@radix-ui/react-dialog",
+      "@radix-ui/react-dropdown-menu",
+    ],
   },
 
   async headers() {

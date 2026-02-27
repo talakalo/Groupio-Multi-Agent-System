@@ -26,9 +26,9 @@ from src.models.contractor import (
 from src.models.contractor import (
     ContractorCreate as ApiContractorCreate,
 )
-from src.models.contractors import (
-    Contractor,
-    ContractorCreate,
+from src.models.contractor import (
+    AgentContractor as Contractor,
+    AgentContractorCreate as ContractorCreate,
     ContractorDocument,
     ContractorMatch,
     ContractorProfile,
@@ -73,12 +73,12 @@ from src.models.offer import (
 from src.models.offer import (
     PricingTier as ApiPricingTier,
 )
-from src.models.offers import (
+from src.models.offer import (
+    AgentOffer as Offer,
+    AgentOfferCreate as OfferCreate,
+    AgentPricingTier as PricingTier,
     CompletedOffer,
     MarketData,
-    Offer,
-    OfferCreate,
-    PricingTier,
 )
 from src.models.residents import (
     Building,
