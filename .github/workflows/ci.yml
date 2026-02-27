@@ -51,6 +51,30 @@ jobs:
       - name: Run Ruff formatter check
         run: ruff format src/ tests/ --check
 
+
+  backend-mypy:
+    name: Backend Type Check (Mypy)
+    runs-on: ubuntu-latest
+    needs: [backend-lint]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install mypy and stubs
+        run: |
+          python -m pip install --upgrade pip
+          pip install "mypy>=1.7.0" types-redis
+
+      - name: Run mypy
+        run: mypy src/ --ignore-missing-imports --strict-optional
+
   frontend-lint:
     name: Frontend Lint & Type Check
     runs-on: ubuntu-latest
@@ -118,7 +142,7 @@ jobs:
   backend-test:
     name: Backend Tests
     runs-on: ubuntu-latest
-    needs: [backend-lint]
+    needs: [backend-lint, backend-mypy]
 
     env:
       REDIS_URL: redis://localhost:6379
@@ -262,6 +286,19 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Generate TypeScript types from FastAPI OpenAPI schema
+        run: |
+          # Start the backend briefly in the background to expose the schema.
+          # Uses stub env vars — no real DB or LLM connections are made.
+          TESTING=true ENVIRONMENT=testing JWT_SECRET_KEY=ci-test-key             python -m uvicorn src.api.main:app --host 127.0.0.1 --port 8099 &
+          BACKEND_PID=$!
+          sleep 8
+          npx --yes openapi-typescript http://127.0.0.1:8099/openapi.json             -o packages/types/src/generated.ts
+          kill $BACKEND_PID || true
+        continue-on-error: true  # non-blocking until types are wired up end-to-end
+        env:
+          PYTHONPATH: .
+
       - name: Build all packages
         run: pnpm build
         env:
@@ -304,7 +341,11 @@ jobs:
     name: E2E Tests
     runs-on: ubuntu-latest
     needs: [frontend-test, backend-test]
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev'
+    if: >
+      github.ref == 'refs/heads/main' ||
+      github.ref == 'refs/heads/dev' ||
+      (github.event_name == 'pull_request' &&
+       (github.base_ref == 'main' || github.base_ref == 'dev'))
     permissions:
       contents: read
       checks: write  # required for publish-unit-test-result-action to list/create check runs
@@ -337,12 +378,10 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: http://localhost:54321
           NEXT_PUBLIC_SUPABASE_ANON_KEY: test-key
 
-      # When E2E is stable, set continue-on-error: false so failures fail CI (see CODE_REVIEW_PLAN Phase 3.6).
       - name: Run E2E tests
         run: pnpm --filter @groupio/web exec playwright test --project=chromium
         env:
           CI: true
-        continue-on-error: true
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -367,7 +406,7 @@ jobs:
   ci-success:
     name: CI Success
     runs-on: ubuntu-latest
-    needs: [backend-test, frontend-test, build, security-scan, docker-build]
+    needs: [backend-test, frontend-test, build, security-scan, docker-build, backend-mypy]
     if: always()
 
     steps:

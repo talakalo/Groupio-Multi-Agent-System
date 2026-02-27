@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
+import { useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 
 import { apiClient } from '@/lib/api/client';
@@ -151,6 +152,10 @@ export default function OfferDetailPage() {
     queryKey: ['offer', offerId],
     queryFn: () => apiClient.getOffer(offerId),
     enabled: Boolean(offerId),
+    // Pricing-sensitive: reflect real-time participant count + tier changes.
+    staleTime: 10_000,           // 10s — shorter than global 60s default
+    refetchOnWindowFocus: true,  // re-fetch when tab regains focus
+    refetchInterval: 30_000,     // poll every 30s while the page is open
   });
 
   const joinMutation = useMutation({
@@ -164,6 +169,24 @@ export default function OfferDetailPage() {
   });
 
   const offer = offerQuery.data;
+
+  const handleShare = useCallback(async () => {
+    const shareData = {
+      title: offer ? `Groupio — ${tCat(offer.category)}` : 'Groupio',
+      text: offer ? t('shareText', { category: tCat(offer.category) }) : '',
+      url: window.location.href,
+    };
+    try {
+      if (navigator.share && navigator.canShare?.(shareData)) {
+        await navigator.share(shareData);
+      } else {
+        await navigator.clipboard.writeText(window.location.href);
+        // TODO: show a brief "Link copied!" toast once a toast component is added
+      }
+    } catch {
+      // User cancelled share dialog — ignore
+    }
+  }, [offer, t, tCat]);
 
   if (offerQuery.isLoading) {
     return (
@@ -223,7 +246,9 @@ export default function OfferDetailPage() {
           </div>
           <button
             type="button"
+            onClick={handleShare}
             className="p-2 rounded-xl hover:bg-gray-100 transition-colors text-gray-500"
+            aria-label={t('shareWithNeighbors')}
             title={t('shareWithNeighbors')}
           >
             <Share2 className="h-5 w-5" />

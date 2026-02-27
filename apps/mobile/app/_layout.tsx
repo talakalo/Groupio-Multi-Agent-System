@@ -1,6 +1,7 @@
 import React from "react";
 import { useEffect, useState } from "react";
 import { I18nManager, Platform } from "react-native";
+import * as Localization from "expo-localization";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { loadAuthToken } from "../lib/api";
 import { StatusBar } from "expo-status-bar";
@@ -23,10 +24,16 @@ import { useColorScheme } from "react-native";
 // Prevent the splash screen from auto-hiding
 SplashScreen.preventAutoHideAsync();
 
-// Force RTL layout for Hebrew
-if (!I18nManager.isRTL) {
+// Enable RTL only when the device locale is Hebrew (or Arabic).
+// Forcing RTL unconditionally breaks English-locale users.
+const deviceLocale = Localization.getLocales()[0]?.languageCode ?? "he";
+const isRTLLocale = deviceLocale === "he" || deviceLocale === "ar";
+if (isRTLLocale && !I18nManager.isRTL) {
   I18nManager.allowRTL(true);
   I18nManager.forceRTL(true);
+} else if (!isRTLLocale && I18nManager.isRTL) {
+  I18nManager.allowRTL(false);
+  I18nManager.forceRTL(false);
 }
 
 // Configure the QueryClient

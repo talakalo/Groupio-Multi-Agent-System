@@ -1,6 +1,7 @@
 'use client';
 
 import type { MessageResponse, ServiceCategory } from '@groupio/types';
+import { useQuery } from '@tanstack/react-query';
 import { Send, Bot, User, Loader2, Sparkles } from 'lucide-react';
 import { useState, useRef, useEffect, useCallback, type FormEvent } from 'react';
 
@@ -66,17 +67,48 @@ export function AIChat({
   const accessToken = useAccessToken();
 
   // ---- State ----
+  // Welcome message: passed as a prop so callers can provide a translated string.
+  // Defaults to an English string; Hebrew callers should pass the translated version.
+  const welcomeContent = placeholder ?? 'Hello! I'm the Groupio assistant. How can I help?';
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome',
       role: 'assistant',
-      content:
-        'היי! אני העוזר הדיגיטלי של גרופיו. איך אוכל לעזור?',
+      content: welcomeContent,
       timestamp: new Date(),
     },
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  // ---- Chat history: load from backend on mount ----
+  // Only fetches when a userId is provided (skip for anonymous/guest sessions).
+  const { data: historyData } = useQuery<{ messages: { id: string; role: 'user' | 'assistant'; content: string; created_at: string }[] }>({
+    queryKey: ['chat-history', userId],
+    queryFn: async () => {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+      const res = await fetch(`${baseUrl}/api/v1/conversations/${userId}/messages`, { headers });
+      if (!res.ok) throw new Error('Failed to load chat history');
+      return res.json();
+    },
+    enabled: Boolean(userId) && userId !== 'anonymous',
+    staleTime: Infinity, // history only needs to load once per mount
+  });
+
+  // Hydrate messages from backend history on first load
+  useEffect(() => {
+    if (!historyData?.messages?.length) return;
+    const historical: ChatMessage[] = historyData.messages.map((m) => ({
+      id: m.id,
+      role: m.role,
+      content: m.content,
+      timestamp: new Date(m.created_at),
+    }));
+    // Prepend history before the welcome message
+    setMessages((prev) => [...historical, ...prev]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [historyData]);
 
   // ---- Refs ----
   const messagesEndRef = useRef<HTMLDivElement>(null);

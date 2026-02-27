@@ -1,4 +1,14 @@
-"""Monitoring, metrics, and logging utilities."""
+"""Monitoring, metrics, and logging utilities.
+
+Logging is configured via structlog (JSON in production, coloured console in dev):
+  - Production:  `ENVIRONMENT=production` → JSONRenderer → machine-parseable logs
+  - Development: any other value → ConsoleRenderer → human-readable coloured logs
+
+Usage across the codebase:
+    from src.utils.monitoring import get_logger
+    log = get_logger(__name__)
+    log.info("offer_joined", offer_id=offer.id, user_id=user.id)
+"""
 
 import functools
 import logging
@@ -6,11 +16,61 @@ import time
 from collections.abc import Callable
 from typing import Any
 
+import structlog
 from prometheus_client import Counter, Gauge, Histogram
 
 from src.config.settings import get_settings
 
-logger = logging.getLogger(__name__)
+# ---------------------------------------------------------------------------
+# Structlog configuration — called once at import time.
+# ---------------------------------------------------------------------------
+
+def _configure_structlog() -> None:
+    settings = get_settings()
+    is_production = settings.ENVIRONMENT in ("production", "staging")
+
+    shared_processors: list[structlog.types.Processor] = [
+        structlog.stdlib.filter_by_level,
+        structlog.stdlib.add_log_level,
+        structlog.stdlib.add_logger_name,
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.StackInfoRenderer(),
+        structlog.processors.ExceptionRenderer(),
+        structlog.processors.UnicodeDecoder(),
+    ]
+
+    renderer: structlog.types.Processor = (
+        structlog.processors.JSONRenderer()
+        if is_production
+        else structlog.dev.ConsoleRenderer(colors=True)
+    )
+
+    structlog.configure(
+        processors=shared_processors + [renderer],
+        wrapper_class=structlog.stdlib.BoundLogger,
+        context_class=dict,
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        cache_logger_on_first_use=True,
+    )
+
+    # Route stdlib logging through structlog so FastAPI/uvicorn logs are
+    # formatted the same way as application logs.
+    logging.basicConfig(
+        format="%(message)s",
+        level=getattr(logging, get_settings().LOG_LEVEL, logging.INFO),
+    )
+
+
+_configure_structlog()
+
+
+def get_logger(name: str) -> structlog.stdlib.BoundLogger:
+    """Return a structlog logger bound to the given module name."""
+    return structlog.get_logger(name)
+
+
+# Module-level logger (backward-compat for code using `logger` directly)
+logger = get_logger(__name__)
 
 # -- Prometheus Metrics --
 

@@ -12,6 +12,7 @@ import {
   ChevronLeft,
   SlidersHorizontal,
   X,
+  AlertCircle,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
@@ -420,6 +421,18 @@ export default function OffersListPage() {
               <div className="h-4 bg-gray-200 rounded w-48" />
             </div>
           ))}
+        </div>
+      ) : offersQuery.isError ? (
+        <div role="alert" className="card text-center py-12 border-red-200 bg-red-50">
+          <AlertCircle className="h-12 w-12 text-red-300 mx-auto mb-3" />
+          <p className="text-red-700 font-medium mb-2">{t('errorLoadingOffers')}</p>
+          <button
+            type="button"
+            onClick={() => offersQuery.refetch()}
+            className="mt-2 text-sm text-red-600 underline hover:text-red-800"
+          >
+            {t('retry')}
+          </button>
         </div>
       ) : filteredOffers.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
