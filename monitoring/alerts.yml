@@ -1,0 +1,125 @@
+# Prometheus alerting rules for Groupio production monitoring.
+# Load into Prometheus via rule_files in prometheus.yml.
+# Each alert has a severity label: critical | warning | info.
+
+groups:
+  - name: groupio-critical
+    rules:
+      - alert: PaymentWebhookFailed
+        expr: >
+          rate(http_requests_total{path="/api/v1/payments/webhook",status=~"4..|5.."}[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "Payment webhook failures detected"
+          description: >
+            Payment webhook endpoint is returning 4xx/5xx errors.
+            Check PAYMENT_WEBHOOK_SECRET configuration and Stripe signature headers.
+
+      - alert: HighErrorRate
+        expr: >
+          rate(http_requests_total{status=~"5.."}[5m]) /
+          rate(http_requests_total[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "API error rate above 5%"
+          description: >
+            The 5-minute error rate is {{ humanizePercentage $value }}.
+            Threshold: 5%. Investigate recent deploys or database connectivity.
+
+      - alert: LLMLatencyHigh
+        expr: >
+          histogram_quantile(0.95,
+            rate(agent_duration_seconds_bucket[5m])) > 30
+        for: 5m
+        labels:
+          severity: critical
+          team: ai
+        annotations:
+          summary: "AI agent P95 latency exceeds 30s"
+          description: >
+            95th-percentile agent duration is {{ $value | humanizeDuration }}.
+            LLM timeout is set to 30s — check Anthropic API status and
+            consider reducing LLM_TIMEOUT_SECONDS or enabling FALLBACK_MODEL.
+
+      - alert: EscalationSurge
+        expr: rate(escalations_total[10m]) > 5
+        for: 5m
+        labels:
+          severity: critical
+          team: ai
+        annotations:
+          summary: "Unusually high escalation rate"
+          description: >
+            Escalation rate is {{ $value | humanize }}/s over the last 10 minutes.
+            This may indicate an agent routing failure or a spike in complex requests.
+
+      - alert: DatabasePoolExhausted
+        expr: db_pool_available_connections < 2
+        for: 1m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "Database connection pool nearly exhausted"
+          description: >
+            Only {{ $value }} connections are available in the pool.
+            Increase DB_MAX_CONNECTIONS or investigate connection leaks.
+
+  - name: groupio-warning
+    rules:
+      - alert: HighRateLimitHits
+        expr: >
+          rate(http_requests_total{status="429"}[5m]) > 10
+        for: 3m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "High rate of 429 Too Many Requests"
+          description: >
+            More than 10 rate-limited requests/second in the last 5 minutes.
+            Possible bot activity or misconfigured client.
+
+      - alert: RedisConnectionFailed
+        expr: redis_connected == 0
+        for: 1m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "Redis connection lost"
+          description: >
+            The backend cannot reach Redis. Rate limiting and session caching
+            are degraded. Check REDIS_URL and network connectivity.
+
+      - alert: LowDiskSpace
+        expr: >
+          (node_filesystem_avail_bytes{mountpoint="/"} /
+           node_filesystem_size_bytes{mountpoint="/"}) < 0.15
+        for: 5m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "Low disk space on root filesystem"
+          description: >
+            Available disk space is {{ humanizePercentage $value }}.
+            Clean up old Docker images or expand the volume.
+
+      - alert: BackupMissed
+        expr: time() - groupio_last_backup_timestamp_seconds > 90000
+        for: 0m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "Database backup is overdue"
+          description: >
+            No successful backup recorded in the last 25 hours.
+            Check the backup GitHub Actions workflow for failures.

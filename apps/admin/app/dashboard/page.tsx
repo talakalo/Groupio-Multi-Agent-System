@@ -67,12 +67,15 @@ const ACTIVITY_TYPE_ICON: Record<
 // ---------------------------------------------------------------------------
 
 export default function DashboardPage() {
-  const { data: metrics } = useDashboardMetrics();
-  const { data: systemStatus } = useSystemStatus();
+  const { data: metrics, isError: metricsError } = useDashboardMetrics();
+  const { data: systemStatus, isError: systemError } = useSystemStatus();
   const { data: escalationsData } = useEscalations();
   const { data: health } = useHealthStatus();
   const { data: analyticsData } = useAdminAnalyticsDashboard();
-  const { data: activityLog = [] } = useActivityLog();
+  const { data: activityLog = [], isError: activityError } = useActivityLog();
+
+  // Show a top-level error banner if core data queries fail
+  const hasCriticalError = metricsError || systemError;
 
   // Derive agent summary data from system status
   const agentSummary = useMemo(() => {

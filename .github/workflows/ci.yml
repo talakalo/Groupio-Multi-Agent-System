@@ -304,7 +304,11 @@ jobs:
     name: E2E Tests
     runs-on: ubuntu-latest
     needs: [frontend-test, backend-test]
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev'
+    if: >
+      github.ref == 'refs/heads/main' ||
+      github.ref == 'refs/heads/dev' ||
+      (github.event_name == 'pull_request' &&
+       (github.base_ref == 'main' || github.base_ref == 'dev'))
     permissions:
       contents: read
       checks: write  # required for publish-unit-test-result-action to list/create check runs
@@ -337,12 +341,10 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: http://localhost:54321
           NEXT_PUBLIC_SUPABASE_ANON_KEY: test-key
 
-      # When E2E is stable, set continue-on-error: false so failures fail CI (see CODE_REVIEW_PLAN Phase 3.6).
       - name: Run E2E tests
         run: pnpm --filter @groupio/web exec playwright test --project=chromium
         env:
           CI: true
-        continue-on-error: true
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
