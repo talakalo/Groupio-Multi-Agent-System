@@ -78,6 +78,9 @@ node_modules/
 .next/
 out/
 
+# Storybook build output
+storybook-static/
+
 # Expo
 .expo/
 dist/
