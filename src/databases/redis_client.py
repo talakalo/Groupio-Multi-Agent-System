@@ -12,19 +12,36 @@ from src.config.settings import get_settings
 logger = logging.getLogger(__name__)
 
 
+# Atomic rate-limit Lua script — INCR + EXPIRE in a single round-trip.
+# Eliminates the TOCTOU race between GET and INCR in the previous implementation.
+_RATE_LIMIT_SCRIPT = """
+local key    = KEYS[1]
+local limit  = tonumber(ARGV[1])
+local window = tonumber(ARGV[2])
+local count  = redis.call('INCR', key)
+if count == 1 then
+    redis.call('EXPIRE', key, window)
+end
+return count
+"""
+
+
 class RedisClient:
     """Redis client for caching, conversation memory, and rate limiting."""
 
     def __init__(self) -> None:
         settings = get_settings()
-        self._redis = redis.from_url(
-            settings.REDIS_URL,
-            decode_responses=True,
-            max_connections=20,
-            socket_connect_timeout=5,
-            socket_timeout=5,
-            retry_on_timeout=True,
-        )
+        redis_kwargs: dict = {
+            "decode_responses": True,
+            "max_connections": 20,
+            "socket_connect_timeout": 5,
+            "socket_timeout": 5,
+            "retry_on_timeout": True,
+        }
+        # Support REDIS_PASSWORD override when the URL does not embed credentials.
+        if settings.REDIS_PASSWORD and "://:@" not in settings.REDIS_URL and "@" not in settings.REDIS_URL:
+            redis_kwargs["password"] = settings.REDIS_PASSWORD
+        self._redis = redis.from_url(settings.REDIS_URL, **redis_kwargs)
         self._context_window = 10
         self._conversation_ttl = 86400  # 24 hours
 
@@ -77,22 +94,15 @@ class RedisClient:
     # -- Rate Limiting --
 
     async def check_rate_limit(self, user_id: str, limit: int = 60, window: int = 60) -> bool:
-        """Check if a user has exceeded their rate limit.
+        """Check if a user has exceeded their rate limit (atomic via Lua).
 
         Returns True if the request is allowed, False if rate limited.
+        Uses a single atomic Lua script to eliminate TOCTOU races between
+        GET and INCR in high-concurrency scenarios.
         """
         key = f"rate:{user_id}"
-        current = await self._redis.get(key)
-
-        if current is None:
-            await self._redis.set(key, 1, ex=window)
-            return True
-
-        if int(current) >= limit:
-            return False
-
-        await self._redis.incr(key)
-        return True
+        count = await self._redis.eval(_RATE_LIMIT_SCRIPT, 1, key, limit, window)
+        return int(count) <= limit
 
     # -- A/B Testing --
 

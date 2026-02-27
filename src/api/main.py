@@ -101,17 +101,18 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
 
 # CORS middleware - origins loaded from environment
 settings = get_settings()
-# Ensure localhost is always allowed for local development
 cors_origins = list(settings.CORS_ORIGINS)
-_dev_origins = [
-    "http://localhost:3000",
-    "http://localhost:3001",
-    "http://127.0.0.1:3000",
-    "http://127.0.0.1:3001",
-]
-for origin in _dev_origins:
-    if origin not in cors_origins:
-        cors_origins.append(origin)
+# Only add localhost origins in development — never in production/staging.
+if settings.ENVIRONMENT == "development":
+    _dev_origins = [
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001",
+    ]
+    for origin in _dev_origins:
+        if origin not in cors_origins:
+            cors_origins.append(origin)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
@@ -279,8 +280,15 @@ async def health_check() -> dict[str, Any]:
 
 
 @app.get("/metrics")
-async def prometheus_metrics() -> Response:
-    """Expose Prometheus metrics in standard text format for scraping."""
+async def prometheus_metrics(
+    x_api_key: str | None = Header(None, alias="X-API-Key"),
+) -> Response:
+    """Expose Prometheus metrics — requires a valid X-API-Key header."""
+    _settings = get_settings()
+    if _settings.API_KEYS:
+        if not x_api_key or x_api_key not in _settings.API_KEYS:
+            raise HTTPException(status_code=403, detail="Invalid or missing API key")
+
     from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
     return Response(

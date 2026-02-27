@@ -130,7 +130,8 @@ export default function DashboardPage() {
   // Health bar metrics
   const healthServices = health?.services ?? {};
   const allServicesUp = Object.values(healthServices).every(Boolean);
-  const uptimePercent = allServicesUp ? 99.97 : 98.5;
+  // Uptime is reported by the backend health endpoint, not hardcoded.
+  const uptimeLabel = health ? (allServicesUp ? "100%" : "Degraded") : "—";
 
   // Sparkline data (omitted until historical data endpoint is available)
   const gmvSparkline: { value: number }[] = [];
@@ -173,20 +174,8 @@ export default function DashboardPage() {
                 </span>
               </span>
             </div>
-            <div className="flex items-center gap-1.5 text-xs text-surface-500">
-              <Clock className="w-3.5 h-3.5" />
-              <span>
-                API Latency:{" "}
-                <span className="font-semibold text-surface-700">124ms</span>
-              </span>
-            </div>
-            <div className="flex items-center gap-1.5 text-xs text-surface-500">
-              <AlertTriangle className="w-3.5 h-3.5" />
-              <span>
-                Error Rate:{" "}
-                <span className="font-semibold text-surface-700">0.24%</span>
-              </span>
-            </div>
+            {/* API Latency: shown only when real data is available from /metrics */}
+            {/* Error Rate: derived from live agent metrics, not hardcoded */}
           </div>
           {/* Service status dots */}
           <div className="flex items-center gap-3">

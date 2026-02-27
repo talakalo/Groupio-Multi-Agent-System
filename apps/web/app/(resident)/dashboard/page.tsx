@@ -262,24 +262,18 @@ export default function ResidentDashboardPage() {
           icon={Tag}
           label={t('activeOffers')}
           value={String(stats?.activeOffers ?? 0)}
-          trend={12}
-          trendLabel={t('thisMonth')}
           color="primary"
         />
         <StatCard
           icon={Users}
           label={t('neighborsJoined')}
           value={String(stats?.neighborsJoined ?? 0)}
-          trend={8}
-          trendLabel={t('thisMonth')}
           color="accent"
         />
         <StatCard
           icon={TrendingDown}
           label={t('totalSavings')}
           value={formatPrice(stats?.totalSavings ?? 0)}
-          trend={23}
-          trendLabel={t('thisMonth')}
           color="emerald"
         />
         <StatCard
