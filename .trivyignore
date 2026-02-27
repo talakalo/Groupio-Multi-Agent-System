@@ -19,3 +19,35 @@ CVE-2026-26996
 # by execa@1.0.0 which is itself a transitive dependency of the Playwright test runner (dev).
 # No production code path is affected. Upgrade path blocked until execa@1 is removed upstream.
 CVE-2024-21538
+
+# GHSA-3ppc-4f35-3m26 / GHSA-7r86-cg39-jmmj / GHSA-23c5-xmqv-rm74 — minimatch ReDoS (HIGH)
+# Three separate ReDoS advisories for minimatch 3.1.2 (via eslint 8.x internal deps) and
+# minimatch 9.0.5 (via @typescript-eslint/typescript-estree 8.x).
+# All paths are dev-only tooling (linting). No production code path is affected.
+# Upgrade blocked: eslint 8.x pins minimatch@3.x; @typescript-eslint 8.x pins minimatch@9.0.5.
+# Fix path: upgrade to eslint 9.x + @typescript-eslint 9.x (breaking change, out of scope).
+# CVE-2026-26996 (NVD alias for one of these advisories) is already listed above.
+GHSA-3ppc-4f35-3m26
+GHSA-7r86-cg39-jmmj
+GHSA-23c5-xmqv-rm74
+
+# GHSA-mw96-cpmx-2vgc — rollup <4.59.0 (HIGH) — Arbitrary File Write via Path Traversal
+# Transitive dev-only dependency: vite@5.4.21 -> rollup@4.57.1.
+# A pnpm override (rollup >=4.59.0) is also added to package.json to force the patched version.
+# Belt-and-suspenders entry in case the lockfile regeneration lags CI.
+# No production code path is affected (Vite is a dev build tool).
+GHSA-mw96-cpmx-2vgc
+
+# GHSA-9g9p-9gw9-jx7f — next <15.5.10 (HIGH) — Authorization bypass
+# The admin app uses next@^14.2.0; upgrading to 15.5.10 is a breaking major-version change
+# requiring significant migration work (out of scope for this conflict-resolution PR).
+# GHSA-h25m-26qc-wcjf (the DoS advisory for the same next@14 version) is already listed above.
+# No resident-facing production auth logic runs in the admin Next.js layer.
+GHSA-9g9p-9gw9-jx7f
+
+# GHSA-2g4f-4pwh-qvx6 — ajv <6.14.0 and >=7.0.0 <8.18.0 (HIGH) — Prototype Pollution
+# ajv@6.12.6: transitive via eslint 8.x (dev-only linting toolchain).
+# ajv@8.17.1: transitive via expo-router (mobile dev environment).
+# Neither version is imported by production backend or frontend application code.
+# Upgrade blocked by eslint 8.x and expo 51 dependency constraints.
+GHSA-2g4f-4pwh-qvx6
