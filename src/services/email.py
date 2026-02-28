@@ -239,6 +239,20 @@ class EmailService:
         return await self.send_email(to_email, subject, html_content, text_content)
 
     # ------------------------------------------------------------------
+    # Shared CSS snippets used in offer lifecycle HTML emails
+    # (defined as plain strings so they can be interpolated into f-strings)
+    # ------------------------------------------------------------------
+
+    _BTN_CSS = (
+        ".btn{display:inline-block;padding:12px 24px;background:#4F46E5;"
+        "color:white;text-decoration:none;border-radius:6px;margin:20px 0;}"
+    )
+    _CELEBRATE_CSS = (
+        ".celebrate{background:#FFF7ED;border:1px solid #FED7AA;"
+        "border-radius:8px;padding:16px;margin:16px 0;text-align:center;}"
+    )
+
+    # ------------------------------------------------------------------
     # Offer lifecycle notification helpers
     # ------------------------------------------------------------------
 
@@ -263,7 +277,7 @@ class EmailService:
         html_content = f"""<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="UTF-8">
 <style>body{{font-family:Arial,sans-serif;direction:rtl;}}
 .c{{max-width:600px;margin:0 auto;padding:20px;}}
-.btn{{display:inline-block;padding:12px 24px;background:#4F46E5;color:white;text-decoration:none;border-radius:6px;margin:20px 0;}}
+{self._BTN_CSS}
 .info{{background:#F0FDF4;border:1px solid #86EFAC;border-radius:8px;padding:16px;margin:16px 0;}}
 .footer{{color:#666;font-size:12px;margin-top:30px;}}</style></head>
 <body><div class="c">
@@ -292,7 +306,7 @@ class EmailService:
         html_content = f"""<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="UTF-8">
 <style>body{{font-family:Arial,sans-serif;direction:rtl;}}
 .c{{max-width:600px;margin:0 auto;padding:20px;}}
-.btn{{display:inline-block;padding:12px 24px;background:#4F46E5;color:white;text-decoration:none;border-radius:6px;margin:20px 0;}}
+{self._BTN_CSS}
 .footer{{color:#666;font-size:12px;margin-top:30px;}}</style></head>
 <body><div class="c">
 <h1>שלום {user_name},</h1>
@@ -319,8 +333,8 @@ class EmailService:
         html_content = f"""<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="UTF-8">
 <style>body{{font-family:Arial,sans-serif;direction:rtl;}}
 .c{{max-width:600px;margin:0 auto;padding:20px;}}
-.btn{{display:inline-block;padding:12px 24px;background:#4F46E5;color:white;text-decoration:none;border-radius:6px;margin:20px 0;}}
-.celebrate{{background:#FFF7ED;border:1px solid #FED7AA;border-radius:8px;padding:16px;margin:16px 0;text-align:center;}}
+{self._BTN_CSS}
+{self._CELEBRATE_CSS}
 .footer{{color:#666;font-size:12px;margin-top:30px;}}</style></head>
 <body><div class="c">
 <h1>שלום {user_name}!</h1>
@@ -377,7 +391,7 @@ class EmailService:
         html_content = f"""<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="UTF-8">
 <style>body{{font-family:Arial,sans-serif;direction:rtl;}}
 .c{{max-width:600px;margin:0 auto;padding:20px;}}
-.btn{{display:inline-block;padding:12px 24px;background:#4F46E5;color:white;text-decoration:none;border-radius:6px;margin:20px 0;}}
+{self._BTN_CSS}
 .match{{background:#F0FDF4;border:1px solid #86EFAC;border-radius:8px;padding:16px;margin:16px 0;}}
 .footer{{color:#666;font-size:12px;margin-top:30px;}}</style></head>
 <body><div class="c">
@@ -388,6 +402,40 @@ class EmailService:
 </div>
 <p>בקרוב תקבל פרטי תשלום ולוח זמנים לביצוע העבודה.</p>
 <a href="{offer_url}" class="btn">צפייה בהצעה</a>
+<div class="footer"><p>© Groupio - קניות קבוצתיות לבניינים</p></div>
+</div></body></html>"""
+        return await self.send_email(to_email, subject, html_content)
+
+    async def send_offer_at_risk(
+        self,
+        to_email: str,
+        user_name: str,
+        offer_title: str,
+        offer_id: str,
+        current_count: int,
+        min_count: int,
+        base_url: str = "https://groupio.co.il",
+    ) -> bool:
+        """Warn remaining participants that the offer dropped below minimum threshold."""
+        offer_url = f"{base_url}/offers/{offer_id}"
+        needed = min_count - current_count
+        subject = f"⚠️ ההצעה {offer_title} זקוקה לעוד דיירים"
+        html_content = f"""<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="UTF-8">
+<style>body{{font-family:Arial,sans-serif;direction:rtl;}}
+.c{{max-width:600px;margin:0 auto;padding:20px;}}
+{self._BTN_CSS}
+.warn{{background:#FFFBEB;border:1px solid #FCD34D;border-radius:8px;padding:16px;margin:16px 0;}}
+.footer{{color:#666;font-size:12px;margin-top:30px;}}</style></head>
+<body><div class="c">
+<h1>שלום {user_name},</h1>
+<div class="warn">
+<h2>⚠️ ההצעה הקבוצתית זקוקה לדיירים נוספים</h2>
+<p>ההצעה <strong>{offer_title}</strong> ירדה מתחת למספר המינימלי הדרוש.</p>
+<p>כרגע: <strong>{current_count} משתתפים</strong> | נדרש מינימום: <strong>{min_count}</strong></p>
+<p>נדרשים עוד <strong>{needed} דיירים</strong> כדי שההצעה תמשיך.</p>
+</div>
+<p>שתפו את השכנים שלכם כדי שנגיע לסף המינימלי!</p>
+<a href="{offer_url}" class="btn">לחצו כאן להזמנת שכנים</a>
 <div class="footer"><p>© Groupio - קניות קבוצתיות לבניינים</p></div>
 </div></body></html>"""
         return await self.send_email(to_email, subject, html_content)
@@ -406,7 +454,7 @@ class EmailService:
         html_content = f"""<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="UTF-8">
 <style>body{{font-family:Arial,sans-serif;direction:rtl;}}
 .c{{max-width:600px;margin:0 auto;padding:20px;}}
-.btn{{display:inline-block;padding:12px 24px;background:#4F46E5;color:white;text-decoration:none;border-radius:6px;margin:20px 0;}}
+{self._BTN_CSS}
 .approved{{background:#F0FDF4;border:1px solid #86EFAC;border-radius:8px;padding:16px;margin:16px 0;}}
 .footer{{color:#666;font-size:12px;margin-top:30px;}}</style></head>
 <body><div class="c">

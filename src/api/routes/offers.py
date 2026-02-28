@@ -23,6 +23,7 @@ from src.models.user import UserInDB
 from src.orchestration.graph import get_orchestrator
 from src.rag.embeddings import get_embedding_client
 from src.services.email import get_email_service
+from src.services.whatsapp_bot import get_whatsapp_bot
 
 logger = logging.getLogger(__name__)
 
@@ -318,6 +319,15 @@ async def join_offer(
         except Exception:
             logger.warning("Failed to fetch participants for threshold notification: offer=%s", offer_id)
 
+    # P3-4: WhatsApp notification on join
+    if current_user.phone:
+        wa_number = f"972{current_user.phone.lstrip('0')}"
+        background_tasks.add_task(
+            get_whatsapp_bot()._send_text_message,
+            to=wa_number,
+            text=f"הצטרפת בהצלחה להצעה '{offer_title}'! כרגע {new_count} דיירים. מינימום נדרש: {min_participants}.",
+        )
+
     return {"status": "joined", "offer_id": offer_id}
 
 
@@ -351,6 +361,35 @@ async def leave_offer(
             offer_title=offer.get("title", ""),
             offer_id=offer_id,
         )
+
+    # P3-4: WhatsApp notification on leave
+    if current_user.phone:
+        wa_number = f"972{current_user.phone.lstrip('0')}"
+        background_tasks.add_task(
+            get_whatsapp_bot()._send_text_message,
+            to=wa_number,
+            text=f"עזבת את ההצעה '{offer.get('title', '')}'. אנחנו מקווים לראותך בהצעות עתידיות!",
+        )
+
+    # P3-3: Threshold collapse detection — notify remaining participants if below minimum
+    updated_offer = await db.get_offer(offer_id)
+    new_count = updated_offer.get("current_participants", 0) if updated_offer else 0
+    min_participants = offer.get("min_participants", 5)
+    if new_count < min_participants:
+        remaining = await db.get_offer_participants(offer_id)
+        for participant in remaining:
+            p_email = participant.get("email") or (participant.get("users") or {}).get("email")
+            p_name = participant.get("full_name") or (participant.get("users") or {}).get("full_name") or "דייר"
+            if p_email:
+                background_tasks.add_task(
+                    get_email_service().send_offer_at_risk,
+                    to_email=p_email,
+                    user_name=p_name,
+                    offer_title=offer.get("title", ""),
+                    offer_id=offer_id,
+                    current_count=new_count,
+                    min_count=min_participants,
+                )
 
     return {"status": "left", "offer_id": offer_id}
 

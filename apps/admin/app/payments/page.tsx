@@ -22,6 +22,7 @@ import {
   Building2,
   Users,
   FileText,
+  Settings,
 } from "lucide-react";
 
 // ---- Types ----
@@ -361,9 +362,11 @@ function EscrowTable({
 function PayoutsTable({
   payouts,
   onApprove,
+  onOverride,
 }: {
   payouts: ContractorPayout[];
   onApprove: (payoutId: string) => void;
+  onOverride: (payoutId: string) => void;
 }) {
   return (
     <div className="overflow-x-auto">
@@ -452,6 +455,14 @@ function PayoutsTable({
                       Paid {payout.paidAt ? formatDate(payout.paidAt) : ""}
                     </span>
                   )}
+                  <button
+                    onClick={() => onOverride(payout.id)}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-surface-100 text-surface-600 text-xs font-medium rounded-lg hover:bg-surface-200 transition-colors ml-1"
+                    title="Override payment status"
+                  >
+                    <Settings className="w-3 h-3" />
+                    Override
+                  </button>
                 </td>
               </tr>
             );
@@ -558,6 +569,35 @@ export default function AdminPaymentsPage() {
       )
     );
     if (!result) {
+      loadData();
+    }
+  }, [loadData]);
+
+  const ALLOWED_PAYMENT_STATUSES = ["pending", "completed", "failed", "refunded", "on_hold"];
+
+  const handleOverrideStatus = useCallback(async (payoutId: string) => {
+    const newStatus = window.prompt(
+      `Enter new status:\n(${ALLOWED_PAYMENT_STATUSES.join(", ")})`
+    );
+    if (!newStatus) return;
+    const trimmed = newStatus.trim();
+    if (!ALLOWED_PAYMENT_STATUSES.includes(trimmed)) {
+      window.alert(`Invalid status. Must be one of: ${ALLOWED_PAYMENT_STATUSES.join(", ")}`);
+      return;
+    }
+    const reason = window.prompt("Reason for override (optional):") ?? "";
+    const result = await fetchApi<{ status: string }>(
+      `/admin/payments/${payoutId}/status`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ status: trimmed, reason }),
+      }
+    );
+    if (result) {
+      setPayouts((prev) =>
+        prev.map((p) => (p.id === payoutId ? { ...p, status: trimmed as PayoutStatus } : p))
+      );
+    } else {
       loadData();
     }
   }, [loadData]);
@@ -723,7 +763,7 @@ export default function AdminPaymentsPage() {
               <p className="text-surface-500">No contractor payouts yet</p>
             </div>
           ) : (
-            <PayoutsTable payouts={payouts} onApprove={handleApprovePayout} />
+            <PayoutsTable payouts={payouts} onApprove={handleApprovePayout} onOverride={handleOverrideStatus} />
           )}
         </div>
       )}

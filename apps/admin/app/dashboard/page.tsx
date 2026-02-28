@@ -74,7 +74,7 @@ export default function DashboardPage() {
   const { data: escalationsData } = useEscalations();
   const { data: health } = useHealthStatus();
   const { data: analyticsData } = useAdminAnalyticsDashboard();
-  const { data: activityLog = [], isError: activityError } = useActivityLog();
+  const { data: activityLog = [] } = useActivityLog();
   const { data: vettingStatus } = useVettingStatus();
 
   // Show a top-level error banner if core data queries fail

@@ -298,6 +298,16 @@ export default function OfferDetailPage() {
 
   const currentTier = offer.tiers[offer.currentTier] ?? offer.tiers[0];
   const discountPercent = currentTier ? Math.round(currentTier.discount * 100) : 0;
+
+  // P3-7: Savings calculator derived values
+  const currentSavings = currentTier ? offer.basePrice - currentTier.price : 0;
+  const nextTierIdx = (offer.currentTier ?? 0) + 1;
+  const nextTier = offer.tiers[nextTierIdx] ?? null;
+  const toNextTier = nextTier ? Math.max(0, nextTier.min - offer.participants) : 0;
+  const nextTierSavings = nextTier ? offer.basePrice - nextTier.price : 0;
+  const progressToNextPct = nextTier
+    ? Math.min(100, Math.round((offer.participants / nextTier.min) * 100))
+    : 100;
   const daysLeft = Math.max(
     0,
     Math.ceil((new Date(offer.expiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
@@ -357,6 +367,42 @@ export default function OfferDetailPage() {
             )}
           </div>
         </div>
+
+        {/* P3-7: Real-time savings calculator */}
+        {currentTier && (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 mb-6">
+            <h3 className="text-sm font-semibold text-emerald-800 mb-3">
+              החיסכון שלך
+            </h3>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm text-emerald-700">חיסכון נוכחי לדירה</span>
+              <span className="text-lg font-bold text-emerald-700">
+                {formatPrice(currentSavings)}
+              </span>
+            </div>
+            {nextTier && toNextTier > 0 && (
+              <>
+                <div className="flex items-center justify-between text-xs text-emerald-600 mb-1">
+                  <span>
+                    עוד {toNextTier} שכנים = חיסכון של {formatPrice(nextTierSavings)}
+                  </span>
+                  <span>{progressToNextPct}%</span>
+                </div>
+                <div className="w-full h-2 bg-emerald-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-2 bg-emerald-500 rounded-full transition-all"
+                    style={{ width: `${progressToNextPct}%` }}
+                  />
+                </div>
+              </>
+            )}
+            {(!nextTier || toNextTier === 0) && (
+              <p className="text-xs text-emerald-600">
+                הגעתם לרמת ההנחה הגבוהה ביותר!
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Stats row */}
         <div className="grid grid-cols-3 gap-4 mb-6">

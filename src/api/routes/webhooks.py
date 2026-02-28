@@ -6,8 +6,8 @@ import logging
 from typing import Any
 
 import httpx
-
 from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Request
+
 
 from src.config.settings import get_settings
 from src.databases.postgres import get_postgres_client
