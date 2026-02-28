@@ -5,8 +5,14 @@ directly from src.models.contractor.
 """
 from src.models.contractor import (
     AgentContractor as Contractor,
+)
+from src.models.contractor import (
     AgentContractorBase as ContractorBase,
+)
+from src.models.contractor import (
     AgentContractorCreate as ContractorCreate,
+)
+from src.models.contractor import (
     ContractorDocument,
     ContractorMatch,
     ContractorProfile,
