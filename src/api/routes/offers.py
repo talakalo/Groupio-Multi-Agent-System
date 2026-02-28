@@ -9,6 +9,7 @@ from src.api.middleware.auth import get_current_user, is_admin
 from src.databases.postgres import get_postgres_client
 from src.databases.vector_store import get_vector_store
 from src.models.offer import (
+    ContractorInOffer,
     OfferCreate,
     OfferJoinRequest,
     OfferListResponse,
@@ -26,6 +27,23 @@ from src.services.email import get_email_service
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["offers"])
+
+
+def _build_contractor_in_offer(contractor: dict) -> dict:
+    """Build a contractor trust summary dict for embedding in offer responses."""
+    return {
+        "id": contractor.get("id", ""),
+        "businessName": contractor.get("business_name"),
+        "verified": contractor.get("verification_status") == "verified",
+        "rating": contractor.get("average_rating"),
+        "trustScore": contractor.get("trust_score"),
+        "yearsInBusiness": contractor.get("years_in_business"),
+        "categories": contractor.get("categories") or [],
+        "description": contractor.get("description"),
+        "phone": contractor.get("phone"),
+        "licenseNumber": contractor.get("license_number"),
+        "regions": contractor.get("regions") or [],
+    }
 
 
 def _get_current_discount_percent(offer: dict, participants: int) -> int:
@@ -119,6 +137,15 @@ async def list_offers(
         page_size=page_size,
     )
 
+    for offer in offers:
+        if offer.get("matched_contractor_id"):
+            try:
+                contractor = await db.get_contractor(offer["matched_contractor_id"])
+                if contractor:
+                    offer["contractor"] = _build_contractor_in_offer(contractor)
+            except Exception:
+                pass
+
     return OfferListResponse(
         items=offers,
         total=total,
@@ -139,6 +166,14 @@ async def get_offer(
 
     if not offer:
         raise HTTPException(status_code=404, detail="Offer not found")
+
+    if offer.get("matched_contractor_id"):
+        try:
+            contractor = await db.get_contractor(offer["matched_contractor_id"])
+            if contractor:
+                offer["contractor"] = _build_contractor_in_offer(contractor)
+        except Exception:
+            logger.warning("Failed to enrich offer %s with contractor data", offer_id)
 
     return offer
 

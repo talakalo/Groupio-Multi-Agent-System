@@ -89,6 +89,22 @@ class OfferInDB(OfferBase):
     updated_at: datetime
 
 
+class ContractorInOffer(BaseModel):
+    """Contractor trust summary embedded in offer responses."""
+
+    id: str
+    businessName: str | None = None
+    verified: bool = False
+    rating: float | None = None
+    trustScore: float | None = None
+    yearsInBusiness: int | None = None
+    categories: list[str] = []
+    description: str | None = None
+    phone: str | None = None
+    licenseNumber: str | None = None
+    regions: list[str] = []
+
+
 class OfferResponse(OfferInDB):
     """Offer response model."""
 
@@ -96,6 +112,7 @@ class OfferResponse(OfferInDB):
     building_name: str | None = None
     current_price: float | None = None
     current_discount: float | None = None
+    contractor: ContractorInOffer | None = None
 
 
 class OfferListResponse(BaseModel):

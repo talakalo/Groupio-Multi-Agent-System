@@ -54,6 +54,7 @@ class UserInDB(UserBase):
     building_id: str | None = None
     contractor_id: str | None = None
     last_login: datetime | None = None
+    terms_accepted_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 

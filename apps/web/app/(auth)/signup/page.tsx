@@ -75,6 +75,7 @@ export default function SignupPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<"role" | "details">("role");
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   const {
     register,
@@ -381,6 +382,21 @@ export default function SignupPage() {
               </div>
             )}
 
+            <label className="flex items-start gap-2 text-sm text-gray-600 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={termsAccepted}
+                onChange={(e) => setTermsAccepted(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600"
+              />
+              <span>
+                קראתי ומסכים/ה ל
+                <Link href="/terms" target="_blank" className="underline text-primary-600 hover:text-primary-700">תנאי השימוש</Link>
+                {" "}ול
+                <Link href="/privacy" target="_blank" className="underline text-primary-600 hover:text-primary-700">מדיניות הפרטיות</Link>
+              </span>
+            </label>
+
             <div className="flex gap-3 pt-2">
               <button
                 type="button"
@@ -391,8 +407,8 @@ export default function SignupPage() {
               </button>
               <button
                 type="submit"
-                disabled={isLoading}
-                className="btn-primary flex-[2] flex items-center justify-center gap-2"
+                disabled={isLoading || !termsAccepted}
+                className="btn-primary flex-[2] flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? (
                   <>

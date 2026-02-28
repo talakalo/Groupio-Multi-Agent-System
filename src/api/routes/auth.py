@@ -90,6 +90,7 @@ async def signup(request: SignupRequest) -> SignupResponse:
         "hashed_password": hashed_password,
         "is_active": True,
         "is_verified": False,
+        "terms_accepted_at": datetime.now(UTC),
     }
 
     user = await db.create_user(user_data)
