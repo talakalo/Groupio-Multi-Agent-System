@@ -1,15 +1,18 @@
 """Payment API routes – resident payments + admin escrow/payout management."""
 
+import hashlib
+import hmac
 import logging
 from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.responses import Response
 from pydantic import BaseModel
 
 from src.api.middleware.auth import get_admin_user, get_current_user
+from src.config.settings import get_settings
 from src.databases.postgres import get_postgres_client
 from src.models.user import UserInDB
 from src.services.payment import get_payment_provider
@@ -43,6 +46,7 @@ class PaymentResponse(BaseModel):
     status: str
     payment_type: str = "direct"  # "escrow" or "direct"
     transaction_id: str | None = None
+    client_secret: str | None = None  # Stripe PaymentIntent client_secret for frontend confirmation
     created_at: str
 
 
@@ -246,6 +250,7 @@ async def initiate_payment(
         )
         payment_data["transaction_id"] = charge_result.get("transaction_id")
         payment_data["status"] = charge_result.get("status", "processing")
+        payment_data["client_secret"] = charge_result.get("client_secret")
     except Exception as exc:
         logger.error("Payment provider error for payment %s: %s", payment_id, exc)
         payment_data["status"] = "failed"
@@ -266,8 +271,83 @@ async def initiate_payment(
         status=payment_data["status"],
         payment_type=payment_type,
         transaction_id=payment_data.get("transaction_id"),
+        client_secret=payment_data.get("client_secret"),
         created_at=payment_data["created_at"],
     )
+
+
+@router.post("/webhook/stripe")
+async def stripe_webhook(request: Request) -> dict:
+    """Handle Stripe webhook events with Stripe signature verification.
+
+    Stripe sends this endpoint async events such as ``payment_intent.succeeded``
+    and ``charge.refunded``.  The ``Stripe-Signature`` header is verified using
+    the ``STRIPE_WEBHOOK_SECRET`` (from the Stripe Dashboard → Webhooks).
+    """
+    raw_body = await request.body()
+    stripe_sig = request.headers.get("stripe-signature", "")
+
+    settings = get_settings()
+
+    if settings.STRIPE_WEBHOOK_SECRET:
+        try:
+            import stripe  # noqa: PLC0415
+
+            event = stripe.Webhook.construct_event(
+                payload=raw_body,
+                sig_header=stripe_sig,
+                secret=settings.STRIPE_WEBHOOK_SECRET,
+            )
+        except Exception as exc:
+            logger.warning("Stripe webhook signature verification failed: %s", exc)
+            raise HTTPException(status_code=400, detail="Invalid Stripe signature") from exc
+        event_type = event.get("type", "")
+        event_data = event.get("data", {}).get("object", {})
+    elif settings.ENVIRONMENT != "development":
+        raise HTTPException(status_code=503, detail="Stripe webhook secret not configured")
+    else:
+        import json  # noqa: PLC0415
+
+        body = json.loads(raw_body)
+        event_type = body.get("type", "")
+        event_data = body.get("data", {}).get("object", {})
+
+    logger.info("Stripe webhook received: %s", event_type)
+
+    # Map Stripe event type to transaction_id and internal status
+    status_map = {
+        "payment_intent.succeeded": "succeeded",
+        "payment_intent.payment_failed": "failed",
+        "payment_intent.canceled": "failed",
+        "payment_intent.processing": "processing",
+        "charge.refunded": "refunded",
+        "charge.dispute.created": "disputed",
+    }
+    new_status = status_map.get(event_type)
+    if not new_status:
+        # Unhandled event type — acknowledge receipt so Stripe doesn't retry
+        return {"status": "ignored", "event_type": event_type}
+
+    transaction_id = event_data.get("id")
+    if not transaction_id:
+        return {"status": "ignored", "reason": "no_transaction_id"}
+
+    db = get_postgres_client()
+    payment = await db.get_payment_by_transaction(transaction_id)
+    if not payment:
+        logger.warning("Stripe webhook for unknown transaction: %s", transaction_id)
+        return {"status": "ignored", "reason": "unknown_transaction"}
+
+    await db.update_payment(payment["id"], {"status": new_status})
+
+    invoice_id = payment.get("invoice_id")
+    if invoice_id:
+        if new_status == "succeeded":
+            await db.update_invoice(invoice_id, {"status": "paid"})
+        elif new_status == "refunded":
+            await db.update_invoice(invoice_id, {"status": "refunded"})
+
+    return {"status": "processed", "payment_id": payment["id"], "new_status": new_status}
 
 
 @router.get("/{payment_id}", response_model=PaymentResponse)
@@ -298,13 +378,56 @@ async def get_payment(
 
 
 @router.post("/webhook")
-async def payment_webhook(request: Request) -> dict:
+async def payment_webhook(
+    request: Request,
+    x_payment_signature: str | None = Header(None, alias="X-Payment-Signature"),
+) -> dict:
     """Handle payment provider webhook callbacks.
 
-    No authentication required — the provider authenticates via
-    signature headers which should be verified in production.
+    Authenticates the request by verifying the HMAC-SHA256 signature
+    supplied in the ``X-Payment-Signature`` header against
+    ``PAYMENT_WEBHOOK_SECRET``.  Requests without a valid signature are
+    rejected with HTTP 403 to block fraudulent webhook forgery.
     """
-    body = await request.json()
+    raw_body = await request.body()
+
+    settings = get_settings()
+    webhook_secret = settings.PAYMENT_WEBHOOK_SECRET
+
+    if webhook_secret:
+        # Compute expected HMAC-SHA256 signature
+        expected_sig = "sha256=" + hmac.new(
+            webhook_secret.encode("utf-8"),
+            raw_body,
+            hashlib.sha256,
+        ).hexdigest()
+        incoming_sig = x_payment_signature or ""
+        if not hmac.compare_digest(expected_sig, incoming_sig):
+            logger.warning(
+                "Payment webhook signature mismatch — possible forgery attempt "
+                "(expected prefix=%s, got=%s)",
+                expected_sig[:20],
+                incoming_sig[:20],
+            )
+            raise HTTPException(status_code=403, detail="Invalid webhook signature")
+    elif settings.ENVIRONMENT != "development":
+        # In non-dev environments, refuse to process unsigned webhooks
+        logger.error(
+            "PAYMENT_WEBHOOK_SECRET is not configured in %s — "
+            "refusing unsigned webhook to prevent fraud.",
+            settings.ENVIRONMENT,
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="Webhook signature verification not configured",
+        )
+    else:
+        logger.warning(
+            "PAYMENT_WEBHOOK_SECRET not set — skipping signature check in development"
+        )
+
+    import json
+    body = json.loads(raw_body)
     logger.info("Payment webhook received: %s", body.get("event_type", "unknown"))
 
     transaction_id = body.get("transaction_id")
@@ -325,6 +448,7 @@ async def payment_webhook(request: Request) -> dict:
 
     # Map provider status to our internal status
     status_mapping = {
+        # Generic events
         "payment.succeeded": "succeeded",
         "payment.failed": "failed",
         "payment.refunded": "refunded",
@@ -332,6 +456,13 @@ async def payment_webhook(request: Request) -> dict:
         "charge.succeeded": "succeeded",
         "charge.failed": "failed",
         "refund.created": "refunded",
+        # Stripe-specific event types
+        "payment_intent.succeeded": "succeeded",
+        "payment_intent.payment_failed": "failed",
+        "payment_intent.canceled": "failed",
+        "payment_intent.processing": "processing",
+        "charge.refunded": "refunded",
+        "charge.dispute.created": "disputed",
     }
     new_status = status_mapping.get(event_type, status or payment.get("status"))
 
@@ -559,7 +690,8 @@ class PaymentSummaryResponse(BaseModel):
 
 
 def _platform_fee_rate() -> float:
-    return 0.05
+    # Terms of Service (section 6) states "up to 3%" — must stay in sync with ToS.
+    return 0.03
 
 
 async def _build_escrow_for_offer(db: Any, offer: dict) -> EscrowAccountResponse:

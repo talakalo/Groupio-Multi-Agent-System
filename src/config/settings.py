@@ -44,7 +44,11 @@ class Settings(BaseSettings):
     USE_LOCAL_POSTGRES: str = ""
 
     # Redis
+    # In production, set REDIS_URL to include credentials, e.g.:
+    #   redis://:yourpassword@redis:6379/0
+    # Or set REDIS_PASSWORD separately (used when REDIS_URL has no password).
     REDIS_URL: str = "redis://localhost:6379"
+    REDIS_PASSWORD: str = ""
 
     # LLM Settings
     PRIMARY_MODEL: str = "claude-sonnet-4-20250514"
@@ -53,6 +57,9 @@ class Settings(BaseSettings):
     EMBEDDING_DIMENSIONS: int = 1536
     MAX_TOKENS: int = 4000
     TEMPERATURE: float = 0.7
+    # Timeout in seconds for a single LLM API call; 0 disables timeout.
+    # On timeout the client automatically retries with FALLBACK_MODEL.
+    LLM_TIMEOUT_SECONDS: float = 30.0
 
     # RAG Settings
     VECTOR_TOP_K: int = 10
@@ -65,8 +72,6 @@ class Settings(BaseSettings):
     SENTIMENT_ESCALATION_THRESHOLD: float = -0.5
     MAX_SUPPORT_ATTEMPTS_BEFORE_ESCALATION: int = 3
     HUMAN_ESCALATION_ENABLED: bool = True
-    SENTIMENT_ESCALATION_THRESHOLD: float = -0.5
-    MAX_SUPPORT_ATTEMPTS_BEFORE_ESCALATION: int = 3
 
     # Feature Flags
     ENABLE_WEB_SEARCH: bool = True
@@ -82,7 +87,10 @@ class Settings(BaseSettings):
     RATE_LIMIT_WINDOW: int = 60  # seconds
 
     # JWT Authentication
-    JWT_SECRET_KEY: str = secrets.token_urlsafe(32)
+    # Leave empty in development — a warning will be logged.
+    # MUST be set to a stable, random secret in production/staging.
+    # Generate with: python -c "import secrets; print(secrets.token_urlsafe(64))"
+    JWT_SECRET_KEY: str = ""
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
@@ -105,9 +113,21 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     SMTP_FROM_EMAIL: str = "noreply@groupio.co.il"
     SMTP_FROM_NAME: str = "Groupio"
+    # Admin inbox for system alerts (vetting escalations, expiry errors, etc.)
+    ADMIN_EMAIL: str = ""
 
-    # Payment provider ("mock" for dev/demos, future: "stripe", "payplus")
+    # Payment provider ("mock" for dev/demos, "stripe" or "payplus" for production)
     PAYMENT_PROVIDER: str = "mock"
+    # Stripe credentials (required when PAYMENT_PROVIDER=stripe)
+    STRIPE_SECRET_KEY: str = ""
+    STRIPE_PUBLISHABLE_KEY: str = ""
+    # Stripe webhook signing secret (from Stripe Dashboard → Webhooks → Signing secret)
+    # Used by POST /payments/webhook/stripe to verify authentic Stripe events.
+    STRIPE_WEBHOOK_SECRET: str = ""
+    # Shared HMAC webhook signing secret — must be set in non-dev environments
+    # to prevent fraudulent webhook forgery. Generate with:
+    #   python -c "import secrets; print(secrets.token_hex(32))"
+    PAYMENT_WEBHOOK_SECRET: str = ""
 
     # Environment
     ENVIRONMENT: str = "development"
@@ -126,22 +146,36 @@ class Settings(BaseSettings):
         # --- JWT secret ---
         if self.ENVIRONMENT not in ("development", "test") and self.JWT_SECRET_KEY in _INSECURE_JWT_DEFAULTS:
             raise ValueError(
-                "JWT_SECRET_KEY must be set to a secure, random value in "
+                "JWT_SECRET_KEY must be set to a stable, random value in "
                 f"non-development environments (current: ENVIRONMENT={self.ENVIRONMENT}). "
-                'Generate one with: python -c "import secrets; print(secrets.token_urlsafe(64))"'
+                "An auto-generated key is NOT acceptable — it changes on every restart, "
+                "invalidating all active user sessions. "
+                'Generate a persistent key with: python -c "import secrets; print(secrets.token_urlsafe(64))"'
             )
         if is_prod and len(self.JWT_SECRET_KEY) < 32:
             raise ValueError(
                 f"JWT_SECRET_KEY must be at least 32 characters in {self.ENVIRONMENT} for adequate security."
             )
         if self.JWT_SECRET_KEY in _INSECURE_JWT_DEFAULTS:
-            logger.warning(
-                "JWT_SECRET_KEY is set to an insecure default. "
-                "This is acceptable in development but MUST be changed before deploying."
-            )
+            if self.ENVIRONMENT in ("development", "test"):
+                # Auto-generate a per-process dev key so the server is usable without config.
+                # Tokens will be invalidated on every restart — acceptable for local dev.
+                self.JWT_SECRET_KEY = secrets.token_urlsafe(32)
+                logger.warning(
+                    "JWT_SECRET_KEY not set — generated a temporary dev key. "
+                    "Sessions will be invalidated on every restart. "
+                    "Set JWT_SECRET_KEY in .env to persist sessions across restarts."
+                )
+            # Production case is already handled by the raise above.
 
         # --- Required secrets in production ---
         if is_prod:
+            if not self.PAYMENT_WEBHOOK_SECRET:
+                raise ValueError(
+                    f"PAYMENT_WEBHOOK_SECRET must be set in {self.ENVIRONMENT} to prevent "
+                    "fraudulent payment webhook forgery. "
+                    'Generate with: python -c "import secrets; print(secrets.token_hex(32))"'
+                )
             if not self.ANTHROPIC_API_KEY and not self.OPENAI_API_KEY:
                 raise ValueError(
                     f"At least one LLM API key (ANTHROPIC_API_KEY or OPENAI_API_KEY) must be set in {self.ENVIRONMENT}."

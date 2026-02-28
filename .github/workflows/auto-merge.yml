@@ -156,10 +156,28 @@ jobs:
             }
 
             if (labels.length > 0) {
+              // Ensure the label exists before applying it (create if missing)
+              for (const label of labels) {
+                const color = label === 'staging' ? '0075ca' : 'e11d48';
+                try {
+                  await github.rest.issues.getLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    name: label,
+                  });
+                } catch {
+                  await github.rest.issues.createLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    name: label,
+                    color,
+                  });
+                }
+              }
               await github.rest.issues.addLabels({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: context.payload.pull_request.number,
-                labels: labels
+                labels: labels,
               });
             }

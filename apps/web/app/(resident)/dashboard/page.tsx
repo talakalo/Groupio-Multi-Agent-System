@@ -13,6 +13,7 @@ import {
   MessageSquare,
   Search,
   Building2,
+  AlertCircle,
   Star,
   ChevronLeft,
 } from 'lucide-react';
@@ -262,24 +263,18 @@ export default function ResidentDashboardPage() {
           icon={Tag}
           label={t('activeOffers')}
           value={String(stats?.activeOffers ?? 0)}
-          trend={12}
-          trendLabel={t('thisMonth')}
           color="primary"
         />
         <StatCard
           icon={Users}
           label={t('neighborsJoined')}
           value={String(stats?.neighborsJoined ?? 0)}
-          trend={8}
-          trendLabel={t('thisMonth')}
           color="accent"
         />
         <StatCard
           icon={TrendingDown}
           label={t('totalSavings')}
           value={formatPrice(stats?.totalSavings ?? 0)}
-          trend={23}
-          trendLabel={t('thisMonth')}
           color="emerald"
         />
         <StatCard
@@ -340,6 +335,18 @@ export default function ResidentDashboardPage() {
                 </div>
               ))}
             </div>
+          ) : offersQuery.isError ? (
+            <div role="alert" className="card border-red-200 bg-red-50 text-center py-8">
+              <AlertCircle className="h-10 w-10 text-red-300 mx-auto mb-2" />
+              <p className="text-red-700 text-sm font-medium mb-2">{t('errorLoadingOffers')}</p>
+              <button
+                type="button"
+                onClick={() => offersQuery.refetch()}
+                className="text-xs text-red-600 underline hover:text-red-800"
+              >
+                {t('retry')}
+              </button>
+            </div>
           ) : offers.length > 0 ? (
             <div className="space-y-4">
               {offers.map((offer: Offer) => (
@@ -373,6 +380,17 @@ export default function ResidentDashboardPage() {
                     </div>
                   </div>
                 ))}
+              </div>
+            ) : activityQuery.isError ? (
+              <div role="alert" className="p-6 text-center">
+                <p className="text-sm text-red-600 mb-2">{t('errorLoadingActivity')}</p>
+                <button
+                  type="button"
+                  onClick={() => activityQuery.refetch()}
+                  className="text-xs text-red-500 underline"
+                >
+                  {t('retry')}
+                </button>
               </div>
             ) : activities.length > 0 ? (
               activities.map((activity) => {

@@ -121,6 +121,123 @@ class MockPaymentProvider(PaymentProvider):
         return customer_id
 
 
+class StripePaymentProvider(PaymentProvider):
+    """Stripe payment provider for production use.
+
+    Requires ``STRIPE_SECRET_KEY`` to be set in settings.
+    Install the Stripe SDK: ``pip install stripe>=7.0.0``.
+    """
+
+    def __init__(self, secret_key: str) -> None:
+        try:
+            import stripe  # noqa: PLC0415
+        except ImportError as exc:
+            raise RuntimeError(
+                "stripe package is not installed. Add 'stripe>=7.0.0' to pyproject.toml"
+            ) from exc
+        self._stripe = stripe
+        self._stripe.api_key = secret_key
+
+    async def create_charge(
+        self,
+        amount: float,
+        currency: str,
+        customer_id: str,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Create a Stripe PaymentIntent.
+
+        If ``metadata`` contains ``payment_method_id``, the intent is confirmed
+        immediately.  Otherwise it is created in ``requires_payment_method``
+        state and the ``client_secret`` must be used by the frontend (Stripe.js)
+        to confirm the payment.
+        """
+        meta = metadata or {}
+        params: dict[str, Any] = {
+            "amount": int(round(amount * 100)),  # Stripe uses smallest currency unit (agorot for ILS)
+            "currency": currency.lower(),
+            "customer": customer_id,
+            "metadata": meta,
+            "automatic_payment_methods": {"enabled": True},
+        }
+
+        payment_method_id = meta.get("payment_method_id")
+        if payment_method_id:
+            params["payment_method"] = payment_method_id
+            params["confirm"] = True
+            params["automatic_payment_methods"] = {"enabled": True, "allow_redirects": "never"}
+
+        try:
+            intent = await self._stripe.PaymentIntent.create_async(**params)
+        except self._stripe.StripeError as exc:
+            logger.error("Stripe create_charge error: %s", exc)
+            raise RuntimeError(f"Payment failed: {getattr(exc, 'user_message', None) or str(exc)}") from exc
+
+        return {
+            "transaction_id": intent.id,
+            "client_secret": intent.client_secret,
+            "status": intent.status,
+            "amount": amount,
+            "currency": currency,
+            "customer_id": customer_id,
+            "metadata": meta,
+            "created_at": datetime.now(UTC).isoformat(),
+        }
+
+    async def refund(
+        self,
+        transaction_id: str,
+        amount: float | None = None,
+    ) -> dict[str, Any]:
+        """Issue a full or partial Stripe refund against a PaymentIntent."""
+        params: dict[str, Any] = {"payment_intent": transaction_id}
+        if amount is not None:
+            params["amount"] = int(round(amount * 100))
+
+        try:
+            refund = await self._stripe.Refund.create_async(**params)
+        except self._stripe.StripeError as exc:
+            logger.error("Stripe refund error for txn %s: %s", transaction_id, exc)
+            raise RuntimeError(f"Refund failed: {getattr(exc, 'user_message', None) or str(exc)}") from exc
+
+        return {
+            "refund_id": refund.id,
+            "transaction_id": transaction_id,
+            "status": refund.status,
+            "amount": (refund.amount / 100) if refund.amount else amount,
+            "created_at": datetime.now(UTC).isoformat(),
+        }
+
+    async def get_status(self, transaction_id: str) -> dict[str, Any]:
+        """Retrieve the current status of a Stripe PaymentIntent."""
+        try:
+            intent = await self._stripe.PaymentIntent.retrieve_async(transaction_id)
+        except self._stripe.StripeError as exc:
+            logger.error("Stripe get_status error for txn %s: %s", transaction_id, exc)
+            raise RuntimeError(f"Status check failed: {str(exc)}") from exc
+
+        return {
+            "transaction_id": intent.id,
+            "status": intent.status,
+            "amount": intent.amount / 100,
+            "currency": intent.currency.upper(),
+            "checked_at": datetime.now(UTC).isoformat(),
+        }
+
+    async def create_customer(self, user_id: str, email: str) -> str:
+        """Create a Stripe Customer record linked to a Groupio user."""
+        try:
+            customer = await self._stripe.Customer.create_async(
+                email=email,
+                metadata={"user_id": user_id},
+            )
+        except self._stripe.StripeError as exc:
+            logger.error("Stripe create_customer error for user %s: %s", user_id, exc)
+            raise RuntimeError(f"Customer creation failed: {str(exc)}") from exc
+
+        return customer.id
+
+
 # ------------------------------------------------------------------
 # Singleton factory
 # ------------------------------------------------------------------
@@ -131,32 +248,43 @@ _payment_provider: PaymentProvider | None = None
 def get_payment_provider() -> PaymentProvider:
     """Get or create the singleton PaymentProvider instance.
 
-    In production, this will refuse to start with the mock provider.
-    Set ``PAYMENT_PROVIDER=mock`` explicitly to override (e.g. for staging demos).
+    Provider is selected by the ``PAYMENT_PROVIDER`` environment variable:
+    - ``mock``   — MockPaymentProvider (development / demo only)
+    - ``stripe`` — StripePaymentProvider (requires STRIPE_SECRET_KEY)
 
-    Returns ``MockPaymentProvider`` in development/test.
+    In production, the ``mock`` provider is blocked unless explicitly set to
+    ``PAYMENT_PROVIDER=mock`` (which logs a loud warning).
     """
     global _payment_provider
     if _payment_provider is None:
         from src.config.settings import get_settings
 
         settings = get_settings()
+        provider_name = settings.PAYMENT_PROVIDER.lower()
 
-        # In production, block mock provider unless explicitly overridden
-        allow_mock = getattr(settings, "PAYMENT_PROVIDER", "") == "mock"
-        if settings.ENVIRONMENT == "production" and not allow_mock:
+        if provider_name == "stripe":
+            if not settings.STRIPE_SECRET_KEY:
+                raise RuntimeError(
+                    "PAYMENT_PROVIDER=stripe but STRIPE_SECRET_KEY is not set. "
+                    "Set STRIPE_SECRET_KEY in your environment."
+                )
+            logger.info("Using StripePaymentProvider")
+            _payment_provider = StripePaymentProvider(secret_key=settings.STRIPE_SECRET_KEY)
+
+        elif provider_name == "mock":
+            is_prod = settings.ENVIRONMENT == "production"
+            if is_prod:
+                logger.warning(
+                    "MOCK PAYMENT PROVIDER is active in production (PAYMENT_PROVIDER=mock). "
+                    "All charges will succeed without real money movement. "
+                    "Set PAYMENT_PROVIDER=stripe and configure STRIPE_SECRET_KEY."
+                )
+            _payment_provider = MockPaymentProvider()
+
+        else:
             raise RuntimeError(
-                "Cannot use MockPaymentProvider in production. "
-                "Integrate a real PSP (Stripe/PayPlus) or set PAYMENT_PROVIDER=mock "
-                "to explicitly allow mock payments for demo purposes."
+                f"Unknown PAYMENT_PROVIDER={provider_name!r}. "
+                "Supported values: 'mock', 'stripe'."
             )
 
-        if settings.ENVIRONMENT in ("production", "staging") and allow_mock:
-            logger.warning(
-                "MOCK PAYMENT PROVIDER active in %s (PAYMENT_PROVIDER=mock). "
-                "All charges will succeed without real processing.",
-                settings.ENVIRONMENT,
-            )
-
-        _payment_provider = MockPaymentProvider()
     return _payment_provider

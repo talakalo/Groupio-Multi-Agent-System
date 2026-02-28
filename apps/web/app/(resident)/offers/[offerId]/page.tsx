@@ -21,10 +21,90 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
+import { useCallback, useState } from 'react';
 import { useTranslations } from 'next-intl';
 
 import { apiClient } from '@/lib/api/client';
+import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
+
+// ---------------------------------------------------------------------------
+// Join Confirmation Modal with cancellation policy disclosure
+// ---------------------------------------------------------------------------
+
+function JoinConfirmationModal({
+  isOpen,
+  onConfirm,
+  onCancel,
+  offerTitle,
+  isLoading,
+}: {
+  isOpen: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+  offerTitle: string;
+  isLoading: boolean;
+}) {
+  const [policyAccepted, setPolicyAccepted] = useState(false);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+      <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6" dir="rtl">
+        <h2 className="text-xl font-bold text-gray-900 mb-2">אישור הצטרפות להצעה</h2>
+        <p className="text-gray-600 text-sm mb-4">
+          הצעה: <strong>{offerTitle}</strong>
+        </p>
+
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-5">
+          <h3 className="font-semibold text-amber-900 mb-2 text-sm flex items-center gap-1.5">
+            <Shield className="h-4 w-4" />
+            מדיניות ביטול
+          </h3>
+          <ul className="text-sm text-amber-800 space-y-1.5 list-disc list-inside">
+            <li>ניתן לעזוב את ההצעה חופשית <strong>עד לשלב התאמת הקבלן</strong> — ללא חיוב.</li>
+            <li>לאחר שנמצא קבלן — ביטול דרך תמיכת לקוחות בלבד.</li>
+            <li>לאחר ביצוע תשלום — כפוף למדיניות ההחזרים.</li>
+          </ul>
+          <Link href="/terms" className="text-xs text-amber-700 underline mt-2 inline-block" target="_blank">
+            תנאי שימוש מלאים ←
+          </Link>
+        </div>
+
+        <label className="flex items-start gap-2.5 text-sm text-gray-700 cursor-pointer mb-6">
+          <input
+            type="checkbox"
+            checked={policyAccepted}
+            onChange={(e) => setPolicyAccepted(e.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600"
+          />
+          <span>קראתי את מדיניות הביטול ואני מסכים/ה לתנאים</span>
+        </label>
+
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={!policyAccepted || isLoading}
+            className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+            אישור הצטרפות
+          </button>
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={isLoading}
+            className="btn-secondary flex-1"
+          >
+            ביטול
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Pricing Tier Card
@@ -142,25 +222,51 @@ export default function OfferDetailPage() {
   const t = useTranslations('offers');
   const tCat = useTranslations('categories');
   const tContractors = useTranslations('contractors');
+  const user = useAuthStore((s) => s.user);
 
   const offerId = params.offerId;
+  const [showJoinModal, setShowJoinModal] = useState(false);
 
   const offerQuery = useQuery<Offer>({
     queryKey: ['offer', offerId],
     queryFn: () => apiClient.getOffer(offerId),
     enabled: Boolean(offerId),
+    // Pricing-sensitive: reflect real-time participant count + tier changes.
+    staleTime: 10_000,           // 10s — shorter than global 60s default
+    refetchOnWindowFocus: true,  // re-fetch when tab regains focus
+    refetchInterval: 30_000,     // poll every 30s while the page is open
   });
 
   const joinMutation = useMutation({
     mutationFn: async () => {
-      return apiClient.joinOffer(offerId, 'current-user');
+      if (!user?.id) throw new Error('Not authenticated');
+      return apiClient.joinOffer(offerId, user.id);
     },
     onSuccess: () => {
+      setShowJoinModal(false);
       queryClient.invalidateQueries({ queryKey: ['offer', offerId] });
     },
   });
 
   const offer = offerQuery.data;
+
+  const handleShare = useCallback(async () => {
+    const shareData = {
+      title: offer ? `Groupio — ${tCat(offer.category)}` : 'Groupio',
+      text: offer ? t('shareText', { category: tCat(offer.category) }) : '',
+      url: window.location.href,
+    };
+    try {
+      if (navigator.share && navigator.canShare?.(shareData)) {
+        await navigator.share(shareData);
+      } else {
+        await navigator.clipboard.writeText(window.location.href);
+        // TODO: show a brief "Link copied!" toast once a toast component is added
+      }
+    } catch {
+      // User cancelled share dialog — ignore
+    }
+  }, [offer, t, tCat]);
 
   if (offerQuery.isLoading) {
     return (
@@ -192,6 +298,16 @@ export default function OfferDetailPage() {
 
   const currentTier = offer.tiers[offer.currentTier] ?? offer.tiers[0];
   const discountPercent = currentTier ? Math.round(currentTier.discount * 100) : 0;
+
+  // P3-7: Savings calculator derived values
+  const currentSavings = currentTier ? offer.basePrice - currentTier.price : 0;
+  const nextTierIdx = (offer.currentTier ?? 0) + 1;
+  const nextTier = offer.tiers[nextTierIdx] ?? null;
+  const toNextTier = nextTier ? Math.max(0, nextTier.min - offer.participants) : 0;
+  const nextTierSavings = nextTier ? offer.basePrice - nextTier.price : 0;
+  const progressToNextPct = nextTier
+    ? Math.min(100, Math.round((offer.participants / nextTier.min) * 100))
+    : 100;
   const daysLeft = Math.max(
     0,
     Math.ceil((new Date(offer.expiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
@@ -220,7 +336,9 @@ export default function OfferDetailPage() {
           </div>
           <button
             type="button"
+            onClick={handleShare}
             className="p-2 rounded-xl hover:bg-gray-100 transition-colors text-gray-500"
+            aria-label={t('shareWithNeighbors')}
             title={t('shareWithNeighbors')}
           >
             <Share2 className="h-5 w-5" />
@@ -250,6 +368,42 @@ export default function OfferDetailPage() {
           </div>
         </div>
 
+        {/* P3-7: Real-time savings calculator */}
+        {currentTier && (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 mb-6">
+            <h3 className="text-sm font-semibold text-emerald-800 mb-3">
+              החיסכון שלך
+            </h3>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm text-emerald-700">חיסכון נוכחי לדירה</span>
+              <span className="text-lg font-bold text-emerald-700">
+                {formatPrice(currentSavings)}
+              </span>
+            </div>
+            {nextTier && toNextTier > 0 && (
+              <>
+                <div className="flex items-center justify-between text-xs text-emerald-600 mb-1">
+                  <span>
+                    עוד {toNextTier} שכנים = חיסכון של {formatPrice(nextTierSavings)}
+                  </span>
+                  <span>{progressToNextPct}%</span>
+                </div>
+                <div className="w-full h-2 bg-emerald-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-2 bg-emerald-500 rounded-full transition-all"
+                    style={{ width: `${progressToNextPct}%` }}
+                  />
+                </div>
+              </>
+            )}
+            {(!nextTier || toNextTier === 0) && (
+              <p className="text-xs text-emerald-600">
+                הגעתם לרמת ההנחה הגבוהה ביותר!
+              </p>
+            )}
+          </div>
+        )}
+
         {/* Stats row */}
         <div className="grid grid-cols-3 gap-4 mb-6">
           <div className="text-center p-3 bg-gray-50 rounded-xl">
@@ -269,11 +423,11 @@ export default function OfferDetailPage() {
           </div>
         </div>
 
-        {/* Join button */}
+        {/* Join button — opens confirmation modal with policy disclosure */}
         <button
           type="button"
-          onClick={() => joinMutation.mutate()}
-          disabled={joinMutation.isPending || offer.status !== 'active'}
+          onClick={() => setShowJoinModal(true)}
+          disabled={joinMutation.isPending || joinMutation.isSuccess || offer.status !== 'active' || !user?.id}
           className="btn-primary w-full flex items-center justify-center gap-2 text-lg py-3"
         >
           {joinMutation.isPending ? (
@@ -294,7 +448,31 @@ export default function OfferDetailPage() {
         {joinMutation.isError && (
           <p className="text-red-500 text-sm mt-2 text-center">{t('joinError')}</p>
         )}
+
+        {/* Cancellation policy summary — always visible */}
+        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <h3 className="font-semibold text-amber-900 text-sm mb-1.5">מדיניות ביטול</h3>
+          <ul className="text-xs text-amber-800 space-y-1 list-disc list-inside">
+            <li>ניתן לעזוב את ההצעה בחינם עד לשלב התאמת הקבלן</li>
+            <li>לאחר אישור קבלן — ביטול דרך תמיכת לקוחות בלבד</li>
+            <li>לאחר תשלום — כפוף למדיניות ההחזרים</li>
+          </ul>
+          <Link href="/terms" className="text-xs text-amber-700 underline mt-1.5 inline-block">
+            תנאי שימוש מלאים ←
+          </Link>
+        </div>
       </div>
+
+      {/* Join confirmation modal */}
+      <JoinConfirmationModal
+        isOpen={showJoinModal}
+        onConfirm={() => joinMutation.mutate()}
+        onCancel={() => setShowJoinModal(false)}
+        offerTitle={offer.contractor?.businessName
+          ? `${offer.contractor.businessName} — ${tCat(offer.category)}`
+          : tCat(offer.category)}
+        isLoading={joinMutation.isPending}
+      />
 
       {/* Two-column layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -368,6 +546,23 @@ export default function OfferDetailPage() {
                     {contractor.rating?.toFixed(1)}
                   </span>
                 </div>
+                {contractor.trustScore != null && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-500">ציון אמינות</span>
+                    <span
+                      className={cn(
+                        'font-semibold px-2 py-0.5 rounded-full text-xs',
+                        contractor.trustScore >= 80
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : contractor.trustScore >= 60
+                          ? 'bg-amber-100 text-amber-700'
+                          : 'bg-red-100 text-red-700'
+                      )}
+                    >
+                      {contractor.trustScore}/100
+                    </span>
+                  </div>
+                )}
                 {contractor.yearsInBusiness && (
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-500">{tContractors('experience', { years: '' })}</span>

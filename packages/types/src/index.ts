@@ -45,7 +45,7 @@ export interface Offer {
   status: OfferStatus;
   buildingId: string;
   contractorId: string;
-  contractor: Contractor;
+  contractor?: Contractor | null;
   participants: number;
   currentTier: number;
   tiers: PricingTier[];

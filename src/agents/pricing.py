@@ -8,7 +8,7 @@ from src.agents.base import AgentConfig, BaseAgent
 from src.config.prompts.pricing import PRICING_SYSTEM_PROMPT
 from src.databases.postgres import get_postgres_client
 from src.models.agent_state import AgentState
-from src.models.offers import SEASONALITY_FACTORS
+from src.models.offer import SEASONALITY_FACTORS
 from src.utils.hebrew_utils import translate_category
 from src.utils.monitoring import track_agent_execution
 
