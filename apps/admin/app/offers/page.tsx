@@ -17,6 +17,7 @@ import {
   Loader2,
   ChevronDown,
   ChevronUp,
+  Download,
   FileText,
   Users,
   DollarSign,
@@ -153,6 +154,18 @@ async function flagOffer(id: string): Promise<void> {
     headers: getAuthHeaders(),
   });
   if (!res.ok) throw new Error("Failed to flag offer");
+}
+
+async function downloadCsv(url: string, filename: string): Promise<void> {
+  const res = await fetch(url, { headers: getAuthHeaders() });
+  if (!res.ok) throw new Error("Export failed");
+  const blob = await res.blob();
+  const href = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = href;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(href);
 }
 
 // ---------------------------------------------------------------------------
@@ -323,13 +336,41 @@ export default function OffersPage() {
   return (
     <div className="space-y-6">
       {/* ---- Page header ---- */}
-      <div>
-        <h1 className="text-xl font-bold text-surface-900">
-          Offer Management
-        </h1>
-        <p className="text-sm text-surface-500 mt-0.5">
-          Review, approve, and manage group-buy offers
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-surface-900">
+            Offer Management
+          </h1>
+          <p className="text-sm text-surface-500 mt-0.5">
+            Review, approve, and manage group-buy offers
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() =>
+              downloadCsv(
+                `${API_URL}/api/v1/admin/export/offers`,
+                `groupio_offers_${new Date().toISOString().slice(0, 10)}.csv`
+              )
+            }
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-surface-300 text-surface-700 hover:bg-surface-50 transition-colors"
+          >
+            <Download className="w-3.5 h-3.5" />
+            Export Offers CSV
+          </button>
+          <button
+            onClick={() =>
+              downloadCsv(
+                `${API_URL}/api/v1/admin/export/participants`,
+                `groupio_participants_${new Date().toISOString().slice(0, 10)}.csv`
+              )
+            }
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-surface-300 text-surface-700 hover:bg-surface-50 transition-colors"
+          >
+            <Download className="w-3.5 h-3.5" />
+            Export Participants CSV
+          </button>
+        </div>
       </div>
 
       {/* ================================================================== */}

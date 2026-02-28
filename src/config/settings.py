@@ -108,6 +108,16 @@ class Settings(BaseSettings):
 
     # Payment provider ("mock" for dev/demos, future: "stripe", "payplus")
     PAYMENT_PROVIDER: str = "mock"
+    # Stripe credentials (required when PAYMENT_PROVIDER=stripe)
+    STRIPE_SECRET_KEY: str = ""
+    STRIPE_PUBLISHABLE_KEY: str = ""
+    # Stripe webhook signing secret (from Stripe Dashboard → Webhooks → Signing secret)
+    # Used by POST /payments/webhook/stripe to verify authentic Stripe events.
+    STRIPE_WEBHOOK_SECRET: str = ""
+    # Shared HMAC webhook signing secret — must be set in non-dev environments
+    # to prevent fraudulent webhook forgery. Generate with:
+    #   python -c "import secrets; print(secrets.token_hex(32))"
+    PAYMENT_WEBHOOK_SECRET: str = ""
 
     # Environment
     ENVIRONMENT: str = "development"

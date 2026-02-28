@@ -238,6 +238,188 @@ class EmailService:
 
         return await self.send_email(to_email, subject, html_content, text_content)
 
+    # ------------------------------------------------------------------
+    # Offer lifecycle notification helpers
+    # ------------------------------------------------------------------
+
+    async def send_offer_joined(
+        self,
+        to_email: str,
+        user_name: str,
+        offer_title: str,
+        current_participants: int,
+        min_participants: int,
+        offer_id: str,
+        base_url: str = "https://groupio.co.il",
+    ) -> bool:
+        """Notify resident they successfully joined an offer."""
+        offer_url = f"{base_url}/offers/{offer_id}"
+        subject = f"הצטרפת להצעה: {offer_title}"
+        threshold_note = (
+            f"כבר {current_participants} דיירים הצטרפו — הושג מינימום ההנחה!"
+            if current_participants >= min_participants
+            else f"נדרשים עוד {min_participants - current_participants} דיירים כדי לפתוח את ההנחה."
+        )
+        html_content = f"""<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="UTF-8">
+<style>body{{font-family:Arial,sans-serif;direction:rtl;}}
+.c{{max-width:600px;margin:0 auto;padding:20px;}}
+.btn{{display:inline-block;padding:12px 24px;background:#4F46E5;color:white;text-decoration:none;border-radius:6px;margin:20px 0;}}
+.info{{background:#F0FDF4;border:1px solid #86EFAC;border-radius:8px;padding:16px;margin:16px 0;}}
+.footer{{color:#666;font-size:12px;margin-top:30px;}}</style></head>
+<body><div class="c">
+<h1>שלום {user_name}!</h1>
+<p>הצטרפת בהצלחה להצעה הקבוצתית: <strong>{offer_title}</strong></p>
+<div class="info">
+<p>📊 {threshold_note}</p>
+<p>ניתן לעזוב את ההצעה בחופשיות עד לשלב התאמת הקבלן.</p>
+</div>
+<a href="{offer_url}" class="btn">צפייה בהצעה</a>
+<div class="footer"><p>© Groupio - קניות קבוצתיות לבניינים</p></div>
+</div></body></html>"""
+        return await self.send_email(to_email, subject, html_content)
+
+    async def send_offer_left(
+        self,
+        to_email: str,
+        user_name: str,
+        offer_title: str,
+        offer_id: str,
+        base_url: str = "https://groupio.co.il",
+    ) -> bool:
+        """Notify resident they left an offer."""
+        offer_url = f"{base_url}/offers/{offer_id}"
+        subject = f"עזבת את ההצעה: {offer_title}"
+        html_content = f"""<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="UTF-8">
+<style>body{{font-family:Arial,sans-serif;direction:rtl;}}
+.c{{max-width:600px;margin:0 auto;padding:20px;}}
+.btn{{display:inline-block;padding:12px 24px;background:#4F46E5;color:white;text-decoration:none;border-radius:6px;margin:20px 0;}}
+.footer{{color:#666;font-size:12px;margin-top:30px;}}</style></head>
+<body><div class="c">
+<h1>שלום {user_name},</h1>
+<p>עזבת את ההצעה הקבוצתית: <strong>{offer_title}</strong>.</p>
+<p>אם תחזור בך, ניתן להצטרף שוב כל עוד ההצעה פתוחה ויש מקום.</p>
+<a href="{offer_url}" class="btn">חזרה להצעה</a>
+<div class="footer"><p>© Groupio - קניות קבוצתיות לבניינים</p></div>
+</div></body></html>"""
+        return await self.send_email(to_email, subject, html_content)
+
+    async def send_offer_threshold_reached(
+        self,
+        to_email: str,
+        user_name: str,
+        offer_title: str,
+        participants: int,
+        discount_percent: int,
+        offer_id: str,
+        base_url: str = "https://groupio.co.il",
+    ) -> bool:
+        """Notify all participants when minimum threshold is reached."""
+        offer_url = f"{base_url}/offers/{offer_id}"
+        subject = f"🎉 ההצעה {offer_title} הגיעה למינימום!"
+        html_content = f"""<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="UTF-8">
+<style>body{{font-family:Arial,sans-serif;direction:rtl;}}
+.c{{max-width:600px;margin:0 auto;padding:20px;}}
+.btn{{display:inline-block;padding:12px 24px;background:#4F46E5;color:white;text-decoration:none;border-radius:6px;margin:20px 0;}}
+.celebrate{{background:#FFF7ED;border:1px solid #FED7AA;border-radius:8px;padding:16px;margin:16px 0;text-align:center;}}
+.footer{{color:#666;font-size:12px;margin-top:30px;}}</style></head>
+<body><div class="c">
+<h1>שלום {user_name}!</h1>
+<div class="celebrate">
+<h2>🎉 ההצעה הגיעה למינימום!</h2>
+<p>{participants} דיירים הצטרפו להצעה <strong>{offer_title}</strong>.</p>
+<p>ההנחה הנוכחית: <strong>{discount_percent}%</strong></p>
+</div>
+<p>בקרוב נתאים לכם קבלן מאומת.</p>
+<a href="{offer_url}" class="btn">צפייה בהצעה</a>
+<div class="footer"><p>© Groupio - קניות קבוצתיות לבניינים</p></div>
+</div></body></html>"""
+        return await self.send_email(to_email, subject, html_content)
+
+    async def send_offer_cancelled(
+        self,
+        to_email: str,
+        user_name: str,
+        offer_title: str,
+        reason: str | None = None,
+    ) -> bool:
+        """Notify participants that an offer was cancelled."""
+        subject = f"ההצעה {offer_title} בוטלה"
+        reason_html = f"<p>סיבה: {reason}</p>" if reason else ""
+        html_content = f"""<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="UTF-8">
+<style>body{{font-family:Arial,sans-serif;direction:rtl;}}
+.c{{max-width:600px;margin:0 auto;padding:20px;}}
+.alert{{background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:16px;margin:16px 0;}}
+.footer{{color:#666;font-size:12px;margin-top:30px;}}</style></head>
+<body><div class="c">
+<h1>שלום {user_name},</h1>
+<div class="alert">
+<p>ההצעה הקבוצתית <strong>{offer_title}</strong> בוטלה.</p>
+{reason_html}
+</div>
+<p>אם שילמת, תקבל החזר מלא תוך 5 ימי עסקים.</p>
+<div class="footer"><p>לשאלות: <a href="mailto:support@groupio.co.il">support@groupio.co.il</a></p>
+<p>© Groupio - קניות קבוצתיות לבניינים</p></div>
+</div></body></html>"""
+        return await self.send_email(to_email, subject, html_content)
+
+    async def send_offer_matched(
+        self,
+        to_email: str,
+        user_name: str,
+        offer_title: str,
+        contractor_name: str,
+        offer_id: str,
+        base_url: str = "https://groupio.co.il",
+    ) -> bool:
+        """Notify participants when their offer is matched to a contractor."""
+        offer_url = f"{base_url}/offers/{offer_id}"
+        subject = f"קבלן נמצא להצעה: {offer_title}"
+        html_content = f"""<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="UTF-8">
+<style>body{{font-family:Arial,sans-serif;direction:rtl;}}
+.c{{max-width:600px;margin:0 auto;padding:20px;}}
+.btn{{display:inline-block;padding:12px 24px;background:#4F46E5;color:white;text-decoration:none;border-radius:6px;margin:20px 0;}}
+.match{{background:#F0FDF4;border:1px solid #86EFAC;border-radius:8px;padding:16px;margin:16px 0;}}
+.footer{{color:#666;font-size:12px;margin-top:30px;}}</style></head>
+<body><div class="c">
+<h1>שלום {user_name}!</h1>
+<div class="match">
+<h2>✅ קבלן נמצא!</h2>
+<p>הצעתך <strong>{offer_title}</strong> הותאמה לקבלן <strong>{contractor_name}</strong>.</p>
+</div>
+<p>בקרוב תקבל פרטי תשלום ולוח זמנים לביצוע העבודה.</p>
+<a href="{offer_url}" class="btn">צפייה בהצעה</a>
+<div class="footer"><p>© Groupio - קניות קבוצתיות לבניינים</p></div>
+</div></body></html>"""
+        return await self.send_email(to_email, subject, html_content)
+
+    async def send_offer_approved(
+        self,
+        to_email: str,
+        user_name: str,
+        offer_title: str,
+        offer_id: str,
+        base_url: str = "https://groupio.co.il",
+    ) -> bool:
+        """Notify offer creator when admin approves their offer."""
+        offer_url = f"{base_url}/offers/{offer_id}"
+        subject = f"ההצעה שלך אושרה: {offer_title}"
+        html_content = f"""<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="UTF-8">
+<style>body{{font-family:Arial,sans-serif;direction:rtl;}}
+.c{{max-width:600px;margin:0 auto;padding:20px;}}
+.btn{{display:inline-block;padding:12px 24px;background:#4F46E5;color:white;text-decoration:none;border-radius:6px;margin:20px 0;}}
+.approved{{background:#F0FDF4;border:1px solid #86EFAC;border-radius:8px;padding:16px;margin:16px 0;}}
+.footer{{color:#666;font-size:12px;margin-top:30px;}}</style></head>
+<body><div class="c">
+<h1>שלום {user_name}!</h1>
+<div class="approved">
+<h2>✅ ההצעה שלך אושרה!</h2>
+<p>ההצעה <strong>{offer_title}</strong> אושרה על ידי הנהלת Groupio ופתוחה עכשיו להצטרפות דיירים.</p>
+</div>
+<a href="{offer_url}" class="btn">צפייה בהצעה</a>
+<div class="footer"><p>© Groupio - קניות קבוצתיות לבניינים</p></div>
+</div></body></html>"""
+        return await self.send_email(to_email, subject, html_content)
+
 
 # Singleton instance
 _email_service: EmailService | None = None
