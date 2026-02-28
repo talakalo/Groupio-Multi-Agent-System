@@ -152,6 +152,8 @@ class VettingAgent(BaseAgent):
             state["escalation_reason"] = (
                 f"Contractor {contractor_id} requires manual review (trust score: {trust_score})"
             )
+            # Notify admin team about the pending manual review
+            await self._notify_admin_vetting(contractor_id, trust_score, doc_analysis)
 
         self._metrics["calls"] += 1
         return state
@@ -346,3 +348,37 @@ class VettingAgent(BaseAgent):
             if e.get("contractor_id"):
                 return e["contractor_id"]
         return None
+
+    async def _notify_admin_vetting(
+        self, contractor_id: str, trust_score: float, doc_analysis: dict[str, Any]
+    ) -> None:
+        """Email admin team when a contractor requires manual vetting review."""
+        try:
+            from src.config.settings import get_settings
+            from src.services.email import get_email_service
+
+            settings = get_settings()
+            admin_email = getattr(settings, "ADMIN_EMAIL", "") or ""
+            if not admin_email:
+                logger.info("ADMIN_EMAIL not configured; skipping vetting escalation email")
+                return
+
+            email_svc = get_email_service()
+            issues = doc_analysis.get("issues", [])
+            issues_html = "".join(f"<li>{i}</li>" for i in issues) if issues else "<li>לא זוהו בעיות ספציפיות</li>"
+            html = (
+                f"<div dir='ltr'>"
+                f"<h2>Manual Vetting Review Required</h2>"
+                f"<p>Contractor <strong>{contractor_id}</strong> scored "
+                f"<strong>{trust_score}/100</strong> and requires manual review.</p>"
+                f"<h3>Document Issues:</h3><ul>{issues_html}</ul>"
+                f"<p>Please review in the admin dashboard.</p>"
+                f"</div>"
+            )
+            await email_svc.send_email(
+                to_email=admin_email,
+                subject=f"[Groupio] Vetting Review Required — Contractor {contractor_id}",
+                html_content=html,
+            )
+        except Exception as exc:
+            logger.warning("Failed to send vetting escalation email: %s", exc)
