@@ -10,6 +10,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 
 from src.api.middleware.auth import get_admin_user, get_current_user
+from src.config.settings import get_settings
 from src.databases.postgres import get_postgres_client
 from src.models.user import UserInDB
 from src.services.payment import get_payment_provider

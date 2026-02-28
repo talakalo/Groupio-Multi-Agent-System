@@ -69,12 +69,12 @@ const ACTIVITY_TYPE_ICON: Record<
 // ---------------------------------------------------------------------------
 
 export default function DashboardPage() {
-  const { data: metrics } = useDashboardMetrics();
-  const { data: systemStatus } = useSystemStatus();
+  const { data: metrics, isError: metricsError } = useDashboardMetrics();
+  const { data: systemStatus, isError: systemError } = useSystemStatus();
   const { data: escalationsData } = useEscalations();
   const { data: health } = useHealthStatus();
   const { data: analyticsData } = useAdminAnalyticsDashboard();
-  const { data: activityLog = [], isError: activityError } = useActivityLog();
+  const { data: activityLog = [] } = useActivityLog();
   const { data: vettingStatus } = useVettingStatus();
 
   // Show a top-level error banner if core data queries fail
@@ -175,7 +175,7 @@ export default function DashboardPage() {
               <span>
                 Uptime:{" "}
                 <span className="font-semibold text-surface-700">
-                  {uptimeLabel}
+                  {uptimePercent}%
                 </span>
               </span>
             </div>
