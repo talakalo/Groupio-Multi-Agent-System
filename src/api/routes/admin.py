@@ -1,10 +1,14 @@
 """Admin API routes for system management."""
 
+import csv
+import io
 import logging
+from datetime import date
 from typing import Any
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, EmailStr
 
 from src.api.middleware.auth import get_admin_user, hash_password
@@ -13,6 +17,7 @@ from src.databases.vector_store import get_vector_store
 from src.models.user import UserInDB
 from src.orchestration.graph import get_orchestrator
 from src.rag.pipeline import get_rag_pipeline
+from src.services.email import get_email_service
 
 logger = logging.getLogger(__name__)
 
@@ -318,6 +323,7 @@ async def flag_offer(
 async def approve_offer(
     offer_id: str,
     request: Request,
+    background_tasks: BackgroundTasks,
     admin: UserInDB = Depends(get_admin_user),
 ) -> dict[str, Any]:
     """Approve a flagged offer."""
@@ -335,6 +341,21 @@ async def approve_offer(
             "ip_address": request.client.host if request.client else None,
         }
     )
+    # Notify the offer creator
+    try:
+        creator_id = offer.get("created_by")
+        if creator_id:
+            creator = await db.get_user_profile(creator_id)
+            if creator and creator.get("email"):
+                background_tasks.add_task(
+                    get_email_service().send_offer_approved,
+                    to_email=creator["email"],
+                    user_name=creator.get("full_name", "דייר"),
+                    offer_title=offer.get("title", ""),
+                    offer_id=offer_id,
+                )
+    except Exception:
+        logger.warning("Failed to send approval notification for offer=%s", offer_id)
     return updated
 
 
@@ -342,6 +363,7 @@ async def approve_offer(
 async def cancel_offer(
     offer_id: str,
     request: Request,
+    background_tasks: BackgroundTasks,
     admin: UserInDB = Depends(get_admin_user),
 ) -> dict[str, Any]:
     """Cancel an offer."""
@@ -349,6 +371,11 @@ async def cancel_offer(
     offer = await db.get_offer(offer_id)
     if not offer:
         raise HTTPException(status_code=404, detail="Offer not found")
+    # Fetch participants before status change so we can notify them
+    try:
+        participants = await db.get_offer_participants(offer_id)
+    except Exception:
+        participants = []
     updated = await db.update_offer(offer_id, {"status": "cancelled"})
     await db.create_audit_log(
         {
@@ -359,6 +386,19 @@ async def cancel_offer(
             "ip_address": request.client.host if request.client else None,
         }
     )
+    # Notify all participants of admin-initiated cancellation
+    offer_title = offer.get("title", "")
+    email_svc = get_email_service()
+    for p in participants:
+        p_email = p.get("email") or p.get("user_email", "")
+        if p_email:
+            background_tasks.add_task(
+                email_svc.send_offer_cancelled,
+                to_email=p_email,
+                user_name=p.get("full_name") or p.get("user_name", "דייר"),
+                offer_title=offer_title,
+                reason="ההצעה בוטלה על ידי מנהל המערכת",
+            )
     return updated
 
 
@@ -414,3 +454,147 @@ async def list_audit_logs(
     db = get_postgres_client()
     items, total = await db.list_audit_logs(page=page, page_size=page_size, action=action, resource_type=resource_type)
     return {"items": items, "total": total, "page": page, "page_size": page_size}
+
+
+# --------------- Data export ---------------
+
+
+@router.get("/export/offers")
+async def export_offers_csv(
+    status: str | None = None,
+    category: str | None = None,
+    admin: UserInDB = Depends(get_admin_user),
+) -> StreamingResponse:
+    """Export all offers to CSV. Supports optional status/category filters."""
+    db = get_postgres_client()
+    items, _ = await db.get_all_offers_admin(
+        page=1,
+        page_size=10000,
+        status=status,
+        category=category,
+    )
+
+    fieldnames = [
+        "id", "title", "category", "status", "building_id",
+        "base_price", "current_participants", "min_participants",
+        "max_participants", "matched_contractor_id", "created_by",
+        "created_at", "deadline",
+    ]
+
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction="ignore")
+    writer.writeheader()
+    for offer in items:
+        writer.writerow({k: offer.get(k, "") for k in fieldnames})
+
+    output.seek(0)
+    filename = f"groupio_offers_{date.today().isoformat()}.csv"
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/export/participants")
+async def export_participants_csv(
+    offer_id: str | None = None,
+    admin: UserInDB = Depends(get_admin_user),
+) -> StreamingResponse:
+    """Export offer participants to CSV. Filter by offer_id if provided."""
+    db = get_postgres_client()
+
+    rows: list[dict] = []
+    if offer_id:
+        offer = await db.get_offer(offer_id)
+        offer_title = offer.get("title", "") if offer else ""
+        try:
+            participants = await db.get_offer_participants(offer_id)
+            for p in participants:
+                rows.append({
+                    "offer_id": offer_id,
+                    "offer_title": offer_title,
+                    "user_id": p.get("user_id", ""),
+                    "user_name": p.get("full_name") or p.get("user_name", ""),
+                    "user_email": p.get("email") or p.get("user_email", ""),
+                    "unit_number": p.get("unit_number", ""),
+                    "unit_count": p.get("unit_count", 1),
+                    "joined_at": p.get("joined_at", ""),
+                })
+        except Exception:
+            logger.warning("Failed to fetch participants for offer=%s in CSV export", offer_id)
+    else:
+        # Export participants for all offers
+        offers, _ = await db.get_all_offers_admin(page=1, page_size=10000)
+        for offer in offers:
+            oid = offer.get("id", "")
+            offer_title = offer.get("title", "")
+            try:
+                participants = await db.get_offer_participants(oid)
+                for p in participants:
+                    rows.append({
+                        "offer_id": oid,
+                        "offer_title": offer_title,
+                        "user_id": p.get("user_id", ""),
+                        "user_name": p.get("full_name") or p.get("user_name", ""),
+                        "user_email": p.get("email") or p.get("user_email", ""),
+                        "unit_number": p.get("unit_number", ""),
+                        "unit_count": p.get("unit_count", 1),
+                        "joined_at": p.get("joined_at", ""),
+                    })
+            except Exception:
+                logger.warning("Failed to fetch participants for offer=%s in CSV export", oid)
+
+    fieldnames = [
+        "offer_id", "offer_title", "user_id", "user_name",
+        "user_email", "unit_number", "unit_count", "joined_at",
+    ]
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction="ignore")
+    writer.writeheader()
+    writer.writerows(rows)
+
+    output.seek(0)
+    filename = f"groupio_participants_{date.today().isoformat()}.csv"
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/export/payments")
+async def export_payments_csv(
+    admin: UserInDB = Depends(get_admin_user),
+) -> StreamingResponse:
+    """Export all payment records to CSV."""
+    db = get_postgres_client()
+
+    try:
+        payments = await db.execute_query(
+            "SELECT id, user_id, offer_id, invoice_id, amount, currency, "
+            "status, payment_method_id, transaction_id, created_at FROM payments "
+            "ORDER BY created_at DESC"
+        )
+        payments = payments or []
+    except Exception:
+        logger.warning("execute_query not available for payments export; returning empty CSV")
+        payments = []
+
+    fieldnames = [
+        "id", "user_id", "offer_id", "invoice_id", "amount", "currency",
+        "status", "payment_method_id", "transaction_id", "created_at",
+    ]
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction="ignore")
+    writer.writeheader()
+    for p in payments:
+        writer.writerow({k: p.get(k, "") for k in fieldnames})
+
+    output.seek(0)
+    filename = f"groupio_payments_{date.today().isoformat()}.csv"
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

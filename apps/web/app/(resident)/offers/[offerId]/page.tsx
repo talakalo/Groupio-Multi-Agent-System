@@ -21,12 +21,90 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useTranslations } from 'next-intl';
 
 import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
+
+// ---------------------------------------------------------------------------
+// Join Confirmation Modal with cancellation policy disclosure
+// ---------------------------------------------------------------------------
+
+function JoinConfirmationModal({
+  isOpen,
+  onConfirm,
+  onCancel,
+  offerTitle,
+  isLoading,
+}: {
+  isOpen: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+  offerTitle: string;
+  isLoading: boolean;
+}) {
+  const [policyAccepted, setPolicyAccepted] = useState(false);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+      <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6" dir="rtl">
+        <h2 className="text-xl font-bold text-gray-900 mb-2">אישור הצטרפות להצעה</h2>
+        <p className="text-gray-600 text-sm mb-4">
+          הצעה: <strong>{offerTitle}</strong>
+        </p>
+
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-5">
+          <h3 className="font-semibold text-amber-900 mb-2 text-sm flex items-center gap-1.5">
+            <Shield className="h-4 w-4" />
+            מדיניות ביטול
+          </h3>
+          <ul className="text-sm text-amber-800 space-y-1.5 list-disc list-inside">
+            <li>ניתן לעזוב את ההצעה חופשית <strong>עד לשלב התאמת הקבלן</strong> — ללא חיוב.</li>
+            <li>לאחר שנמצא קבלן — ביטול דרך תמיכת לקוחות בלבד.</li>
+            <li>לאחר ביצוע תשלום — כפוף למדיניות ההחזרים.</li>
+          </ul>
+          <Link href="/terms" className="text-xs text-amber-700 underline mt-2 inline-block" target="_blank">
+            תנאי שימוש מלאים ←
+          </Link>
+        </div>
+
+        <label className="flex items-start gap-2.5 text-sm text-gray-700 cursor-pointer mb-6">
+          <input
+            type="checkbox"
+            checked={policyAccepted}
+            onChange={(e) => setPolicyAccepted(e.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600"
+          />
+          <span>קראתי את מדיניות הביטול ואני מסכים/ה לתנאים</span>
+        </label>
+
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={!policyAccepted || isLoading}
+            className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+            אישור הצטרפות
+          </button>
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={isLoading}
+            className="btn-secondary flex-1"
+          >
+            ביטול
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Pricing Tier Card
@@ -147,6 +225,7 @@ export default function OfferDetailPage() {
   const user = useAuthStore((s) => s.user);
 
   const offerId = params.offerId;
+  const [showJoinModal, setShowJoinModal] = useState(false);
 
   const offerQuery = useQuery<Offer>({
     queryKey: ['offer', offerId],
@@ -164,6 +243,7 @@ export default function OfferDetailPage() {
       return apiClient.joinOffer(offerId, user.id);
     },
     onSuccess: () => {
+      setShowJoinModal(false);
       queryClient.invalidateQueries({ queryKey: ['offer', offerId] });
     },
   });
@@ -297,11 +377,11 @@ export default function OfferDetailPage() {
           </div>
         </div>
 
-        {/* Join button */}
+        {/* Join button — opens confirmation modal with policy disclosure */}
         <button
           type="button"
-          onClick={() => joinMutation.mutate()}
-          disabled={joinMutation.isPending || offer.status !== 'active' || !user?.id}
+          onClick={() => setShowJoinModal(true)}
+          disabled={joinMutation.isPending || joinMutation.isSuccess || offer.status !== 'active' || !user?.id}
           className="btn-primary w-full flex items-center justify-center gap-2 text-lg py-3"
         >
           {joinMutation.isPending ? (
@@ -322,7 +402,31 @@ export default function OfferDetailPage() {
         {joinMutation.isError && (
           <p className="text-red-500 text-sm mt-2 text-center">{t('joinError')}</p>
         )}
+
+        {/* Cancellation policy summary — always visible */}
+        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <h3 className="font-semibold text-amber-900 text-sm mb-1.5">מדיניות ביטול</h3>
+          <ul className="text-xs text-amber-800 space-y-1 list-disc list-inside">
+            <li>ניתן לעזוב את ההצעה בחינם עד לשלב התאמת הקבלן</li>
+            <li>לאחר אישור קבלן — ביטול דרך תמיכת לקוחות בלבד</li>
+            <li>לאחר תשלום — כפוף למדיניות ההחזרים</li>
+          </ul>
+          <Link href="/terms" className="text-xs text-amber-700 underline mt-1.5 inline-block">
+            תנאי שימוש מלאים ←
+          </Link>
+        </div>
       </div>
+
+      {/* Join confirmation modal */}
+      <JoinConfirmationModal
+        isOpen={showJoinModal}
+        onConfirm={() => joinMutation.mutate()}
+        onCancel={() => setShowJoinModal(false)}
+        offerTitle={offer.contractor?.businessName
+          ? `${offer.contractor.businessName} — ${tCat(offer.category)}`
+          : tCat(offer.category)}
+        isLoading={joinMutation.isPending}
+      />
 
       {/* Two-column layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

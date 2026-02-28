@@ -69,6 +69,39 @@ export default function TermsPage() {
         </section>
 
         <section>
+          <h2 className="text-xl font-semibold text-gray-900 mb-3">4א. מדיניות ביטול והחזרים</h2>
+
+          <h3 className="text-base font-medium text-gray-800 mt-4 mb-2">ביטול לפני התאמת קבלן</h3>
+          <p>
+            דייר רשאי לעזוב הצעה פעילה בכל עת לפני שלב ההתאמה, ללא חיוב. יציאה מהצעה
+            מתבצעת דרך לחצן &quot;עזיבת הצעה&quot; בפרופיל ההצעה.
+          </p>
+
+          <h3 className="text-base font-medium text-gray-800 mt-4 mb-2">ביטול לאחר התאמת קבלן</h3>
+          <p>
+            לאחר שנמצא קבלן מתאים, ביטול ההשתתפות כפוף לאישור. יש ליצור קשר עם תמיכת
+            לקוחות בכתובת{' '}
+            <a href="mailto:support@groupio.co.il" className="text-blue-600 hover:underline">
+              support@groupio.co.il
+            </a>
+            . Groupio תבחן כל בקשת ביטול בנפרד.
+          </p>
+
+          <h3 className="text-base font-medium text-gray-800 mt-4 mb-2">ביטול לאחר תשלום</h3>
+          <p>
+            החזרים לאחר תשלום יינתנו בהתאם לשלב ביצוע העבודה ולהסכם עם הקבלן.
+            עמלת הפלטפורמה (עד 3%) אינה מוחזרת לאחר ביצוע תשלום.
+            החזרים יבוצעו תוך 5–14 ימי עסקים לאמצעי התשלום המקורי.
+          </p>
+
+          <h3 className="text-base font-medium text-gray-800 mt-4 mb-2">ביטול על ידי מנהל המערכת</h3>
+          <p>
+            Groupio רשאית לבטל הצעה בכל עת (למשל: אי-עמידה במינימום, בעיה עם הקבלן).
+            כל המשתתפים יקבלו הודעה בדוא&quot;ל, והתשלומים ששולמו יוחזרו במלואם.
+          </p>
+        </section>
+
+        <section>
           <h2 className="text-xl font-semibold text-gray-900 mb-3">5. אחריות קבלנים</h2>
           <p>
             Groupio מאמתת את רישיונות הקבלנים ועורכת בדיקות רקע, אך אינה
