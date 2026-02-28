@@ -473,6 +473,23 @@ export default function OfferDetailPage() {
                     {contractor.rating?.toFixed(1)}
                   </span>
                 </div>
+                {contractor.trustScore != null && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-500">ציון אמינות</span>
+                    <span
+                      className={cn(
+                        'font-semibold px-2 py-0.5 rounded-full text-xs',
+                        contractor.trustScore >= 80
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : contractor.trustScore >= 60
+                          ? 'bg-amber-100 text-amber-700'
+                          : 'bg-red-100 text-red-700'
+                      )}
+                    >
+                      {contractor.trustScore}/100
+                    </span>
+                  </div>
+                )}
                 {contractor.yearsInBusiness && (
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-500">{tContractors('experience', { years: '' })}</span>

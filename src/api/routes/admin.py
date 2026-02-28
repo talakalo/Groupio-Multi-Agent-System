@@ -598,3 +598,56 @@ async def export_payments_csv(
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+# --------------- Vetting pipeline monitoring ---------------
+
+
+@router.get("/vetting/status")
+async def vetting_pipeline_status(
+    admin: UserInDB = Depends(get_admin_user),
+) -> dict[str, Any]:
+    """Return current vetting pipeline stats: counts by decision bucket and contractors needing review."""
+    db = get_postgres_client()
+
+    # Contractors pending vetting (submitted but not yet verified/rejected)
+    try:
+        pending_items, pending_total = await db.list_contractors(
+            filters={"verification_status": "pending"}, page=1, page_size=100
+        )
+    except Exception:
+        pending_items, pending_total = [], 0
+
+    # Contractors that have been through vetting and were approved
+    try:
+        _, approved_total = await db.list_contractors(
+            filters={"verification_status": "verified"}, page=1, page_size=1
+        )
+    except Exception:
+        approved_total = 0
+
+    # Contractors that were rejected
+    try:
+        _, rejected_total = await db.list_contractors(
+            filters={"verification_status": "rejected"}, page=1, page_size=1
+        )
+    except Exception:
+        rejected_total = 0
+
+    # Build a brief summary list for the pending contractors
+    pending_summary = [
+        {
+            "id": c.get("id"),
+            "businessName": c.get("business_name") or c.get("businessName", ""),
+            "submittedAt": c.get("created_at") or c.get("createdAt", ""),
+            "trustScore": c.get("trust_score"),
+        }
+        for c in (pending_items or [])
+    ]
+
+    return {
+        "pendingReview": pending_total,
+        "approved": approved_total,
+        "rejected": rejected_total,
+        "pendingContractors": pending_summary,
+    }

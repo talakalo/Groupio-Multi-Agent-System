@@ -105,6 +105,8 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     SMTP_FROM_EMAIL: str = "noreply@groupio.co.il"
     SMTP_FROM_NAME: str = "Groupio"
+    # Admin inbox for system alerts (vetting escalations, expiry errors, etc.)
+    ADMIN_EMAIL: str = ""
 
     # Payment provider ("mock" for dev/demos, future: "stripe", "payplus")
     PAYMENT_PROVIDER: str = "mock"
