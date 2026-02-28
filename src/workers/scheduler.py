@@ -100,13 +100,16 @@ scheduler = TaskScheduler()
 
 @scheduler.register("check_expired_offers", interval_seconds=3600)  # Hourly
 async def check_expired_offers():
-    """Close offers past their deadline."""
+    """Close offers past their deadline and notify participants."""
+    from src.services.email import get_email_service
+
     db = get_postgres_client()
+    email_svc = get_email_service()
     # Get all pending/matching offers past deadline
     now = datetime.now(UTC)
     expired_offers = (
         await db.execute_query(
-            "SELECT id FROM offers WHERE deadline < $1 AND status IN ('pending', 'matching', 'draft')",
+            "SELECT id, title FROM offers WHERE deadline < $1 AND status IN ('pending', 'matching', 'draft')",
             {"deadline": now.isoformat()},
         )
         if hasattr(db, "execute_query")
@@ -114,11 +117,40 @@ async def check_expired_offers():
     )
 
     for offer in expired_offers:
+        offer_id = offer["id"]
+        offer_title = offer.get("title", "")
+        # Fetch participants so we can notify them before cancelling
         try:
-            await db.update_offer(offer["id"], {"status": "cancelled"})
-            logger.info("Expired offer %s cancelled", offer["id"])
+            participants = await db.get_offer_participants(offer_id)
         except Exception as exc:
-            logger.error("Failed to cancel expired offer %s: %s", offer["id"], exc)
+            logger.warning("Could not fetch participants for expired offer %s: %s", offer_id, exc)
+            participants = []
+
+        # Cancel the offer
+        try:
+            await db.update_offer(offer_id, {"status": "cancelled"})
+            logger.info("Expired offer %s cancelled", offer_id)
+        except Exception as exc:
+            logger.error("Failed to cancel expired offer %s: %s", offer_id, exc)
+            continue  # Skip notifications if cancellation itself failed
+
+        # Notify each participant
+        for p in participants:
+            p_email = p.get("email") or p.get("user_email", "")
+            if not p_email:
+                continue
+            try:
+                await email_svc.send_offer_cancelled(
+                    to_email=p_email,
+                    user_name=p.get("full_name") or p.get("user_name", "דייר"),
+                    offer_title=offer_title,
+                    reason="פג תוקף ההצעה",
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Failed to send expiry notification to %s for offer %s: %s",
+                    p_email, offer_id, exc,
+                )
 
 
 @scheduler.register("recalculate_trust_scores", interval_seconds=604800)  # Weekly

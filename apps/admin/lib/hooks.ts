@@ -471,3 +471,36 @@ export function useAdminUser() {
     },
   });
 }
+
+// ---- Vetting Pipeline Status ----
+
+export interface VettingStatus {
+  pendingReview: number;
+  approved: number;
+  rejected: number;
+  pendingContractors: Array<{
+    id: string;
+    businessName: string;
+    submittedAt: string;
+    trustScore?: number;
+  }>;
+}
+
+export function useVettingStatus() {
+  return useQuery<VettingStatus>({
+    queryKey: ["admin", "vetting-status"],
+    queryFn: async (): Promise<VettingStatus> => {
+      const token = getAuthToken();
+      const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "") || "http://localhost:8000";
+      const url = baseUrl.endsWith("/api/v1")
+        ? `${baseUrl.replace(/\/api\/v1$/, "")}/api/v1/admin/vetting/status`
+        : `${baseUrl}/api/v1/admin/vetting/status`;
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      const res = await fetch(url, { headers });
+      if (!res.ok) return { pendingReview: 0, approved: 0, rejected: 0, pendingContractors: [] };
+      return res.json();
+    },
+    refetchInterval: 60_000,
+  });
+}
