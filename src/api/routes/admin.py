@@ -37,6 +37,18 @@ class AdminUserCreate(BaseModel):
     role: str = "admin"
 
 
+class ForceCancelRequest(BaseModel):
+    reason: str = ""
+
+
+class PaymentStatusOverride(BaseModel):
+    status: str
+    reason: str = ""
+
+
+_ALLOWED_PAYMENT_STATUSES = {"pending", "completed", "failed", "refunded", "on_hold"}
+
+
 router = APIRouter(
     tags=["admin"],
     dependencies=[Depends(get_admin_user)],  # Require admin auth for all routes
@@ -651,3 +663,82 @@ async def vetting_pipeline_status(
         "rejected": rejected_total,
         "pendingContractors": pending_summary,
     }
+
+
+# --------------- Offer management ---------------
+
+
+@router.post("/offers/{offer_id}/force-cancel")
+async def force_cancel_offer(
+    offer_id: str,
+    body: ForceCancelRequest,
+    background_tasks: BackgroundTasks,
+    admin: UserInDB = Depends(get_admin_user),
+) -> dict[str, Any]:
+    """Force-cancel an offer in any non-terminal status and notify all participants."""
+    db = get_postgres_client()
+    offer = await db.get_offer(offer_id)
+    if not offer:
+        raise HTTPException(status_code=404, detail="Offer not found")
+
+    terminal_statuses = {"cancelled", "completed"}
+    if offer.get("status") in terminal_statuses:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Offer is already in terminal status: {offer.get('status')}",
+        )
+
+    await db.update_offer(offer_id, {"status": "cancelled"})
+    logger.info("Admin %s force-cancelled offer %s (reason: %s)", admin.id, offer_id, body.reason)
+
+    # Notify all participants of the cancellation
+    try:
+        participants = await db.get_offer_participants(offer_id)
+        for p in participants:
+            p_email = p.get("email") or (p.get("users") or {}).get("email")
+            p_name = p.get("full_name") or (p.get("users") or {}).get("full_name") or "דייר"
+            if p_email:
+                background_tasks.add_task(
+                    get_email_service().send_offer_cancelled,
+                    to_email=p_email,
+                    user_name=p_name,
+                    offer_title=offer.get("title", ""),
+                    reason=body.reason or None,
+                )
+    except Exception:
+        logger.warning("Failed to notify participants of force-cancel for offer %s", offer_id)
+
+    return {"status": "cancelled", "offer_id": offer_id}
+
+
+# --------------- Payment management ---------------
+
+
+@router.patch("/payments/{payment_id}/status")
+async def override_payment_status(
+    payment_id: str,
+    body: PaymentStatusOverride,
+    admin: UserInDB = Depends(get_admin_user),
+) -> dict[str, Any]:
+    """Manually override a payment record's status (admin only)."""
+    if body.status not in _ALLOWED_PAYMENT_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid status '{body.status}'. Allowed: {', '.join(sorted(_ALLOWED_PAYMENT_STATUSES))}",
+        )
+
+    db = get_postgres_client()
+    payment = await db.get_payment(payment_id)
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+
+    await db.update_payment(payment_id, {"status": body.status})
+    logger.info(
+        "Admin %s overrode payment %s status: %s → %s (reason: %s)",
+        admin.id,
+        payment_id,
+        payment.get("status"),
+        body.status,
+        body.reason,
+    )
+    return {"payment_id": payment_id, "status": body.status, "updated_by": admin.id}
