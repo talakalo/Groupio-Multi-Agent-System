@@ -1,5 +1,6 @@
 """Claude API wrapper for LLM interactions."""
 
+import asyncio
 import json
 import logging
 from typing import Any
@@ -19,8 +20,10 @@ class LLMClient:
         settings = get_settings()
         self._client = AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
         self._model = settings.PRIMARY_MODEL
+        self._fallback_model = settings.FALLBACK_MODEL
         self._max_tokens = settings.MAX_TOKENS
         self._temperature = settings.TEMPERATURE
+        self._timeout_secs = settings.LLM_TIMEOUT_SECONDS
 
     @retry(
         stop=stop_after_attempt(3),
@@ -34,6 +37,7 @@ class LLMClient:
         max_tokens: int | None = None,
         temperature: float | None = None,
         tools: list[dict[str, Any]] | None = None,
+        use_fallback: bool = False,
     ) -> dict[str, Any]:
         """Send a message to Claude and get a response.
 
@@ -44,12 +48,16 @@ class LLMClient:
             max_tokens: Override the default max tokens.
             temperature: Override the default temperature.
             tools: Optional list of tool definitions for function calling.
+            use_fallback: If True, use the fallback model instead of primary.
 
         Returns:
             Response dict with 'content', 'model', 'usage', etc.
+        Raises:
+            asyncio.TimeoutError: If the LLM call exceeds LLM_TIMEOUT_SECONDS.
         """
+        selected_model = model or (self._fallback_model if use_fallback else self._model)
         kwargs: dict[str, Any] = {
-            "model": model or self._model,
+            "model": selected_model,
             "max_tokens": max_tokens or self._max_tokens,
             "messages": messages,
         }
@@ -63,7 +71,28 @@ class LLMClient:
         if tools:
             kwargs["tools"] = tools
 
-        response = await self._client.messages.create(**kwargs)
+        try:
+            response = await asyncio.wait_for(
+                self._client.messages.create(**kwargs),
+                timeout=self._timeout_secs,
+            )
+        except TimeoutError:
+            if not use_fallback and self._fallback_model and self._fallback_model != selected_model:
+                logger.warning(
+                    "LLM timeout after %ss on model %s — falling back to %s",
+                    self._timeout_secs,
+                    selected_model,
+                    self._fallback_model,
+                )
+                return await self.create_message(
+                    messages=messages,
+                    system=system,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    tools=tools,
+                    use_fallback=True,
+                )
+            raise
 
         return {
             "content": [

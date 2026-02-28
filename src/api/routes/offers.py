@@ -3,7 +3,7 @@
 import logging
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 
 from src.api.middleware.auth import get_current_user, is_admin
 from src.databases.postgres import get_postgres_client
@@ -21,10 +21,25 @@ from src.models.offer import (
 from src.models.user import UserInDB
 from src.orchestration.graph import get_orchestrator
 from src.rag.embeddings import get_embedding_client
+from src.services.email import get_email_service
+from src.services.whatsapp_bot import get_whatsapp_bot
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["offers"])
+
+
+def _get_current_discount_percent(offer: dict, participants: int) -> int:
+    """Return the discount percentage unlocked at the given participant count."""
+    tiers = offer.get("pricing_tiers") or offer.get("tiers") or []
+    best = 0
+    for tier in tiers:
+        tier_min = tier.get("min", 0)
+        if participants >= tier_min:
+            pct = tier.get("discount_percent") or int((tier.get("discount", 0)) * 100)
+            if pct > best:
+                best = pct
+    return best
 
 
 @router.post("/", response_model=OfferResponse)
@@ -56,7 +71,7 @@ async def create_offer(
     # Generate embedding for vector search
     try:
         embeddings = get_embedding_client()
-        text = f"{offer.title} {offer.description} {offer.category.value}"
+        text = f"{offer.get('title', '')} {offer.get('description', '')} {offer.get('category', '')}"
         embedding = await embeddings.embed_text(text)
 
         vs = get_vector_store()
@@ -66,10 +81,10 @@ async def create_offer(
             vectors=[embedding],
             payloads=[
                 {
-                    "title": offer.title,
-                    "category": offer.category.value,
-                    "building_id": offer.building_id,
-                    "status": offer.status.value,
+                    "title": offer.get("title", ""),
+                    "category": offer.get("category", ""),
+                    "building_id": offer.get("building_id", ""),
+                    "status": offer.get("status", "draft"),
                 },
             ],
         )
@@ -143,11 +158,11 @@ async def update_offer(
         raise HTTPException(status_code=404, detail="Offer not found")
 
     # Only creator or admin can update
-    if offer.created_by != current_user.id and not is_admin(current_user):
+    if offer.get("created_by") != current_user.id and not is_admin(current_user):
         raise HTTPException(status_code=403, detail="Not authorized to update this offer")
 
     # Cannot update completed/cancelled offers
-    if offer.status in (OfferStatus.COMPLETED, OfferStatus.CANCELLED):
+    if offer.get("status") in (OfferStatus.COMPLETED, OfferStatus.CANCELLED):
         raise HTTPException(status_code=400, detail="Cannot update completed or cancelled offer")
 
     update_data = request.model_dump(exclude_unset=True)
@@ -159,6 +174,7 @@ async def update_offer(
 @router.delete("/{offer_id}")
 async def delete_offer(
     offer_id: str,
+    background_tasks: BackgroundTasks,
     current_user: UserInDB = Depends(get_current_user),
 ) -> dict[str, str]:
     """Delete (cancel) an offer."""
@@ -168,13 +184,31 @@ async def delete_offer(
     if not offer:
         raise HTTPException(status_code=404, detail="Offer not found")
 
-    if offer.created_by != current_user.id and not is_admin(current_user):
+    if offer.get("created_by") != current_user.id and not is_admin(current_user):
         raise HTTPException(status_code=403, detail="Not authorized to delete this offer")
 
-    if offer.status not in (OfferStatus.DRAFT, OfferStatus.PENDING):
+    if offer.get("status") not in (OfferStatus.DRAFT, OfferStatus.PENDING):
         raise HTTPException(status_code=400, detail="Can only cancel draft or pending offers")
 
+    # Fetch participants before cancelling so we can notify them
+    try:
+        participants = await db.get_offer_participants(offer_id)
+    except Exception:
+        participants = []
+
     await db.update_offer(offer_id, {"status": OfferStatus.CANCELLED})
+
+    offer_title = offer.get("title", "")
+    email_svc = get_email_service()
+    for p in participants:
+        p_email = p.get("email") or p.get("user_email", "")
+        if p_email:
+            background_tasks.add_task(
+                email_svc.send_offer_cancelled,
+                to_email=p_email,
+                user_name=p.get("full_name") or p.get("user_name", "דייר"),
+                offer_title=offer_title,
+            )
 
     return {"status": "cancelled", "offer_id": offer_id}
 
@@ -183,6 +217,7 @@ async def delete_offer(
 async def join_offer(
     offer_id: str,
     request: OfferJoinRequest,
+    background_tasks: BackgroundTasks,
     current_user: UserInDB = Depends(get_current_user),
 ) -> dict[str, str]:
     """Join an offer as a participant."""
@@ -192,11 +227,11 @@ async def join_offer(
     if not offer:
         raise HTTPException(status_code=404, detail="Offer not found")
 
-    if offer.status not in (OfferStatus.PENDING, OfferStatus.MATCHING):
+    if offer.get("status") not in (OfferStatus.PENDING, OfferStatus.MATCHING):
         raise HTTPException(status_code=400, detail="Offer is not open for joining")
 
     # Verify user is in the building
-    is_resident = await db.is_user_in_building(current_user.id, offer.building_id)
+    is_resident = await db.is_user_in_building(current_user.id, offer["building_id"])
     if not is_resident:
         raise HTTPException(status_code=403, detail="Not a resident of this building")
 
@@ -206,10 +241,57 @@ async def join_offer(
         raise HTTPException(status_code=400, detail="Already joined this offer")
 
     # Check capacity
-    if offer.current_participants >= offer.max_participants:
+    current_count = offer.get("current_participants", 0)
+    if current_count >= offer.get("max_participants", 50):
         raise HTTPException(status_code=400, detail="Offer is at maximum capacity")
 
     await db.join_offer(current_user.id, offer_id, request.unit_count)
+
+    # Dispatch join confirmation email (fire-and-forget)
+    new_count = current_count + 1
+    min_participants = offer.get("min_participants", 5)
+    offer_title = offer.get("title", "")
+    email_svc = get_email_service()
+
+    if current_user.email:
+        background_tasks.add_task(
+            email_svc.send_offer_joined,
+            to_email=current_user.email,
+            user_name=current_user.full_name or "דייר",
+            offer_title=offer_title,
+            current_participants=new_count,
+            min_participants=min_participants,
+            offer_id=offer_id,
+        )
+
+    # If threshold just reached, notify all participants
+    if new_count == min_participants:
+        try:
+            participants = await db.get_offer_participants(offer_id)
+            discount_percent = _get_current_discount_percent(offer, new_count)
+            for p in participants:
+                p_email = p.get("email") or p.get("user_email", "")
+                if p_email:
+                    background_tasks.add_task(
+                        email_svc.send_offer_threshold_reached,
+                        to_email=p_email,
+                        user_name=p.get("full_name") or p.get("user_name", "דייר"),
+                        offer_title=offer_title,
+                        participants=new_count,
+                        discount_percent=discount_percent,
+                        offer_id=offer_id,
+                    )
+        except Exception:
+            logger.warning("Failed to fetch participants for threshold notification: offer=%s", offer_id)
+
+    # P3-4: WhatsApp notification on join
+    if current_user.phone:
+        wa_number = f"972{current_user.phone.lstrip('0')}"
+        background_tasks.add_task(
+            get_whatsapp_bot()._send_text_message,
+            to=wa_number,
+            text=f"הצטרפת בהצלחה להצעה '{offer_title}'! כרגע {new_count} דיירים. מינימום נדרש: {min_participants}.",
+        )
 
     return {"status": "joined", "offer_id": offer_id}
 
@@ -217,6 +299,7 @@ async def join_offer(
 @router.post("/{offer_id}/leave")
 async def leave_offer(
     offer_id: str,
+    background_tasks: BackgroundTasks,
     current_user: UserInDB = Depends(get_current_user),
 ) -> dict[str, str]:
     """Leave an offer."""
@@ -226,7 +309,7 @@ async def leave_offer(
     if not offer:
         raise HTTPException(status_code=404, detail="Offer not found")
 
-    if offer.status not in (OfferStatus.PENDING, OfferStatus.MATCHING):
+    if offer.get("status") not in (OfferStatus.PENDING, OfferStatus.MATCHING):
         raise HTTPException(status_code=400, detail="Cannot leave offer in current status")
 
     has_joined = await db.has_user_joined_offer(current_user.id, offer_id)
@@ -234,6 +317,44 @@ async def leave_offer(
         raise HTTPException(status_code=400, detail="Not a participant of this offer")
 
     await db.leave_offer(current_user.id, offer_id)
+
+    if current_user.email:
+        background_tasks.add_task(
+            get_email_service().send_offer_left,
+            to_email=current_user.email,
+            user_name=current_user.full_name or "דייר",
+            offer_title=offer.get("title", ""),
+            offer_id=offer_id,
+        )
+
+    # P3-4: WhatsApp notification on leave
+    if current_user.phone:
+        wa_number = f"972{current_user.phone.lstrip('0')}"
+        background_tasks.add_task(
+            get_whatsapp_bot()._send_text_message,
+            to=wa_number,
+            text=f"עזבת את ההצעה '{offer.get('title', '')}'. אנחנו מקווים לראותך בהצעות עתידיות!",
+        )
+
+    # P3-3: Threshold collapse detection — notify remaining participants if below minimum
+    updated_offer = await db.get_offer(offer_id)
+    new_count = updated_offer.get("current_participants", 0) if updated_offer else 0
+    min_participants = offer.get("min_participants", 5)
+    if new_count < min_participants:
+        remaining = await db.get_offer_participants(offer_id)
+        for participant in remaining:
+            p_email = participant.get("email") or (participant.get("users") or {}).get("email")
+            p_name = participant.get("full_name") or (participant.get("users") or {}).get("full_name") or "דייר"
+            if p_email:
+                background_tasks.add_task(
+                    get_email_service().send_offer_at_risk,
+                    to_email=p_email,
+                    user_name=p_name,
+                    offer_title=offer.get("title", ""),
+                    offer_id=offer_id,
+                    current_count=new_count,
+                    min_count=min_participants,
+                )
 
     return {"status": "left", "offer_id": offer_id}
 
@@ -250,10 +371,10 @@ async def publish_offer(
     if not offer:
         raise HTTPException(status_code=404, detail="Offer not found")
 
-    if offer.created_by != current_user.id:
+    if offer.get("created_by") != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    if offer.status != OfferStatus.DRAFT:
+    if offer.get("status") != OfferStatus.DRAFT:
         raise HTTPException(status_code=400, detail="Only draft offers can be published")
 
     updated = await db.update_offer(offer_id, {"status": OfferStatus.PENDING})
@@ -272,13 +393,15 @@ async def start_matching(
     if not offer:
         raise HTTPException(status_code=404, detail="Offer not found")
 
-    if offer.status != OfferStatus.PENDING:
+    if offer.get("status") != OfferStatus.PENDING:
         raise HTTPException(status_code=400, detail="Offer must be pending to start matching")
 
-    if offer.current_participants < offer.min_participants:
+    current_participants = offer.get("current_participants", 0)
+    min_participants = offer.get("min_participants", 5)
+    if current_participants < min_participants:
         raise HTTPException(
             status_code=400,
-            detail=f"Need at least {offer.min_participants} participants",
+            detail=f"Need at least {min_participants} participants",
         )
 
     # Update status and trigger matching agent
@@ -289,7 +412,7 @@ async def start_matching(
     await orchestrator.run(
         user_message=f"Find contractors for offer {offer_id}",
         user_id="system",
-        building_id=offer.building_id,
+        building_id=offer["building_id"],
     )
 
     return {"status": "matching_started", "offer_id": offer_id}
@@ -299,6 +422,7 @@ async def start_matching(
 async def match_contractor(
     offer_id: str,
     request: OfferMatchRequest,
+    background_tasks: BackgroundTasks,
     current_user: UserInDB = Depends(get_current_user),
 ) -> OfferResponse:
     """Match offer with a contractor (admin only)."""
@@ -323,6 +447,26 @@ async def match_contractor(
         },
     )
 
+    # Notify all participants of the match
+    try:
+        participants = await db.get_offer_participants(offer_id)
+        contractor_name = contractor.get("business_name") or contractor.get("name", "קבלן")
+        offer_title = offer.get("title", "")
+        email_svc = get_email_service()
+        for p in participants:
+            p_email = p.get("email") or p.get("user_email", "")
+            if p_email:
+                background_tasks.add_task(
+                    email_svc.send_offer_matched,
+                    to_email=p_email,
+                    user_name=p.get("full_name") or p.get("user_name", "דייר"),
+                    offer_title=offer_title,
+                    contractor_name=contractor_name,
+                    offer_id=offer_id,
+                )
+    except Exception:
+        logger.warning("Failed to send match notifications for offer=%s", offer_id)
+
     return updated
 
 
@@ -330,8 +474,12 @@ async def match_contractor(
 async def get_participants(
     offer_id: str,
     current_user: UserInDB = Depends(get_current_user),
-) -> dict[str, list]:
-    """Get offer participants."""
+) -> dict:
+    """Get offer participants.
+
+    Non-admin users see only unit numbers (anonymized). Admins see full details.
+    Each user can always see their own full record.
+    """
     db = get_postgres_client()
 
     offer = await db.get_offer(offer_id)
@@ -340,4 +488,21 @@ async def get_participants(
 
     participants = await db.get_offer_participants(offer_id)
 
-    return {"participants": participants, "total": len(participants)}
+    if is_admin(current_user):
+        return {"participants": participants, "total": len(participants)}
+
+    # Anonymize: expose personal details only to the participant themselves
+    anonymized = [
+        {
+            "participant_id": p.get("id"),
+            "unit_number": p.get("unit_number", "דייר"),
+            "unit_count": p.get("unit_count", 1),
+            "joined_at": p.get("joined_at"),
+            "is_self": p.get("user_id") == current_user.id,
+            # Personal fields only for the requesting user's own record
+            "name": p.get("full_name") if p.get("user_id") == current_user.id else None,
+            "email": p.get("email") if p.get("user_id") == current_user.id else None,
+        }
+        for p in participants
+    ]
+    return {"participants": anonymized, "total": len(anonymized)}

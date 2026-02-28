@@ -4,11 +4,12 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
+from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
+from src.api.middleware.auth import get_current_user
 from src.api.middleware.logging import RequestLoggingMiddleware
 from src.api.middleware.security import SecurityHeadersMiddleware
 from src.api.routes import api_router
@@ -17,6 +18,7 @@ from src.databases.graph_store import get_graph_store
 from src.databases.postgres import get_postgres_client
 from src.databases.redis_client import get_redis_client
 from src.databases.vector_store import get_vector_store
+from src.models.user import UserInDB
 from src.orchestration.graph import get_orchestrator
 from src.utils.monitoring import init_monitoring
 from src.utils.validators import sanitize_input, validate_message_request
@@ -99,17 +101,18 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
 
 # CORS middleware - origins loaded from environment
 settings = get_settings()
-# Ensure localhost is always allowed for local development
 cors_origins = list(settings.CORS_ORIGINS)
-_dev_origins = [
-    "http://localhost:3000",
-    "http://localhost:3001",
-    "http://127.0.0.1:3000",
-    "http://127.0.0.1:3001",
-]
-for origin in _dev_origins:
-    if origin not in cors_origins:
-        cors_origins.append(origin)
+# Only add localhost origins in development — never in production/staging.
+if settings.ENVIRONMENT == "development":
+    _dev_origins = [
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001",
+    ]
+    for origin in _dev_origins:
+        if origin not in cors_origins:
+            cors_origins.append(origin)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
@@ -171,8 +174,13 @@ class MessageResponse(BaseModel):
 async def send_message(
     request: MessageRequest,
     background_tasks: BackgroundTasks,
+    current_user: UserInDB = Depends(get_current_user),
 ) -> MessageResponse:
     """Main endpoint for processing user messages through the agent system."""
+    # Override body-supplied user_id with the authenticated user's id
+    # to prevent impersonation attacks.
+    request.user_id = current_user.id
+
     # Validate request
     is_valid, reason = validate_message_request(request.model_dump())
     if not is_valid:
@@ -181,11 +189,11 @@ async def send_message(
     # Sanitize input
     sanitized_message = sanitize_input(request.message)
 
-    # Rate limiting
+    # Rate limiting (keyed on authenticated user id — not body-supplied)
     redis = get_redis_client()
     settings = get_settings()
     allowed = await redis.check_rate_limit(
-        request.user_id,
+        current_user.id,
         limit=settings.RATE_LIMIT_PER_USER,
         window=settings.RATE_LIMIT_WINDOW,
     )
@@ -196,14 +204,14 @@ async def send_message(
         orchestrator = get_orchestrator()
         result = await orchestrator.run(
             user_message=sanitized_message,
-            user_id=request.user_id,
+            user_id=current_user.id,
             building_id=request.building_id,
         )
 
         # Log conversation asynchronously
         background_tasks.add_task(
             _log_conversation,
-            user_id=request.user_id,
+            user_id=current_user.id,
             message=sanitized_message,
             response=result["response"],
             metadata=result["metadata"],
@@ -272,8 +280,15 @@ async def health_check() -> dict[str, Any]:
 
 
 @app.get("/metrics")
-async def prometheus_metrics() -> Response:
-    """Expose Prometheus metrics in standard text format for scraping."""
+async def prometheus_metrics(
+    x_api_key: str | None = Header(None, alias="X-API-Key"),
+) -> Response:
+    """Expose Prometheus metrics — requires a valid X-API-Key header."""
+    _settings = get_settings()
+    if _settings.API_KEYS:
+        if not x_api_key or x_api_key not in _settings.API_KEYS:
+            raise HTTPException(status_code=403, detail="Invalid or missing API key")
+
     from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
     return Response(

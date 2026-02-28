@@ -5,6 +5,7 @@ import hmac
 import logging
 from typing import Any
 
+import httpx
 from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Request
 
 from src.config.settings import get_settings
@@ -117,8 +118,13 @@ async def whatsapp_verify(
 @router.post("/contractor-update")
 async def contractor_update_webhook(
     payload: dict[str, Any],
+    x_api_key: str | None = Header(None, alias="X-API-Key"),
 ) -> dict[str, str]:
-    """Handle contractor profile update notifications."""
+    """Handle contractor profile update notifications — requires X-API-Key."""
+    settings = get_settings()
+    if settings.API_KEYS:
+        if not x_api_key or x_api_key not in settings.API_KEYS:
+            raise HTTPException(status_code=403, detail="Invalid or missing API key")
     contractor_id = payload.get("contractor_id")
     update_type = payload.get("type")
 
@@ -172,5 +178,43 @@ def _parse_whatsapp_payload(payload: dict) -> dict[str, str] | None:
 
 
 async def _send_whatsapp_reply(phone: str, text: str) -> None:
-    """Send a WhatsApp reply (stub - integrate with WhatsApp Business API)."""
-    logger.info("WhatsApp reply to %s: %s", phone, text[:100])
+    """Send a WhatsApp reply via the Meta WhatsApp Business Cloud API.
+
+    Requires WHATSAPP_API_TOKEN and WHATSAPP_PHONE_ID to be set in settings.
+    Falls back to logging only if either value is missing (development mode).
+    """
+    settings = get_settings()
+
+    if not settings.WHATSAPP_API_TOKEN or not settings.WHATSAPP_PHONE_ID:
+        logger.info(
+            "WhatsApp reply (dev — no credentials): to=%s text=%s",
+            phone,
+            text[:100],
+        )
+        return
+
+    url = f"https://graph.facebook.com/v17.0/{settings.WHATSAPP_PHONE_ID}/messages"
+    payload = {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": phone,
+        "type": "text",
+        "text": {"body": text},
+    }
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(
+                url,
+                headers={"Authorization": f"Bearer {settings.WHATSAPP_API_TOKEN}"},
+                json=payload,
+            )
+            response.raise_for_status()
+            logger.info("WhatsApp message sent to %s (status %d)", phone, response.status_code)
+    except httpx.HTTPStatusError as exc:
+        logger.error(
+            "WhatsApp API error: status=%d body=%s",
+            exc.response.status_code,
+            exc.response.text[:200],
+        )
+    except httpx.RequestError as exc:
+        logger.error("WhatsApp network error: %s", exc)

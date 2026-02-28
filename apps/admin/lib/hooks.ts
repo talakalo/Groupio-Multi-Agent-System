@@ -21,7 +21,8 @@ let apiClient: GroupioApiClient | undefined;
 
 function getAuthToken(): string | null {
   if (typeof window === "undefined") return null;
-  return localStorage.getItem("auth_token");
+  // Admin login stores token in sessionStorage (not localStorage) for security.
+  return sessionStorage.getItem("auth_token");
 }
 
 function getApiClient(authToken?: string | null): GroupioApiClient {
@@ -111,7 +112,7 @@ export function useDashboardMetrics() {
         return {
           gmvToday: 0,
           gmvChange: 0,
-          activeOffers: metricsData.totalCalls > 0 ? 34 : 0,
+          activeOffers: 0,
           activeOffersChange: 0,
           pendingVerifications: 0,
           urgentVerifications: 0,
@@ -244,11 +245,11 @@ export function useAgentMetrics(agentName: string) {
           model: agent.model,
           totalCalls: agent.calls,
           errorRate,
-          avgLatencyMs: 320,
+          avgLatencyMs: agent.avgDurationMs ?? 0,
           successRate: 100 - errorRate,
-          callsToday: Math.round(agent.calls * 0.12),
-          tokensUsed: agent.calls * 850,
-          history: generateHistory(agentName),
+          callsToday: 0,   // requires a time-series endpoint (not yet available)
+          tokensUsed: agent.tokens ?? 0,
+          history: [],     // requires a time-series endpoint (not yet available)
         };
       } catch {
         return {
@@ -268,29 +269,9 @@ export function useAgentMetrics(agentName: string) {
   });
 }
 
-function generateHistory(
-  agentName: string
-): { timestamp: string; calls: number; avgLatencyMs: number }[] {
-  const now = Date.now();
-  const hours = 24;
-  const seed = agentName.length;
-  const result: { timestamp: string; calls: number; avgLatencyMs: number }[] =
-    [];
-
-  for (let i = hours; i >= 0; i--) {
-    const timestamp = new Date(now - i * 60 * 60 * 1000).toISOString();
-    const baseCalls = 20 + seed * 5;
-    const calls = Math.round(
-      baseCalls + Math.sin(i * 0.5 + seed) * 15 + Math.random() * 10
-    );
-    const avgLatencyMs = Math.round(
-      250 + Math.sin(i * 0.3 + seed) * 80 + Math.random() * 40
-    );
-    result.push({ timestamp, calls, avgLatencyMs });
-  }
-
-  return result;
-}
+// generateHistory was removed — it produced synthetic chart data using Math.sin
+// and Math.random that showed fabricated trends. Historical time-series data
+// should be fetched from a real /admin/agents/:name/history endpoint.
 
 // ---- Agent Reload ----
 
@@ -299,9 +280,12 @@ export function useReloadAgent() {
 
   return useMutation({
     mutationFn: async (agentName: string) => {
+      const token = getAuthToken();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL ?? "/api/v1"}/admin/agents/${encodeURIComponent(agentName)}/reload`,
-        { method: "POST", headers: { "Content-Type": "application/json" } }
+        { method: "POST", headers }
       );
       if (!response.ok) throw new Error(`Failed to reload agent ${agentName}`);
       return response.json();
@@ -485,5 +469,38 @@ export function useAdminUser() {
       if (!res.ok) return null;
       return res.json();
     },
+  });
+}
+
+// ---- Vetting Pipeline Status ----
+
+export interface VettingStatus {
+  pendingReview: number;
+  approved: number;
+  rejected: number;
+  pendingContractors: Array<{
+    id: string;
+    businessName: string;
+    submittedAt: string;
+    trustScore?: number;
+  }>;
+}
+
+export function useVettingStatus() {
+  return useQuery<VettingStatus>({
+    queryKey: ["admin", "vetting-status"],
+    queryFn: async (): Promise<VettingStatus> => {
+      const token = getAuthToken();
+      const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "") || "http://localhost:8000";
+      const url = baseUrl.endsWith("/api/v1")
+        ? `${baseUrl.replace(/\/api\/v1$/, "")}/api/v1/admin/vetting/status`
+        : `${baseUrl}/api/v1/admin/vetting/status`;
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      const res = await fetch(url, { headers });
+      if (!res.ok) return { pendingReview: 0, approved: 0, rejected: 0, pendingContractors: [] };
+      return res.json();
+    },
+    refetchInterval: 60_000,
   });
 }

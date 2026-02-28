@@ -22,8 +22,11 @@ const API_BASE_URL: string =
   "https://api.groupio.co.il/api/v1";
 
 // ---------------------------------------------------------------------------
-// Auth token storage (in-memory; swap for SecureStore in production)
+// Auth token storage — backed by expo-secure-store for persistence.
+// Call loadAuthToken() once on app start to restore session from secure storage.
 // ---------------------------------------------------------------------------
+
+import { secureStorage } from './storage';
 
 let _authToken: string | null = null;
 
@@ -33,6 +36,65 @@ export function setAuthToken(token: string | null): void {
 
 export function getAuthToken(): string | null {
   return _authToken;
+}
+
+/**
+ * Restore the access token from SecureStore on app launch.
+ * Call this in the root layout before rendering authenticated screens.
+ */
+export async function loadAuthToken(): Promise<string | null> {
+  const stored = await secureStorage.getAuth();
+  if (stored && stored.expiresAt > Date.now()) {
+    _authToken = stored.accessToken;
+    return _authToken;
+  }
+  _authToken = null;
+  return null;
+}
+
+/**
+ * Persist a new auth session to SecureStore and update the in-memory token.
+ */
+export async function saveAuthSession(
+  accessToken: string,
+  refreshToken: string,
+  expiresInSeconds: number,
+): Promise<void> {
+  _authToken = accessToken;
+  await secureStorage.setAuth({
+    accessToken,
+    refreshToken,
+    expiresAt: Date.now() + expiresInSeconds * 1000,
+  });
+}
+
+/**
+ * Clear auth from memory and SecureStore (logout).
+ */
+export async function clearAuthSession(): Promise<void> {
+  _authToken = null;
+  await secureStorage.clearAuth();
+}
+
+/**
+ * Login with email/phone + password. Persists tokens to SecureStore.
+ */
+export async function login(credentials: {
+  email?: string;
+  phone?: string;
+  password: string;
+}): Promise<{ accessToken: string; refreshToken: string; expiresIn: number }> {
+  const data = await request<{
+    access_token: string;
+    refresh_token: string;
+    expires_in: number;
+  }>("POST", "/auth/login/json", { body: credentials });
+  await saveAuthSession(data.access_token, data.refresh_token, data.expires_in);
+  return {
+    accessToken: data.access_token,
+    refreshToken: data.refresh_token,
+    expiresIn: data.expires_in,
+  };
 }
 
 // ---------------------------------------------------------------------------

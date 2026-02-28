@@ -1,0 +1,36 @@
+name: Chromatic visual regression
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    paths:
+      - "packages/ui/**"
+
+jobs:
+  chromatic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Chromatic needs full history for change detection
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Publish to Chromatic
+        uses: chromaui/action@latest
+        with:
+          # Add CHROMATIC_PROJECT_TOKEN to GitHub repo secrets.
+          # Get the token at https://www.chromatic.com after linking your repo.
+          projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+          workingDir: packages/ui
+          buildScriptName: build-storybook
+          # Auto-accept story changes on non-main branches (reviewers approve on PRs).
+          autoAcceptChanges: "main"
+          exitZeroOnChanges: true

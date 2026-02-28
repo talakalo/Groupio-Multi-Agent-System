@@ -26,6 +26,7 @@ asyncpg>=0.29.0
 redis[hiredis]>=5.0.0
 
 # HTTP & Networking
+aiosmtplib>=3.0.0
 httpx>=0.25.0
 python-multipart>=0.0.6
 tenacity>=8.2.0
@@ -37,7 +38,6 @@ structlog>=23.2.0
 
 # Auth
 PyJWT>=2.8.0
-python-jose[cryptography]>=3.3.0
 bcrypt>=4.0.0
 
 # Utilities

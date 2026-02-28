@@ -11,10 +11,19 @@ from src.models.building import (
     BuildingStats,
     BuildingUpdate,
 )
+from src.models.contractor import (
+    AgentContractor as Contractor,
+)
+from src.models.contractor import (
+    AgentContractorCreate as ContractorCreate,
+)
 
 # API models - Contractor
 from src.models.contractor import (
     ContractorBase,
+    ContractorDocument,
+    ContractorMatch,
+    ContractorProfile,
     ContractorResponse,
     ContractorReview,
     ContractorSearchRequest,
@@ -22,17 +31,10 @@ from src.models.contractor import (
     Region,
     TrustScoreBreakdown,
     VerificationStatus,
+    VettingResult,
 )
 from src.models.contractor import (
     ContractorCreate as ApiContractorCreate,
-)
-from src.models.contractors import (
-    Contractor,
-    ContractorCreate,
-    ContractorDocument,
-    ContractorMatch,
-    ContractorProfile,
-    VettingResult,
 )
 
 # API models - Escalation
@@ -56,9 +58,20 @@ from src.models.messages import (
     RouterResult,
     SupportTicket,
 )
+from src.models.offer import (
+    AgentOffer as Offer,
+)
+from src.models.offer import (
+    AgentOfferCreate as OfferCreate,
+)
+from src.models.offer import (
+    AgentPricingTier as PricingTier,
+)
 
 # API models - Offer
 from src.models.offer import (
+    CompletedOffer,
+    MarketData,
     OfferBase,
     OfferInDB,
     OfferListResponse,
@@ -72,13 +85,6 @@ from src.models.offer import (
 )
 from src.models.offer import (
     PricingTier as ApiPricingTier,
-)
-from src.models.offers import (
-    CompletedOffer,
-    MarketData,
-    Offer,
-    OfferCreate,
-    PricingTier,
 )
 from src.models.residents import (
     Building,

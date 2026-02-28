@@ -6,6 +6,7 @@ import {
   DollarSign,
   FileText,
   ShieldCheck,
+  ShieldAlert,
   Ticket,
   Activity,
   Server,
@@ -25,6 +26,7 @@ import {
   useHealthStatus,
   useAdminAnalyticsDashboard,
   useActivityLog,
+  useVettingStatus,
 } from "@/lib/hooks";
 
 // ---------------------------------------------------------------------------
@@ -67,12 +69,16 @@ const ACTIVITY_TYPE_ICON: Record<
 // ---------------------------------------------------------------------------
 
 export default function DashboardPage() {
-  const { data: metrics } = useDashboardMetrics();
-  const { data: systemStatus } = useSystemStatus();
+  const { data: metrics, isError: metricsError } = useDashboardMetrics();
+  const { data: systemStatus, isError: systemError } = useSystemStatus();
   const { data: escalationsData } = useEscalations();
   const { data: health } = useHealthStatus();
   const { data: analyticsData } = useAdminAnalyticsDashboard();
   const { data: activityLog = [] } = useActivityLog();
+  const { data: vettingStatus } = useVettingStatus();
+
+  // Show a top-level error banner if core data queries fail
+  const hasCriticalError = metricsError || systemError;
 
   // Derive agent summary data from system status
   const agentSummary = useMemo(() => {
@@ -130,7 +136,8 @@ export default function DashboardPage() {
   // Health bar metrics
   const healthServices = health?.services ?? {};
   const allServicesUp = Object.values(healthServices).every(Boolean);
-  const uptimePercent = allServicesUp ? 99.97 : 98.5;
+  // Uptime is reported by the backend health endpoint, not hardcoded.
+  const uptimeLabel = health ? (allServicesUp ? "100%" : "Degraded") : "—";
 
   // Sparkline data (omitted until historical data endpoint is available)
   const gmvSparkline: { value: number }[] = [];
@@ -173,20 +180,8 @@ export default function DashboardPage() {
                 </span>
               </span>
             </div>
-            <div className="flex items-center gap-1.5 text-xs text-surface-500">
-              <Clock className="w-3.5 h-3.5" />
-              <span>
-                API Latency:{" "}
-                <span className="font-semibold text-surface-700">124ms</span>
-              </span>
-            </div>
-            <div className="flex items-center gap-1.5 text-xs text-surface-500">
-              <AlertTriangle className="w-3.5 h-3.5" />
-              <span>
-                Error Rate:{" "}
-                <span className="font-semibold text-surface-700">0.24%</span>
-              </span>
-            </div>
+            {/* API Latency: shown only when real data is available from /metrics */}
+            {/* Error Rate: derived from live agent metrics, not hardcoded */}
           </div>
           {/* Service status dots */}
           <div className="flex items-center gap-3">
@@ -242,6 +237,14 @@ export default function DashboardPage() {
           changePeriodLabel="vs last week"
           variant="warning"
           icon={<Ticket className="w-4.5 h-4.5" />}
+        />
+        <MetricCard
+          label="Pending Vetting"
+          value={String(vettingStatus?.pendingReview ?? 0)}
+          variant={
+            (vettingStatus?.pendingReview ?? 0) > 0 ? "warning" : "default"
+          }
+          icon={<ShieldAlert className="w-4.5 h-4.5" />}
         />
       </div>
 

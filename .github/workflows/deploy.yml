@@ -94,7 +94,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
@@ -155,6 +155,24 @@ jobs:
             docker compose up -d backend
             docker system prune -f
 
+      - name: Smoke test — verify deployment health
+        if: steps.check-secrets.outputs.has_deploy_secrets == 'true'
+        run: |
+          echo "Waiting 15s for service to initialise..."
+          sleep 15
+          HEALTH_URL="https://api.groupio.co.il/api/v1/health/live"
+          for i in 1 2 3 4 5; do
+            echo "Health check attempt ${i}/5..."
+            if curl -sf --max-time 10 "${HEALTH_URL}"; then
+              echo "✅ Service is healthy"
+              exit 0
+            fi
+            echo "Attempt ${i} failed — retrying in 5s"
+            sleep 5
+          done
+          echo "❌ Health check failed after 5 attempts — deployment may be unhealthy"
+          exit 1
+
       - name: Deployment summary
         run: |
           echo "## Backend Deployment" >> $GITHUB_STEP_SUMMARY
@@ -162,6 +180,7 @@ jobs:
           echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| Docker Build | ${{ steps.check-secrets.outputs.has_docker_secrets == 'true' && '✅ Completed' || '⏭️ Skipped (no secrets)' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Server Deploy | ${{ steps.check-secrets.outputs.has_deploy_secrets == 'true' && '✅ Completed' || '⏭️ Skipped (no secrets)' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Smoke Test | ${{ steps.check-secrets.outputs.has_deploy_secrets == 'true' && '✅ Passed' || '⏭️ Skipped (no secrets)' }} |" >> $GITHUB_STEP_SUMMARY
 
   # ============================================
   # Deploy Web App to Vercel
@@ -176,7 +195,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
@@ -251,7 +270,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
@@ -326,7 +345,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
@@ -393,7 +412,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 

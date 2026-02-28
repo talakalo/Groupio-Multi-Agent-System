@@ -12,11 +12,14 @@ import {
   ChevronLeft,
   SlidersHorizontal,
   X,
+  AlertCircle,
+  Star,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useState, useMemo } from 'react';
 
+import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
 
 // ---------------------------------------------------------------------------
@@ -99,11 +102,26 @@ function OfferCard({ offer }: { offer: Offer }) {
         <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-sm font-bold text-gray-500">
           {offer.contractor?.businessName?.charAt(0) ?? '?'}
         </div>
-        <div>
+        <div className="flex-1 min-w-0">
           <p className="font-medium text-gray-900 text-sm">{offer.contractor?.businessName}</p>
-          {offer.contractor?.verified && (
-            <span className="text-xs text-emerald-600 font-medium">{t('verifiedContractor')}</span>
-          )}
+          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+            {offer.contractor?.verified && (
+              <span className="text-xs text-emerald-600 font-medium">{t('verifiedContractor')}</span>
+            )}
+            {/* Star rating */}
+            {offer.contractor?.rating != null && offer.contractor.rating > 0 && (
+              <span className="flex items-center gap-0.5 text-xs text-amber-500 font-medium">
+                <Star className="h-3 w-3 fill-amber-400 stroke-amber-500" />
+                {offer.contractor.rating.toFixed(1)}
+              </span>
+            )}
+            {/* Trust score badge */}
+            {offer.contractor?.trustScore != null && offer.contractor.trustScore >= 80 && (
+              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-primary-50 text-primary-700 text-[10px] font-semibold">
+                ✓ {offer.contractor.trustScore}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -178,10 +196,7 @@ export default function OffersListPage() {
     priceMax: null,
   });
 
-  const accessToken = typeof window !== 'undefined'
-    ? (window as unknown as { __auth_store?: { getState: () => { accessToken: string | null } } }).__auth_store?.getState()?.accessToken
-      ?? localStorage.getItem('auth_token')
-    : null;
+  const accessToken = useAuthStore((s) => s.accessToken);
   const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
   const offersQuery = useQuery<{ items: Offer[]; total: number }>({
@@ -422,6 +437,18 @@ export default function OffersListPage() {
               <div className="h-4 bg-gray-200 rounded w-48" />
             </div>
           ))}
+        </div>
+      ) : offersQuery.isError ? (
+        <div role="alert" className="card text-center py-12 border-red-200 bg-red-50">
+          <AlertCircle className="h-12 w-12 text-red-300 mx-auto mb-3" />
+          <p className="text-red-700 font-medium mb-2">{t('errorLoadingOffers')}</p>
+          <button
+            type="button"
+            onClick={() => offersQuery.refetch()}
+            className="mt-2 text-sm text-red-600 underline hover:text-red-800"
+          >
+            {t('retry')}
+          </button>
         </div>
       ) : filteredOffers.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

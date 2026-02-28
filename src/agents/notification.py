@@ -232,14 +232,8 @@ class NotificationAgent(BaseAgent):
         user_profile: dict[str, Any],
         message: dict[str, Any],
     ) -> None:
-        """Dispatch a notification via the specified channel.
-
-        Currently logs the notification. The actual sending infrastructure
-        is available in:
-        - Email: src/services/email.py (EmailService)
-        - WhatsApp: src/services/whatsapp_bot.py (WhatsAppBotService)
-        """
-        user_email = user_profile.get("email", "unknown")
+        """Dispatch a notification via the specified channel."""
+        user_email = user_profile.get("email", "")
         user_name = user_profile.get("full_name", "User")
         body_preview = (message.get("body", ""))[:80]
 
@@ -254,12 +248,39 @@ class NotificationAgent(BaseAgent):
                 message.get("subject", ""),
                 body_preview,
             )
+            if user_email:
+                from src.services.email import get_email_service  # noqa: PLC0415
+
+                email_svc = get_email_service()
+                body = message.get("body", "")
+                cta_url = message.get("cta_url", "")
+                cta_text = message.get("cta_text", "לצפייה")
+                html_body = f"<div dir='rtl'><p>{body}</p>"
+                if cta_url:
+                    html_body += f"<p><a href='{cta_url}' style='color:#4F46E5;'>{cta_text}</a></p>"
+                html_body += "</div>"
+                await email_svc.send_email(
+                    to_email=user_email,
+                    subject=message.get("subject", "עדכון מ-Groupio"),
+                    html_content=html_body,
+                )
+
         elif channel == "whatsapp":
             logger.info(
                 "NOTIFICATION [whatsapp] to=%s body='%s...'",
                 redacted_phone,
                 body_preview,
             )
+            phone = user_profile.get("phone", "")
+            if phone:
+                try:
+                    from src.services.whatsapp_bot import get_whatsapp_bot  # noqa: PLC0415
+
+                    wa = get_whatsapp_bot()
+                    await wa.send_text_message(to=phone, text=message.get("body", ""))
+                except Exception as exc:
+                    logger.warning("WhatsApp dispatch failed for user %s: %s", user_name, exc)
+
         elif channel == "push":
             logger.info(
                 "NOTIFICATION [push] user=%s body='%s...'",

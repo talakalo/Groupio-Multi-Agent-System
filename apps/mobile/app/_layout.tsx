@@ -1,7 +1,9 @@
 import React from "react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { I18nManager, Platform } from "react-native";
-import { Stack } from "expo-router";
+import * as Localization from "expo-localization";
+import { Stack, useRouter, useSegments } from "expo-router";
+import { loadAuthToken } from "../lib/api";
 import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -22,10 +24,16 @@ import { useColorScheme } from "react-native";
 // Prevent the splash screen from auto-hiding
 SplashScreen.preventAutoHideAsync();
 
-// Force RTL layout for Hebrew
-if (!I18nManager.isRTL) {
+// Enable RTL only when the device locale is Hebrew (or Arabic).
+// Forcing RTL unconditionally breaks English-locale users.
+const deviceLocale = Localization.getLocales()[0]?.languageCode ?? "he";
+const isRTLLocale = deviceLocale === "he" || deviceLocale === "ar";
+if (isRTLLocale && !I18nManager.isRTL) {
   I18nManager.allowRTL(true);
   I18nManager.forceRTL(true);
+} else if (!isRTLLocale && I18nManager.isRTL) {
+  I18nManager.allowRTL(false);
+  I18nManager.forceRTL(false);
 }
 
 // Configure the QueryClient
@@ -154,11 +162,38 @@ export default function RootLayout() {
   const isDark = colorScheme === "dark";
   const paperTheme = isDark ? darkTheme : lightTheme;
   const navigationTheme = isDark ? navDarkTheme : navLightTheme;
+  const router = useRouter();
+  const segments = useSegments();
+  const [authChecked, setAuthChecked] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    // Hide splash screen after layout is ready
-    SplashScreen.hideAsync();
+    // Restore token from SecureStore and redirect accordingly
+    loadAuthToken().then((token) => {
+      setIsAuthenticated(!!token);
+      setAuthChecked(true);
+      SplashScreen.hideAsync();
+    });
   }, []);
+
+  useEffect(() => {
+    if (!authChecked) return;
+
+    const inAuthGroup = segments[0] === "(auth)";
+
+    if (!isAuthenticated && !inAuthGroup) {
+      // Not authenticated — redirect to login
+      router.replace("/(auth)/login");
+    } else if (isAuthenticated && inAuthGroup) {
+      // Already authenticated — redirect to main app
+      router.replace("/(tabs)");
+    }
+  }, [authChecked, isAuthenticated, segments]);
+
+  if (!authChecked) {
+    // Splash is still visible while we check auth
+    return null;
+  }
 
   return (
     <QueryClientProvider client={queryClient}>
