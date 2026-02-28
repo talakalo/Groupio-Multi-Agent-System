@@ -6,6 +6,7 @@ import {
   DollarSign,
   FileText,
   ShieldCheck,
+  ShieldAlert,
   Ticket,
   Activity,
   Server,
@@ -25,6 +26,7 @@ import {
   useHealthStatus,
   useAdminAnalyticsDashboard,
   useActivityLog,
+  useVettingStatus,
 } from "@/lib/hooks";
 
 // ---------------------------------------------------------------------------
@@ -72,7 +74,8 @@ export default function DashboardPage() {
   const { data: escalationsData } = useEscalations();
   const { data: health } = useHealthStatus();
   const { data: analyticsData } = useAdminAnalyticsDashboard();
-  const { data: activityLog = [], isError: activityError } = useActivityLog();
+  const { data: activityLog = [] } = useActivityLog();
+  const { data: vettingStatus } = useVettingStatus();
 
   // Show a top-level error banner if core data queries fail
   const hasCriticalError = metricsError || systemError;
@@ -234,6 +237,14 @@ export default function DashboardPage() {
           changePeriodLabel="vs last week"
           variant="warning"
           icon={<Ticket className="w-4.5 h-4.5" />}
+        />
+        <MetricCard
+          label="Pending Vetting"
+          value={String(vettingStatus?.pendingReview ?? 0)}
+          variant={
+            (vettingStatus?.pendingReview ?? 0) > 0 ? "warning" : "default"
+          }
+          icon={<ShieldAlert className="w-4.5 h-4.5" />}
         />
       </div>
 

@@ -4,7 +4,7 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request
+from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
@@ -14,11 +14,11 @@ from src.api.middleware.logging import RequestLoggingMiddleware
 from src.api.middleware.security import SecurityHeadersMiddleware
 from src.api.routes import api_router
 from src.config.settings import get_settings
-from src.models.user import UserInDB
 from src.databases.graph_store import get_graph_store
 from src.databases.postgres import get_postgres_client
 from src.databases.redis_client import get_redis_client
 from src.databases.vector_store import get_vector_store
+from src.models.user import UserInDB
 from src.orchestration.graph import get_orchestrator
 from src.utils.monitoring import init_monitoring
 from src.utils.validators import sanitize_input, validate_message_request

@@ -239,6 +239,20 @@ class EmailService:
         return await self.send_email(to_email, subject, html_content, text_content)
 
     # ------------------------------------------------------------------
+    # Shared CSS snippets used in offer lifecycle HTML emails
+    # (defined as plain strings so they can be interpolated into f-strings)
+    # ------------------------------------------------------------------
+
+    _BTN_CSS = (
+        ".btn{display:inline-block;padding:12px 24px;background:#4F46E5;"
+        "color:white;text-decoration:none;border-radius:6px;margin:20px 0;}"
+    )
+    _CELEBRATE_CSS = (
+        ".celebrate{background:#FFF7ED;border:1px solid #FED7AA;"
+        "border-radius:8px;padding:16px;margin:16px 0;text-align:center;}"
+    )
+
+    # ------------------------------------------------------------------
     # Offer lifecycle notification helpers
     # ------------------------------------------------------------------
 
@@ -263,7 +277,7 @@ class EmailService:
         html_content = f"""<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="UTF-8">
 <style>body{{font-family:Arial,sans-serif;direction:rtl;}}
 .c{{max-width:600px;margin:0 auto;padding:20px;}}
-.btn{{display:inline-block;padding:12px 24px;background:#4F46E5;color:white;text-decoration:none;border-radius:6px;margin:20px 0;}}
+{self._BTN_CSS}
 .info{{background:#F0FDF4;border:1px solid #86EFAC;border-radius:8px;padding:16px;margin:16px 0;}}
 .footer{{color:#666;font-size:12px;margin-top:30px;}}</style></head>
 <body><div class="c">
@@ -292,7 +306,7 @@ class EmailService:
         html_content = f"""<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="UTF-8">
 <style>body{{font-family:Arial,sans-serif;direction:rtl;}}
 .c{{max-width:600px;margin:0 auto;padding:20px;}}
-.btn{{display:inline-block;padding:12px 24px;background:#4F46E5;color:white;text-decoration:none;border-radius:6px;margin:20px 0;}}
+{self._BTN_CSS}
 .footer{{color:#666;font-size:12px;margin-top:30px;}}</style></head>
 <body><div class="c">
 <h1>שלום {user_name},</h1>
@@ -319,8 +333,8 @@ class EmailService:
         html_content = f"""<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="UTF-8">
 <style>body{{font-family:Arial,sans-serif;direction:rtl;}}
 .c{{max-width:600px;margin:0 auto;padding:20px;}}
-.btn{{display:inline-block;padding:12px 24px;background:#4F46E5;color:white;text-decoration:none;border-radius:6px;margin:20px 0;}}
-.celebrate{{background:#FFF7ED;border:1px solid #FED7AA;border-radius:8px;padding:16px;margin:16px 0;text-align:center;}}
+{self._BTN_CSS}
+{self._CELEBRATE_CSS}
 .footer{{color:#666;font-size:12px;margin-top:30px;}}</style></head>
 <body><div class="c">
 <h1>שלום {user_name}!</h1>
@@ -377,7 +391,7 @@ class EmailService:
         html_content = f"""<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="UTF-8">
 <style>body{{font-family:Arial,sans-serif;direction:rtl;}}
 .c{{max-width:600px;margin:0 auto;padding:20px;}}
-.btn{{display:inline-block;padding:12px 24px;background:#4F46E5;color:white;text-decoration:none;border-radius:6px;margin:20px 0;}}
+{self._BTN_CSS}
 .match{{background:#F0FDF4;border:1px solid #86EFAC;border-radius:8px;padding:16px;margin:16px 0;}}
 .footer{{color:#666;font-size:12px;margin-top:30px;}}</style></head>
 <body><div class="c">
@@ -406,7 +420,7 @@ class EmailService:
         html_content = f"""<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="UTF-8">
 <style>body{{font-family:Arial,sans-serif;direction:rtl;}}
 .c{{max-width:600px;margin:0 auto;padding:20px;}}
-.btn{{display:inline-block;padding:12px 24px;background:#4F46E5;color:white;text-decoration:none;border-radius:6px;margin:20px 0;}}
+{self._BTN_CSS}
 .approved{{background:#F0FDF4;border:1px solid #86EFAC;border-radius:8px;padding:16px;margin:16px 0;}}
 .footer{{color:#666;font-size:12px;margin-top:30px;}}</style></head>
 <body><div class="c">

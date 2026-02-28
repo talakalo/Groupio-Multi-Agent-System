@@ -76,7 +76,7 @@ class LLMClient:
                 self._client.messages.create(**kwargs),
                 timeout=self._timeout_secs,
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             if not use_fallback and self._fallback_model and self._fallback_model != selected_model:
                 logger.warning(
                     "LLM timeout after %ss on model %s — falling back to %s",
