@@ -40,15 +40,14 @@ const MOCK_AUDIT_LOGS = {
   total_pages: 1,
 };
 
-function createWrapper() {
+/** Render *ui* inside a fresh QueryClientProvider to avoid cross-test cache. */
+function renderWithQuery(ui: React.ReactElement) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  return function Wrapper({ children }: { children: React.ReactNode }) {
-    return (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    );
-  };
+  return render(
+    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
+  );
 }
 
 describe('AuditLogsPage', () => {
@@ -63,7 +62,7 @@ describe('AuditLogsPage', () => {
       json: async () => MOCK_AUDIT_LOGS,
     });
 
-    render(<AuditLogsPage />, { wrapper: createWrapper() });
+    renderWithQuery(<AuditLogsPage />);
 
     await waitFor(() => {
       expect(screen.getAllByText('admin@groupio.co.il').length).toBeGreaterThanOrEqual(1);
@@ -83,7 +82,7 @@ describe('AuditLogsPage', () => {
       json: async () => MOCK_AUDIT_LOGS,
     });
 
-    render(<AuditLogsPage />, { wrapper: createWrapper() });
+    renderWithQuery(<AuditLogsPage />);
 
     await waitFor(() => {
       expect(screen.getByText('create')).toBeInTheDocument();
@@ -108,7 +107,7 @@ describe('AuditLogsPage', () => {
         }),
       });
 
-    render(<AuditLogsPage />, { wrapper: createWrapper() });
+    renderWithQuery(<AuditLogsPage />);
 
     await waitFor(() => {
       expect(screen.getAllByText('admin@groupio.co.il').length).toBeGreaterThanOrEqual(1);
@@ -123,7 +122,7 @@ describe('AuditLogsPage', () => {
       expect(screen.getByText('Action Type')).toBeInTheDocument();
     });
 
-    const actionSelect = screen.getByLabelText('Action Type') || 
+    const actionSelect = screen.getByLabelText('Action Type') ||
       screen.getAllByRole('combobox')[0];
     fireEvent.change(actionSelect, { target: { value: 'create' } });
 
@@ -147,7 +146,7 @@ describe('AuditLogsPage', () => {
     global.URL.createObjectURL = mockCreateObjectURL;
     global.URL.revokeObjectURL = mockRevokeObjectURL;
 
-    render(<AuditLogsPage />, { wrapper: createWrapper() });
+    renderWithQuery(<AuditLogsPage />);
 
     await waitFor(() => {
       expect(screen.getAllByText('admin@groupio.co.il').length).toBeGreaterThanOrEqual(1);
@@ -166,7 +165,7 @@ describe('AuditLogsPage', () => {
       () => new Promise(() => {})
     );
 
-    render(<AuditLogsPage />, { wrapper: createWrapper() });
+    renderWithQuery(<AuditLogsPage />);
 
     // Loading spinner is shown
     expect(screen.getByText('Audit Logs')).toBeInTheDocument();
@@ -177,7 +176,7 @@ describe('AuditLogsPage', () => {
       new Error('Failed to fetch audit logs: 500')
     );
 
-    render(<AuditLogsPage />, { wrapper: createWrapper() });
+    renderWithQuery(<AuditLogsPage />);
 
     await waitFor(() => {
       expect(screen.getByText(/failed to load audit logs/i)).toBeInTheDocument();
@@ -196,7 +195,7 @@ describe('AuditLogsPage', () => {
       }),
     });
 
-    render(<AuditLogsPage />, { wrapper: createWrapper() });
+    renderWithQuery(<AuditLogsPage />);
 
     await waitFor(() => {
       expect(screen.getByText(/no audit logs found/i)).toBeInTheDocument();
@@ -215,7 +214,7 @@ describe('AuditLogsPage', () => {
       }),
     });
 
-    render(<AuditLogsPage />, { wrapper: createWrapper() });
+    renderWithQuery(<AuditLogsPage />);
 
     await waitFor(() => {
       expect(screen.getByText(/no audit logs found/i)).toBeInTheDocument();

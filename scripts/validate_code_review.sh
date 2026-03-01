@@ -56,7 +56,11 @@ else
 fi
 
 # 6. Admin header must have logout wired (onClick or handleLogout)
-if grep -q "handleLogout\|onClick.*logout\|LogOut" "$REPO_ROOT/apps/admin/app/layout.tsx" 2>/dev/null; then
+# The logout handler lives in AdminShell.tsx (a client component) which is
+# rendered by layout.tsx — check both files to be resilient to refactoring.
+if grep -q "handleLogout\|onClick.*logout\|LogOut" \
+     "$REPO_ROOT/apps/admin/app/layout.tsx" \
+     "$REPO_ROOT/apps/admin/components/AdminShell.tsx" 2>/dev/null; then
   report "ok" "Admin header has logout action"
 else
   report "fail" "Admin header should wire Sign out button to logout"

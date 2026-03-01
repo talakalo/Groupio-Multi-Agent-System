@@ -28,7 +28,7 @@ describe('LoginPage', () => {
     render(<LoginPage />);
 
     expect(screen.getByLabelText(/email address/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
+    expect(screen.getByLabelText('Password')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument();
   });
 
@@ -40,30 +40,27 @@ describe('LoginPage', () => {
     expect(submitButton).toBeDisabled();
   });
 
-  it('transitions to 2FA step after successful credentials submission', async () => {
+  it('redirects to /dashboard after successful admin login', async () => {
+    // Step 1: Login endpoint returns token
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       json: async () => ({ token: 'temp-token-123' }),
     });
+    // Step 2: auth/me confirms admin role
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ role: 'admin' }),
+    });
 
     render(<LoginPage />);
 
-    const emailInput = screen.getByLabelText(/email address/i);
-    const passwordInput = screen.getByLabelText(/password/i);
-
-    fireEvent.change(emailInput, { target: { value: 'admin@groupio.co.il' } });
-    fireEvent.change(passwordInput, { target: { value: 'AdminSecure123!' } });
-
-    const submitButton = screen.getByRole('button', { name: /sign in/i });
-    fireEvent.click(submitButton);
+    fireEvent.change(screen.getByLabelText(/email address/i), { target: { value: 'admin@groupio.co.il' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'AdminSecure123!' } });
+    fireEvent.click(screen.getByRole('button', { name: /sign in/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/two-factor authentication/i)).toBeInTheDocument();
+      expect(mockPush).toHaveBeenCalledWith('/dashboard');
     });
-
-    // Verify TOTP input fields appear (6 digit inputs)
-    const totpInputs = screen.getAllByRole('textbox');
-    expect(totpInputs.length).toBe(6);
   });
 
   it('shows error message on failed login (401)', async () => {
@@ -76,7 +73,7 @@ describe('LoginPage', () => {
     render(<LoginPage />);
 
     const emailInput = screen.getByLabelText(/email address/i);
-    const passwordInput = screen.getByLabelText(/password/i);
+    const passwordInput = screen.getByLabelText('Password');
 
     fireEvent.change(emailInput, { target: { value: 'admin@groupio.co.il' } });
     fireEvent.change(passwordInput, { target: { value: 'wrongpassword' } });
@@ -89,50 +86,38 @@ describe('LoginPage', () => {
     });
   });
 
-  it('redirects to /dashboard after successful 2FA verification', async () => {
-    // Step 1: Login returns token (moves to 2FA step)
+  it('shows error message when non-admin account logs in', async () => {
+    // Login endpoint returns token
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       json: async () => ({ token: 'temp-token-123' }),
+    });
+    // auth/me returns a non-admin role
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ role: 'user' }),
     });
 
     render(<LoginPage />);
 
     fireEvent.change(screen.getByLabelText(/email address/i), {
-      target: { value: 'admin@groupio.co.il' },
+      target: { value: 'user@groupio.co.il' },
     });
-    fireEvent.change(screen.getByLabelText(/password/i), {
-      target: { value: 'AdminSecure123!' },
+    fireEvent.change(screen.getByLabelText('Password'), {
+      target: { value: 'Password123!' },
     });
     fireEvent.click(screen.getByRole('button', { name: /sign in/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/two-factor authentication/i)).toBeInTheDocument();
-    });
-
-    // Step 2: 2FA verification succeeds
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ access_token: 'final-token' }),
-    });
-
-    // Fill in 6-digit TOTP code
-    const totpInputs = screen.getAllByRole('textbox');
-    const digits = ['1', '2', '3', '4', '5', '6'];
-    digits.forEach((digit, idx) => {
-      fireEvent.change(totpInputs[idx], { target: { value: digit } });
-    });
-
-    await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith('/dashboard');
+      expect(screen.getByText(/admin privileges/i)).toBeInTheDocument();
     });
   });
 
-  it('shows error message on failed 2FA verification', async () => {
-    // Step 1: Login succeeds
+  it('shows error message when login endpoint returns server error', async () => {
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ token: 'temp-token-123' }),
+      ok: false,
+      status: 500,
+      json: async () => ({ detail: 'Internal server error' }),
     });
 
     render(<LoginPage />);
@@ -140,28 +125,13 @@ describe('LoginPage', () => {
     fireEvent.change(screen.getByLabelText(/email address/i), {
       target: { value: 'admin@groupio.co.il' },
     });
-    fireEvent.change(screen.getByLabelText(/password/i), {
+    fireEvent.change(screen.getByLabelText('Password'), {
       target: { value: 'AdminSecure123!' },
     });
     fireEvent.click(screen.getByRole('button', { name: /sign in/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/two-factor authentication/i)).toBeInTheDocument();
-    });
-
-    // Step 2: 2FA fails
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      ok: false,
-      json: async () => ({ detail: 'Invalid verification code' }),
-    });
-
-    const totpInputs = screen.getAllByRole('textbox');
-    ['1', '2', '3', '4', '5', '6'].forEach((digit, idx) => {
-      fireEvent.change(totpInputs[idx], { target: { value: digit } });
-    });
-
-    await waitFor(() => {
-      expect(screen.getByText(/invalid verification code/i)).toBeInTheDocument();
+      expect(screen.getByText(/internal server error/i)).toBeInTheDocument();
     });
   });
 });
