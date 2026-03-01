@@ -132,9 +132,7 @@ class StripePaymentProvider(PaymentProvider):
         try:
             import stripe  # noqa: PLC0415
         except ImportError as exc:
-            raise RuntimeError(
-                "stripe package is not installed. Add 'stripe>=7.0.0' to pyproject.toml"
-            ) from exc
+            raise RuntimeError("stripe package is not installed. Add 'stripe>=7.0.0' to pyproject.toml") from exc
         self._stripe = stripe
         self._stripe.api_key = secret_key
 
@@ -282,9 +280,6 @@ def get_payment_provider() -> PaymentProvider:
             _payment_provider = MockPaymentProvider()
 
         else:
-            raise RuntimeError(
-                f"Unknown PAYMENT_PROVIDER={provider_name!r}. "
-                "Supported values: 'mock', 'stripe'."
-            )
+            raise RuntimeError(f"Unknown PAYMENT_PROVIDER={provider_name!r}. Supported values: 'mock', 'stripe'.")
 
     return _payment_provider

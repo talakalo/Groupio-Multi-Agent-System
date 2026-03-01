@@ -127,7 +127,7 @@ describe('ApiClient', () => {
 
   describe('ApiError', () => {
     it('includes status and body', () => {
-      const error = new ApiError(404, 'Not Found', { detail: 'Resource not found' });
+      const error = new ApiError('Not Found', 404, { detail: 'Resource not found' });
 
       expect(error.status).toBe(404);
       expect(error.message).toBe('Not Found');

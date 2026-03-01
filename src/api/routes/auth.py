@@ -179,7 +179,7 @@ async def login(
 
     # Verify password
     hashed = await db.get_user_password_hash(user.id)
-    if not verify_password(form_data.password, hashed):
+    if not hashed or not verify_password(form_data.password, hashed):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     if not user.is_active:
@@ -243,7 +243,7 @@ async def login_json(
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     hashed = await db.get_user_password_hash(user.id)
-    if not verify_password(request.password, hashed):
+    if not hashed or not verify_password(request.password, hashed):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     if not user.is_active:
@@ -302,6 +302,8 @@ async def refresh_token(
         raise HTTPException(status_code=401, detail="Invalid refresh token")
 
     user_id = payload.get("sub")
+    if not user_id or not isinstance(user_id, str):
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
 
     # Verify token in Redis
     redis = get_redis_client()
@@ -405,7 +407,7 @@ async def change_password(
 
     # Verify current password
     hashed = await db.get_user_password_hash(current_user.id)
-    if not verify_password(request.current_password, hashed):
+    if not hashed or not verify_password(request.current_password, hashed):
         raise HTTPException(status_code=400, detail="Current password is incorrect")
 
     # Hash and update new password
@@ -532,6 +534,7 @@ async def resend_verification(
 
     return {"status": "verification_email_sent"}
 
+
 @router.delete("/me")
 async def delete_account(
     response: Response,
@@ -551,7 +554,7 @@ async def delete_account(
     # Delete user — cascade rules in the DB handle linked rows.
     # If the DB client exposes a delete method, use it; otherwise anonymise.
     try:
-        await db.delete_user(current_user.id)
+        await db.delete_user(current_user.id)  # type: ignore[attr-defined]
     except AttributeError:
         # Fallback: anonymise PII if hard-delete is not yet implemented
         anonymised = {

@@ -69,7 +69,7 @@ export function AIChat({
   // ---- State ----
   // Welcome message: passed as a prop so callers can provide a translated string.
   // Defaults to an English string; Hebrew callers should pass the translated version.
-  const welcomeContent = placeholder ?? 'Hello! I'm the Groupio assistant. How can I help?';
+  const welcomeContent = placeholder ?? "Hello! I'm the Groupio assistant. How can I help?";
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome',

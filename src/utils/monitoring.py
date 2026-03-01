@@ -25,6 +25,7 @@ from src.config.settings import get_settings
 # Structlog configuration — called once at import time.
 # ---------------------------------------------------------------------------
 
+
 def _configure_structlog() -> None:
     settings = get_settings()
     is_production = settings.ENVIRONMENT in ("production", "staging")
@@ -40,9 +41,7 @@ def _configure_structlog() -> None:
     ]
 
     renderer: structlog.types.Processor = (
-        structlog.processors.JSONRenderer()
-        if is_production
-        else structlog.dev.ConsoleRenderer(colors=True)
+        structlog.processors.JSONRenderer() if is_production else structlog.dev.ConsoleRenderer(colors=True)
     )
 
     structlog.configure(

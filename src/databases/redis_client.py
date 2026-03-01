@@ -141,12 +141,19 @@ class RedisClient:
 
     # -- Raw key-value (for auth tokens, etc.) --
 
-    async def set(self, key: str, value: str, ex: int | None = None) -> None:
-        """Set a key-value pair with optional TTL."""
+    async def set(self, key: str, value: str, ex: int | None = None, nx: bool = False) -> bool:
+        """Set a key-value pair with optional TTL and NX (set-if-not-exists) flag.
+
+        Returns:
+            True if the key was set, False if nx=True and the key already existed.
+        """
+        kwargs: dict[str, Any] = {}
         if ex is not None:
-            await self._redis.set(key, value, ex=ex)
-        else:
-            await self._redis.set(key, value)
+            kwargs["ex"] = ex
+        if nx:
+            kwargs["nx"] = nx
+        result = await self._redis.set(key, value, **kwargs)
+        return result is not None
 
     async def get(self, key: str) -> str | None:
         """Get a value by key."""

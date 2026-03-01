@@ -170,21 +170,23 @@ class TestRateLimiting:
 
     @pytest.mark.asyncio
     async def test_rate_limit_boundary(self):
-        """Exactly at the limit should still allow, one over should block."""
+        """Exactly at the limit should still allow, one over should block.
+
+        The implementation uses an atomic Lua script (INCR + EXPIRE) that returns
+        the post-increment count. count <= limit means allowed; count > limit means blocked.
+        """
         from src.databases.redis_client import RedisClient
 
         client = RedisClient.__new__(RedisClient)
         mock_redis = AsyncMock()
-
-        # Simulate: counter at limit - 1 -> allow
-        mock_redis.get = AsyncMock(return_value="59")
-        mock_redis.incr = AsyncMock()
         client._redis = mock_redis
 
+        # Simulate: counter was at 59, after INCR = 60. 60 <= 60 → allowed
+        mock_redis.eval = AsyncMock(return_value=60)
         allowed = await client.check_rate_limit("user1", limit=60, window=60)
         assert allowed is True
 
-        # Simulate: counter at limit -> block
-        mock_redis.get = AsyncMock(return_value="60")
+        # Simulate: counter was at 60, after INCR = 61. 61 <= 60 → blocked
+        mock_redis.eval = AsyncMock(return_value=61)
         allowed = await client.check_rate_limit("user1", limit=60, window=60)
         assert allowed is False

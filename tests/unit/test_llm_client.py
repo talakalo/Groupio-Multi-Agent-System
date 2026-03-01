@@ -41,8 +41,10 @@ def llm_client():
         settings = MagicMock()
         settings.ANTHROPIC_API_KEY = "test-key"
         settings.PRIMARY_MODEL = "claude-sonnet-4-20250514"
+        settings.FALLBACK_MODEL = "claude-haiku-4-5-20251001"
         settings.MAX_TOKENS = 1024
         settings.TEMPERATURE = 0.7
+        settings.LLM_TIMEOUT_SECONDS = 30
         mock_settings.return_value = settings
 
         client = LLMClient()

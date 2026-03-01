@@ -3,6 +3,7 @@
 This module re-exports for backward compatibility. New code should import
 directly from src.models.contractor.
 """
+
 from src.models.contractor import (
     AgentContractor as Contractor,
 )

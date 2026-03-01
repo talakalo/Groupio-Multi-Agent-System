@@ -134,7 +134,7 @@ export default function TermsPage() {
         <section>
           <h2 className="text-xl font-semibold text-gray-900 mb-3">8. הגבלת אחריות</h2>
           <p>
-            הפלטפורמה מסופקת "כמות שהיא" (AS IS). Groupio לא תהיה אחראית
+            הפלטפורמה מסופקת &quot;כמות שהיא&quot; (AS IS). Groupio לא תהיה אחראית
             לנזקים עקיפים, אקראיים או תוצאתיים העולים על סכום התשלומים
             ששילמת ב-12 החודשים האחרונים.
           </p>
@@ -144,7 +144,7 @@ export default function TermsPage() {
           <h2 className="text-xl font-semibold text-gray-900 mb-3">9. שינויים בתנאים</h2>
           <p>
             Groupio רשאית לעדכן תנאים אלו בכל עת. שינויים מהותיים יודיעו
-            בדוא"ל לפחות 14 ימים מראש. המשך השימוש לאחר מתן ההודעה מהווה
+            בדוא&quot;ל לפחות 14 ימים מראש. המשך השימוש לאחר מתן ההודעה מהווה
             הסכמה לתנאים המעודכנים.
           </p>
         </section>

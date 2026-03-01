@@ -135,7 +135,7 @@ export function OfferCard({
             {CATEGORY_LABELS[offer.category]}
           </span>
           <h3 className="text-base font-bold text-gray-900 line-clamp-1">
-            {offer.contractor.businessName}
+            {offer.contractor?.businessName ?? ""}
           </h3>
         </div>
 
@@ -180,7 +180,7 @@ export function OfferCard({
           <span>{offer.participants} שכנים הצטרפו</span>
         </div>
 
-        {offer.contractor.verified && (
+        {offer.contractor?.verified && (
           <div className="flex items-center gap-1 text-emerald-600">
             <BadgeCheck className="h-4 w-4" />
             <span className="text-xs font-medium">מאומת</span>

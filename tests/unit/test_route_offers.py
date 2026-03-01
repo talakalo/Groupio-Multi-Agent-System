@@ -359,6 +359,7 @@ class TestLeaveOffer:
         db.get_offer = AsyncMock(return_value=offer)
         db.has_user_joined_offer = AsyncMock(return_value=True)
         db.leave_offer = AsyncMock()
+        db.get_offer_participants = AsyncMock(return_value=[])
 
         from src.api.main import app
         from src.api.middleware.auth import get_current_user
