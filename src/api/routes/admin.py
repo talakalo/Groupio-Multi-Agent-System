@@ -487,10 +487,19 @@ async def export_offers_csv(
     )
 
     fieldnames = [
-        "id", "title", "category", "status", "building_id",
-        "base_price", "current_participants", "min_participants",
-        "max_participants", "matched_contractor_id", "created_by",
-        "created_at", "deadline",
+        "id",
+        "title",
+        "category",
+        "status",
+        "building_id",
+        "base_price",
+        "current_participants",
+        "min_participants",
+        "max_participants",
+        "matched_contractor_id",
+        "created_by",
+        "created_at",
+        "deadline",
     ]
 
     output = io.StringIO()
@@ -523,16 +532,18 @@ async def export_participants_csv(
         try:
             participants = await db.get_offer_participants(offer_id)
             for p in participants:
-                rows.append({
-                    "offer_id": offer_id,
-                    "offer_title": offer_title,
-                    "user_id": p.get("user_id", ""),
-                    "user_name": p.get("full_name") or p.get("user_name", ""),
-                    "user_email": p.get("email") or p.get("user_email", ""),
-                    "unit_number": p.get("unit_number", ""),
-                    "unit_count": p.get("unit_count", 1),
-                    "joined_at": p.get("joined_at", ""),
-                })
+                rows.append(
+                    {
+                        "offer_id": offer_id,
+                        "offer_title": offer_title,
+                        "user_id": p.get("user_id", ""),
+                        "user_name": p.get("full_name") or p.get("user_name", ""),
+                        "user_email": p.get("email") or p.get("user_email", ""),
+                        "unit_number": p.get("unit_number", ""),
+                        "unit_count": p.get("unit_count", 1),
+                        "joined_at": p.get("joined_at", ""),
+                    }
+                )
         except Exception:
             logger.warning("Failed to fetch participants for offer=%s in CSV export", offer_id)
     else:
@@ -544,22 +555,30 @@ async def export_participants_csv(
             try:
                 participants = await db.get_offer_participants(oid)
                 for p in participants:
-                    rows.append({
-                        "offer_id": oid,
-                        "offer_title": offer_title,
-                        "user_id": p.get("user_id", ""),
-                        "user_name": p.get("full_name") or p.get("user_name", ""),
-                        "user_email": p.get("email") or p.get("user_email", ""),
-                        "unit_number": p.get("unit_number", ""),
-                        "unit_count": p.get("unit_count", 1),
-                        "joined_at": p.get("joined_at", ""),
-                    })
+                    rows.append(
+                        {
+                            "offer_id": oid,
+                            "offer_title": offer_title,
+                            "user_id": p.get("user_id", ""),
+                            "user_name": p.get("full_name") or p.get("user_name", ""),
+                            "user_email": p.get("email") or p.get("user_email", ""),
+                            "unit_number": p.get("unit_number", ""),
+                            "unit_count": p.get("unit_count", 1),
+                            "joined_at": p.get("joined_at", ""),
+                        }
+                    )
             except Exception:
                 logger.warning("Failed to fetch participants for offer=%s in CSV export", oid)
 
     fieldnames = [
-        "offer_id", "offer_title", "user_id", "user_name",
-        "user_email", "unit_number", "unit_count", "joined_at",
+        "offer_id",
+        "offer_title",
+        "user_id",
+        "user_name",
+        "user_email",
+        "unit_number",
+        "unit_count",
+        "joined_at",
     ]
     output = io.StringIO()
     writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction="ignore")
@@ -594,8 +613,16 @@ async def export_payments_csv(
         payments = []
 
     fieldnames = [
-        "id", "user_id", "offer_id", "invoice_id", "amount", "currency",
-        "status", "payment_method_id", "transaction_id", "created_at",
+        "id",
+        "user_id",
+        "offer_id",
+        "invoice_id",
+        "amount",
+        "currency",
+        "status",
+        "payment_method_id",
+        "transaction_id",
+        "created_at",
     ]
     output = io.StringIO()
     writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction="ignore")
@@ -632,17 +659,13 @@ async def vetting_pipeline_status(
 
     # Contractors that have been through vetting and were approved
     try:
-        _, approved_total = await db.list_contractors(
-            filters={"verification_status": "verified"}, page=1, page_size=1
-        )
+        _, approved_total = await db.list_contractors(filters={"verification_status": "verified"}, page=1, page_size=1)
     except Exception:
         approved_total = 0
 
     # Contractors that were rejected
     try:
-        _, rejected_total = await db.list_contractors(
-            filters={"verification_status": "rejected"}, page=1, page_size=1
-        )
+        _, rejected_total = await db.list_contractors(filters={"verification_status": "rejected"}, page=1, page_size=1)
     except Exception:
         rejected_total = 0
 

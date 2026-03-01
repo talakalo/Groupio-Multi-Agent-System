@@ -128,6 +128,7 @@ class OfferMatchRequest(BaseModel):
 # Used by the pricing, analytics, and outreach agents.
 # ---------------------------------------------------------------------------
 
+
 class AgentPricingTier(BaseModel):
     """Simplified pricing tier used by agents (no strict validation)."""
 

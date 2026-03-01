@@ -349,9 +349,7 @@ class VettingAgent(BaseAgent):
                 return e["contractor_id"]
         return None
 
-    async def _notify_admin_vetting(
-        self, contractor_id: str, trust_score: float, doc_analysis: dict[str, Any]
-    ) -> None:
+    async def _notify_admin_vetting(self, contractor_id: str, trust_score: float, doc_analysis: dict[str, Any]) -> None:
         """Email admin team when a contractor requires manual vetting review."""
         try:
             from src.config.settings import get_settings
