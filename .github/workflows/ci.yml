@@ -208,7 +208,7 @@ jobs:
           OPENAI_API_KEY: 'test-key'
           JWT_SECRET_KEY: 'test-secret-key-for-ci-testing-only'
         run: |
-          pytest tests/integration/ -v --timeout=30
+          pytest tests/integration/ -v --timeout=30 --no-cov
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238 # v4
