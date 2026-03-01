@@ -245,6 +245,15 @@ class TestGetPayment:
 class TestPaymentWebhook:
     """Tests for POST /api/v1/payments/webhook (no auth required)."""
 
+    @pytest.fixture(autouse=True)
+    def dev_settings(self):
+        """Patch settings so the webhook runs in development mode, skipping signature verification."""
+        mock_settings = MagicMock()
+        mock_settings.PAYMENT_WEBHOOK_SECRET = None
+        mock_settings.ENVIRONMENT = "development"
+        with patch("src.api.routes.payments.get_settings", return_value=mock_settings):
+            yield mock_settings
+
     def test_webhook_payment_succeeded(self, unauth_client, mock_db, mock_payment_record):
         """Webhook with payment.succeeded updates payment status."""
         mock_db.get_payment_by_transaction = AsyncMock(return_value=mock_payment_record)

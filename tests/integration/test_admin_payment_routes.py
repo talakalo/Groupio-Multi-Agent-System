@@ -269,8 +269,8 @@ class TestContractorPayouts:
 
         # First payout (pending)
         assert data[0]["gross_amount"] == 50000
-        assert data[0]["platform_fee"] == 2500  # 5%
-        assert data[0]["net_amount"] == 47500
+        assert data[0]["platform_fee"] == 1500.0  # 3%
+        assert data[0]["net_amount"] == 48500.0
         assert data[0]["status"] == "pending"
 
         # Second payout (completed)
@@ -348,7 +348,7 @@ class TestReleaseEscrow:
         assert data["status"] == "released"
         assert data["offer_id"] == "offer-100"
         assert data["amount_released"] == 50000
-        assert data["platform_fee"] == 2500  # 5% of 50000
+        assert data["platform_fee"] == 1500.0  # 3% of 50000
         assert data["released_by"] == "admin@groupio.co.il"
 
         # Verify invoice was marked as released
