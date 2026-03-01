@@ -5,6 +5,7 @@ skipped due to a missing cryptography backend).  It provides at least one
 test result so ``pytest tests/integration/`` exits with code 0 instead of
 code 5 ("no tests ran").
 """
+
 import pytest
 
 

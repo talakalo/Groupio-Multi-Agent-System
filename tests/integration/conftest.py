@@ -9,6 +9,7 @@ This conftest detects that situation early and marks all regular integration
 test files to be skipped (ignored at collection time), while letting the
 ``test_environment.py`` sentinel run so pytest exits 0 rather than 5.
 """
+
 from pathlib import Path
 
 _CRYPTO_AVAILABLE = True
