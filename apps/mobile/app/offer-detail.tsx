@@ -106,25 +106,25 @@ export default function OfferDetailScreen() {
         <View style={styles.contractorSection}>
           <Avatar.Text
             size={56}
-            label={offer.contractor.businessName.substring(0, 2)}
+            label={(offer.contractor?.businessName ?? "??").substring(0, 2)}
             style={{ backgroundColor: theme.colors.primaryContainer }}
             labelStyle={{ color: theme.colors.onPrimaryContainer }}
           />
           <View style={styles.contractorInfo}>
             <Text variant="titleLarge" style={{ color: theme.colors.onSurface, fontWeight: "700" }}>
-              {offer.contractor.businessName}
+              {offer.contractor?.businessName ?? ""}
             </Text>
             <View style={styles.ratingRow}>
               {Array.from({ length: 5 }).map((_, i) => (
                 <Icon
                   key={i}
-                  name={i < Math.floor(offer.contractor.rating) ? "star" : "star-outline"}
+                  name={i < Math.floor(offer.contractor?.rating ?? 0) ? "star" : "star-outline"}
                   size={18}
                   color="#FFC107"
                 />
               ))}
               <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginStart: 4 }}>
-                {offer.contractor.rating.toFixed(1)}
+                {(offer.contractor?.rating ?? 0).toFixed(1)}
               </Text>
             </View>
           </View>

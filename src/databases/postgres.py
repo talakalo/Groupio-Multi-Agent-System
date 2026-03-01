@@ -3,6 +3,8 @@
 import json
 import logging
 import re
+from collections.abc import AsyncIterator as _AsyncIterator
+from contextlib import asynccontextmanager as _acm
 from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
@@ -162,9 +164,6 @@ class PostgresClient:
         pool = await self._get_client()
         async with pool.acquire() as conn:
             await conn.execute(query, *args)
-
-    from collections.abc import AsyncIterator as _AsyncIterator
-    from contextlib import asynccontextmanager as _acm
 
     @_acm
     async def transaction(self) -> "_AsyncIterator[Any]":
@@ -892,7 +891,7 @@ class PostgresClient:
                 .execute()
             )
             offer = await self.get_offer(offer_id)
-            cur = (offer.get("current_participants") or 0) + unit_count
+            cur = ((offer.get("current_participants") or 0) if offer is not None else 0) + unit_count
             await client.table("offers").update({"current_participants": cur}).eq("id", offer_id).execute()
         else:
             await self._pg_execute(
@@ -923,7 +922,7 @@ class PostgresClient:
             uc = part.data[0]["unit_count"] if part.data else 1
             await client.table("offer_participants").delete().eq("user_id", user_id).eq("offer_id", offer_id).execute()
             offer = await self.get_offer(offer_id)
-            cur = max(0, (offer.get("current_participants") or 0) - uc)
+            cur = max(0, ((offer.get("current_participants") or 0) if offer is not None else 0) - uc)
             await client.table("offers").update({"current_participants": cur}).eq("id", offer_id).execute()
         else:
             row = await self._pg_fetch_one(

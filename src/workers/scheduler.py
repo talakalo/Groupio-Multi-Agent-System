@@ -149,7 +149,9 @@ async def check_expired_offers():
             except Exception as exc:
                 logger.warning(
                     "Failed to send expiry notification to %s for offer %s: %s",
-                    p_email, offer_id, exc,
+                    p_email,
+                    offer_id,
+                    exc,
                 )
 
 
