@@ -21,7 +21,6 @@ from src.orchestration.state import (
     create_initial_state,
     summarize_rag_results,
 )
-from src.orchestration.state_contract import validate_agent_state
 from src.rag.pipeline import get_rag_pipeline
 
 logger = logging.getLogger(__name__)
@@ -430,11 +429,9 @@ class GroupioOrchestrator:
             building_id=building_id,
             conversation_id=conversation_id,
         )
-        initial_state = validate_agent_state(initial_state, context="orchestrator.run.initial")
 
         # Run the LangGraph workflow
         final_state = await self.graph.ainvoke(initial_state)
-        final_state = validate_agent_state(final_state, context="orchestrator.run.final")
 
         return {
             "conversation_id": final_state["conversation_id"],

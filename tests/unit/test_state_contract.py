@@ -2,7 +2,6 @@
 
 import pytest
 
-from src.orchestration.state import create_initial_state
 from src.orchestration.state_contract import validate_agent_state
 
 
@@ -32,10 +31,13 @@ def _valid_state() -> dict:
     }
 
 
-def test_create_initial_state_includes_contract_version():
-    """Initial state should include state contract metadata and validate."""
-    state = create_initial_state(user_message="hello", user_id="user-1")
-    assert state["state_contract_version"] == 1
+def test_validate_agent_state_defaults_contract_version_when_missing():
+    """Contract version should default to v1 if caller omits it."""
+    base = _valid_state()
+    base.pop("state_contract_version")
+
+    validated = validate_agent_state(base, context="test.default_contract_version")
+    assert validated["state_contract_version"] == 1
 
 
 def test_validate_agent_state_accepts_active_agents():
