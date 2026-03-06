@@ -5,6 +5,7 @@ from typing import Any
 
 from src.agents.base import AgentConfig, BaseAgent
 from src.config.prompts.matching import MATCHING_SYSTEM_PROMPT
+from src.config.settings import get_settings
 from src.databases.graph_store import get_graph_store
 from src.models.agent_state import AgentState
 from src.utils.hebrew_utils import detect_language, translate_category
@@ -131,6 +132,16 @@ class MatchingAgent(BaseAgent):
                 "suggested_next_agent": "pricing" if has_matches else "",
             }
         ]
+
+        # Task 3.1 — Autonomy mode: in recommend mode, flag for human confirmation
+        settings = get_settings()
+        if settings.MATCHING_AGENT_MODE in ("recommend", "gated"):
+            state["needs_human"] = True
+            state["escalation_reason"] = (
+                f"Matching results require admin confirmation (mode={settings.MATCHING_AGENT_MODE})"
+            )
+            if state["actions_taken"]:
+                state["actions_taken"][-1]["requires_human_confirmation"] = True
 
         self._metrics["calls"] += 1
         return state

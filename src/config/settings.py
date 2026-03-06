@@ -73,6 +73,15 @@ class Settings(BaseSettings):
     MAX_SUPPORT_ATTEMPTS_BEFORE_ESCALATION: int = 3
     HUMAN_ESCALATION_ENABLED: bool = True
 
+    # Agent Autonomy Modes: "auto" | "recommend" | "gated"
+    # auto: results are applied immediately
+    # recommend: results are queued for admin confirmation before action
+    # gated: always requires human approval (like outreach)
+    MATCHING_AGENT_MODE: str = "recommend"
+    PRICING_AGENT_MODE: str = "recommend"
+    VETTING_AGENT_MODE: str = "recommend"
+    OUTREACH_AGENT_MODE: str = "gated"
+
     # Feature Flags
     ENABLE_WEB_SEARCH: bool = True
     ENABLE_GRAPH_QUERIES: bool = True

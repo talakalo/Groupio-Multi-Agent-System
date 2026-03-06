@@ -216,7 +216,6 @@ async def initiate_payment(
                 }
             ],
         }
-        await db.create_invoice(invoice_data)
         existing_invoice = invoice_data
     else:
         amount = existing_invoice.get("amount", 0)
@@ -255,7 +254,11 @@ async def initiate_payment(
         logger.error("Payment provider error for payment %s: %s", payment_id, exc)
         payment_data["status"] = "failed"
 
-    await db.create_payment(payment_data)
+    # Task 3.2: wrap invoice + payment creation in a single atomic transaction
+    async with db.transaction() as conn:
+        if not await db.get_invoice_for_offer(current_user.id, request.offer_id):
+            await db.create_invoice(existing_invoice, conn=conn)
+        await db.create_payment(payment_data, conn=conn)
 
     # For direct payments that succeeded, mark invoice as paid immediately
     # For escrow payments, invoice stays pending until admin releases

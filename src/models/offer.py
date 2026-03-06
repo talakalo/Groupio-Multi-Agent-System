@@ -85,6 +85,7 @@ class OfferInDB(OfferBase):
     current_participants: int = 0
     matched_contractor_id: str | None = None
     pricing_tiers: list[PricingTier] = []
+    pricing_rationale: str | None = None
     created_at: datetime
     updated_at: datetime
 

@@ -64,9 +64,7 @@ async def test_list_agent_audit_log_asyncpg():
     mock_pool.acquire = MagicMock(return_value=mock_acquire)
 
     with patch.object(db, "_get_client", AsyncMock(return_value=mock_pool)):
-        items, total = await db.list_agent_audit_log(
-            page=1, page_size=20, agent_name="matching"
-        )
+        items, total = await db.list_agent_audit_log(page=1, page_size=20, agent_name="matching")
 
     assert items == []
     assert total == 5
@@ -76,7 +74,6 @@ async def test_list_agent_audit_log_asyncpg():
 async def test_matching_agent_sets_requires_human_review():
     """Matching, Pricing, and Vetting agents must flag requires_human_review=True."""
     import asyncio
-    from unittest.mock import patch
 
     persisted_data: dict = {}
 

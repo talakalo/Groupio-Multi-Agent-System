@@ -4,7 +4,7 @@ import asyncio
 import hashlib
 import json
 import logging
-import time
+import re
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime
 from typing import Any
@@ -126,6 +126,23 @@ class LLMResponseCache:
 
 _llm_cache = LLMResponseCache(default_ttl=1800)  # 30 min default
 
+# Agents whose decisions require human review in recommend mode
+_REVIEW_AGENTS: frozenset[str] = frozenset({"matching", "pricing", "vetting"})
+
+_THINKING_RE = re.compile(r"<thinking>(.*?)</thinking>", re.DOTALL)
+
+
+def _extract_thinking_blocks(response: dict[str, Any]) -> list[str]:
+    """Extract <thinking> tag contents from a Claude extended-thinking response."""
+    blocks: list[str] = []
+    for block in response.get("content", []):
+        if block.get("type") == "thinking":
+            blocks.append(block.get("thinking", ""))
+        elif block.get("type") == "text":
+            for m in _THINKING_RE.finditer(block.get("text", "")):
+                blocks.append(m.group(1).strip())
+    return blocks
+
 
 class BaseAgent(ABC):
     """Base class for all Groupio agents.
@@ -232,10 +249,12 @@ class BaseAgent(ABC):
         output_summary: str,
         latency_ms: int,
         tokens_used: int = 0,
+        reasoning_chain: list[str] | None = None,
+        cited_sources: list[str] | None = None,
+        alternatives_considered: list[dict] | None = None,
     ) -> None:
         """Fire-and-forget persistence of an agent decision to agent_audit_log."""
         # Agents that make consequential decisions require human review
-        _REVIEW_AGENTS = {"matching", "pricing", "vetting"}
         requires_review = self.config.name.lower() in _REVIEW_AGENTS
 
         async def _write() -> None:
@@ -256,6 +275,9 @@ class BaseAgent(ABC):
                         "tokens_used": tokens_used,
                         "latency_ms": latency_ms,
                         "requires_human_review": requires_review,
+                        "reasoning_chain": reasoning_chain or [],
+                        "cited_sources": cited_sources or [],
+                        "alternatives_considered": alternatives_considered or [],
                         "created_at": datetime.now(UTC),
                     }
                 )

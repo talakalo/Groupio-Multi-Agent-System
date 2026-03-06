@@ -109,8 +109,9 @@ class PostgresClient:
                 db_url = db_url.replace("postgres://", "postgresql://", 1)
             self._asyncpg_pool = await asyncpg.create_pool(
                 db_url,
-                min_size=1,
-                max_size=10,
+                min_size=5,
+                max_size=25,
+                max_inactive_connection_lifetime=300,
                 command_timeout=60,
             )
         return self._asyncpg_pool
@@ -1941,8 +1942,9 @@ class PostgresClient:
             """INSERT INTO agent_audit_log
                (id, session_id, user_id, agent_name, action, input_summary,
                 output_summary, model_used, tokens_used, latency_ms,
-                requires_human_review, created_at)
-               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)""",
+                requires_human_review, reasoning_chain, cited_sources,
+                alternatives_considered, created_at)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)""",
             data["id"],
             data.get("session_id"),
             data.get("user_id"),
@@ -1954,6 +1956,9 @@ class PostgresClient:
             data.get("tokens_used"),
             data.get("latency_ms"),
             data.get("requires_human_review", False),
+            json.dumps(data.get("reasoning_chain") or []),
+            json.dumps(data.get("cited_sources") or []),
+            json.dumps(data.get("alternatives_considered") or []),
             data.get("created_at"),
         )
 
@@ -2093,34 +2098,38 @@ class PostgresClient:
     # Invoices
     # ------------------------------------------------------------------
 
-    async def create_invoice(self, data: dict[str, Any]) -> dict[str, Any]:
-        """Insert an invoice record."""
+    async def create_invoice(self, data: dict[str, Any], conn: Any = None) -> dict[str, Any]:
+        """Insert an invoice record. Pass conn to reuse an existing transaction connection."""
         if self._use_supabase_client():
             client = await self._get_client()
             result = await client.table("invoices").insert(data).execute()
             return result.data[0] if result.data else data
-        await self._pg_execute(
-            """INSERT INTO invoices
+        sql = """INSERT INTO invoices
                (id, invoice_number, offer_id, contractor_id, subtotal,
                 tax_rate, tax, platform_fee_rate, platform_fee, total,
                 status, paid_at, transaction_id, payment_method, created_at)
-               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)""",
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)"""
+        args = (
             data["id"],
-            data["invoice_number"],
+            data.get("invoice_number"),
             data["offer_id"],
-            data["contractor_id"],
-            data["subtotal"],
+            data.get("contractor_id"),
+            data.get("subtotal", data.get("amount", 0)),
             data.get("tax_rate", 0.17),
             data.get("tax", 0),
             data.get("platform_fee_rate", 0.05),
             data.get("platform_fee", 0),
-            data["total"],
+            data.get("total", data.get("amount", 0)),
             data.get("status", "pending"),
             data.get("paid_at"),
             data.get("transaction_id"),
             data.get("payment_method"),
             data.get("created_at"),
         )
+        if conn is not None:
+            await conn.execute(sql, *args)
+        else:
+            await self._pg_execute(sql, *args)
         return await self.get_invoice(data["id"]) or data
 
     async def get_invoice(self, invoice_id: str) -> dict[str, Any] | None:
@@ -2233,8 +2242,8 @@ class PostgresClient:
     # Payments
     # ------------------------------------------------------------------
 
-    async def create_payment(self, data: dict[str, Any]) -> dict[str, Any]:
-        """Insert a payment record."""
+    async def create_payment(self, data: dict[str, Any], conn: Any = None) -> dict[str, Any]:
+        """Insert a payment record. Pass conn to reuse an existing transaction connection."""
         if self._use_supabase_client():
             client = await self._get_client()
             # Filter to only columns that exist in the payments table
@@ -2259,11 +2268,11 @@ class PostgresClient:
             }
             result = await client.table("payments").insert(insert_data).execute()
             return result.data[0] if result.data else data
-        await self._pg_execute(
-            """INSERT INTO payments
+        sql_pay = """INSERT INTO payments
                (id, invoice_id, user_id, offer_id, amount, currency, status,
                 transaction_id, payment_method, provider_data, created_at)
-               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)""",
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)"""
+        pay_args = (
             data["id"],
             data.get("invoice_id"),
             data["user_id"],
@@ -2276,6 +2285,10 @@ class PostgresClient:
             json.dumps(data.get("provider_data", {})),
             data.get("created_at"),
         )
+        if conn is not None:
+            await conn.execute(sql_pay, *pay_args)
+        else:
+            await self._pg_execute(sql_pay, *pay_args)
         return await self.get_payment(data["id"]) or data
 
     async def get_payment(self, payment_id: str) -> dict[str, Any] | None:
