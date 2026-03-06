@@ -28,6 +28,8 @@ import { cn } from '@/lib/utils/cn';
 interface ContractorWithScore extends Contractor {
   trustScore?: number;
   matchScore?: number;
+  completedJobs?: number;
+  licenseNumber?: string;
 }
 
 interface ContractorFilters {
