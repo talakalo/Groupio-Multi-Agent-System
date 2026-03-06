@@ -309,6 +309,7 @@ class PostgresClient:
             "is_verified",
             "last_login",
             "role",
+            "onboarded_at",
         }
         filtered = {k: v for k, v in update_data.items() if k in allowed}
         if not filtered:
@@ -1050,6 +1051,45 @@ class PostgresClient:
                 json.dumps(response),
                 json.dumps(metadata),
             )
+
+    async def get_conversation_history(
+        self,
+        user_id: str,
+        limit: int = 50,
+        before: str | None = None,
+    ) -> tuple[list[dict[str, Any]], int]:
+        """Return (items, total) for a user's conversation_logs.
+
+        Each row represents one exchange (user message + assistant response).
+        ``before`` is an ISO-8601 timestamp used as an exclusive upper bound for
+        cursor-based pagination (oldest-first, so "before" means "created_at <").
+        """
+        if self._use_supabase_client():
+            client = await self._get_client()
+            q = client.table("conversation_logs").select("*", count="exact").eq("user_id", user_id)
+            if before:
+                q = q.lt("created_at", before)
+            q = q.order("created_at", desc=False).limit(limit)
+            result = await q.execute()
+            total = result.count if hasattr(result, "count") and result.count is not None else len(result.data or [])
+            return (result.data or [], total)
+
+        # Raw postgres path
+        args: list[Any] = [user_id]
+        extra = ""
+        if before:
+            args.append(before)
+            extra = f" AND created_at < ${len(args)}"
+        count_row = await self._pg_fetch_one(
+            f"SELECT COUNT(*) AS c FROM conversation_logs WHERE user_id = $1{extra}", *args
+        )
+        total = count_row["c"] if count_row else 0
+        args.append(limit)
+        rows = await self._pg_fetch_all(
+            f"SELECT * FROM conversation_logs WHERE user_id = $1{extra} ORDER BY created_at ASC LIMIT ${len(args)}",
+            *args,
+        )
+        return (rows or [], total)
 
     async def create_contractor(self, contractor_data: dict[str, Any], password: str) -> dict[str, Any]:
         """Create a contractor (user + contractor row)."""
