@@ -31,6 +31,8 @@ class AgentState(TypedDict):
         "outreach",
         "analytics",
         "human",
+        "architecture",
+        "payment",
     ]
     intent: str | None
     confidence: float
@@ -65,3 +67,4 @@ class AgentState(TypedDict):
     # Metadata
     start_time: str
     tokens_used: int
+    state_contract_version: int
