@@ -1,5 +1,6 @@
 """Document chunking strategies for the RAG pipeline."""
 
+from functools import lru_cache
 import logging
 import re
 from typing import Any
@@ -8,12 +9,38 @@ import tiktoken
 
 logger = logging.getLogger(__name__)
 
-_encoder = tiktoken.get_encoding("cl100k_base")
+
+class _FallbackEncoder:
+    """Simple local fallback encoder used when tiktoken encoding is unavailable.
+
+    This intentionally does not require network access. It provides an
+    approximate token count by splitting into words/punctuation chunks.
+    """
+
+    @staticmethod
+    def encode(text: str) -> list[str]:
+        if not text:
+            return []
+        return re.findall(r"\w+|[^\w\s]", text, flags=re.UNICODE)
+
+
+@lru_cache(maxsize=1)
+def _get_encoder() -> Any:
+    """Get tokenizer encoder lazily with network-safe fallback.
+
+    This avoids import-time initialization so importing the API/application
+    doesn't fail in restricted environments.
+    """
+    try:
+        return tiktoken.get_encoding("cl100k_base")
+    except Exception as exc:  # pragma: no cover - environment-dependent path
+        logger.warning("tiktoken encoder unavailable; using fallback tokenizer: %s", exc)
+        return _FallbackEncoder()
 
 
 def count_tokens(text: str) -> int:
     """Count the number of tokens in a text string."""
-    return len(_encoder.encode(text))
+    return len(_get_encoder().encode(text))
 
 
 def chunk_by_tokens(
