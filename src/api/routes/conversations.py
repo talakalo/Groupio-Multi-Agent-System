@@ -27,6 +27,7 @@ Response shape (matches AIChat.tsx expectation):
 """
 
 import logging
+from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
@@ -83,7 +84,7 @@ async def get_conversation_messages(
     for row in rows:
         row_id = str(row.get("id", ""))
         created_at = row.get("created_at")
-        created_at_str = created_at.isoformat() if hasattr(created_at, "isoformat") else str(created_at or "")
+        created_at_str = created_at.isoformat() if isinstance(created_at, date) else str(created_at or "")
 
         user_content = row.get("message") or ""
         if user_content:
@@ -124,7 +125,7 @@ async def get_conversation_messages(
     if rows and len(rows) == limit:
         first_row = rows[0]
         ts = first_row.get("created_at")
-        next_cursor = ts.isoformat() if hasattr(ts, "isoformat") else str(ts) if ts else None
+        next_cursor = ts.isoformat() if isinstance(ts, date) else str(ts) if ts else None
 
     return {
         "messages": messages,

@@ -1,7 +1,7 @@
 """State management utilities for the LangGraph orchestration."""
 
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 from src.models.agent_state import AgentState
 from src.orchestration.state_contract import validate_agent_state
@@ -43,7 +43,7 @@ def create_initial_state(
         tokens_used=0,
         state_contract_version=1,
     )
-    return validate_agent_state(initial_state, context="create_initial_state")
+    return validate_agent_state(cast(dict[str, Any], initial_state), context="create_initial_state")
 
 
 def calculate_duration_ms(start_time: str) -> int:

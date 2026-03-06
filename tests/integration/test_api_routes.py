@@ -206,7 +206,7 @@ class TestOffersAPI:
         """Test creating an offer."""
         mock_db.get_building = AsyncMock(return_value={"id": "building-123"})
         mock_db.is_user_in_building = AsyncMock(return_value=True)
-        mock_db.create_offer = AsyncMock(return_value=MagicMock(**mock_offer))
+        mock_db.create_offer = AsyncMock(return_value=mock_offer)
         override_auth({"id": "user-123", "role": "resident"})
 
         with (
