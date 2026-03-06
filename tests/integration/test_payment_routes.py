@@ -39,6 +39,13 @@ def mock_db():
     """Mock PostgreSQL client at the payments route module level."""
     with patch("src.api.routes.payments.get_postgres_client") as mock:
         db = AsyncMock()
+        # db.transaction() is decorated with @asynccontextmanager, so it must
+        # return an async context manager, not a bare coroutine.  AsyncMock()
+        # attributes are themselves AsyncMocks (callable → coroutine), which
+        # do NOT satisfy the `async with` protocol.  Use a regular MagicMock
+        # wrapping an AsyncMock so `async with db.transaction() as conn` works.
+        _txn_cm = AsyncMock()
+        db.transaction = MagicMock(return_value=_txn_cm)
         mock.return_value = db
         yield db
 

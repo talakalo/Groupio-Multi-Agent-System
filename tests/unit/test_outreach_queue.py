@@ -15,6 +15,8 @@ async def test_outreach_agent_queues_instead_of_dispatching():
     agent.config = MagicMock()
     agent.config.name = "outreach"
     agent._metrics = {"calls": 0, "errors": 0, "tokens": 0}
+    # BaseAgent.__init__ sets self.rag; bypass via __new__ requires manual init
+    agent.rag = None
     agent._db = AsyncMock()
     agent._db.create_outreach_pending = AsyncMock(return_value={})
     agent._db.get_user_profile = AsyncMock(
