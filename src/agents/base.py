@@ -5,7 +5,6 @@ import hashlib
 import json
 import logging
 import re
-import time
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime
 from typing import Any
@@ -253,11 +252,9 @@ class BaseAgent(ABC):
         reasoning_chain: list[str] | None = None,
         cited_sources: list[str] | None = None,
         alternatives_considered: list[dict] | None = None,
- 
     ) -> None:
         """Fire-and-forget persistence of an agent decision to agent_audit_log."""
         # Agents that make consequential decisions require human review
-        _REVIEW_AGENTS = {"matching", "pricing", "vetting"}
         requires_review = self.config.name.lower() in _REVIEW_AGENTS
 
         async def _write() -> None:

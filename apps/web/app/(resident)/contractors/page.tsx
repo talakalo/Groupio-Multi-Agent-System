@@ -29,7 +29,7 @@ interface ContractorWithScore extends Contractor {
   trustScore?: number;
   matchScore?: number;
   completedJobs?: number;
-  licenseNumber?: string;
+  // licenseNumber is inherited as required from Contractor
 }
 
 interface ContractorFilters {
