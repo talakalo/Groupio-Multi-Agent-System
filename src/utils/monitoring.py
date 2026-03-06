@@ -137,8 +137,9 @@ def init_monitoring() -> None:
 
             sentry_sdk.init(
                 dsn=settings.SENTRY_DSN,
+                environment=settings.ENVIRONMENT,
                 traces_sample_rate=0.1,
-                profiles_sample_rate=0.1,
+                profiles_sample_rate=0.05,
                 integrations=[FastApiIntegration()],
             )
             logger.info("Sentry initialized")

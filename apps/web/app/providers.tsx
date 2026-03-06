@@ -33,6 +33,12 @@ class AppErrorBoundary extends Component<
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error("[AppErrorBoundary]", error, info);
+    try {
+      // Dynamically import to avoid SSR issues when Sentry is not configured
+      import('@sentry/nextjs').then(({ captureException }) => captureException(error)).catch(() => {});
+    } catch {
+      // Sentry not available — silently skip
+    }
   }
 
   handleReset = () => {

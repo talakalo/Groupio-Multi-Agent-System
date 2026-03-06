@@ -381,6 +381,25 @@ export default function SignupPage() {
               </div>
             )}
 
+            <div className="flex items-start gap-2 pt-2">
+              <input
+                type="checkbox"
+                id="tos"
+                required
+                className="mt-1 h-4 w-4 rounded border-gray-300 text-primary-600"
+              />
+              <label htmlFor="tos" className="text-sm text-gray-600">
+                קראתי ומסכים/ה ל
+                <Link href="/terms" className="text-primary-600 hover:underline mx-1">
+                  תנאי השימוש
+                </Link>
+                ול
+                <Link href="/privacy" className="text-primary-600 hover:underline mx-1">
+                  מדיניות הפרטיות
+                </Link>
+              </label>
+            </div>
+
             <div className="flex gap-3 pt-2">
               <button
                 type="button"

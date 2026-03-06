@@ -765,3 +765,118 @@ async def override_payment_status(
         body.reason,
     )
     return {"payment_id": payment_id, "status": body.status, "updated_by": admin.id}
+
+
+# --------------- Outreach queue management ---------------
+
+
+@router.get("/outreach/queue")
+async def list_outreach_queue(
+    status: str = "pending_approval",
+    admin: UserInDB = Depends(get_admin_user),
+) -> dict[str, Any]:
+    """List pending outreach messages awaiting admin approval."""
+    db = get_postgres_client()
+    items = await db.list_outreach_queue(status=status)
+    return {"items": items, "total": len(items), "status": status}
+
+
+@router.post("/outreach/{pending_id}/approve")
+async def approve_outreach(
+    pending_id: str,
+    admin: UserInDB = Depends(get_admin_user),
+) -> dict[str, Any]:
+    """Approve and dispatch a pending outreach message."""
+    db = get_postgres_client()
+    entry = await db.get_outreach_pending(pending_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Outreach entry not found")
+    if entry.get("status") != "pending_approval":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot approve entry with status '{entry.get('status')}'",
+        )
+    await db.update_outreach_queue_status(pending_id, "approved", approved_by=admin.id)
+    # Mark as sent immediately after approval (actual dispatch happens via message service)
+    await db.update_outreach_queue_status(pending_id, "sent")
+    logger.info("Admin %s approved outreach %s", admin.id, pending_id)
+    return {"status": "approved_and_dispatched", "pending_id": pending_id}
+
+
+@router.post("/outreach/{pending_id}/reject")
+async def reject_outreach(
+    pending_id: str,
+    admin: UserInDB = Depends(get_admin_user),
+) -> dict[str, Any]:
+    """Reject a pending outreach message."""
+    db = get_postgres_client()
+    entry = await db.get_outreach_pending(pending_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Outreach entry not found")
+    if entry.get("status") != "pending_approval":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot reject entry with status '{entry.get('status')}'",
+        )
+    await db.update_outreach_queue_status(pending_id, "rejected", approved_by=admin.id)
+    logger.info("Admin %s rejected outreach %s", admin.id, pending_id)
+    return {"status": "rejected", "pending_id": pending_id}
+
+
+# --------------- User suspend / activate ---------------
+
+
+@router.post("/users/{user_id}/suspend")
+async def suspend_user(
+    user_id: str,
+    request: Request,
+    body: dict = None,
+    admin: UserInDB = Depends(get_admin_user),
+) -> dict[str, Any]:
+    """Suspend a user account and invalidate their refresh token."""
+    if body is None:
+        body = {}
+    db = get_postgres_client()
+    user = await db.get_user(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.id == admin.id:
+        raise HTTPException(status_code=400, detail="Cannot suspend yourself")
+    await db.update_user(user_id, {"is_active": False})
+    await db.create_audit_log({
+        "user_id": admin.id,
+        "action": "suspend_user",
+        "resource_type": "user",
+        "resource_id": user_id,
+        "details": {"reason": body.get("reason", ""), "suspended_user_email": user.email},
+        "ip_address": request.client.host if request.client else None,
+    })
+    from src.databases.redis_client import get_redis_client as _get_redis
+    redis = _get_redis()
+    await redis.delete(f"refresh_token:{user_id}")
+    logger.info("Admin %s suspended user %s", admin.id, user_id)
+    return {"status": "suspended", "user_id": user_id}
+
+
+@router.post("/users/{user_id}/activate")
+async def activate_user(
+    user_id: str,
+    request: Request,
+    admin: UserInDB = Depends(get_admin_user),
+) -> dict[str, Any]:
+    """Reactivate a suspended user account."""
+    db = get_postgres_client()
+    user = await db.get_user(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    await db.update_user(user_id, {"is_active": True})
+    await db.create_audit_log({
+        "user_id": admin.id,
+        "action": "activate_user",
+        "resource_type": "user",
+        "resource_id": user_id,
+        "details": {"activated_user_email": user.email},
+        "ip_address": request.client.host if request.client else None,
+    })
+    logger.info("Admin %s activated user %s", admin.id, user_id)
+    return {"status": "active", "user_id": user_id}
