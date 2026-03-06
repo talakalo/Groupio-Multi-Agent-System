@@ -101,6 +101,7 @@ async def get_conversation_messages(
         if isinstance(response_obj, str):
             # Supabase may return already-decoded strings in some configurations
             import json as _json  # local import to keep module top-level clean
+
             try:
                 response_obj = _json.loads(response_obj)
             except Exception:

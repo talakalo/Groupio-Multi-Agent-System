@@ -97,7 +97,6 @@ def _make_log_row(idx: int, user_message: str, assistant_reply: str) -> dict:
 
 
 class TestGetConversationMessages:
-
     def test_empty_history_returns_200(self, client_user, mock_db):
         """No conversation logs → returns 200 with empty messages list."""
         mock_db.get_conversation_history = AsyncMock(return_value=([], 0))
