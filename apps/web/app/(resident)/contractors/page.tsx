@@ -16,6 +16,7 @@ import {
 import { useTranslations } from 'next-intl';
 import { useState, useMemo } from 'react';
 
+import { ContractorTrustBadge } from '@/components/features/ContractorTrustBadge';
 import { apiClient } from '@/lib/api/client';
 import { cn } from '@/lib/utils/cn';
 
@@ -130,11 +131,14 @@ function ContractorCard({ contractor }: { contractor: ContractorWithScore }) {
           </div>
 
           {/* Trust score */}
-          {contractor.trustScore && (
-            <div className="mt-2">
-              <TrustScoreBadge score={contractor.trustScore} />
-            </div>
-          )}
+          <div className="mt-2">
+            <ContractorTrustBadge
+              verificationStatus={contractor.verified ? 'verified' : 'pending'}
+              trustScore={contractor.trustScore ?? 0}
+              completedJobs={contractor.completedJobs ?? 0}
+              licenseNumber={contractor.licenseNumber}
+            />
+          </div>
 
           {/* Specialties */}
           <div className="flex flex-wrap gap-1.5 mt-3">

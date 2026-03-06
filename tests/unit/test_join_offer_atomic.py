@@ -1,6 +1,5 @@
 """Tests for atomic offer join/leave race condition fix (Task 1.4 / Task 2.9)."""
 
-import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest

@@ -6,6 +6,7 @@ from typing import Any
 
 from src.agents.base import AgentConfig, BaseAgent
 from src.config.prompts.pricing import PRICING_SYSTEM_PROMPT
+from src.config.settings import get_settings
 from src.databases.postgres import get_postgres_client
 from src.models.agent_state import AgentState
 from src.models.offer import SEASONALITY_FACTORS
@@ -147,6 +148,41 @@ class PricingAgent(BaseAgent):
                 "suggested_next_agent": "payment",
             }
         ]
+
+        # Task 3.4 — Generate a Hebrew pricing rationale and persist to DB
+        offer_id_for_rationale = entities.get("offer_id") or context_next.get("offer_id")
+        city = region
+        participants_count = int(market_data.get("avg_participants", 1)) or 1
+        if offer_id_for_rationale and base_price > 0:
+            try:
+                rationale_resp = await self._call_llm(
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": (
+                                f"Explain in one Hebrew sentence why this price (₪{round(base_price, 0):.0f}) "
+                                f"is fair for {category} service for {participants_count} participants in {city}."
+                            ),
+                        }
+                    ],
+                    system="You are a helpful pricing assistant. Reply only in Hebrew, one sentence.",
+                )
+                rationale_content = rationale_resp.get("content", [])
+                rationale_text = rationale_content[0].get("text", "") if rationale_content else ""
+                if rationale_text:
+                    await self._db.update_offer(offer_id_for_rationale, {"pricing_rationale": rationale_text[:500]})
+            except Exception:
+                logger.warning("Failed to generate/store pricing rationale")
+
+        # Task 3.1 — Autonomy mode: in recommend mode, flag for human confirmation
+        settings = get_settings()
+        if settings.PRICING_AGENT_MODE in ("recommend", "gated"):
+            state["needs_human"] = True
+            state["escalation_reason"] = (
+                f"Pricing results require admin confirmation (mode={settings.PRICING_AGENT_MODE})"
+            )
+            if state["actions_taken"]:
+                state["actions_taken"][-1]["requires_human_confirmation"] = True
 
         self._metrics["calls"] += 1
         return state

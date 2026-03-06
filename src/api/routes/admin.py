@@ -913,3 +913,35 @@ async def list_agent_audit(
         "page_size": page_size,
         "has_more": (page * page_size) < total,
     }
+
+
+# --------------- Agent autonomy modes (Task 3.1) ---------------
+
+
+@router.get("/agents/autonomy")
+async def get_agent_autonomy_modes(
+    admin: UserInDB = Depends(get_admin_user),
+) -> dict[str, Any]:
+    """Return current autonomy mode for each agent."""
+    from src.config.settings import get_settings
+
+    settings = get_settings()
+    return {
+        "matching": settings.MATCHING_AGENT_MODE,
+        "pricing": settings.PRICING_AGENT_MODE,
+        "vetting": settings.VETTING_AGENT_MODE,
+        "outreach": settings.OUTREACH_AGENT_MODE,
+    }
+
+
+@router.get("/agents/audit/{audit_id}")
+async def get_agent_audit_entry(
+    audit_id: str,
+    admin: UserInDB = Depends(get_admin_user),
+) -> dict[str, Any]:
+    """Get a single agent audit log entry including reasoning_chain (Task 3.6)."""
+    db = get_postgres_client()
+    entry = await db._pg_fetch_one("SELECT * FROM agent_audit_log WHERE id = $1", audit_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Audit entry not found")
+    return dict(entry)
