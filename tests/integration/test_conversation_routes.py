@@ -1,6 +1,6 @@
 """Integration tests for GET /api/v1/conversations/{userId}/messages."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -8,7 +8,6 @@ from fastapi.testclient import TestClient
 
 from src.api.main import app
 from src.api.middleware.auth import get_current_user
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -81,7 +80,7 @@ def mock_db():
 
 
 def _make_log_row(idx: int, user_message: str, assistant_reply: str) -> dict:
-    ts = datetime(2024, 1, idx + 1, 10, 0, 0, tzinfo=timezone.utc)
+    ts = datetime(2024, 1, idx + 1, 10, 0, 0, tzinfo=UTC)
     return {
         "id": f"log-{idx}",
         "user_id": "user-abc",

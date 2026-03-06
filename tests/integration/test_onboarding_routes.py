@@ -1,5 +1,6 @@
 """Integration tests for POST /api/v1/onboarding."""
 
+from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -7,7 +8,7 @@ from fastapi.testclient import TestClient
 
 from src.api.main import app
 from src.api.middleware.auth import get_current_user
-
+from src.models.user import UserInDB
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -95,8 +96,6 @@ class TestResidentOnboarding:
 
     def test_resident_onboarding_creates_new_building(self, client_resident, mock_db, resident_user):
         """Happy path: no existing building → creates one, links user."""
-        from src.models.user import UserInDB
-        from datetime import datetime
 
         # No existing building found
         mock_db.list_buildings = AsyncMock(return_value=([], 0))
@@ -140,8 +139,6 @@ class TestResidentOnboarding:
 
     def test_resident_onboarding_finds_existing_building(self, client_resident, mock_db):
         """When a building at the same address already exists, reuse it."""
-        from src.models.user import UserInDB
-        from datetime import datetime
 
         existing_building = {"id": "bld-existing", "address": "10 Herzl Street", "city": "Tel Aviv"}
         mock_db.list_buildings = AsyncMock(return_value=([existing_building], 1))
@@ -190,8 +187,6 @@ class TestResidentOnboarding:
 
     def test_already_onboarded_resident_returns_200(self, client_already_onboarded, mock_db):
         """Re-submitting onboarding when building_id is already set is idempotent."""
-        from src.models.user import UserInDB
-        from datetime import datetime
 
         existing_user = MagicMock(spec=UserInDB)
         existing_user.model_dump.return_value = {
@@ -244,8 +239,6 @@ class TestContractorOnboarding:
 
     def test_contractor_onboarding_success(self, client_contractor, mock_db, contractor_user):
         """Happy path: contractor profile created and user updated."""
-        from src.models.user import UserInDB
-        from datetime import datetime
 
         updated_user = MagicMock(spec=UserInDB)
         updated_user.model_dump.return_value = {

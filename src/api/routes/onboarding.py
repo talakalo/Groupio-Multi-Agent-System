@@ -14,7 +14,7 @@ from typing import Any
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from src.api.middleware.auth import get_current_user
 from src.databases.postgres import get_postgres_client
@@ -31,19 +31,24 @@ router = APIRouter(tags=["onboarding"])
 
 
 class ResidentBuilding(BaseModel):
-    buildingAddress: str = Field(..., min_length=2, max_length=500)
+    # Accept camelCase from the frontend while keeping snake_case internals.
+    model_config = ConfigDict(populate_by_name=True)
+
+    building_address: str = Field(..., alias="buildingAddress", min_length=2, max_length=500)
     city: str = Field(..., min_length=1, max_length=100)
     region: str = Field(..., min_length=1, max_length=50)
-    apartmentNumber: str = Field(..., min_length=1, max_length=20)
-    buildingType: str = Field(default="new_residential", max_length=50)
+    apartment_number: str = Field(..., alias="apartmentNumber", min_length=1, max_length=20)
+    building_type: str = Field("new_residential", alias="buildingType", max_length=50)
 
 
 class ContractorBusiness(BaseModel):
-    businessName: str = Field(..., min_length=2, max_length=200)
-    licenseNumber: str = Field(..., min_length=1, max_length=50)
-    yearsInBusiness: int = Field(default=0, ge=0, le=100)
+    model_config = ConfigDict(populate_by_name=True)
+
+    business_name: str = Field(..., alias="businessName", min_length=2, max_length=200)
+    license_number: str = Field(..., alias="licenseNumber", min_length=1, max_length=50)
+    years_in_business: int = Field(0, alias="yearsInBusiness", ge=0, le=100)
     regions: list[str] = Field(default_factory=list)
-    description: str = Field(default="", max_length=2000)
+    description: str = Field("", max_length=2000)
 
 
 class OnboardingRequest(BaseModel):
@@ -112,7 +117,7 @@ async def complete_onboarding(
         info = request.building
 
         # Find existing building by address + city (exact match, case-insensitive)
-        building = await _find_building_by_address(db, info.buildingAddress, info.city)
+        building = await _find_building_by_address(db, info.building_address, info.city)
 
         if not building:
             # Create a new building record. The current user becomes its admin.
@@ -121,8 +126,8 @@ async def complete_onboarding(
                 building = await db.create_building(
                     {
                         "id": building_id,
-                        "name": f"{info.buildingAddress}, {info.city}",
-                        "address": info.buildingAddress,
+                        "name": f"{info.building_address}, {info.city}",
+                        "address": info.building_address,
                         "city": info.city,
                         "region": info.region,
                         "total_units": 0,
@@ -147,11 +152,11 @@ async def complete_onboarding(
         already_in_building = await db.is_user_in_building(user_id, building_id)
         if not already_in_building:
             try:
-                floor = _floor_from_apartment(info.apartmentNumber)
+                floor = _floor_from_apartment(info.apartment_number)
                 await db.add_resident_to_building(
                     user_id=user_id,
                     building_id=building_id,
-                    unit_number=info.apartmentNumber,
+                    unit_number=info.apartment_number,
                     floor=floor,
                     is_owner=True,
                 )
@@ -189,19 +194,19 @@ async def complete_onboarding(
         contractor_row: dict[str, Any] = {
             "id": contractor_id,
             "user_id": user_id,
-            "business_name": info.businessName,
+            "business_name": info.business_name,
             "contact_name": current_user.full_name,
             "email": current_user.email,
             "phone": current_user.phone,
             "description": info.description or "",
-            "categories": [c for c in request.categories],
+            "categories": list(request.categories),
             "regions": info.regions,
-            "years_experience": info.yearsInBusiness,
+            "years_experience": info.years_in_business,
             "employee_count": 1,
             "website": None,
             "verification_status": "pending",
             "trust_score": 0.0,
-            "license_number": info.licenseNumber,
+            "license_number": info.license_number,
         }
 
         try:
