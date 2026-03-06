@@ -1,8 +1,8 @@
 """Document chunking strategies for the RAG pipeline."""
 
-from functools import lru_cache
 import logging
 import re
+from functools import lru_cache
 from typing import Any
 
 import tiktoken

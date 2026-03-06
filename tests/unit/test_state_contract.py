@@ -67,3 +67,49 @@ def test_validate_agent_state_rejects_invalid_start_time():
 
     with pytest.raises(ValueError, match="start_time must be ISO format"):
         validate_agent_state(base, context="test.invalid_start_time")
+
+
+def test_validate_agent_state_normalizes_action_envelope_defaults():
+    """Missing optional action fields should be normalized to safe defaults."""
+    base = _valid_state()
+    base["actions_taken"] = [
+        {
+            "agent": "router",
+            "action": "clarification_needed",
+            "response": {"type": "text", "message": "Please clarify"},
+        }
+    ]
+
+    validated = validate_agent_state(base, context="test.normalize_actions")
+    action = validated["actions_taken"][0]
+
+    assert action["requires_followup"] is False
+    assert action["details"] == {}
+    assert action["entities_to_pass"] == {}
+
+
+def test_validate_agent_state_rejects_action_without_required_fields():
+    """Actions missing required fields should fail validation."""
+    base = _valid_state()
+    base["actions_taken"] = [{"action": "oops_missing_agent"}]
+
+    with pytest.raises(ValueError, match="Invalid agent state"):
+        validate_agent_state(base, context="test.invalid_action")
+
+
+def test_validate_agent_state_rejects_confidence_out_of_range():
+    """Confidence must be clamped by producers; contract rejects invalid values."""
+    base = _valid_state()
+    base["confidence"] = 1.5
+
+    with pytest.raises(ValueError, match="Invalid agent state"):
+        validate_agent_state(base, context="test.invalid_confidence")
+
+
+def test_validate_agent_state_rejects_negative_tokens_used():
+    """Token usage metadata cannot be negative."""
+    base = _valid_state()
+    base["tokens_used"] = -1
+
+    with pytest.raises(ValueError, match="Invalid agent state"):
+        validate_agent_state(base, context="test.invalid_tokens")

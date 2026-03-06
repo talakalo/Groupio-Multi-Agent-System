@@ -2,13 +2,13 @@
 
 import importlib
 
+import src.rag.chunking as chunking_module
 from src.rag.chunking import (
     chunk_by_tokens,
     chunk_document,
     chunk_faq,
     count_tokens,
 )
-import src.rag.chunking as chunking_module
 
 
 def test_count_tokens():

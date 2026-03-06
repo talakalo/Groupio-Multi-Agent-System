@@ -7,6 +7,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from src.models.agent_actions import normalize_actions
 from src.models.agent_state import AgentState
 
 
@@ -39,7 +40,7 @@ class AgentStateContract(BaseModel):
         "human",
     ]
     intent: str | None = None
-    confidence: float
+    confidence: float = Field(ge=0.0, le=1.0)
 
     # Context
     user_profile: dict[str, Any]
@@ -62,7 +63,7 @@ class AgentStateContract(BaseModel):
 
     # Metadata
     start_time: str
-    tokens_used: int
+    tokens_used: int = Field(ge=0)
 
 
 def validate_agent_state(state: dict[str, Any], *, context: str = "unknown") -> AgentState:
@@ -81,4 +82,8 @@ def validate_agent_state(state: dict[str, Any], *, context: str = "unknown") -> 
     # Keep unknown keys (if any) while ensuring validated core schema
     normalized = dict(state)
     normalized.update(validated.model_dump())
+    try:
+        normalized["actions_taken"] = normalize_actions(normalized.get("actions_taken", []))
+    except ValidationError as exc:
+        raise ValueError(f"Invalid agent state at {context}: {exc}") from exc
     return normalized  # type: ignore[return-value]
