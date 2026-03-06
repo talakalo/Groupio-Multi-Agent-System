@@ -74,6 +74,7 @@ async def test_list_agent_audit_log_asyncpg():
 async def test_matching_agent_sets_requires_human_review():
     """Matching, Pricing, and Vetting agents must flag requires_human_review=True."""
     import asyncio
+    from unittest.mock import patch
 
     persisted_data: dict = {}
 
