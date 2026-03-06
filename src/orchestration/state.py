@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from src.models.agent_state import AgentState
+from src.orchestration.state_contract import validate_agent_state
 from src.utils.monitoring import generate_conversation_id
 
 
@@ -19,7 +20,7 @@ def create_initial_state(
     conversation_id: str | None = None,
 ) -> AgentState:
     """Create the initial state for a new agent workflow invocation."""
-    return AgentState(
+    initial_state = AgentState(
         user_id=user_id,
         building_id=building_id,
         conversation_id=conversation_id or generate_conversation_id(),
@@ -40,7 +41,9 @@ def create_initial_state(
         final_response=None,
         start_time=_utcnow().isoformat(),
         tokens_used=0,
+        state_contract_version=1,
     )
+    return validate_agent_state(initial_state, context="create_initial_state")
 
 
 def calculate_duration_ms(start_time: str) -> int:
