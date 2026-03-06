@@ -127,8 +127,26 @@ class StorageService:
             client = await self._get_client()
             res = await client.storage.from_(bucket).create_signed_url(storage_path, expires_in)
             return res.get("signedURL", "")
-        # Local fallback – just return the static path
-        return f"/uploads/{bucket}/{storage_path}"
+        return await self._local_signed_url(storage_path, expires_in)
+
+    async def create_signed_url(self, bucket: str, path: str, expires_in: int = 3600) -> str:
+        """Generate a time-limited signed URL for private file access."""
+        return await self.get_signed_url(bucket, path, expires_in)
+
+    async def _local_signed_url(self, path: str, expires_in: int) -> str:
+        """Generate a local HMAC-signed URL for development/testing."""
+        import hashlib
+        import hmac
+        import time
+
+        settings = get_settings()
+        expiry = int(time.time()) + expires_in
+        sig = hmac.new(
+            settings.JWT_SECRET_KEY.encode(),
+            f"{path}:{expiry}".encode(),
+            hashlib.sha256,
+        ).hexdigest()
+        return f"/local-files/{path}?expires={expiry}&sig={sig}"
 
     # ------------------------------------------------------------------
     # Delete

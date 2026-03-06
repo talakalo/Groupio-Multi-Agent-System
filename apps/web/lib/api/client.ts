@@ -17,7 +17,9 @@ export type On401Retry = () => Promise<string | null>;
 class ApiClient {
   private baseUrl: string;
   private defaultHeaders: Record<string, string>;
-  private on401Retry: On401Retry | null = null;
+  private _on401Retry: On401Retry | null = null;
+  /** Single-flight mutex: reuse in-flight refresh so concurrent 401s only call refresh once. */
+  private _refreshPromise: Promise<string | null> | null = null;
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
@@ -26,9 +28,21 @@ class ApiClient {
     };
   }
 
-  /** Set handler for 401: refresh token and return new access token; client will retry the request once. */
+  /** Set handler for 401: refresh token and return new access token; client will retry once. */
   setOn401Retry(fn: On401Retry | null): void {
-    this.on401Retry = fn;
+    this._on401Retry = fn;
+  }
+
+  private async refreshToken(): Promise<string | null> {
+    if (this._refreshPromise) {
+      return this._refreshPromise; // Reuse in-flight refresh
+    }
+    this._refreshPromise = this._on401Retry?.() ?? Promise.resolve(null);
+    try {
+      return await this._refreshPromise;
+    } finally {
+      this._refreshPromise = null;
+    }
   }
 
   private getAuthToken(): string | null {
@@ -60,8 +74,8 @@ class ApiClient {
       signal,
     });
 
-    if (response.status === 401 && this.on401Retry && !isRetry) {
-      const newToken = await this.on401Retry();
+    if (response.status === 401 && this._on401Retry && !isRetry) {
+      const newToken = await this.refreshToken();
       if (newToken) {
         return this.request<T>(endpoint, options, true);
       }

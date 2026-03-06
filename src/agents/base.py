@@ -1,10 +1,14 @@
 """Base agent class for all Groupio agents."""
 
+import asyncio
 import hashlib
 import json
 import logging
+import time
 from abc import ABC, abstractmethod
+from datetime import UTC, datetime
 from typing import Any
+from uuid import uuid4
 
 from pydantic import BaseModel, Field
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
@@ -219,6 +223,46 @@ class BaseAgent(ABC):
             self._metrics["errors"] += 1
             logger.error("Permanent LLM error in agent %s: %s", self.config.name, type(exc).__name__)
             raise
+
+    def _persist_audit(
+        self,
+        state: "AgentState",
+        action: str,
+        input_summary: str,
+        output_summary: str,
+        latency_ms: int,
+        tokens_used: int = 0,
+    ) -> None:
+        """Fire-and-forget persistence of an agent decision to agent_audit_log."""
+        # Agents that make consequential decisions require human review
+        _REVIEW_AGENTS = {"matching", "pricing", "vetting"}
+        requires_review = self.config.name.lower() in _REVIEW_AGENTS
+
+        async def _write() -> None:
+            try:
+                from src.databases.postgres import get_postgres_client
+
+                db = get_postgres_client()
+                await db.create_agent_audit_entry(
+                    {
+                        "id": str(uuid4()),
+                        "session_id": state.get("conversation_id"),
+                        "user_id": state.get("user_id"),
+                        "agent_name": self.config.name,
+                        "action": action,
+                        "input_summary": input_summary[:500],
+                        "output_summary": output_summary[:500],
+                        "model_used": self.config.model,
+                        "tokens_used": tokens_used,
+                        "latency_ms": latency_ms,
+                        "requires_human_review": requires_review,
+                        "created_at": datetime.now(UTC),
+                    }
+                )
+            except Exception as exc:
+                logger.warning("agent_audit_log write failed: %s", exc)
+
+        asyncio.create_task(_write())
 
     @retry(
         stop=stop_after_attempt(3),

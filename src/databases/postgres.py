@@ -1928,6 +1928,76 @@ class PostgresClient:
         return (rows or [], total)
 
     # ------------------------------------------------------------------
+    # Agent Audit Log
+    # ------------------------------------------------------------------
+
+    async def create_agent_audit_entry(self, data: dict[str, Any]) -> None:
+        """Insert an agent decision into agent_audit_log (fire-and-forget)."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            await client.table("agent_audit_log").insert(data).execute()
+            return
+        await self._pg_execute(
+            """INSERT INTO agent_audit_log
+               (id, session_id, user_id, agent_name, action, input_summary,
+                output_summary, model_used, tokens_used, latency_ms,
+                requires_human_review, created_at)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)""",
+            data["id"],
+            data.get("session_id"),
+            data.get("user_id"),
+            data["agent_name"],
+            data["action"],
+            data.get("input_summary"),
+            data.get("output_summary"),
+            data.get("model_used"),
+            data.get("tokens_used"),
+            data.get("latency_ms"),
+            data.get("requires_human_review", False),
+            data.get("created_at"),
+        )
+
+    async def list_agent_audit_log(
+        self,
+        page: int = 1,
+        page_size: int = 20,
+        agent_name: str | None = None,
+        requires_human_review: bool | None = None,
+    ) -> tuple[list[dict[str, Any]], int]:
+        """Paginated agent audit log with optional filters."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            q = client.table("agent_audit_log").select("*", count="exact")
+            if agent_name:
+                q = q.eq("agent_name", agent_name)
+            if requires_human_review is not None:
+                q = q.eq("requires_human_review", requires_human_review)
+            result = (
+                await q.order("created_at", desc=True).range((page - 1) * page_size, page * page_size - 1).execute()
+            )
+            total = result.count if hasattr(result, "count") and result.count is not None else len(result.data or [])
+            return (result.data or [], total)
+
+        where_parts: list[str] = []
+        args: list[Any] = []
+        if agent_name:
+            args.append(agent_name)
+            where_parts.append(f"agent_name = ${len(args)}")
+        if requires_human_review is not None:
+            args.append(requires_human_review)
+            where_parts.append(f"requires_human_review = ${len(args)}")
+        where_sql = " AND ".join(where_parts) if where_parts else "1=1"
+        count_row = await self._pg_fetch_one(f"SELECT COUNT(*) AS c FROM agent_audit_log WHERE {where_sql}", *args)
+        total = count_row["c"] if count_row else 0
+        args.extend([page_size, (page - 1) * page_size])
+        n1, n2 = len(args) - 1, len(args)
+        rows = await self._pg_fetch_all(
+            f"SELECT * FROM agent_audit_log WHERE {where_sql} ORDER BY created_at DESC LIMIT ${n1} OFFSET ${n2}",
+            *args,
+        )
+        return (rows or [], total)
+
+    # ------------------------------------------------------------------
     # Outreach Queue
     # ------------------------------------------------------------------
 
@@ -1986,12 +2056,7 @@ class PostgresClient:
                 update["approved_at"] = now.isoformat()
             if status == "sent":
                 update["sent_at"] = now.isoformat()
-            result = (
-                await client.table("outreach_queue")
-                .update(update)
-                .eq("id", pending_id)
-                .execute()
-            )
+            result = await client.table("outreach_queue").update(update).eq("id", pending_id).execute()
             return result.data[0] if result.data else None
         if approved_by:
             await self._pg_execute(

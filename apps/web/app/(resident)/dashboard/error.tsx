@@ -11,9 +11,11 @@ export default function DashboardError({ error, reset }: ErrorPageProps) {
   React.useEffect(() => {
     console.error("Dashboard error:", error);
     try {
-      import('@sentry/nextjs').then(({ captureException }) => captureException(error)).catch(() => {});
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { captureException } = require('@sentry/nextjs');
+      captureException(error);
     } catch {
-      // Sentry not available
+      // @sentry/nextjs not installed
     }
   }, [error]);
 

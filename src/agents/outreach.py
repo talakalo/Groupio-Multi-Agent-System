@@ -172,15 +172,17 @@ class OutreachAgent(BaseAgent):
         )
 
         pending_id = str(uuid4())
-        await self._db.create_outreach_pending({
-            "id": pending_id,
-            "user_id": state["user_id"],
-            "campaign_type": campaign_type,
-            "message": personalized,
-            "variant": variant,
-            "status": "pending_approval",
-            "created_at": datetime.now(UTC),
-        })
+        await self._db.create_outreach_pending(
+            {
+                "id": pending_id,
+                "user_id": state["user_id"],
+                "campaign_type": campaign_type,
+                "message": personalized,
+                "variant": variant,
+                "status": "pending_approval",
+                "created_at": datetime.now(UTC),
+            }
+        )
 
         state["actions_taken"] = [
             {

@@ -843,15 +843,18 @@ async def suspend_user(
     if user.id == admin.id:
         raise HTTPException(status_code=400, detail="Cannot suspend yourself")
     await db.update_user(user_id, {"is_active": False})
-    await db.create_audit_log({
-        "user_id": admin.id,
-        "action": "suspend_user",
-        "resource_type": "user",
-        "resource_id": user_id,
-        "details": {"reason": body.get("reason", ""), "suspended_user_email": user.email},
-        "ip_address": request.client.host if request.client else None,
-    })
+    await db.create_audit_log(
+        {
+            "user_id": admin.id,
+            "action": "suspend_user",
+            "resource_type": "user",
+            "resource_id": user_id,
+            "details": {"reason": body.get("reason", ""), "suspended_user_email": user.email},
+            "ip_address": request.client.host if request.client else None,
+        }
+    )
     from src.databases.redis_client import get_redis_client as _get_redis
+
     redis = _get_redis()
     await redis.delete(f"refresh_token:{user_id}")
     logger.info("Admin %s suspended user %s", admin.id, user_id)
@@ -870,13 +873,43 @@ async def activate_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     await db.update_user(user_id, {"is_active": True})
-    await db.create_audit_log({
-        "user_id": admin.id,
-        "action": "activate_user",
-        "resource_type": "user",
-        "resource_id": user_id,
-        "details": {"activated_user_email": user.email},
-        "ip_address": request.client.host if request.client else None,
-    })
+    await db.create_audit_log(
+        {
+            "user_id": admin.id,
+            "action": "activate_user",
+            "resource_type": "user",
+            "resource_id": user_id,
+            "details": {"activated_user_email": user.email},
+            "ip_address": request.client.host if request.client else None,
+        }
+    )
     logger.info("Admin %s activated user %s", admin.id, user_id)
     return {"status": "active", "user_id": user_id}
+
+
+# --------------- Agent audit log ---------------
+
+
+@router.get("/agents/audit")
+async def list_agent_audit(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    agent_name: str | None = None,
+    requires_human_review: bool | None = None,
+    admin: UserInDB = Depends(get_admin_user),
+) -> dict[str, Any]:
+    """List paginated AI agent audit log entries."""
+    db = get_postgres_client()
+    items, total = await db.list_agent_audit_log(
+        page=page,
+        page_size=page_size,
+        agent_name=agent_name,
+        requires_human_review=requires_human_review,
+    )
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "has_more": (page * page_size) < total,
+    }
