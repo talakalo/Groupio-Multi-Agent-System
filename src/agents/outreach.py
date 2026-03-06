@@ -2,8 +2,9 @@
 
 import hashlib
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
+from uuid import uuid4
 
 from src.agents.base import AgentConfig, BaseAgent
 from src.config.prompts.outreach import OUTREACH_SYSTEM_PROMPT
@@ -170,22 +171,30 @@ class OutreachAgent(BaseAgent):
             variants={"control": 50, "variant_a": 50},
         )
 
+        pending_id = str(uuid4())
+        await self._db.create_outreach_pending(
+            {
+                "id": pending_id,
+                "user_id": state["user_id"],
+                "campaign_type": campaign_type,
+                "message": personalized,
+                "variant": variant,
+                "status": "pending_approval",
+                "created_at": datetime.now(UTC),
+            }
+        )
+
         state["actions_taken"] = [
             {
                 "agent": "outreach",
-                "action": "campaign_generated",
-                "details": {
-                    "campaign_type": campaign_type,
-                    "variant": variant,
-                },
+                "action": "campaign_queued_for_approval",
+                "details": {"pending_id": pending_id, "campaign_type": campaign_type},
                 "response": {
-                    "type": "outreach",
-                    "message": personalized,
-                    "campaign_type": campaign_type,
-                    "variant": variant,
+                    "type": "outreach_pending",
+                    "message": "Queued for admin approval",
                 },
-                "requires_followup": False,
-                "summary_for_next_agent": f"Outreach campaign ({campaign_type}) message generated and dispatched.",
+                "requires_followup": True,
+                "summary_for_next_agent": f"Outreach campaign ({campaign_type}) queued, pending admin approval.",
             }
         ]
 

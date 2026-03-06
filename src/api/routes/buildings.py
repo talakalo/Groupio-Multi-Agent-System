@@ -237,6 +237,7 @@ async def get_building_residents(
         "total": total,
         "page": page,
         "page_size": page_size,
+        "has_more": (page * page_size) < total,
     }
 
 
@@ -364,6 +365,7 @@ async def get_building_offers(
         "total": total,
         "page": page,
         "page_size": page_size,
+        "has_more": (page * page_size) < total,
     }
 
 

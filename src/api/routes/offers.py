@@ -1,6 +1,7 @@
 """Offer API routes."""
 
 import logging
+from datetime import datetime
 from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
@@ -506,3 +507,67 @@ async def get_participants(
         for p in participants
     ]
     return {"participants": anonymized, "total": len(anonymized)}
+
+
+@router.post("/{offer_id}/resolve-undersubscription", response_model=OfferResponse)
+async def resolve_undersubscription(
+    offer_id: str,
+    action: str = Query(..., pattern="^(extend_deadline|cancel_with_refund|lower_minimum)$"),
+    new_deadline: datetime | None = None,
+    new_minimum: int | None = None,
+    current_user: UserInDB = Depends(get_current_user),
+) -> OfferResponse:
+    """Handle an offer that failed to reach minimum participants."""
+    if not is_admin(current_user):
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    db = get_postgres_client()
+    offer = await db.get_offer(offer_id)
+    if not offer:
+        raise HTTPException(status_code=404, detail="Offer not found")
+
+    if action == "extend_deadline":
+        if not new_deadline:
+            raise HTTPException(status_code=400, detail="new_deadline required")
+        await db.update_offer(offer_id, {"deadline": new_deadline})
+        logger.info("Admin %s extended deadline for offer %s", current_user.id, offer_id)
+
+    elif action == "lower_minimum":
+        if not new_minimum or new_minimum < 1:
+            raise HTTPException(status_code=400, detail="new_minimum must be >= 1")
+        await db.update_offer(offer_id, {"min_participants": new_minimum})
+        logger.info(
+            "Admin %s lowered minimum for offer %s to %d",
+            current_user.id,
+            offer_id,
+            new_minimum,
+        )
+
+    elif action == "cancel_with_refund":
+        await db.update_offer(offer_id, {"status": "cancelled"})
+        logger.info(
+            "Admin %s cancelled under-subscribed offer %s with refund",
+            current_user.id,
+            offer_id,
+        )
+        # Trigger payment reversal notifications (actual refund via payment provider)
+        try:
+            participants = await db.get_offer_participants(offer_id)
+            email_service = get_email_service()
+            for p in participants:
+                p_email = p.get("email") or (p.get("users") or {}).get("email")
+                p_name = p.get("full_name") or (p.get("users") or {}).get("full_name") or "דייר"
+                if p_email:
+                    await email_service.send_offer_cancelled(
+                        to_email=p_email,
+                        user_name=p_name,
+                        offer_title=offer.get("title", ""),
+                        reason="ההצעה בוטלה עקב אי-עמידה במינימום משתתפים. תקבל/י החזר כספי מלא.",
+                    )
+        except Exception:
+            logger.warning("Failed to notify participants of under-subscription cancellation")
+
+    updated = await db.get_offer(offer_id)
+    if not updated:
+        raise HTTPException(status_code=500, detail="Failed to retrieve updated offer")
+    return OfferResponse(**updated)

@@ -111,6 +111,16 @@ export default function TermsPage() {
         </section>
 
         <section>
+          <h2 className="text-xl font-semibold text-gray-900 mb-3">5א. הגבלת אחריות קבלן</h2>
+          <p>
+            Groupio פועלת כמתווך בלבד בין דיירים לקבלנים עצמאיים.
+            Groupio אינה מעסיקה קבלנים ואינה נושאת באחריות ישירה לביצוע,
+            איכות, בטיחות, או נזקים הנובעים מעבודות הקבלן.
+            כל הסכם עבודה הינו בין הדייר לקבלן בלבד.
+          </p>
+        </section>
+
+        <section>
           <h2 className="text-xl font-semibold text-gray-900 mb-3">6. תשלומים ועמלות</h2>
           <p>
             Groupio גובה עמלת פלטפורמה של עד 3% מסכום כל עסקה. כספי
@@ -156,10 +166,6 @@ export default function TermsPage() {
             <a href="mailto:legal@groupio.co.il" className="text-blue-600 hover:underline">
               legal@groupio.co.il
             </a>
-          </p>
-          <p className="mt-2 text-sm text-gray-500">
-            ⚠️ מסמך זה הינו טיוטה המיועדת לבדיקה פנימית בלבד ואינה מייצגת
-            ייעוץ משפטי. יש להביאה לסקירת עורך דין לפני פרסום לציבור.
           </p>
         </section>
       </div>

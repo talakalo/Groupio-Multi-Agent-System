@@ -145,10 +145,6 @@ export default function PrivacyPage() {
               privacy@groupio.co.il
             </a>
           </p>
-          <p className="mt-2 text-sm text-gray-500">
-            ⚠️ מסמך זה הינו טיוטה המיועדת לבדיקה פנימית בלבד ואינה מייצגת
-            ייעוץ משפטי. יש להביאה לסקירת עורך דין לפני פרסום לציבור.
-          </p>
         </section>
 
         <div className="pt-4 border-t border-gray-200 text-sm text-gray-500 text-center">

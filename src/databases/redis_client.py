@@ -104,6 +104,26 @@ class RedisClient:
         count = await self._redis.eval(_RATE_LIMIT_SCRIPT, 1, key, limit, window)
         return int(count) <= limit
 
+    async def check_ip_rate_limit(self, ip: str, limit: int = 20, window: int = 60) -> bool:
+        """Check if an IP has exceeded the rate limit (atomic via Lua).
+
+        Returns True if the request is allowed, False if rate limited.
+        Uses the same atomic Lua script as check_rate_limit.
+        """
+        key = f"auth_ip:{ip}"
+        count = await self._redis.eval(_RATE_LIMIT_SCRIPT, 1, key, limit, window)
+        return int(count) <= limit
+
+    async def increment_login_failures(self, user_id: str, window: int = 900) -> int:
+        """Increment failed login counter for a user. Returns new count."""
+        key = f"login_fail:{user_id}"
+        count = await self._redis.eval(_RATE_LIMIT_SCRIPT, 1, key, 9999, window)
+        return int(count)
+
+    async def clear_login_failures(self, user_id: str) -> None:
+        """Clear the failed login counter after a successful login."""
+        await self._redis.delete(f"login_fail:{user_id}")
+
     # -- A/B Testing --
 
     async def ab_test_track(

@@ -879,36 +879,43 @@ class PostgresClient:
         return row is not None
 
     async def join_offer(self, user_id: str, offer_id: str, unit_count: int = 1) -> None:
-        """Add user as participant and increment current_participants."""
-        from uuid import uuid4
-
+        """Add user as participant and increment current_participants (atomic)."""
         pid = str(uuid4())
         if self._use_supabase_client():
             client = await self._get_client()
-            await (
-                client.table("offer_participants")
-                .insert({"id": pid, "offer_id": offer_id, "user_id": user_id, "unit_count": unit_count})
-                .execute()
-            )
-            offer = await self.get_offer(offer_id)
-            cur = ((offer.get("current_participants") or 0) if offer is not None else 0) + unit_count
-            await client.table("offers").update({"current_participants": cur}).eq("id", offer_id).execute()
+            # Atomic Postgres function eliminates the read-modify-write race
+            await client.rpc(
+                "join_offer_atomic",
+                {
+                    "p_id": pid,
+                    "p_offer_id": offer_id,
+                    "p_user_id": user_id,
+                    "p_unit_count": unit_count,
+                },
+            ).execute()
         else:
-            await self._pg_execute(
-                "INSERT INTO offer_participants (id, offer_id, user_id, unit_count) VALUES ($1, $2, $3, $4)",
-                pid,
-                offer_id,
-                user_id,
-                unit_count,
-            )
-            await self._pg_execute(
-                "UPDATE offers SET current_participants = current_participants + $1 WHERE id = $2",
-                unit_count,
-                offer_id,
-            )
+            pool = await self._get_client()
+            async with pool.acquire() as conn:
+                async with conn.transaction():
+                    await conn.execute(
+                        "INSERT INTO offer_participants (id, offer_id, user_id, unit_count) VALUES ($1, $2, $3, $4)",
+                        pid,
+                        offer_id,
+                        user_id,
+                        unit_count,
+                    )
+                    result = await conn.execute(
+                        "UPDATE offers SET current_participants = current_participants + $1 "
+                        "WHERE id = $2 AND status IN ('pending', 'matching') "
+                        "AND current_participants < max_participants",
+                        unit_count,
+                        offer_id,
+                    )
+                    if result == "UPDATE 0":
+                        raise ValueError("Offer not joinable, full, or does not exist")
 
     async def leave_offer(self, user_id: str, offer_id: str) -> None:
-        """Remove user from offer and decrement current_participants."""
+        """Remove user from offer and decrement current_participants (atomic)."""
         if self._use_supabase_client():
             client = await self._get_client()
             part = (
@@ -925,22 +932,25 @@ class PostgresClient:
             cur = max(0, ((offer.get("current_participants") or 0) if offer is not None else 0) - uc)
             await client.table("offers").update({"current_participants": cur}).eq("id", offer_id).execute()
         else:
-            row = await self._pg_fetch_one(
-                "SELECT unit_count FROM offer_participants WHERE user_id = $1 AND offer_id = $2",
-                user_id,
-                offer_id,
-            )
-            uc = row["unit_count"] if row else 1
-            await self._pg_execute(
-                "DELETE FROM offer_participants WHERE user_id = $1 AND offer_id = $2",
-                user_id,
-                offer_id,
-            )
-            await self._pg_execute(
-                "UPDATE offers SET current_participants = GREATEST(0, current_participants - $1) WHERE id = $2",
-                uc,
-                offer_id,
-            )
+            pool = await self._get_client()
+            async with pool.acquire() as conn:
+                async with conn.transaction():
+                    row = await conn.fetchrow(
+                        "SELECT unit_count FROM offer_participants WHERE user_id = $1 AND offer_id = $2 FOR UPDATE",
+                        user_id,
+                        offer_id,
+                    )
+                    uc = row["unit_count"] if row else 1
+                    await conn.execute(
+                        "DELETE FROM offer_participants WHERE user_id = $1 AND offer_id = $2",
+                        user_id,
+                        offer_id,
+                    )
+                    await conn.execute(
+                        "UPDATE offers SET current_participants = GREATEST(0, current_participants - $1) WHERE id = $2",
+                        uc,
+                        offer_id,
+                    )
 
     async def get_offer_participants(self, offer_id: str) -> list[dict[str, Any]]:
         """Get all participants of an offer."""
@@ -1916,6 +1926,168 @@ class PostgresClient:
             *args,
         )
         return (rows or [], total)
+
+    # ------------------------------------------------------------------
+    # Agent Audit Log
+    # ------------------------------------------------------------------
+
+    async def create_agent_audit_entry(self, data: dict[str, Any]) -> None:
+        """Insert an agent decision into agent_audit_log (fire-and-forget)."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            await client.table("agent_audit_log").insert(data).execute()
+            return
+        await self._pg_execute(
+            """INSERT INTO agent_audit_log
+               (id, session_id, user_id, agent_name, action, input_summary,
+                output_summary, model_used, tokens_used, latency_ms,
+                requires_human_review, created_at)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)""",
+            data["id"],
+            data.get("session_id"),
+            data.get("user_id"),
+            data["agent_name"],
+            data["action"],
+            data.get("input_summary"),
+            data.get("output_summary"),
+            data.get("model_used"),
+            data.get("tokens_used"),
+            data.get("latency_ms"),
+            data.get("requires_human_review", False),
+            data.get("created_at"),
+        )
+
+    async def list_agent_audit_log(
+        self,
+        page: int = 1,
+        page_size: int = 20,
+        agent_name: str | None = None,
+        requires_human_review: bool | None = None,
+    ) -> tuple[list[dict[str, Any]], int]:
+        """Paginated agent audit log with optional filters."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            q = client.table("agent_audit_log").select("*", count="exact")
+            if agent_name:
+                q = q.eq("agent_name", agent_name)
+            if requires_human_review is not None:
+                q = q.eq("requires_human_review", requires_human_review)
+            result = (
+                await q.order("created_at", desc=True).range((page - 1) * page_size, page * page_size - 1).execute()
+            )
+            total = result.count if hasattr(result, "count") and result.count is not None else len(result.data or [])
+            return (result.data or [], total)
+
+        where_parts: list[str] = []
+        args: list[Any] = []
+        if agent_name:
+            args.append(agent_name)
+            where_parts.append(f"agent_name = ${len(args)}")
+        if requires_human_review is not None:
+            args.append(requires_human_review)
+            where_parts.append(f"requires_human_review = ${len(args)}")
+        where_sql = " AND ".join(where_parts) if where_parts else "1=1"
+        count_row = await self._pg_fetch_one(f"SELECT COUNT(*) AS c FROM agent_audit_log WHERE {where_sql}", *args)
+        total = count_row["c"] if count_row else 0
+        args.extend([page_size, (page - 1) * page_size])
+        n1, n2 = len(args) - 1, len(args)
+        rows = await self._pg_fetch_all(
+            f"SELECT * FROM agent_audit_log WHERE {where_sql} ORDER BY created_at DESC LIMIT ${n1} OFFSET ${n2}",
+            *args,
+        )
+        return (rows or [], total)
+
+    # ------------------------------------------------------------------
+    # Outreach Queue
+    # ------------------------------------------------------------------
+
+    async def create_outreach_pending(self, data: dict[str, Any]) -> dict[str, Any]:
+        """Insert a pending outreach message into the approval queue."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            result = await client.table("outreach_queue").insert(data).execute()
+            return result.data[0] if result.data else data
+        await self._pg_execute(
+            """INSERT INTO outreach_queue
+               (id, user_id, campaign_type, message, variant, status, created_at)
+               VALUES ($1, $2, $3, $4, $5, $6, $7)""",
+            data["id"],
+            data["user_id"],
+            data["campaign_type"],
+            data["message"],
+            data.get("variant"),
+            data.get("status", "pending_approval"),
+            data.get("created_at"),
+        )
+        return data
+
+    async def list_outreach_queue(self, status: str = "pending_approval") -> list[dict[str, Any]]:
+        """List outreach messages filtered by status."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            result = (
+                await client.table("outreach_queue")
+                .select("*")
+                .eq("status", status)
+                .order("created_at", desc=True)
+                .execute()
+            )
+            return result.data or []
+        return await self._pg_fetch_all(
+            "SELECT * FROM outreach_queue WHERE status = $1 ORDER BY created_at DESC",
+            status,
+        )
+
+    async def update_outreach_queue_status(
+        self,
+        pending_id: str,
+        status: str,
+        approved_by: str | None = None,
+    ) -> dict[str, Any] | None:
+        """Update the status of an outreach queue entry."""
+        from datetime import UTC, datetime
+
+        now = datetime.now(UTC)
+        if self._use_supabase_client():
+            client = await self._get_client()
+            update: dict[str, Any] = {"status": status}
+            if approved_by:
+                update["approved_by"] = approved_by
+                update["approved_at"] = now.isoformat()
+            if status == "sent":
+                update["sent_at"] = now.isoformat()
+            result = await client.table("outreach_queue").update(update).eq("id", pending_id).execute()
+            return result.data[0] if result.data else None
+        if approved_by:
+            await self._pg_execute(
+                "UPDATE outreach_queue SET status=$1, approved_by=$2, approved_at=$3 WHERE id=$4",
+                status,
+                approved_by,
+                now,
+                pending_id,
+            )
+        elif status == "sent":
+            await self._pg_execute(
+                "UPDATE outreach_queue SET status=$1, sent_at=$2 WHERE id=$3",
+                status,
+                now,
+                pending_id,
+            )
+        else:
+            await self._pg_execute(
+                "UPDATE outreach_queue SET status=$1 WHERE id=$2",
+                status,
+                pending_id,
+            )
+        return await self._pg_fetch_one("SELECT * FROM outreach_queue WHERE id=$1", pending_id)
+
+    async def get_outreach_pending(self, pending_id: str) -> dict[str, Any] | None:
+        """Get a single outreach queue entry by ID."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            result = await client.table("outreach_queue").select("*").eq("id", pending_id).execute()
+            return result.data[0] if result.data else None
+        return await self._pg_fetch_one("SELECT * FROM outreach_queue WHERE id=$1", pending_id)
 
     # ------------------------------------------------------------------
     # Invoices
