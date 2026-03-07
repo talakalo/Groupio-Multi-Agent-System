@@ -3,14 +3,11 @@
 import time
 from datetime import UTC, datetime
 
-import pytest
-
 from src.orchestration.state import (
     calculate_duration_ms,
     create_initial_state,
     summarize_rag_results,
 )
-
 
 # ---------------------------------------------------------------------------
 # create_initial_state

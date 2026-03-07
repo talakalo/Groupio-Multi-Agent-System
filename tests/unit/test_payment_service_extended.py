@@ -8,7 +8,6 @@ import pytest
 import src.services.payment as pay_module
 from src.services.payment import MockPaymentProvider, get_payment_provider
 
-
 # ---------------------------------------------------------------------------
 # MockPaymentProvider
 # ---------------------------------------------------------------------------

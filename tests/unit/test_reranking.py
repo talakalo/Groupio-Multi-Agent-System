@@ -6,7 +6,6 @@ import pytest
 
 from src.rag.reranking import Reranker
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -49,10 +48,13 @@ async def test_rerank_calls_llm_and_sorts(reranker):
     """LLM scores are used to reorder documents."""
     docs = _docs(6)
     llm = AsyncMock()
+    scores = (
+        '[{"index": 0, "score": 9}, {"index": 1, "score": 2},'
+        ' {"index": 2, "score": 7}, {"index": 3, "score": 5},'
+        ' {"index": 4, "score": 3}, {"index": 5, "score": 8}]'
+    )
     llm.create_message = AsyncMock(
-        return_value={
-            "content": [{"text": '[{"index": 0, "score": 9}, {"index": 1, "score": 2}, {"index": 2, "score": 7}, {"index": 3, "score": 5}, {"index": 4, "score": 3}, {"index": 5, "score": 8}]'}]
-        }
+        return_value={"content": [{"text": scores}]}
     )
     with patch("src.rag.reranking.get_llm_client", return_value=llm):
         result = await reranker.rerank("query", docs, top_k=3)

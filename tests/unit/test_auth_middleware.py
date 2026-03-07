@@ -22,7 +22,6 @@ from src.api.middleware.auth import (
 )
 from src.models.user import UserInDB, UserRole
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------

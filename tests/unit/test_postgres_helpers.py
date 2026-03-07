@@ -7,7 +7,6 @@ import pytest
 
 from src.databases.postgres import PostgresClient, _compute_avg_resolution_hours, _row_to_user
 
-
 # ---------------------------------------------------------------------------
 # _compute_avg_resolution_hours
 # ---------------------------------------------------------------------------
