@@ -303,3 +303,343 @@ class TestEscalationStats:
             assert resp.status_code == 403
         finally:
             app.dependency_overrides.clear()
+
+
+class TestCreateEscalation:
+    def test_create_ok(self):
+        esc = _make_escalation()
+        db = AsyncMock()
+        db.create_escalation = AsyncMock(return_value=esc)
+
+        from src.api.main import app
+
+        app.dependency_overrides.clear()
+        try:
+            with patch("src.api.routes.escalations.get_postgres_client", return_value=db):
+                client = TestClient(app, raise_server_exceptions=False)
+                resp = client.post(
+                    "/api/v1/escalations/",
+                    json={
+                        "user_id": "user-1",
+                        "conversation_id": "conv-1",
+                        "source_agent": "support",
+                        "reason": "negative_sentiment",
+                        "priority": "medium",
+                        "summary": "User is very frustrated and needs help",
+                    },
+                )
+            assert resp.status_code == 200
+        finally:
+            app.dependency_overrides.clear()
+
+
+class TestFilterEscalations:
+    def test_filter_ok(self):
+        user = _make_user()
+        db = AsyncMock()
+        db.list_escalations = AsyncMock(return_value=([_make_escalation()], 1))
+
+        from src.api.main import app
+        from src.api.middleware.auth import get_current_user
+
+        app.dependency_overrides[get_current_user] = lambda: user
+        try:
+            with patch("src.api.routes.escalations.get_postgres_client", return_value=db):
+                client = TestClient(app, raise_server_exceptions=False)
+                resp = client.post(
+                    "/api/v1/escalations/filter",
+                    json={"status": ["open"], "priority": ["high"]},
+                )
+            assert resp.status_code == 200
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_filter_resident_forbidden(self):
+        user = _make_user(UserRole.RESIDENT)
+
+        from src.api.main import app
+        from src.api.middleware.auth import get_current_user
+
+        app.dependency_overrides[get_current_user] = lambda: user
+        try:
+            client = TestClient(app, raise_server_exceptions=False)
+            resp = client.post("/api/v1/escalations/filter", json={})
+            assert resp.status_code == 403
+        finally:
+            app.dependency_overrides.clear()
+
+
+class TestGetMyEscalations:
+    def test_my_ok(self):
+        user = _make_user()
+        db = AsyncMock()
+        db.list_escalations = AsyncMock(return_value=([_make_escalation()], 1))
+
+        from src.api.main import app
+        from src.api.middleware.auth import get_current_user
+
+        app.dependency_overrides[get_current_user] = lambda: user
+        try:
+            with patch("src.api.routes.escalations.get_postgres_client", return_value=db):
+                client = TestClient(app, raise_server_exceptions=False)
+                resp = client.get("/api/v1/escalations/my")
+            assert resp.status_code == 200
+            call_kwargs = db.list_escalations.call_args[1]
+            assert call_kwargs["filters"]["assigned_to"] == "admin-1"
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_my_resident_forbidden(self):
+        user = _make_user(UserRole.RESIDENT)
+
+        from src.api.main import app
+        from src.api.middleware.auth import get_current_user
+
+        app.dependency_overrides[get_current_user] = lambda: user
+        try:
+            client = TestClient(app, raise_server_exceptions=False)
+            resp = client.get("/api/v1/escalations/my")
+            assert resp.status_code == 403
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_my_with_status_filter(self):
+        user = _make_user()
+        db = AsyncMock()
+        db.list_escalations = AsyncMock(return_value=([], 0))
+
+        from src.api.main import app
+        from src.api.middleware.auth import get_current_user
+
+        app.dependency_overrides[get_current_user] = lambda: user
+        try:
+            with patch("src.api.routes.escalations.get_postgres_client", return_value=db):
+                client = TestClient(app, raise_server_exceptions=False)
+                resp = client.get("/api/v1/escalations/my?status=open")
+            assert resp.status_code == 200
+        finally:
+            app.dependency_overrides.clear()
+
+
+class TestUpdateEscalation:
+    def test_update_ok(self):
+        user = _make_user()
+        db = AsyncMock()
+        db.get_escalation = AsyncMock(return_value=_make_escalation(status="open"))
+        db.update_escalation = AsyncMock(return_value=_make_escalation(status="in_progress"))
+
+        from src.api.main import app
+        from src.api.middleware.auth import get_current_user
+
+        app.dependency_overrides[get_current_user] = lambda: user
+        try:
+            with patch("src.api.routes.escalations.get_postgres_client", return_value=db):
+                client = TestClient(app, raise_server_exceptions=False)
+                resp = client.put(
+                    "/api/v1/escalations/esc-1",
+                    json={"status": "in_progress"},
+                )
+            assert resp.status_code == 200
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_update_not_found(self):
+        user = _make_user()
+        db = AsyncMock()
+        db.get_escalation = AsyncMock(return_value=None)
+
+        from src.api.main import app
+        from src.api.middleware.auth import get_current_user
+
+        app.dependency_overrides[get_current_user] = lambda: user
+        try:
+            with patch("src.api.routes.escalations.get_postgres_client", return_value=db):
+                client = TestClient(app, raise_server_exceptions=False)
+                resp = client.put("/api/v1/escalations/missing", json={"status": "resolved"})
+            assert resp.status_code == 404
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_update_to_resolved_sets_resolved_at(self):
+        user = _make_user()
+        db = AsyncMock()
+        db.get_escalation = AsyncMock(return_value=_make_escalation(status="open"))
+        db.update_escalation = AsyncMock(return_value=_make_escalation(status="resolved"))
+
+        from src.api.main import app
+        from src.api.middleware.auth import get_current_user
+
+        app.dependency_overrides[get_current_user] = lambda: user
+        try:
+            with patch("src.api.routes.escalations.get_postgres_client", return_value=db):
+                client = TestClient(app, raise_server_exceptions=False)
+                resp = client.put("/api/v1/escalations/esc-1", json={"status": "resolved"})
+            assert resp.status_code == 200
+            update_data = db.update_escalation.call_args[0][1]
+            assert "resolved_at" in update_data
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_update_resident_forbidden(self):
+        user = _make_user(UserRole.RESIDENT)
+
+        from src.api.main import app
+        from src.api.middleware.auth import get_current_user
+
+        app.dependency_overrides[get_current_user] = lambda: user
+        try:
+            client = TestClient(app, raise_server_exceptions=False)
+            resp = client.put("/api/v1/escalations/esc-1", json={"status": "resolved"})
+            assert resp.status_code == 403
+        finally:
+            app.dependency_overrides.clear()
+
+
+class TestAssignEscalation:
+    def test_assign_ok(self):
+        admin = _make_user()
+        db = AsyncMock()
+        db.get_escalation = AsyncMock(return_value=_make_escalation())
+        db.get_user = AsyncMock(return_value=admin)
+        db.update_escalation = AsyncMock(return_value=_make_escalation(assigned_to="admin-1"))
+
+        from src.api.main import app
+        from src.api.middleware.auth import get_current_user
+
+        app.dependency_overrides[get_current_user] = lambda: admin
+        try:
+            with patch("src.api.routes.escalations.get_postgres_client", return_value=db):
+                client = TestClient(app, raise_server_exceptions=False)
+                resp = client.post(
+                    "/api/v1/escalations/esc-1/assign",
+                    params={"admin_id": "admin-1"},
+                )
+            assert resp.status_code == 200
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_assign_escalation_not_found(self):
+        admin = _make_user()
+        db = AsyncMock()
+        db.get_escalation = AsyncMock(return_value=None)
+
+        from src.api.main import app
+        from src.api.middleware.auth import get_current_user
+
+        app.dependency_overrides[get_current_user] = lambda: admin
+        try:
+            with patch("src.api.routes.escalations.get_postgres_client", return_value=db):
+                client = TestClient(app, raise_server_exceptions=False)
+                resp = client.post(
+                    "/api/v1/escalations/missing/assign",
+                    params={"admin_id": "admin-1"},
+                )
+            assert resp.status_code == 404
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_assign_invalid_admin(self):
+        admin = _make_user()
+        db = AsyncMock()
+        db.get_escalation = AsyncMock(return_value=_make_escalation())
+        db.get_user = AsyncMock(return_value=None)
+
+        from src.api.main import app
+        from src.api.middleware.auth import get_current_user
+
+        app.dependency_overrides[get_current_user] = lambda: admin
+        try:
+            with patch("src.api.routes.escalations.get_postgres_client", return_value=db):
+                client = TestClient(app, raise_server_exceptions=False)
+                resp = client.post(
+                    "/api/v1/escalations/esc-1/assign",
+                    params={"admin_id": "nonexistent"},
+                )
+            assert resp.status_code == 400
+        finally:
+            app.dependency_overrides.clear()
+
+
+class TestReplyEscalation:
+    def test_reply_ok(self):
+        admin = _make_user()
+        db = AsyncMock()
+        db.get_escalation = AsyncMock(return_value=_make_escalation())
+        db.add_escalation_message = AsyncMock()
+
+        from src.api.main import app
+        from src.api.middleware.auth import get_current_user
+
+        app.dependency_overrides[get_current_user] = lambda: admin
+        try:
+            with patch("src.api.routes.escalations.get_postgres_client", return_value=db):
+                client = TestClient(app, raise_server_exceptions=False)
+                resp = client.post(
+                    "/api/v1/escalations/esc-1/reply",
+                    json={"content": "Looking into this issue", "resolve": False},
+                )
+            assert resp.status_code == 200
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_reply_with_resolve(self):
+        admin = _make_user()
+        db = AsyncMock()
+        db.get_escalation = AsyncMock(return_value=_make_escalation())
+        db.add_escalation_message = AsyncMock()
+        db.update_escalation = AsyncMock()
+
+        from src.api.main import app
+        from src.api.middleware.auth import get_current_user
+
+        app.dependency_overrides[get_current_user] = lambda: admin
+        try:
+            with patch("src.api.routes.escalations.get_postgres_client", return_value=db):
+                client = TestClient(app, raise_server_exceptions=False)
+                resp = client.post(
+                    "/api/v1/escalations/esc-1/reply",
+                    json={"content": "Resolved", "resolve": True, "resolution_notes": "Done"},
+                )
+            assert resp.status_code == 200
+            db.update_escalation.assert_called_once()
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_reply_not_found(self):
+        admin = _make_user()
+        db = AsyncMock()
+        db.get_escalation = AsyncMock(return_value=None)
+
+        from src.api.main import app
+        from src.api.middleware.auth import get_current_user
+
+        app.dependency_overrides[get_current_user] = lambda: admin
+        try:
+            with patch("src.api.routes.escalations.get_postgres_client", return_value=db):
+                client = TestClient(app, raise_server_exceptions=False)
+                resp = client.post(
+                    "/api/v1/escalations/missing/reply",
+                    json={"content": "Hello", "resolve": False},
+                )
+            assert resp.status_code == 404
+        finally:
+            app.dependency_overrides.clear()
+
+
+class TestGetEscalationMessagesExtra:
+    def test_get_messages_not_found(self):
+        user = _make_user()
+        db = AsyncMock()
+        db.get_escalation = AsyncMock(return_value=None)
+
+        from src.api.main import app
+        from src.api.middleware.auth import get_current_user
+
+        app.dependency_overrides[get_current_user] = lambda: user
+        try:
+            with patch("src.api.routes.escalations.get_postgres_client", return_value=db):
+                client = TestClient(app, raise_server_exceptions=False)
+                resp = client.get("/api/v1/escalations/missing/messages")
+            assert resp.status_code == 404
+        finally:
+            app.dependency_overrides.clear()

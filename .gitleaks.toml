@@ -6,8 +6,14 @@ title = "gitleaks config"
 useDefault = true
 
 [allowlist]
-description = "Allowlist .env.example files (placeholder values only)"
+description = "Allowlist .env.example files and known test fixtures (placeholder values only)"
+commits = [
+  "32238b5892ef0a9815a2f8ff746c64fcce67ab48",
+]
 paths = [
+  '''(^|\/)\.env\.example$''',
   '''docker/\.env\.example$''',
   '''apps/mobile/\.env\.example$''',
+  '''apps/admin/\.env\.example$''',
+  '''apps/web/\.env\.example$''',
 ]
