@@ -4,6 +4,8 @@ import type { Offer } from '@groupio/types';
 import { useTranslations } from 'next-intl';
 import { useState, useEffect } from 'react';
 
+import { useAuthStore } from '@/lib/stores/authStore';
+
 type ProjectStatus = 'all' | 'in_progress' | 'completed' | 'cancelled';
 
 interface ProjectWithStats extends Offer {
@@ -19,6 +21,7 @@ interface ProjectWithStats extends Offer {
 
 export default function ContractorProjectsPage() {
   const t = useTranslations('contractor.projects');
+  const accessToken = useAuthStore((s) => s.accessToken);
   const [projects, setProjects] = useState<ProjectWithStats[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<ProjectStatus>('all');
@@ -28,7 +31,7 @@ export default function ContractorProjectsPage() {
     async function fetchProjects() {
       setIsLoading(true);
       const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+      const token = accessToken;
       const headers: Record<string, string> = {};
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
@@ -50,7 +53,7 @@ export default function ContractorProjectsPage() {
     }
 
     fetchProjects();
-  }, [statusFilter, year]);
+  }, [statusFilter, year, accessToken]);
 
   const stats = {
     total: projects.length,

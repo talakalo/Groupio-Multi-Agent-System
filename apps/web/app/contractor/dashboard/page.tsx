@@ -7,10 +7,12 @@ import { useState, useEffect } from 'react';
 import { AIChat } from '@/components/features/chat/AIChat';
 import { OfferCard } from '@/components/features/offers/OfferCard';
 import { StatCard } from '@/components/shared/StatCard';
+import { useAuthStore } from '@/lib/stores/authStore';
 
 
 export default function ContractorDashboardPage() {
   const t = useTranslations('contractor.dashboard');
+  const accessToken = useAuthStore((s) => s.accessToken);
   const [stats, setStats] = useState<ContractorStats | null>(null);
   const [activeOffers, setActiveOffers] = useState<Offer[]>([]);
   const [pendingOffers, setPendingOffers] = useState<Offer[]>([]);
@@ -19,7 +21,7 @@ export default function ContractorDashboardPage() {
   useEffect(() => {
     async function fetchDashboardData() {
       const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+      const token = accessToken;
       const headers: Record<string, string> = {};
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
@@ -52,7 +54,7 @@ export default function ContractorDashboardPage() {
     }
 
     fetchDashboardData();
-  }, []);
+  }, [accessToken]);
 
   if (isLoading) {
     return (
