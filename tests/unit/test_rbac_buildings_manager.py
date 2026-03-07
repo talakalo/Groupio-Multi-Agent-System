@@ -18,7 +18,6 @@ from src.api.main import app
 from src.api.middleware.auth import get_current_user, is_admin
 from src.models.user import UserInDB, UserRole
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
