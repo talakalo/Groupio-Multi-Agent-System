@@ -6,11 +6,12 @@ import logging
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Query, Request
 
 from src.config.settings import get_settings
 from src.databases.postgres import get_postgres_client
 from src.orchestration.graph import get_orchestrator
+from src.orchestration.state import create_initial_state
 
 logger = logging.getLogger(__name__)
 
@@ -91,9 +92,9 @@ async def whatsapp_webhook(
 
 @router.get("/whatsapp")
 async def whatsapp_verify(
-    hub_mode: str = "",
-    hub_challenge: str = "",
-    hub_verify_token: str = "",
+    hub_mode: str = Query(default="", alias="hub.mode"),
+    hub_challenge: str = Query(default="", alias="hub.challenge"),
+    hub_verify_token: str = Query(default="", alias="hub.verify_token"),
 ) -> Any:
     """WhatsApp webhook verification endpoint.
 
@@ -138,8 +139,6 @@ async def contractor_update_webhook(
         orchestrator = get_orchestrator()
         vetting_agent = orchestrator.agents.get("vetting")
         if vetting_agent:
-            from src.orchestration.state import create_initial_state
-
             state = create_initial_state(
                 user_message=f"Re-vet contractor {contractor_id}",
                 user_id="system",
