@@ -5,12 +5,14 @@ import { useTranslations } from 'next-intl';
 import { useState, useEffect } from 'react';
 
 import { OfferCard } from '@/components/features/offers/OfferCard';
+import { useAuthStore } from '@/lib/stores/authStore';
 
 
 type OfferStatus = 'all' | 'pending' | 'accepted' | 'in_progress' | 'completed';
 
 export default function ContractorActiveOffersPage() {
   const t = useTranslations('contractor.offers');
+  const accessToken = useAuthStore((s) => s.accessToken);
   const [offers, setOffers] = useState<Offer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<OfferStatus>('all');
@@ -27,7 +29,7 @@ export default function ContractorActiveOffersPage() {
         params.set('sort', sortBy);
 
         const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-        const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+        const token = accessToken;
         const headers: Record<string, string> = {};
         if (token) headers['Authorization'] = `Bearer ${token}`;
 
@@ -44,7 +46,7 @@ export default function ContractorActiveOffersPage() {
     }
 
     fetchOffers();
-  }, [statusFilter, categoryFilter, sortBy]);
+  }, [statusFilter, categoryFilter, sortBy, accessToken]);
 
   const statusOptions: { value: OfferStatus; label: string }[] = [
     { value: 'all', label: t('filters.allStatuses') },

@@ -20,6 +20,7 @@ import { useTranslations } from 'next-intl';
 import { useState, useCallback } from 'react';
 
 import { apiClient } from '@/lib/api/client';
+import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
 
 
@@ -91,6 +92,7 @@ export default function OnboardingPage() {
   const router = useRouter();
   const t = useTranslations('onboarding');
   const tCommon = useTranslations('common');
+  const accessToken = useAuthStore((s) => s.accessToken);
 
   const [currentStep, setCurrentStep] = useState<OnboardingStep>('role');
   const [role, setRole] = useState<UserRole | null>(null);
@@ -126,7 +128,7 @@ export default function OnboardingPage() {
           : { business: contractorInfo }),
       };
       const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+      const token = accessToken;
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
       const response = await fetch(`${apiBase}/api/v1/onboarding`, {
