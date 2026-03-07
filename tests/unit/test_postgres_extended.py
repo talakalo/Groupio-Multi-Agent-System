@@ -650,20 +650,25 @@ async def test_has_user_joined_offer_false(pg):
 @pytest.mark.asyncio
 async def test_leave_offer_executes_transaction(pg):
     """leave_offer uses pool/conn transaction path on asyncpg."""
+    from unittest.mock import MagicMock
+
     mock_conn = AsyncMock()
     mock_conn.fetchrow = AsyncMock(return_value={"unit_count": 1})
     mock_conn.execute = AsyncMock()
 
-    mock_transaction = AsyncMock()
+    # conn.transaction() is a sync call returning an async context manager
+    mock_transaction = MagicMock()
     mock_transaction.__aenter__ = AsyncMock(return_value=mock_transaction)
     mock_transaction.__aexit__ = AsyncMock(return_value=False)
-    mock_conn.transaction = AsyncMock(return_value=mock_transaction)
+    mock_conn.transaction = MagicMock(return_value=mock_transaction)
 
-    mock_pool = AsyncMock()
-    mock_pool_ctx = AsyncMock()
+    # pool.acquire() is a sync call returning an async context manager
+    mock_pool_ctx = MagicMock()
     mock_pool_ctx.__aenter__ = AsyncMock(return_value=mock_conn)
     mock_pool_ctx.__aexit__ = AsyncMock(return_value=False)
-    mock_pool.acquire = AsyncMock(return_value=mock_pool_ctx)
+
+    mock_pool = MagicMock()
+    mock_pool.acquire = MagicMock(return_value=mock_pool_ctx)
 
     with patch.object(pg, "_get_client", new_callable=AsyncMock, return_value=mock_pool):
         await pg.leave_offer("u1", "o1")
