@@ -153,9 +153,7 @@ def test_parse_text_message(bot):
                                     "text": {"body": "Hello"},
                                 }
                             ],
-                            "contacts": [
-                                {"wa_id": "972501234567", "profile": {"name": "Alice"}}
-                            ],
+                            "contacts": [{"wa_id": "972501234567", "profile": {"name": "Alice"}}],
                             "statuses": [{"id": "s1", "status": "delivered"}],
                         }
                     }
@@ -326,9 +324,7 @@ def test_parse_empty_entry(bot):
 
 @pytest.mark.asyncio
 async def test_handle_message_text(bot, mock_orchestrator, mock_redis):
-    msg = WhatsAppMessage(
-        message_id="m1", from_number="972501234567", timestamp="1700000000", text="Help me"
-    )
+    msg = WhatsAppMessage(message_id="m1", from_number="972501234567", timestamp="1700000000", text="Help me")
     contact = WhatsAppContact(wa_id="972501234567", profile_name="Bob")
     await bot.handle_message(msg, contact)
 
@@ -352,9 +348,7 @@ async def test_handle_message_with_offers(bot, mock_orchestrator):
             "offers": [{"id": "o1", "title": "Roof fix", "price": 1000, "category": "roofing"}],
         }
     )
-    msg = WhatsAppMessage(
-        message_id="m3", from_number="972501234567", timestamp="1700000002", text="Show offers"
-    )
+    msg = WhatsAppMessage(message_id="m3", from_number="972501234567", timestamp="1700000002", text="Show offers")
     bot._send_offers_list = AsyncMock()
     await bot.handle_message(msg, None)
     bot._send_offers_list.assert_awaited_once()
@@ -368,9 +362,7 @@ async def test_handle_message_with_contractors(bot, mock_orchestrator):
             "contractors": [{"id": "c1", "name": "BuildCo", "rating": 4.5, "category": "plumbing"}],
         }
     )
-    msg = WhatsAppMessage(
-        message_id="m4", from_number="972501234567", timestamp="1700000003", text="Find plumber"
-    )
+    msg = WhatsAppMessage(message_id="m4", from_number="972501234567", timestamp="1700000003", text="Find plumber")
     bot._send_contractors_list = AsyncMock()
     await bot.handle_message(msg, None)
     bot._send_contractors_list.assert_awaited_once()
@@ -384,9 +376,7 @@ async def test_handle_message_with_quick_replies(bot, mock_orchestrator):
             "quick_replies": [{"id": "q1", "title": "Yes"}, {"id": "q2", "title": "No"}],
         }
     )
-    msg = WhatsAppMessage(
-        message_id="m5", from_number="972501234567", timestamp="1700000004", text="question"
-    )
+    msg = WhatsAppMessage(message_id="m5", from_number="972501234567", timestamp="1700000004", text="question")
     bot._send_quick_replies = AsyncMock()
     await bot.handle_message(msg, None)
     bot._send_quick_replies.assert_awaited_once()
@@ -396,9 +386,7 @@ async def test_handle_message_with_quick_replies(bot, mock_orchestrator):
 async def test_handle_message_empty_response(bot, mock_orchestrator):
     """Falls back to error message when orchestrator returns empty response."""
     mock_orchestrator.run = AsyncMock(return_value={"response": {}})
-    msg = WhatsAppMessage(
-        message_id="m6", from_number="972501234567", timestamp="1700000005", text="hello"
-    )
+    msg = WhatsAppMessage(message_id="m6", from_number="972501234567", timestamp="1700000005", text="hello")
     bot._send_text_message = AsyncMock()
     await bot.handle_message(msg, None)
     bot._send_text_message.assert_awaited()
@@ -407,9 +395,7 @@ async def test_handle_message_empty_response(bot, mock_orchestrator):
 @pytest.mark.asyncio
 async def test_handle_message_orchestrator_exception(bot, mock_orchestrator):
     mock_orchestrator.run = AsyncMock(side_effect=Exception("boom"))
-    msg = WhatsAppMessage(
-        message_id="m7", from_number="972501234567", timestamp="1700000006", text="crash"
-    )
+    msg = WhatsAppMessage(message_id="m7", from_number="972501234567", timestamp="1700000006", text="crash")
     bot._send_text_message = AsyncMock()
     await bot.handle_message(msg, None)
     bot._send_text_message.assert_awaited_once()

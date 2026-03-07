@@ -147,9 +147,7 @@ def test_use_supabase_client_with_supabase_settings():
 def test_use_supabase_client_force_local():
     """Returns False when USE_LOCAL_POSTGRES='1' even if Supabase is configured."""
     client = PostgresClient()
-    mock_settings = _mock_settings(
-        supabase_url="https://xyz.supabase.co", supabase_key="key", force_local="1"
-    )
+    mock_settings = _mock_settings(supabase_url="https://xyz.supabase.co", supabase_key="key", force_local="1")
     with patch("src.databases.postgres.get_settings", return_value=mock_settings):
         result = client._use_supabase_client()
     assert result is False
@@ -178,9 +176,7 @@ def test_use_supabase_client_cached():
 
 
 def test_build_safe_update_basic():
-    query, args = PostgresClient._build_safe_update(
-        "users", {"full_name": "Alice", "phone": "0501234567"}, "id", "u1"
-    )
+    query, args = PostgresClient._build_safe_update("users", {"full_name": "Alice", "phone": "0501234567"}, "id", "u1")
     assert "UPDATE users" in query
     assert '"full_name"' in query
     assert '"phone"' in query
@@ -189,9 +185,7 @@ def test_build_safe_update_basic():
 
 def test_build_safe_update_unsafe_column_raises():
     with pytest.raises(ValueError, match="Unsafe column name"):
-        PostgresClient._build_safe_update(
-            "users", {"evil; DROP TABLE users": "x"}, "id", "u1"
-        )
+        PostgresClient._build_safe_update("users", {"evil; DROP TABLE users": "x"}, "id", "u1")
 
 
 # ---------------------------------------------------------------------------
@@ -307,9 +301,7 @@ async def test_get_user_not_found(pg_client):
 
 @pytest.mark.asyncio
 async def test_get_user_password_hash(pg_client):
-    with patch.object(
-        pg_client, "_pg_fetch_one", new_callable=AsyncMock, return_value={"hashed_password": "h123"}
-    ):
+    with patch.object(pg_client, "_pg_fetch_one", new_callable=AsyncMock, return_value={"hashed_password": "h123"}):
         result = await pg_client.get_user_password_hash("u1")
     assert result == "h123"
 

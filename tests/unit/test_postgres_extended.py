@@ -180,9 +180,7 @@ async def test_get_building_returns_none(pg):
 @pytest.mark.asyncio
 async def test_get_building_by_phone_returns_building_id(pg):
     """get_building_by_phone returns building_id string when row found."""
-    with patch.object(
-        pg, "_pg_fetch_one", new_callable=AsyncMock, return_value={"building_id": "b1"}
-    ):
+    with patch.object(pg, "_pg_fetch_one", new_callable=AsyncMock, return_value={"building_id": "b1"}):
         result = await pg.get_building_by_phone("0501234567")
         assert result == "b1"
 
@@ -198,9 +196,7 @@ async def test_get_building_by_phone_returns_none_when_no_row(pg):
 @pytest.mark.asyncio
 async def test_get_building_by_phone_returns_none_when_building_id_null(pg):
     """get_building_by_phone returns None when building_id is None in row."""
-    with patch.object(
-        pg, "_pg_fetch_one", new_callable=AsyncMock, return_value={"building_id": None}
-    ):
+    with patch.object(pg, "_pg_fetch_one", new_callable=AsyncMock, return_value={"building_id": None}):
         result = await pg.get_building_by_phone("0501234567")
         assert result is None
 
@@ -213,9 +209,7 @@ async def test_get_building_by_phone_returns_none_when_building_id_null(pg):
 @pytest.mark.asyncio
 async def test_is_user_in_building_true_from_users_table(pg):
     """is_user_in_building returns True when user found in users table."""
-    with patch.object(
-        pg, "_pg_fetch_one", new_callable=AsyncMock, return_value={"1": 1}
-    ):
+    with patch.object(pg, "_pg_fetch_one", new_callable=AsyncMock, return_value={"1": 1}):
         result = await pg.is_user_in_building("u1", "b1")
         assert result is True
 
@@ -333,9 +327,7 @@ async def test_list_buildings_with_city_filter(pg):
 async def test_list_buildings_empty_result(pg):
     """list_buildings returns ([], 0) when no buildings found."""
     with (
-        patch.object(
-            pg, "_pg_fetch_one", new_callable=AsyncMock, return_value={"c": 0}
-        ),
+        patch.object(pg, "_pg_fetch_one", new_callable=AsyncMock, return_value={"c": 0}),
         patch.object(pg, "_pg_fetch_all", new_callable=AsyncMock, return_value=[]),
     ):
         result, total = await pg.list_buildings({})
@@ -442,12 +434,8 @@ async def test_get_building_residents_returns_list_and_total(pg):
         {"id": "r1", "user_id": "u1", "building_id": "b1", "full_name": "Test", "email": "u@test.com", "phone": "05"}
     ]
     with (
-        patch.object(
-            pg, "_pg_fetch_one", new_callable=AsyncMock, return_value={"c": 1}
-        ),
-        patch.object(
-            pg, "_pg_fetch_all", new_callable=AsyncMock, return_value=resident_rows
-        ),
+        patch.object(pg, "_pg_fetch_one", new_callable=AsyncMock, return_value={"c": 1}),
+        patch.object(pg, "_pg_fetch_all", new_callable=AsyncMock, return_value=resident_rows),
     ):
         result, total = await pg.get_building_residents("b1")
         assert total == 1
@@ -459,9 +447,7 @@ async def test_get_building_residents_returns_list_and_total(pg):
 async def test_get_building_residents_empty(pg):
     """get_building_residents returns ([], 0) when none found."""
     with (
-        patch.object(
-            pg, "_pg_fetch_one", new_callable=AsyncMock, return_value={"c": 0}
-        ),
+        patch.object(pg, "_pg_fetch_one", new_callable=AsyncMock, return_value={"c": 0}),
         patch.object(pg, "_pg_fetch_all", new_callable=AsyncMock, return_value=[]),
     ):
         result, total = await pg.get_building_residents("b99")
@@ -764,9 +750,7 @@ async def test_get_conversation_history_returns_rows_and_total(pg):
     """get_conversation_history returns (rows, total)."""
     rows = [{"id": "c1", "user_id": "u1", "message": "Hello", "response": {}}]
     with (
-        patch.object(
-            pg, "_pg_fetch_one", new_callable=AsyncMock, return_value={"c": 1}
-        ),
+        patch.object(pg, "_pg_fetch_one", new_callable=AsyncMock, return_value={"c": 1}),
         patch.object(pg, "_pg_fetch_all", new_callable=AsyncMock, return_value=rows),
     ):
         result, total = await pg.get_conversation_history("u1")
@@ -779,9 +763,7 @@ async def test_get_conversation_history_returns_rows_and_total(pg):
 async def test_get_conversation_history_empty(pg):
     """get_conversation_history returns ([], 0) when no rows."""
     with (
-        patch.object(
-            pg, "_pg_fetch_one", new_callable=AsyncMock, return_value={"c": 0}
-        ),
+        patch.object(pg, "_pg_fetch_one", new_callable=AsyncMock, return_value={"c": 0}),
         patch.object(pg, "_pg_fetch_all", new_callable=AsyncMock, return_value=[]),
     ):
         result, total = await pg.get_conversation_history("u1")
@@ -794,9 +776,7 @@ async def test_get_conversation_history_with_before_param(pg):
     """get_conversation_history with before param passes it to queries."""
     rows = [{"id": "c1", "user_id": "u1", "message": "Hi", "response": {}}]
     with (
-        patch.object(
-            pg, "_pg_fetch_one", new_callable=AsyncMock, return_value={"c": 1}
-        ),
+        patch.object(pg, "_pg_fetch_one", new_callable=AsyncMock, return_value={"c": 1}),
         patch.object(pg, "_pg_fetch_all", new_callable=AsyncMock, return_value=rows),
     ):
         result, total = await pg.get_conversation_history("u1", before="2026-01-01T00:00:00Z")
@@ -862,12 +842,8 @@ async def test_get_contractor_reviews_returns_list_and_total(pg):
     """get_contractor_reviews returns (list, total)."""
     review_rows = [{"id": "r1", "contractor_id": "c1", "rating": 5, "comment": "Great"}]
     with (
-        patch.object(
-            pg, "_pg_fetch_one", new_callable=AsyncMock, return_value={"c": 1}
-        ),
-        patch.object(
-            pg, "_pg_fetch_all", new_callable=AsyncMock, return_value=review_rows
-        ),
+        patch.object(pg, "_pg_fetch_one", new_callable=AsyncMock, return_value={"c": 1}),
+        patch.object(pg, "_pg_fetch_all", new_callable=AsyncMock, return_value=review_rows),
     ):
         result, total = await pg.get_contractor_reviews("c1")
         assert total == 1
@@ -879,9 +855,7 @@ async def test_get_contractor_reviews_returns_list_and_total(pg):
 async def test_get_contractor_reviews_empty(pg):
     """get_contractor_reviews returns ([], 0) when no reviews."""
     with (
-        patch.object(
-            pg, "_pg_fetch_one", new_callable=AsyncMock, return_value={"c": 0}
-        ),
+        patch.object(pg, "_pg_fetch_one", new_callable=AsyncMock, return_value={"c": 0}),
         patch.object(pg, "_pg_fetch_all", new_callable=AsyncMock, return_value=[]),
     ):
         result, total = await pg.get_contractor_reviews("c1")
@@ -931,9 +905,7 @@ async def test_create_escalation_returns_dict(pg):
     escalation_row = {**escalation_data, "status": "open", "priority": "medium"}
     with (
         patch.object(pg, "_pg_execute", new_callable=AsyncMock) as mock_exec,
-        patch.object(
-            pg, "_pg_fetch_one", new_callable=AsyncMock, return_value=escalation_row
-        ),
+        patch.object(pg, "_pg_fetch_one", new_callable=AsyncMock, return_value=escalation_row),
     ):
         result = await pg.create_escalation(escalation_data)
         mock_exec.assert_called_once()
@@ -969,9 +941,7 @@ async def test_list_escalations_no_filters_returns_tuple(pg):
     """list_escalations with no filters returns (list, total)."""
     esc_rows = [{"id": "e1", "status": "open", "priority": "high"}]
     with (
-        patch.object(
-            pg, "_pg_fetch_one", new_callable=AsyncMock, return_value={"c": 1}
-        ),
+        patch.object(pg, "_pg_fetch_one", new_callable=AsyncMock, return_value={"c": 1}),
         patch.object(pg, "_pg_fetch_all", new_callable=AsyncMock, return_value=esc_rows),
     ):
         result, total = await pg.list_escalations({})
@@ -985,9 +955,7 @@ async def test_list_escalations_with_status_filter(pg):
     """list_escalations with status filter works correctly."""
     esc_rows = [{"id": "e1", "status": "open"}]
     with (
-        patch.object(
-            pg, "_pg_fetch_one", new_callable=AsyncMock, return_value={"c": 1}
-        ),
+        patch.object(pg, "_pg_fetch_one", new_callable=AsyncMock, return_value={"c": 1}),
         patch.object(pg, "_pg_fetch_all", new_callable=AsyncMock, return_value=esc_rows),
     ):
         result, total = await pg.list_escalations({"status": "open"})
@@ -1000,9 +968,7 @@ async def test_list_escalations_with_list_status_filter(pg):
     """list_escalations with list-type status filter works correctly."""
     esc_rows = [{"id": "e1", "status": "open"}, {"id": "e2", "status": "in_progress"}]
     with (
-        patch.object(
-            pg, "_pg_fetch_one", new_callable=AsyncMock, return_value={"c": 2}
-        ),
+        patch.object(pg, "_pg_fetch_one", new_callable=AsyncMock, return_value={"c": 2}),
         patch.object(pg, "_pg_fetch_all", new_callable=AsyncMock, return_value=esc_rows),
     ):
         result, total = await pg.list_escalations({"status": ["open", "in_progress"]})
@@ -1232,9 +1198,7 @@ async def test_list_audit_logs_no_filters(pg):
     """list_audit_logs with no filters returns (list, total)."""
     rows = [{"id": "al1", "action": "login", "user_id": "u1"}]
     with (
-        patch.object(
-            pg, "_pg_fetch_one", new_callable=AsyncMock, return_value={"c": 1}
-        ),
+        patch.object(pg, "_pg_fetch_one", new_callable=AsyncMock, return_value={"c": 1}),
         patch.object(pg, "_pg_fetch_all", new_callable=AsyncMock, return_value=rows),
     ):
         result, total = await pg.list_audit_logs()
@@ -1248,9 +1212,7 @@ async def test_list_audit_logs_with_action_filter(pg):
     """list_audit_logs with action filter passes it to query."""
     rows = [{"id": "al1", "action": "login"}]
     with (
-        patch.object(
-            pg, "_pg_fetch_one", new_callable=AsyncMock, return_value={"c": 1}
-        ),
+        patch.object(pg, "_pg_fetch_one", new_callable=AsyncMock, return_value={"c": 1}),
         patch.object(pg, "_pg_fetch_all", new_callable=AsyncMock, return_value=rows),
     ):
         result, total = await pg.list_audit_logs(action="login")
@@ -1275,9 +1237,7 @@ async def test_create_payment_with_conn_none_calls_pg_execute(pg):
     payment_row = {**data, "status": "pending"}
     with (
         patch.object(pg, "_pg_execute", new_callable=AsyncMock) as mock_exec,
-        patch.object(
-            pg, "_pg_fetch_one", new_callable=AsyncMock, return_value=payment_row
-        ),
+        patch.object(pg, "_pg_fetch_one", new_callable=AsyncMock, return_value=payment_row),
     ):
         result = await pg.create_payment(data, conn=None)
         mock_exec.assert_called_once()
@@ -1362,8 +1322,6 @@ async def test_health_check_returns_true_on_success(pg):
 @pytest.mark.asyncio
 async def test_health_check_returns_false_on_exception(pg):
     """health_check returns False when _pg_fetch_one raises an exception."""
-    with patch.object(
-        pg, "_pg_fetch_one", new_callable=AsyncMock, side_effect=Exception("DB down")
-    ):
+    with patch.object(pg, "_pg_fetch_one", new_callable=AsyncMock, side_effect=Exception("DB down")):
         result = await pg.health_check()
         assert result is False

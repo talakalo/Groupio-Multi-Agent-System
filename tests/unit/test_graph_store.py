@@ -116,9 +116,7 @@ async def test_get_contractor_reputation_found(store):
     s, driver = store
     session = driver.session().__aenter__.return_value
     result_mock = AsyncMock()
-    result_mock.data = AsyncMock(
-        return_value=[{"reputation": {"contractor_id": "c1", "total_projects": 5}}]
-    )
+    result_mock.data = AsyncMock(return_value=[{"reputation": {"contractor_id": "c1", "total_projects": 5}}])
     session.run = AsyncMock(return_value=result_mock)
 
     result = await s.get_contractor_reputation("c1")
@@ -147,9 +145,7 @@ async def test_detect_suspicious_patterns_found(store):
     s, driver = store
     session = driver.session().__aenter__.return_value
     result_mock = AsyncMock()
-    result_mock.data = AsyncMock(
-        return_value=[{"patterns": {"suspicious": True, "failed_projects": 5}}]
-    )
+    result_mock.data = AsyncMock(return_value=[{"patterns": {"suspicious": True, "failed_projects": 5}}])
     session.run = AsyncMock(return_value=result_mock)
 
     result = await s.detect_suspicious_patterns("c1")

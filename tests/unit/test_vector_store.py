@@ -129,9 +129,7 @@ async def test_search_with_filters(store):
     s, client = store
     client.search = AsyncMock(return_value=[])
 
-    results = await s.search(
-        "contractors", [0.1] * 1536, filters={"verified": True}, score_threshold=0.7
-    )
+    results = await s.search("contractors", [0.1] * 1536, filters={"verified": True}, score_threshold=0.7)
     assert results == []
 
 

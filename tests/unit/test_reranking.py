@@ -53,9 +53,7 @@ async def test_rerank_calls_llm_and_sorts(reranker):
         ' {"index": 2, "score": 7}, {"index": 3, "score": 5},'
         ' {"index": 4, "score": 3}, {"index": 5, "score": 8}]'
     )
-    llm.create_message = AsyncMock(
-        return_value={"content": [{"text": scores}]}
-    )
+    llm.create_message = AsyncMock(return_value={"content": [{"text": scores}]})
     with patch("src.rag.reranking.get_llm_client", return_value=llm):
         result = await reranker.rerank("query", docs, top_k=3)
 
@@ -83,9 +81,7 @@ async def test_rerank_falls_back_on_exception(reranker):
 async def test_score_documents_assigns_scores(reranker):
     docs = [{"text": "doc1", "score": 0.8}, {"text": "doc2", "score": 0.6}]
     llm = AsyncMock()
-    llm.create_message = AsyncMock(
-        return_value={"content": '[{"index": 0, "score": 8}, {"index": 1, "score": 4}]'}
-    )
+    llm.create_message = AsyncMock(return_value={"content": '[{"index": 0, "score": 8}, {"index": 1, "score": 4}]'})
     result = await reranker._score_documents(llm, "test query", docs)
     assert result[0]["rerank_score"] == pytest.approx(0.8)
     assert result[1]["rerank_score"] == pytest.approx(0.4)

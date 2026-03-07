@@ -93,9 +93,7 @@ def test_create_access_token_returns_string(mock_settings):
 
 def test_create_access_token_with_custom_expiry(mock_settings):
     with patch("src.api.middleware.auth.get_settings", return_value=mock_settings):
-        token = create_access_token(
-            "user-1", "user@example.com", UserRole.RESIDENT, expires_delta=timedelta(hours=1)
-        )
+        token = create_access_token("user-1", "user@example.com", UserRole.RESIDENT, expires_delta=timedelta(hours=1))
     assert isinstance(token, str)
 
 
@@ -147,9 +145,7 @@ def test_verify_access_token_wrong_type(mock_settings):
 
 def test_verify_access_token_expired(mock_settings):
     with patch("src.api.middleware.auth.get_settings", return_value=mock_settings):
-        token = create_access_token(
-            "user-1", "u@e.com", UserRole.RESIDENT, expires_delta=timedelta(seconds=-1)
-        )
+        token = create_access_token("user-1", "u@e.com", UserRole.RESIDENT, expires_delta=timedelta(seconds=-1))
         result = verify_access_token(token)
     # May be None (expired) or a valid payload depending on JWT mock
     assert result is None or result.sub == "user-1"
