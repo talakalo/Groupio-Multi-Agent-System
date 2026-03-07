@@ -8,6 +8,9 @@ useDefault = true
 [allowlist]
 description = "Allowlist .env.example files (placeholder values only)"
 paths = [
+  '''(^|\/)\.env\.example$''',
   '''docker/\.env\.example$''',
   '''apps/mobile/\.env\.example$''',
+  '''apps/admin/\.env\.example$''',
+  '''apps/web/\.env\.example$''',
 ]

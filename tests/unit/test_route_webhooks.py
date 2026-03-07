@@ -63,19 +63,7 @@ class TestWhatsAppWebhook:
     def test_webhook_no_signature_no_secret(self):
         """When no secret is configured, webhook is accepted regardless of signature."""
         payload = {
-            "entry": [
-                {
-                    "changes": [
-                        {
-                            "value": {
-                                "messages": [
-                                    {"from": "972501234567", "text": {"body": "Hello"}}
-                                ]
-                            }
-                        }
-                    ]
-                }
-            ]
+            "entry": [{"changes": [{"value": {"messages": [{"from": "972501234567", "text": {"body": "Hello"}}]}}]}]
         }
 
         from src.api.main import app
@@ -187,9 +175,9 @@ class TestContractorUpdateWebhook:
         with patch("src.api.routes.webhooks.get_settings") as mock_settings:
             mock_settings.return_value.API_KEYS = []
             with patch("src.api.routes.webhooks.get_orchestrator", return_value=mock_orchestrator):
-                with patch("src.api.routes.webhooks.create_initial_state", return_value={
-                    "messages": [], "actions_taken": []
-                }):
+                with patch(
+                    "src.api.routes.webhooks.create_initial_state", return_value={"messages": [], "actions_taken": []}
+                ):
                     client = TestClient(app, raise_server_exceptions=False)
                     resp = client.post(
                         "/api/v1/webhooks/contractor-update",
@@ -232,21 +220,7 @@ def test_verify_signature_missing_header():
 def test_parse_whatsapp_payload_valid():
     from src.api.routes.webhooks import _parse_whatsapp_payload
 
-    payload = {
-        "entry": [
-            {
-                "changes": [
-                    {
-                        "value": {
-                            "messages": [
-                                {"from": "972501234567", "text": {"body": "Hello"}}
-                            ]
-                        }
-                    }
-                ]
-            }
-        ]
-    }
+    payload = {"entry": [{"changes": [{"value": {"messages": [{"from": "972501234567", "text": {"body": "Hello"}}]}}]}]}
     result = _parse_whatsapp_payload(payload)
     assert result is not None
     assert result["phone"] == "972501234567"
@@ -263,20 +237,6 @@ def test_parse_whatsapp_payload_no_messages():
 def test_parse_whatsapp_payload_empty_text():
     from src.api.routes.webhooks import _parse_whatsapp_payload
 
-    payload = {
-        "entry": [
-            {
-                "changes": [
-                    {
-                        "value": {
-                            "messages": [
-                                {"from": "972501234567", "text": {"body": ""}}
-                            ]
-                        }
-                    }
-                ]
-            }
-        ]
-    }
+    payload = {"entry": [{"changes": [{"value": {"messages": [{"from": "972501234567", "text": {"body": ""}}]}}]}]}
     result = _parse_whatsapp_payload(payload)
     assert result is None

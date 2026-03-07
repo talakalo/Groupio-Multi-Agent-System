@@ -148,9 +148,7 @@ class TestGetInvoice:
                 "created_at": datetime.now(UTC).isoformat(),
             }
         )
-        db.list_payments_for_user = AsyncMock(
-            return_value=[_make_payment(invoice_id="inv-1")]
-        )
+        db.list_payments_for_user = AsyncMock(return_value=[_make_payment(invoice_id="inv-1")])
 
         from src.api.main import app
         from src.api.middleware.auth import get_current_user
@@ -213,9 +211,7 @@ class TestDownloadInvoicePdf:
                 "items": [],
             }
         )
-        db.list_payments_for_user = AsyncMock(
-            return_value=[_make_payment(invoice_id="inv-1")]
-        )
+        db.list_payments_for_user = AsyncMock(return_value=[_make_payment(invoice_id="inv-1")])
 
         from src.api.main import app
         from src.api.middleware.auth import get_current_user

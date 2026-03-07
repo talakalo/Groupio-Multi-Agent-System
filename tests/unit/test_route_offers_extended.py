@@ -656,9 +656,7 @@ class TestStartMatching:
     def test_start_matching_not_enough_participants(self):
         admin = _make_user(role=UserRole.ADMIN)
         db = AsyncMock()
-        db.get_offer = AsyncMock(
-            return_value=_make_offer(status="pending", current_participants=2, min_participants=5)
-        )
+        db.get_offer = AsyncMock(return_value=_make_offer(status="pending", current_participants=2, min_participants=5))
 
         from src.api.main import app
         from src.api.middleware.auth import get_current_user
@@ -683,9 +681,7 @@ class TestMatchContractor:
         admin = _make_user(role=UserRole.ADMIN)
         db = AsyncMock()
         db.get_offer = AsyncMock(return_value=_make_offer(status="matching"))
-        db.get_contractor = AsyncMock(
-            return_value={"id": "c1", "business_name": "Best Plumber"}
-        )
+        db.get_contractor = AsyncMock(return_value={"id": "c1", "business_name": "Best Plumber"})
         db.update_offer = AsyncMock(return_value=_make_offer(status="matched"))
         db.get_offer_participants = AsyncMock(return_value=[])
 
