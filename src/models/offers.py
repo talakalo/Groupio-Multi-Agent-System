@@ -3,6 +3,7 @@
 This module re-exports for backward compatibility. New code should import
 directly from src.models.offer.
 """
+
 from src.models.offer import (
     SEASONALITY_FACTORS,
     CompletedOffer,

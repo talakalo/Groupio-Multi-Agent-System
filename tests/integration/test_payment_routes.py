@@ -39,6 +39,13 @@ def mock_db():
     """Mock PostgreSQL client at the payments route module level."""
     with patch("src.api.routes.payments.get_postgres_client") as mock:
         db = AsyncMock()
+        # db.transaction() is decorated with @asynccontextmanager, so it must
+        # return an async context manager, not a bare coroutine.  AsyncMock()
+        # attributes are themselves AsyncMocks (callable → coroutine), which
+        # do NOT satisfy the `async with` protocol.  Use a regular MagicMock
+        # wrapping an AsyncMock so `async with db.transaction() as conn` works.
+        _txn_cm = AsyncMock()
+        db.transaction = MagicMock(return_value=_txn_cm)
         mock.return_value = db
         yield db
 
@@ -244,6 +251,15 @@ class TestGetPayment:
 
 class TestPaymentWebhook:
     """Tests for POST /api/v1/payments/webhook (no auth required)."""
+
+    @pytest.fixture(autouse=True)
+    def dev_settings(self):
+        """Patch settings so the webhook runs in development mode, skipping signature verification."""
+        mock_settings = MagicMock()
+        mock_settings.PAYMENT_WEBHOOK_SECRET = None
+        mock_settings.ENVIRONMENT = "development"
+        with patch("src.api.routes.payments.get_settings", return_value=mock_settings):
+            yield mock_settings
 
     def test_webhook_payment_succeeded(self, unauth_client, mock_db, mock_payment_record):
         """Webhook with payment.succeeded updates payment status."""

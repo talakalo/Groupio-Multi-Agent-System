@@ -7,6 +7,8 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
+import { useAuthStore } from '@/lib/stores/authStore';
+
 const profileSchema = z.object({
   businessName: z.string().min(2, 'Business name is required'),
   contactName: z.string().min(2, 'Contact name is required'),
@@ -26,6 +28,7 @@ type ProfileForm = z.infer<typeof profileSchema>;
 
 export default function ContractorProfilePage() {
   const t = useTranslations('contractor.profile');
+  const accessToken = useAuthStore((s) => s.accessToken);
   const [contractor, setContractor] = useState<Contractor | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -53,7 +56,7 @@ export default function ContractorProfilePage() {
 
       setIsUploading(docType);
       const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+      const token = accessToken;
       const formData = new FormData();
       formData.append('file', file);
 
@@ -87,7 +90,7 @@ export default function ContractorProfilePage() {
   useEffect(() => {
     async function fetchProfile() {
       const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+      const token = accessToken;
       const headers: Record<string, string> = {};
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
@@ -114,7 +117,7 @@ export default function ContractorProfilePage() {
     }
 
     fetchProfile();
-  }, [reset]);
+  }, [reset, accessToken]);
 
   async function onSubmit(data: ProfileForm) {
     if (!contractorId) return;

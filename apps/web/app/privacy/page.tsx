@@ -28,7 +28,7 @@ export default function PrivacyPage() {
           <h2 className="text-xl font-semibold text-gray-900 mb-3">1. מידע שאנו אוספים</h2>
           <h3 className="text-lg font-medium text-gray-800 mt-4 mb-2">מידע שמסרת לנו ישירות:</h3>
           <ul className="list-disc list-inside space-y-1">
-            <li>שם מלא וכתובת דוא"ל</li>
+            <li>שם מלא וכתובת דוא&quot;ל</li>
             <li>מספר טלפון</li>
             <li>כתובת מגורים ומספר דירה</li>
             <li>פרטי תשלום (מאוחסנים בצורה מוצפנת)</li>
@@ -132,7 +132,7 @@ export default function PrivacyPage() {
         <section>
           <h2 className="text-xl font-semibold text-gray-900 mb-3">8. שינויים במדיניות</h2>
           <p>
-            שינויים מהותיים יודיעו בדוא"ל 14 ימים מראש. המשך השימוש לאחר
+            שינויים מהותיים יודיעו בדוא&quot;ל 14 ימים מראש. המשך השימוש לאחר
             מועד ההודעה מהווה הסכמה למדיניות המעודכנת.
           </p>
         </section>
@@ -144,10 +144,6 @@ export default function PrivacyPage() {
             <a href="mailto:privacy@groupio.co.il" className="text-blue-600 hover:underline">
               privacy@groupio.co.il
             </a>
-          </p>
-          <p className="mt-2 text-sm text-gray-500">
-            ⚠️ מסמך זה הינו טיוטה המיועדת לבדיקה פנימית בלבד ואינה מייצגת
-            ייעוץ משפטי. יש להביאה לסקירת עורך דין לפני פרסום לציבור.
           </p>
         </section>
 

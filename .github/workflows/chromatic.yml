@@ -24,10 +24,12 @@ jobs:
         run: npm ci
 
       - name: Publish to Chromatic
+        # Skip gracefully when the project token has not been configured yet.
+        # Add CHROMATIC_PROJECT_TOKEN to GitHub repo secrets once the project
+        # is linked at https://www.chromatic.com/start.
+        if: ${{ secrets.CHROMATIC_PROJECT_TOKEN != '' }}
         uses: chromaui/action@latest
         with:
-          # Add CHROMATIC_PROJECT_TOKEN to GitHub repo secrets.
-          # Get the token at https://www.chromatic.com after linking your repo.
           projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
           workingDir: packages/ui
           buildScriptName: build-storybook

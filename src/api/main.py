@@ -279,6 +279,30 @@ async def health_check() -> dict[str, Any]:
     }
 
 
+@app.get(
+    "/api/v1/health/db",
+    summary="Database pool stats",
+    description="Returns asyncpg connection pool statistics (Task 3.5).",
+)
+async def db_pool_health() -> dict:
+    """Return DB pool size/free/used stats for monitoring."""
+    from src.databases.postgres import get_postgres_client
+
+    db = get_postgres_client()
+    try:
+        pool = await db._get_client()
+        if db._use_supabase_client():
+            return {"backend": "supabase", "pool_stats": "n/a"}
+        return {
+            "backend": "asyncpg",
+            "pool_size": pool.get_size(),
+            "free_connections": pool.get_idle_size(),
+            "used_connections": pool.get_size() - pool.get_idle_size(),
+        }
+    except Exception as exc:
+        return {"error": str(exc)}
+
+
 @app.get("/metrics")
 async def prometheus_metrics(
     x_api_key: str | None = Header(None, alias="X-API-Key"),

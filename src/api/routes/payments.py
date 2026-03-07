@@ -216,7 +216,6 @@ async def initiate_payment(
                 }
             ],
         }
-        await db.create_invoice(invoice_data)
         existing_invoice = invoice_data
     else:
         amount = existing_invoice.get("amount", 0)
@@ -255,7 +254,11 @@ async def initiate_payment(
         logger.error("Payment provider error for payment %s: %s", payment_id, exc)
         payment_data["status"] = "failed"
 
-    await db.create_payment(payment_data)
+    # Task 3.2: wrap invoice + payment creation in a single atomic transaction
+    async with db.transaction() as conn:
+        if not await db.get_invoice_for_offer(current_user.id, request.offer_id):
+            await db.create_invoice(existing_invoice, conn=conn)
+        await db.create_payment(payment_data, conn=conn)
 
     # For direct payments that succeeded, mark invoice as paid immediately
     # For escrow payments, invoice stays pending until admin releases
@@ -396,16 +399,18 @@ async def payment_webhook(
 
     if webhook_secret:
         # Compute expected HMAC-SHA256 signature
-        expected_sig = "sha256=" + hmac.new(
-            webhook_secret.encode("utf-8"),
-            raw_body,
-            hashlib.sha256,
-        ).hexdigest()
+        expected_sig = (
+            "sha256="
+            + hmac.new(
+                webhook_secret.encode("utf-8"),
+                raw_body,
+                hashlib.sha256,
+            ).hexdigest()
+        )
         incoming_sig = x_payment_signature or ""
         if not hmac.compare_digest(expected_sig, incoming_sig):
             logger.warning(
-                "Payment webhook signature mismatch — possible forgery attempt "
-                "(expected prefix=%s, got=%s)",
+                "Payment webhook signature mismatch — possible forgery attempt (expected prefix=%s, got=%s)",
                 expected_sig[:20],
                 incoming_sig[:20],
             )
@@ -413,8 +418,7 @@ async def payment_webhook(
     elif settings.ENVIRONMENT != "development":
         # In non-dev environments, refuse to process unsigned webhooks
         logger.error(
-            "PAYMENT_WEBHOOK_SECRET is not configured in %s — "
-            "refusing unsigned webhook to prevent fraud.",
+            "PAYMENT_WEBHOOK_SECRET is not configured in %s — refusing unsigned webhook to prevent fraud.",
             settings.ENVIRONMENT,
         )
         raise HTTPException(
@@ -422,11 +426,10 @@ async def payment_webhook(
             detail="Webhook signature verification not configured",
         )
     else:
-        logger.warning(
-            "PAYMENT_WEBHOOK_SECRET not set — skipping signature check in development"
-        )
+        logger.warning("PAYMENT_WEBHOOK_SECRET not set — skipping signature check in development")
 
     import json
+
     body = json.loads(raw_body)
     logger.info("Payment webhook received: %s", body.get("event_type", "unknown"))
 

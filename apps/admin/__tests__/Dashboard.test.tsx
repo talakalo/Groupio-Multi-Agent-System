@@ -42,6 +42,7 @@ vi.mock('@/lib/hooks', () => ({
     data: { totalContractors: 200, gmvToday: 12500 },
   }),
   useActivityLog: () => ({ data: [] }),
+  useVettingStatus: () => ({ data: { pendingReview: 3, approved: 42, rejected: 5, contractors: [] } }),
 }));
 
 // Mock Next.js router

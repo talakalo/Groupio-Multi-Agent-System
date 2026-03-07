@@ -109,6 +109,7 @@ class TestMessageEndpoint:
 
     def test_send_message_success(self, client, mock_db, mock_redis):
         """Test successful message processing."""
+        override_auth({"id": "user-123", "role": "resident"})
         mock_redis.check_rate_limit = AsyncMock(return_value=True)
         mock_db.log_conversation = AsyncMock()
         with patch("src.api.main.get_orchestrator") as mock_orch:
@@ -135,6 +136,7 @@ class TestMessageEndpoint:
 
     def test_send_message_rate_limited(self, client, mock_db, mock_redis):
         """Test message rejected due to rate limiting."""
+        override_auth({"id": "user-123", "role": "resident"})
         mock_redis.check_rate_limit = AsyncMock(return_value=False)
 
         response = client.post(
@@ -149,6 +151,7 @@ class TestMessageEndpoint:
 
     def test_send_message_invalid_input(self, client):
         """Test message validation fails."""
+        override_auth({"id": "user-123", "role": "resident"})
         response = client.post(
             "/api/v1/message",
             json={
@@ -203,7 +206,7 @@ class TestOffersAPI:
         """Test creating an offer."""
         mock_db.get_building = AsyncMock(return_value={"id": "building-123"})
         mock_db.is_user_in_building = AsyncMock(return_value=True)
-        mock_db.create_offer = AsyncMock(return_value=MagicMock(**mock_offer))
+        mock_db.create_offer = AsyncMock(return_value=mock_offer)
         override_auth({"id": "user-123", "role": "resident"})
 
         with (
@@ -293,7 +296,7 @@ class TestOffersAPI:
         mock_offer["status"] = "pending"
         mock_offer["current_participants"] = 3
         mock_offer["max_participants"] = 20
-        mock_db.get_offer = AsyncMock(return_value=MagicMock(**mock_offer))
+        mock_db.get_offer = AsyncMock(return_value=mock_offer)
         mock_db.is_user_in_building = AsyncMock(return_value=True)
         mock_db.has_user_joined_offer = AsyncMock(return_value=False)
         mock_db.join_offer = AsyncMock()

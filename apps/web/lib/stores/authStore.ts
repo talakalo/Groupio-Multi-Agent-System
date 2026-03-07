@@ -6,7 +6,7 @@ export interface User {
   email: string;
   fullName: string;
   phone: string;
-  role: 'resident' | 'contractor' | 'admin' | 'super_admin';
+  role: 'resident' | 'contractor' | 'admin' | 'buildings_manager' | 'super_admin';
   preferredLanguage: 'he' | 'en';
   avatarUrl?: string;
   buildingId?: string;
@@ -244,8 +244,12 @@ export const useUser = () => useAuthStore((state) => state.user);
 export const useIsAuthenticated = () => useAuthStore((state) => state.isAuthenticated);
 export const useIsAdmin = () =>
   useAuthStore((state) =>
-    state.user?.role === 'admin' || state.user?.role === 'super_admin'
+    state.user?.role === 'admin' ||
+    state.user?.role === 'buildings_manager' ||
+    state.user?.role === 'super_admin'
   );
+export const useIsBuildingsManager = () =>
+  useAuthStore((state) => state.user?.role === 'buildings_manager');
 export const useIsContractor = () =>
   useAuthStore((state) => state.user?.role === 'contractor');
 export const useAccessToken = () => useAuthStore((state) => state.accessToken);

@@ -21,6 +21,10 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
     },
     {
+      name: "chromium-he",
+      use: { ...devices["Desktop Chrome"], locale: "he-IL" },
+    },
+    {
       name: "Mobile Safari",
       use: { ...devices["iPhone 14"] },
     },

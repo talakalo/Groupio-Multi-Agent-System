@@ -54,8 +54,13 @@ def mock_deps():
         mock_support_pg.return_value = pg
         mock_analytics_pg.return_value = pg
 
-        mock_graph.return_value = AsyncMock()
-        mock_vetting_graph.return_value = AsyncMock()
+        graph = AsyncMock()
+        graph.find_matching_contractors = AsyncMock(return_value=[])
+        graph.get_contractor_reputation = AsyncMock(return_value={})
+        graph.detect_suspicious_patterns = AsyncMock(return_value={})
+        graph.get_contractor_building_history = AsyncMock(return_value=[])
+        mock_graph.return_value = graph
+        mock_vetting_graph.return_value = graph
         mock_support_redis.return_value = AsyncMock()
 
         yield

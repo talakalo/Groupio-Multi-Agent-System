@@ -20,6 +20,7 @@ import {
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 
+import { EmptyState } from '@/components/shared/EmptyState';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
 
@@ -256,6 +257,16 @@ export default function ResidentDashboardPage() {
         </h1>
         <p className="text-gray-500 mt-1">{t('dashboardSubtitle')}</p>
       </div>
+
+      {/* New resident: no building yet */}
+      {stats?.buildingName === '-' && (
+        <EmptyState
+          icon={Building2}
+          title="ברוכים הבאים ל-Groupio!"
+          description="עדיין לא הצטרפתם לבניין. הצטרפו לבניין שלכם כדי לגשת להצעות קבוצתיות."
+          action={{ label: 'הצטרפו לבניין', href: '/building/join' }}
+        />
+      )}
 
       {/* Stats grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

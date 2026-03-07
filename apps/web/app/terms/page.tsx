@@ -111,6 +111,16 @@ export default function TermsPage() {
         </section>
 
         <section>
+          <h2 className="text-xl font-semibold text-gray-900 mb-3">5א. הגבלת אחריות קבלן</h2>
+          <p>
+            Groupio פועלת כמתווך בלבד בין דיירים לקבלנים עצמאיים.
+            Groupio אינה מעסיקה קבלנים ואינה נושאת באחריות ישירה לביצוע,
+            איכות, בטיחות, או נזקים הנובעים מעבודות הקבלן.
+            כל הסכם עבודה הינו בין הדייר לקבלן בלבד.
+          </p>
+        </section>
+
+        <section>
           <h2 className="text-xl font-semibold text-gray-900 mb-3">6. תשלומים ועמלות</h2>
           <p>
             Groupio גובה עמלת פלטפורמה של עד 3% מסכום כל עסקה. כספי
@@ -134,7 +144,7 @@ export default function TermsPage() {
         <section>
           <h2 className="text-xl font-semibold text-gray-900 mb-3">8. הגבלת אחריות</h2>
           <p>
-            הפלטפורמה מסופקת "כמות שהיא" (AS IS). Groupio לא תהיה אחראית
+            הפלטפורמה מסופקת &quot;כמות שהיא&quot; (AS IS). Groupio לא תהיה אחראית
             לנזקים עקיפים, אקראיים או תוצאתיים העולים על סכום התשלומים
             ששילמת ב-12 החודשים האחרונים.
           </p>
@@ -144,7 +154,7 @@ export default function TermsPage() {
           <h2 className="text-xl font-semibold text-gray-900 mb-3">9. שינויים בתנאים</h2>
           <p>
             Groupio רשאית לעדכן תנאים אלו בכל עת. שינויים מהותיים יודיעו
-            בדוא"ל לפחות 14 ימים מראש. המשך השימוש לאחר מתן ההודעה מהווה
+            בדוא&quot;ל לפחות 14 ימים מראש. המשך השימוש לאחר מתן ההודעה מהווה
             הסכמה לתנאים המעודכנים.
           </p>
         </section>
@@ -156,10 +166,6 @@ export default function TermsPage() {
             <a href="mailto:legal@groupio.co.il" className="text-blue-600 hover:underline">
               legal@groupio.co.il
             </a>
-          </p>
-          <p className="mt-2 text-sm text-gray-500">
-            ⚠️ מסמך זה הינו טיוטה המיועדת לבדיקה פנימית בלבד ואינה מייצגת
-            ייעוץ משפטי. יש להביאה לסקירת עורך דין לפני פרסום לציבור.
           </p>
         </section>
       </div>

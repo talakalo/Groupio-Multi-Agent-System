@@ -1,5 +1,8 @@
 """Unit tests for document chunking strategies."""
 
+import importlib
+
+import src.rag.chunking as chunking_module
 from src.rag.chunking import (
     chunk_by_tokens,
     chunk_document,
@@ -108,3 +111,32 @@ def test_chunk_overlap():
         last_words_first & first_words_second
         # Overlap may vary, but structure should be maintained
         assert len(chunks) >= 2
+
+
+def test_chunking_module_does_not_initialize_encoder_on_import(monkeypatch):
+    """Reloading chunking module should not call tiktoken.get_encoding at import-time."""
+    called = {"count": 0}
+
+    def _fake_get_encoding(name: str):
+        called["count"] += 1
+        raise RuntimeError(f"unexpected get_encoding call for {name}")
+
+    monkeypatch.setattr(chunking_module.tiktoken, "get_encoding", _fake_get_encoding)
+    chunking_module._get_encoder.cache_clear()
+
+    importlib.reload(chunking_module)
+
+    assert called["count"] == 0
+
+
+def test_count_tokens_falls_back_when_tiktoken_unavailable(monkeypatch):
+    """count_tokens should still work when tiktoken encoding lookup fails."""
+
+    def _always_fail_get_encoding(name: str):
+        raise RuntimeError(f"encoding unavailable: {name}")
+
+    monkeypatch.setattr(chunking_module.tiktoken, "get_encoding", _always_fail_get_encoding)
+    chunking_module._get_encoder.cache_clear()
+
+    assert chunking_module.count_tokens("hello world") > 0
+    assert chunking_module.count_tokens("") == 0

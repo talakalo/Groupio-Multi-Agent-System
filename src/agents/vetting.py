@@ -5,6 +5,7 @@ from typing import Any
 
 from src.agents.base import AgentConfig, BaseAgent
 from src.config.prompts.vetting import VETTING_SYSTEM_PROMPT
+from src.config.settings import get_settings
 from src.databases.graph_store import get_graph_store
 from src.databases.postgres import get_postgres_client
 from src.models.agent_state import AgentState
@@ -154,6 +155,17 @@ class VettingAgent(BaseAgent):
             )
             # Notify admin team about the pending manual review
             await self._notify_admin_vetting(contractor_id, trust_score, doc_analysis)
+
+        # Task 3.1 — Autonomy mode: in recommend/gated mode, flag for human confirmation
+        settings = get_settings()
+        if settings.VETTING_AGENT_MODE in ("recommend", "gated"):
+            state["needs_human"] = True
+            state.setdefault(
+                "escalation_reason",
+                (f"Vetting result requires admin confirmation (mode={settings.VETTING_AGENT_MODE})"),
+            )
+            if state["actions_taken"]:
+                state["actions_taken"][-1]["requires_human_confirmation"] = True
 
         self._metrics["calls"] += 1
         return state
@@ -349,9 +361,7 @@ class VettingAgent(BaseAgent):
                 return e["contractor_id"]
         return None
 
-    async def _notify_admin_vetting(
-        self, contractor_id: str, trust_score: float, doc_analysis: dict[str, Any]
-    ) -> None:
+    async def _notify_admin_vetting(self, contractor_id: str, trust_score: float, doc_analysis: dict[str, Any]) -> None:
         """Email admin team when a contractor requires manual vetting review."""
         try:
             from src.config.settings import get_settings

@@ -176,7 +176,7 @@ export default function DashboardPage() {
               <span>
                 Uptime:{" "}
                 <span className="font-semibold text-surface-700">
-                  {uptimePercent}%
+                  {uptimeLabel}
                 </span>
               </span>
             </div>

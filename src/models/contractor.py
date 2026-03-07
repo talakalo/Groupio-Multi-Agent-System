@@ -158,6 +158,7 @@ class ContractorStats(BaseModel):
 # These are used by the matching, vetting, and outreach agents.
 # ---------------------------------------------------------------------------
 
+
 class AgentContractorBase(BaseModel):
     """Base contractor fields used by agents and internal services."""
 

@@ -38,6 +38,19 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["auth"])
 
 
+async def check_auth_rate_limit(request: Request) -> None:
+    """Enforce IP-based rate limit on auth endpoints (20 req/min)."""
+    redis = get_redis_client()
+    client_ip = request.client.host if request.client else "unknown"
+    allowed = await redis.check_ip_rate_limit(client_ip, limit=20, window=60)
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many authentication attempts. Try again in a minute.",
+            headers={"Retry-After": "60"},
+        )
+
+
 class SignupRequest(BaseModel):
     """Signup request (frontend format: name, buildingId)."""
 
@@ -65,7 +78,7 @@ class SignupResponse(BaseModel):
 
 
 @router.post("/signup", response_model=SignupResponse)
-async def signup(request: SignupRequest) -> SignupResponse:
+async def signup(request: SignupRequest, _: None = Depends(check_auth_rate_limit)) -> SignupResponse:
     """Register a new user and return token (auto-login)."""
     db = get_postgres_client()
 
@@ -167,11 +180,14 @@ async def register(request: UserCreate) -> UserResponse:
 
 @router.post("/login", response_model=TokenResponse)
 async def login(
+    http_request: Request,
     response: Response,
     form_data: OAuth2PasswordRequestForm = Depends(),
+    _: None = Depends(check_auth_rate_limit),
 ) -> TokenResponse:
     """Login and get access token."""
     db = get_postgres_client()
+    redis = get_redis_client()
 
     user = await db.get_user_by_email(form_data.username)
     if not user:
@@ -179,11 +195,17 @@ async def login(
 
     # Verify password
     hashed = await db.get_user_password_hash(user.id)
-    if not verify_password(form_data.password, hashed):
+    if not hashed or not verify_password(form_data.password, hashed):
+        # Brute-force lockout: increment failure counter
+        fail_count = await redis.increment_login_failures(user.id)
+        if fail_count >= 5:
+            await db.update_user(user.id, {"is_active": False})
+            logger.warning("Account locked due to too many failed logins: %s", user.email)
+            raise HTTPException(status_code=423, detail="Account locked due to too many failed attempts")
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     if not user.is_active:
-        raise HTTPException(status_code=403, detail="Account is disabled")
+        raise HTTPException(status_code=423, detail="Account is locked")
 
     settings = get_settings()
 
@@ -195,13 +217,13 @@ async def login(
     )
     refresh_token = create_refresh_token(user_id=user.id)
 
-    # Store refresh token in Redis
-    redis = get_redis_client()
+    # Store refresh token in Redis and clear failure counter
     await redis.set(
         f"refresh_token:{user.id}",
         refresh_token,
         ex=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
     )
+    await redis.clear_login_failures(user.id)
 
     # Update last login
     await db.update_user(user.id, {"last_login": datetime.now(UTC)})
@@ -228,11 +250,14 @@ async def login(
 
 @router.post("/login/json", response_model=TokenResponse)
 async def login_json(
+    http_request: Request,
     request: LoginRequest,
     response: Response,
+    _: None = Depends(check_auth_rate_limit),
 ) -> TokenResponse:
     """Login with JSON body (email or phone)."""
     db = get_postgres_client()
+    redis = get_redis_client()
 
     if request.email:
         user = await db.get_user_by_email(request.email)
@@ -243,11 +268,16 @@ async def login_json(
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     hashed = await db.get_user_password_hash(user.id)
-    if not verify_password(request.password, hashed):
+    if not hashed or not verify_password(request.password, hashed):
+        fail_count = await redis.increment_login_failures(user.id)
+        if fail_count >= 5:
+            await db.update_user(user.id, {"is_active": False})
+            logger.warning("Account locked due to too many failed logins: %s", user.email)
+            raise HTTPException(status_code=423, detail="Account locked due to too many failed attempts")
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     if not user.is_active:
-        raise HTTPException(status_code=403, detail="Account is disabled")
+        raise HTTPException(status_code=423, detail="Account is locked")
 
     settings = get_settings()
 
@@ -258,12 +288,12 @@ async def login_json(
     )
     refresh_token = create_refresh_token(user_id=user.id)
 
-    redis = get_redis_client()
     await redis.set(
         f"refresh_token:{user.id}",
         refresh_token,
         ex=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
     )
+    await redis.clear_login_failures(user.id)
 
     await db.update_user(user.id, {"last_login": datetime.now(UTC)})
 
@@ -302,6 +332,8 @@ async def refresh_token(
         raise HTTPException(status_code=401, detail="Invalid refresh token")
 
     user_id = payload.get("sub")
+    if not user_id or not isinstance(user_id, str):
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
 
     # Verify token in Redis
     redis = get_redis_client()
@@ -405,7 +437,7 @@ async def change_password(
 
     # Verify current password
     hashed = await db.get_user_password_hash(current_user.id)
-    if not verify_password(request.current_password, hashed):
+    if not hashed or not verify_password(request.current_password, hashed):
         raise HTTPException(status_code=400, detail="Current password is incorrect")
 
     # Hash and update new password
@@ -422,7 +454,11 @@ async def change_password(
 
 
 @router.post("/password/reset")
-async def request_password_reset(request: PasswordReset) -> dict[str, str]:
+async def request_password_reset(
+    http_request: Request,
+    request: PasswordReset,
+    _: None = Depends(check_auth_rate_limit),
+) -> dict[str, str]:
     """Request password reset email."""
     db = get_postgres_client()
 
@@ -532,6 +568,7 @@ async def resend_verification(
 
     return {"status": "verification_email_sent"}
 
+
 @router.delete("/me")
 async def delete_account(
     response: Response,
@@ -551,7 +588,7 @@ async def delete_account(
     # Delete user — cascade rules in the DB handle linked rows.
     # If the DB client exposes a delete method, use it; otherwise anonymise.
     try:
-        await db.delete_user(current_user.id)
+        await db.delete_user(current_user.id)  # type: ignore[attr-defined]
     except AttributeError:
         # Fallback: anonymise PII if hard-delete is not yet implemented
         anonymised = {

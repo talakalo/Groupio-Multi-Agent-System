@@ -487,10 +487,19 @@ async def export_offers_csv(
     )
 
     fieldnames = [
-        "id", "title", "category", "status", "building_id",
-        "base_price", "current_participants", "min_participants",
-        "max_participants", "matched_contractor_id", "created_by",
-        "created_at", "deadline",
+        "id",
+        "title",
+        "category",
+        "status",
+        "building_id",
+        "base_price",
+        "current_participants",
+        "min_participants",
+        "max_participants",
+        "matched_contractor_id",
+        "created_by",
+        "created_at",
+        "deadline",
     ]
 
     output = io.StringIO()
@@ -523,16 +532,18 @@ async def export_participants_csv(
         try:
             participants = await db.get_offer_participants(offer_id)
             for p in participants:
-                rows.append({
-                    "offer_id": offer_id,
-                    "offer_title": offer_title,
-                    "user_id": p.get("user_id", ""),
-                    "user_name": p.get("full_name") or p.get("user_name", ""),
-                    "user_email": p.get("email") or p.get("user_email", ""),
-                    "unit_number": p.get("unit_number", ""),
-                    "unit_count": p.get("unit_count", 1),
-                    "joined_at": p.get("joined_at", ""),
-                })
+                rows.append(
+                    {
+                        "offer_id": offer_id,
+                        "offer_title": offer_title,
+                        "user_id": p.get("user_id", ""),
+                        "user_name": p.get("full_name") or p.get("user_name", ""),
+                        "user_email": p.get("email") or p.get("user_email", ""),
+                        "unit_number": p.get("unit_number", ""),
+                        "unit_count": p.get("unit_count", 1),
+                        "joined_at": p.get("joined_at", ""),
+                    }
+                )
         except Exception:
             logger.warning("Failed to fetch participants for offer=%s in CSV export", offer_id)
     else:
@@ -544,22 +555,30 @@ async def export_participants_csv(
             try:
                 participants = await db.get_offer_participants(oid)
                 for p in participants:
-                    rows.append({
-                        "offer_id": oid,
-                        "offer_title": offer_title,
-                        "user_id": p.get("user_id", ""),
-                        "user_name": p.get("full_name") or p.get("user_name", ""),
-                        "user_email": p.get("email") or p.get("user_email", ""),
-                        "unit_number": p.get("unit_number", ""),
-                        "unit_count": p.get("unit_count", 1),
-                        "joined_at": p.get("joined_at", ""),
-                    })
+                    rows.append(
+                        {
+                            "offer_id": oid,
+                            "offer_title": offer_title,
+                            "user_id": p.get("user_id", ""),
+                            "user_name": p.get("full_name") or p.get("user_name", ""),
+                            "user_email": p.get("email") or p.get("user_email", ""),
+                            "unit_number": p.get("unit_number", ""),
+                            "unit_count": p.get("unit_count", 1),
+                            "joined_at": p.get("joined_at", ""),
+                        }
+                    )
             except Exception:
                 logger.warning("Failed to fetch participants for offer=%s in CSV export", oid)
 
     fieldnames = [
-        "offer_id", "offer_title", "user_id", "user_name",
-        "user_email", "unit_number", "unit_count", "joined_at",
+        "offer_id",
+        "offer_title",
+        "user_id",
+        "user_name",
+        "user_email",
+        "unit_number",
+        "unit_count",
+        "joined_at",
     ]
     output = io.StringIO()
     writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction="ignore")
@@ -594,8 +613,16 @@ async def export_payments_csv(
         payments = []
 
     fieldnames = [
-        "id", "user_id", "offer_id", "invoice_id", "amount", "currency",
-        "status", "payment_method_id", "transaction_id", "created_at",
+        "id",
+        "user_id",
+        "offer_id",
+        "invoice_id",
+        "amount",
+        "currency",
+        "status",
+        "payment_method_id",
+        "transaction_id",
+        "created_at",
     ]
     output = io.StringIO()
     writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction="ignore")
@@ -632,17 +659,13 @@ async def vetting_pipeline_status(
 
     # Contractors that have been through vetting and were approved
     try:
-        _, approved_total = await db.list_contractors(
-            filters={"verification_status": "verified"}, page=1, page_size=1
-        )
+        _, approved_total = await db.list_contractors(filters={"verification_status": "verified"}, page=1, page_size=1)
     except Exception:
         approved_total = 0
 
     # Contractors that were rejected
     try:
-        _, rejected_total = await db.list_contractors(
-            filters={"verification_status": "rejected"}, page=1, page_size=1
-        )
+        _, rejected_total = await db.list_contractors(filters={"verification_status": "rejected"}, page=1, page_size=1)
     except Exception:
         rejected_total = 0
 
@@ -742,3 +765,183 @@ async def override_payment_status(
         body.reason,
     )
     return {"payment_id": payment_id, "status": body.status, "updated_by": admin.id}
+
+
+# --------------- Outreach queue management ---------------
+
+
+@router.get("/outreach/queue")
+async def list_outreach_queue(
+    status: str = "pending_approval",
+    admin: UserInDB = Depends(get_admin_user),
+) -> dict[str, Any]:
+    """List pending outreach messages awaiting admin approval."""
+    db = get_postgres_client()
+    items = await db.list_outreach_queue(status=status)
+    return {"items": items, "total": len(items), "status": status}
+
+
+@router.post("/outreach/{pending_id}/approve")
+async def approve_outreach(
+    pending_id: str,
+    admin: UserInDB = Depends(get_admin_user),
+) -> dict[str, Any]:
+    """Approve and dispatch a pending outreach message."""
+    db = get_postgres_client()
+    entry = await db.get_outreach_pending(pending_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Outreach entry not found")
+    if entry.get("status") != "pending_approval":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot approve entry with status '{entry.get('status')}'",
+        )
+    await db.update_outreach_queue_status(pending_id, "approved", approved_by=admin.id)
+    # Mark as sent immediately after approval (actual dispatch happens via message service)
+    await db.update_outreach_queue_status(pending_id, "sent")
+    logger.info("Admin %s approved outreach %s", admin.id, pending_id)
+    return {"status": "approved_and_dispatched", "pending_id": pending_id}
+
+
+@router.post("/outreach/{pending_id}/reject")
+async def reject_outreach(
+    pending_id: str,
+    admin: UserInDB = Depends(get_admin_user),
+) -> dict[str, Any]:
+    """Reject a pending outreach message."""
+    db = get_postgres_client()
+    entry = await db.get_outreach_pending(pending_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Outreach entry not found")
+    if entry.get("status") != "pending_approval":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot reject entry with status '{entry.get('status')}'",
+        )
+    await db.update_outreach_queue_status(pending_id, "rejected", approved_by=admin.id)
+    logger.info("Admin %s rejected outreach %s", admin.id, pending_id)
+    return {"status": "rejected", "pending_id": pending_id}
+
+
+# --------------- User suspend / activate ---------------
+
+
+@router.post("/users/{user_id}/suspend")
+async def suspend_user(
+    user_id: str,
+    request: Request,
+    body: dict = None,
+    admin: UserInDB = Depends(get_admin_user),
+) -> dict[str, Any]:
+    """Suspend a user account and invalidate their refresh token."""
+    if body is None:
+        body = {}
+    db = get_postgres_client()
+    user = await db.get_user(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.id == admin.id:
+        raise HTTPException(status_code=400, detail="Cannot suspend yourself")
+    await db.update_user(user_id, {"is_active": False})
+    await db.create_audit_log(
+        {
+            "user_id": admin.id,
+            "action": "suspend_user",
+            "resource_type": "user",
+            "resource_id": user_id,
+            "details": {"reason": body.get("reason", ""), "suspended_user_email": user.email},
+            "ip_address": request.client.host if request.client else None,
+        }
+    )
+    from src.databases.redis_client import get_redis_client as _get_redis
+
+    redis = _get_redis()
+    await redis.delete(f"refresh_token:{user_id}")
+    logger.info("Admin %s suspended user %s", admin.id, user_id)
+    return {"status": "suspended", "user_id": user_id}
+
+
+@router.post("/users/{user_id}/activate")
+async def activate_user(
+    user_id: str,
+    request: Request,
+    admin: UserInDB = Depends(get_admin_user),
+) -> dict[str, Any]:
+    """Reactivate a suspended user account."""
+    db = get_postgres_client()
+    user = await db.get_user(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    await db.update_user(user_id, {"is_active": True})
+    await db.create_audit_log(
+        {
+            "user_id": admin.id,
+            "action": "activate_user",
+            "resource_type": "user",
+            "resource_id": user_id,
+            "details": {"activated_user_email": user.email},
+            "ip_address": request.client.host if request.client else None,
+        }
+    )
+    logger.info("Admin %s activated user %s", admin.id, user_id)
+    return {"status": "active", "user_id": user_id}
+
+
+# --------------- Agent audit log ---------------
+
+
+@router.get("/agents/audit")
+async def list_agent_audit(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    agent_name: str | None = None,
+    requires_human_review: bool | None = None,
+    admin: UserInDB = Depends(get_admin_user),
+) -> dict[str, Any]:
+    """List paginated AI agent audit log entries."""
+    db = get_postgres_client()
+    items, total = await db.list_agent_audit_log(
+        page=page,
+        page_size=page_size,
+        agent_name=agent_name,
+        requires_human_review=requires_human_review,
+    )
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "has_more": (page * page_size) < total,
+    }
+
+
+# --------------- Agent autonomy modes (Task 3.1) ---------------
+
+
+@router.get("/agents/autonomy")
+async def get_agent_autonomy_modes(
+    admin: UserInDB = Depends(get_admin_user),
+) -> dict[str, Any]:
+    """Return current autonomy mode for each agent."""
+    from src.config.settings import get_settings
+
+    settings = get_settings()
+    return {
+        "matching": settings.MATCHING_AGENT_MODE,
+        "pricing": settings.PRICING_AGENT_MODE,
+        "vetting": settings.VETTING_AGENT_MODE,
+        "outreach": settings.OUTREACH_AGENT_MODE,
+    }
+
+
+@router.get("/agents/audit/{audit_id}")
+async def get_agent_audit_entry(
+    audit_id: str,
+    admin: UserInDB = Depends(get_admin_user),
+) -> dict[str, Any]:
+    """Get a single agent audit log entry including reasoning_chain (Task 3.6)."""
+    db = get_postgres_client()
+    entry = await db._pg_fetch_one("SELECT * FROM agent_audit_log WHERE id = $1", audit_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Audit entry not found")
+    return dict(entry)

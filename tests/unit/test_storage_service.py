@@ -17,6 +17,9 @@ def storage():
     with patch("src.services.storage.get_settings") as mock_settings:
         mock_settings.return_value.SUPABASE_URL = ""
         mock_settings.return_value.SUPABASE_KEY = ""
+        # _local_signed_url calls get_settings().JWT_SECRET_KEY.encode(); provide
+        # a real string so hmac.new() receives bytes instead of a MagicMock.
+        mock_settings.return_value.JWT_SECRET_KEY = "test-secret-key-for-unit-tests"
         svc = StorageService()
         yield svc
 
@@ -89,9 +92,11 @@ async def test_upload_local_fallback(storage, tmp_path, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_get_signed_url_local(storage):
-    """Local fallback returns a static path instead of a signed URL."""
+    """Local fallback returns an HMAC-signed path for development access."""
     url = await storage.get_signed_url("contractor-docs", "2026/01/abc.pdf")
-    assert url == "/uploads/contractor-docs/2026/01/abc.pdf"
+    # _local_signed_url returns /local-files/{path}?expires=<ts>&sig=<hmac>
+    assert url.startswith("/local-files/2026/01/abc.pdf?expires=")
+    assert "&sig=" in url
 
 
 @pytest.mark.asyncio

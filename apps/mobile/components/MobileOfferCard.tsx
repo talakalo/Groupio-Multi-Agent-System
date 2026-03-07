@@ -117,7 +117,7 @@ export function MobileOfferCard({ offer, onJoin, onPress }: MobileOfferCardProps
           <View style={styles.contractorInfo}>
             <Avatar.Text
               size={44}
-              label={offer.contractor.businessName.substring(0, 2)}
+              label={(offer.contractor?.businessName ?? "??").substring(0, 2)}
               style={{ backgroundColor: theme.colors.primaryContainer }}
               labelStyle={{ color: theme.colors.onPrimaryContainer }}
             />
@@ -127,9 +127,9 @@ export function MobileOfferCard({ offer, onJoin, onPress }: MobileOfferCardProps
                 style={[styles.contractorName, { color: theme.colors.onSurface }]}
                 numberOfLines={1}
               >
-                {offer.contractor.businessName}
+                {offer.contractor?.businessName ?? ""}
               </Text>
-              <RatingStars rating={offer.contractor.rating} />
+              <RatingStars rating={offer.contractor?.rating ?? 0} />
             </View>
           </View>
           <Chip

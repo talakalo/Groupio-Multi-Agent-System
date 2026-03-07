@@ -3,6 +3,8 @@
 import json
 import logging
 import re
+from collections.abc import AsyncIterator as _AsyncIterator
+from contextlib import asynccontextmanager as _acm
 from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
@@ -107,8 +109,9 @@ class PostgresClient:
                 db_url = db_url.replace("postgres://", "postgresql://", 1)
             self._asyncpg_pool = await asyncpg.create_pool(
                 db_url,
-                min_size=1,
-                max_size=10,
+                min_size=5,
+                max_size=25,
+                max_inactive_connection_lifetime=300,
                 command_timeout=60,
             )
         return self._asyncpg_pool
@@ -162,9 +165,6 @@ class PostgresClient:
         pool = await self._get_client()
         async with pool.acquire() as conn:
             await conn.execute(query, *args)
-
-    from collections.abc import AsyncIterator as _AsyncIterator
-    from contextlib import asynccontextmanager as _acm
 
     @_acm
     async def transaction(self) -> "_AsyncIterator[Any]":
@@ -309,6 +309,7 @@ class PostgresClient:
             "is_verified",
             "last_login",
             "role",
+            "onboarded_at",
         }
         filtered = {k: v for k, v in update_data.items() if k in allowed}
         if not filtered:
@@ -880,36 +881,43 @@ class PostgresClient:
         return row is not None
 
     async def join_offer(self, user_id: str, offer_id: str, unit_count: int = 1) -> None:
-        """Add user as participant and increment current_participants."""
-        from uuid import uuid4
-
+        """Add user as participant and increment current_participants (atomic)."""
         pid = str(uuid4())
         if self._use_supabase_client():
             client = await self._get_client()
-            await (
-                client.table("offer_participants")
-                .insert({"id": pid, "offer_id": offer_id, "user_id": user_id, "unit_count": unit_count})
-                .execute()
-            )
-            offer = await self.get_offer(offer_id)
-            cur = (offer.get("current_participants") or 0) + unit_count
-            await client.table("offers").update({"current_participants": cur}).eq("id", offer_id).execute()
+            # Atomic Postgres function eliminates the read-modify-write race
+            await client.rpc(
+                "join_offer_atomic",
+                {
+                    "p_id": pid,
+                    "p_offer_id": offer_id,
+                    "p_user_id": user_id,
+                    "p_unit_count": unit_count,
+                },
+            ).execute()
         else:
-            await self._pg_execute(
-                "INSERT INTO offer_participants (id, offer_id, user_id, unit_count) VALUES ($1, $2, $3, $4)",
-                pid,
-                offer_id,
-                user_id,
-                unit_count,
-            )
-            await self._pg_execute(
-                "UPDATE offers SET current_participants = current_participants + $1 WHERE id = $2",
-                unit_count,
-                offer_id,
-            )
+            pool = await self._get_client()
+            async with pool.acquire() as conn:
+                async with conn.transaction():
+                    await conn.execute(
+                        "INSERT INTO offer_participants (id, offer_id, user_id, unit_count) VALUES ($1, $2, $3, $4)",
+                        pid,
+                        offer_id,
+                        user_id,
+                        unit_count,
+                    )
+                    result = await conn.execute(
+                        "UPDATE offers SET current_participants = current_participants + $1 "
+                        "WHERE id = $2 AND status IN ('pending', 'matching') "
+                        "AND current_participants < max_participants",
+                        unit_count,
+                        offer_id,
+                    )
+                    if result == "UPDATE 0":
+                        raise ValueError("Offer not joinable, full, or does not exist")
 
     async def leave_offer(self, user_id: str, offer_id: str) -> None:
-        """Remove user from offer and decrement current_participants."""
+        """Remove user from offer and decrement current_participants (atomic)."""
         if self._use_supabase_client():
             client = await self._get_client()
             part = (
@@ -923,25 +931,28 @@ class PostgresClient:
             uc = part.data[0]["unit_count"] if part.data else 1
             await client.table("offer_participants").delete().eq("user_id", user_id).eq("offer_id", offer_id).execute()
             offer = await self.get_offer(offer_id)
-            cur = max(0, (offer.get("current_participants") or 0) - uc)
+            cur = max(0, ((offer.get("current_participants") or 0) if offer is not None else 0) - uc)
             await client.table("offers").update({"current_participants": cur}).eq("id", offer_id).execute()
         else:
-            row = await self._pg_fetch_one(
-                "SELECT unit_count FROM offer_participants WHERE user_id = $1 AND offer_id = $2",
-                user_id,
-                offer_id,
-            )
-            uc = row["unit_count"] if row else 1
-            await self._pg_execute(
-                "DELETE FROM offer_participants WHERE user_id = $1 AND offer_id = $2",
-                user_id,
-                offer_id,
-            )
-            await self._pg_execute(
-                "UPDATE offers SET current_participants = GREATEST(0, current_participants - $1) WHERE id = $2",
-                uc,
-                offer_id,
-            )
+            pool = await self._get_client()
+            async with pool.acquire() as conn:
+                async with conn.transaction():
+                    row = await conn.fetchrow(
+                        "SELECT unit_count FROM offer_participants WHERE user_id = $1 AND offer_id = $2 FOR UPDATE",
+                        user_id,
+                        offer_id,
+                    )
+                    uc = row["unit_count"] if row else 1
+                    await conn.execute(
+                        "DELETE FROM offer_participants WHERE user_id = $1 AND offer_id = $2",
+                        user_id,
+                        offer_id,
+                    )
+                    await conn.execute(
+                        "UPDATE offers SET current_participants = GREATEST(0, current_participants - $1) WHERE id = $2",
+                        uc,
+                        offer_id,
+                    )
 
     async def get_offer_participants(self, offer_id: str) -> list[dict[str, Any]]:
         """Get all participants of an offer."""
@@ -1040,6 +1051,45 @@ class PostgresClient:
                 json.dumps(response),
                 json.dumps(metadata),
             )
+
+    async def get_conversation_history(
+        self,
+        user_id: str,
+        limit: int = 50,
+        before: str | None = None,
+    ) -> tuple[list[dict[str, Any]], int]:
+        """Return (items, total) for a user's conversation_logs.
+
+        Each row represents one exchange (user message + assistant response).
+        ``before`` is an ISO-8601 timestamp used as an exclusive upper bound for
+        cursor-based pagination (oldest-first, so "before" means "created_at <").
+        """
+        if self._use_supabase_client():
+            client = await self._get_client()
+            q = client.table("conversation_logs").select("*", count="exact").eq("user_id", user_id)
+            if before:
+                q = q.lt("created_at", before)
+            q = q.order("created_at", desc=False).limit(limit)
+            result = await q.execute()
+            total = result.count if hasattr(result, "count") and result.count is not None else len(result.data or [])
+            return (result.data or [], total)
+
+        # Raw postgres path
+        args: list[Any] = [user_id]
+        extra = ""
+        if before:
+            args.append(before)
+            extra = f" AND created_at < ${len(args)}"
+        count_row = await self._pg_fetch_one(
+            f"SELECT COUNT(*) AS c FROM conversation_logs WHERE user_id = $1{extra}", *args
+        )
+        total = count_row["c"] if count_row else 0
+        args.append(limit)
+        rows = await self._pg_fetch_all(
+            f"SELECT * FROM conversation_logs WHERE user_id = $1{extra} ORDER BY created_at ASC LIMIT ${len(args)}",
+            *args,
+        )
+        return (rows or [], total)
 
     async def create_contractor(self, contractor_data: dict[str, Any], password: str) -> dict[str, Any]:
         """Create a contractor (user + contractor row)."""
@@ -1919,37 +1969,207 @@ class PostgresClient:
         return (rows or [], total)
 
     # ------------------------------------------------------------------
+    # Agent Audit Log
+    # ------------------------------------------------------------------
+
+    async def create_agent_audit_entry(self, data: dict[str, Any]) -> None:
+        """Insert an agent decision into agent_audit_log (fire-and-forget)."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            await client.table("agent_audit_log").insert(data).execute()
+            return
+        await self._pg_execute(
+            """INSERT INTO agent_audit_log
+               (id, session_id, user_id, agent_name, action, input_summary,
+                output_summary, model_used, tokens_used, latency_ms,
+                requires_human_review, reasoning_chain, cited_sources,
+                alternatives_considered, created_at)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)""",
+            data["id"],
+            data.get("session_id"),
+            data.get("user_id"),
+            data["agent_name"],
+            data["action"],
+            data.get("input_summary"),
+            data.get("output_summary"),
+            data.get("model_used"),
+            data.get("tokens_used"),
+            data.get("latency_ms"),
+            data.get("requires_human_review", False),
+            json.dumps(data.get("reasoning_chain") or []),
+            json.dumps(data.get("cited_sources") or []),
+            json.dumps(data.get("alternatives_considered") or []),
+            data.get("created_at"),
+        )
+
+    async def list_agent_audit_log(
+        self,
+        page: int = 1,
+        page_size: int = 20,
+        agent_name: str | None = None,
+        requires_human_review: bool | None = None,
+    ) -> tuple[list[dict[str, Any]], int]:
+        """Paginated agent audit log with optional filters."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            q = client.table("agent_audit_log").select("*", count="exact")
+            if agent_name:
+                q = q.eq("agent_name", agent_name)
+            if requires_human_review is not None:
+                q = q.eq("requires_human_review", requires_human_review)
+            result = (
+                await q.order("created_at", desc=True).range((page - 1) * page_size, page * page_size - 1).execute()
+            )
+            total = result.count if hasattr(result, "count") and result.count is not None else len(result.data or [])
+            return (result.data or [], total)
+
+        where_parts: list[str] = []
+        args: list[Any] = []
+        if agent_name:
+            args.append(agent_name)
+            where_parts.append(f"agent_name = ${len(args)}")
+        if requires_human_review is not None:
+            args.append(requires_human_review)
+            where_parts.append(f"requires_human_review = ${len(args)}")
+        where_sql = " AND ".join(where_parts) if where_parts else "1=1"
+        count_row = await self._pg_fetch_one(f"SELECT COUNT(*) AS c FROM agent_audit_log WHERE {where_sql}", *args)
+        total = count_row["c"] if count_row else 0
+        args.extend([page_size, (page - 1) * page_size])
+        n1, n2 = len(args) - 1, len(args)
+        rows = await self._pg_fetch_all(
+            f"SELECT * FROM agent_audit_log WHERE {where_sql} ORDER BY created_at DESC LIMIT ${n1} OFFSET ${n2}",
+            *args,
+        )
+        return (rows or [], total)
+
+    # ------------------------------------------------------------------
+    # Outreach Queue
+    # ------------------------------------------------------------------
+
+    async def create_outreach_pending(self, data: dict[str, Any]) -> dict[str, Any]:
+        """Insert a pending outreach message into the approval queue."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            result = await client.table("outreach_queue").insert(data).execute()
+            return result.data[0] if result.data else data
+        await self._pg_execute(
+            """INSERT INTO outreach_queue
+               (id, user_id, campaign_type, message, variant, status, created_at)
+               VALUES ($1, $2, $3, $4, $5, $6, $7)""",
+            data["id"],
+            data["user_id"],
+            data["campaign_type"],
+            data["message"],
+            data.get("variant"),
+            data.get("status", "pending_approval"),
+            data.get("created_at"),
+        )
+        return data
+
+    async def list_outreach_queue(self, status: str = "pending_approval") -> list[dict[str, Any]]:
+        """List outreach messages filtered by status."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            result = (
+                await client.table("outreach_queue")
+                .select("*")
+                .eq("status", status)
+                .order("created_at", desc=True)
+                .execute()
+            )
+            return result.data or []
+        return await self._pg_fetch_all(
+            "SELECT * FROM outreach_queue WHERE status = $1 ORDER BY created_at DESC",
+            status,
+        )
+
+    async def update_outreach_queue_status(
+        self,
+        pending_id: str,
+        status: str,
+        approved_by: str | None = None,
+    ) -> dict[str, Any] | None:
+        """Update the status of an outreach queue entry."""
+        from datetime import UTC, datetime
+
+        now = datetime.now(UTC)
+        if self._use_supabase_client():
+            client = await self._get_client()
+            update: dict[str, Any] = {"status": status}
+            if approved_by:
+                update["approved_by"] = approved_by
+                update["approved_at"] = now.isoformat()
+            if status == "sent":
+                update["sent_at"] = now.isoformat()
+            result = await client.table("outreach_queue").update(update).eq("id", pending_id).execute()
+            return result.data[0] if result.data else None
+        if approved_by:
+            await self._pg_execute(
+                "UPDATE outreach_queue SET status=$1, approved_by=$2, approved_at=$3 WHERE id=$4",
+                status,
+                approved_by,
+                now,
+                pending_id,
+            )
+        elif status == "sent":
+            await self._pg_execute(
+                "UPDATE outreach_queue SET status=$1, sent_at=$2 WHERE id=$3",
+                status,
+                now,
+                pending_id,
+            )
+        else:
+            await self._pg_execute(
+                "UPDATE outreach_queue SET status=$1 WHERE id=$2",
+                status,
+                pending_id,
+            )
+        return await self._pg_fetch_one("SELECT * FROM outreach_queue WHERE id=$1", pending_id)
+
+    async def get_outreach_pending(self, pending_id: str) -> dict[str, Any] | None:
+        """Get a single outreach queue entry by ID."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            result = await client.table("outreach_queue").select("*").eq("id", pending_id).execute()
+            return result.data[0] if result.data else None
+        return await self._pg_fetch_one("SELECT * FROM outreach_queue WHERE id=$1", pending_id)
+
+    # ------------------------------------------------------------------
     # Invoices
     # ------------------------------------------------------------------
 
-    async def create_invoice(self, data: dict[str, Any]) -> dict[str, Any]:
-        """Insert an invoice record."""
+    async def create_invoice(self, data: dict[str, Any], conn: Any = None) -> dict[str, Any]:
+        """Insert an invoice record. Pass conn to reuse an existing transaction connection."""
         if self._use_supabase_client():
             client = await self._get_client()
             result = await client.table("invoices").insert(data).execute()
             return result.data[0] if result.data else data
-        await self._pg_execute(
-            """INSERT INTO invoices
+        sql = """INSERT INTO invoices
                (id, invoice_number, offer_id, contractor_id, subtotal,
                 tax_rate, tax, platform_fee_rate, platform_fee, total,
                 status, paid_at, transaction_id, payment_method, created_at)
-               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)""",
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)"""
+        args = (
             data["id"],
-            data["invoice_number"],
+            data.get("invoice_number"),
             data["offer_id"],
-            data["contractor_id"],
-            data["subtotal"],
+            data.get("contractor_id"),
+            data.get("subtotal", data.get("amount", 0)),
             data.get("tax_rate", 0.17),
             data.get("tax", 0),
             data.get("platform_fee_rate", 0.05),
             data.get("platform_fee", 0),
-            data["total"],
+            data.get("total", data.get("amount", 0)),
             data.get("status", "pending"),
             data.get("paid_at"),
             data.get("transaction_id"),
             data.get("payment_method"),
             data.get("created_at"),
         )
+        if conn is not None:
+            await conn.execute(sql, *args)
+        else:
+            await self._pg_execute(sql, *args)
         return await self.get_invoice(data["id"]) or data
 
     async def get_invoice(self, invoice_id: str) -> dict[str, Any] | None:
@@ -2062,8 +2282,8 @@ class PostgresClient:
     # Payments
     # ------------------------------------------------------------------
 
-    async def create_payment(self, data: dict[str, Any]) -> dict[str, Any]:
-        """Insert a payment record."""
+    async def create_payment(self, data: dict[str, Any], conn: Any = None) -> dict[str, Any]:
+        """Insert a payment record. Pass conn to reuse an existing transaction connection."""
         if self._use_supabase_client():
             client = await self._get_client()
             # Filter to only columns that exist in the payments table
@@ -2088,11 +2308,11 @@ class PostgresClient:
             }
             result = await client.table("payments").insert(insert_data).execute()
             return result.data[0] if result.data else data
-        await self._pg_execute(
-            """INSERT INTO payments
+        sql_pay = """INSERT INTO payments
                (id, invoice_id, user_id, offer_id, amount, currency, status,
                 transaction_id, payment_method, provider_data, created_at)
-               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)""",
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)"""
+        pay_args = (
             data["id"],
             data.get("invoice_id"),
             data["user_id"],
@@ -2105,6 +2325,10 @@ class PostgresClient:
             json.dumps(data.get("provider_data", {})),
             data.get("created_at"),
         )
+        if conn is not None:
+            await conn.execute(sql_pay, *pay_args)
+        else:
+            await self._pg_execute(sql_pay, *pay_args)
         return await self.get_payment(data["id"]) or data
 
     async def get_payment(self, payment_id: str) -> dict[str, Any] | None:

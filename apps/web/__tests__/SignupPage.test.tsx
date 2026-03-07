@@ -50,6 +50,8 @@ function fillDetailsForm() {
   fireEvent.change(screen.getByLabelText('כתובת אימייל'), { target: { value: 'test@example.com' } });
   fireEvent.change(screen.getByLabelText('מספר טלפון'), { target: { value: '0501234567' } });
   fireEvent.change(screen.getByLabelText('סיסמה'), { target: { value: 'Password1!' } });
+  // Required TOS checkbox — jsdom enforces constraint validation before dispatching submit
+  fireEvent.click(screen.getByRole('checkbox'));
 }
 
 describe('Web SignupPage — navigation', () => {

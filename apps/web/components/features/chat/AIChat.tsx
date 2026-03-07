@@ -8,6 +8,13 @@ import { useState, useRef, useEffect, useCallback, type FormEvent } from 'react'
 import { cn } from '@/lib/utils/cn';
 import { useAccessToken } from '@/lib/stores/authStore';
 
+const AI_THINKING_MESSAGES = [
+  'מחפש קבלנים...',
+  'בודק מחירים...',
+  'מנתח היסטוריה...',
+  'מכין המלצות...',
+];
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -69,7 +76,9 @@ export function AIChat({
   // ---- State ----
   // Welcome message: passed as a prop so callers can provide a translated string.
   // Defaults to an English string; Hebrew callers should pass the translated version.
-  const welcomeContent = placeholder ?? 'Hello! I'm the Groupio assistant. How can I help?';
+  const welcomeContent = placeholder ?? "Hello! I'm the Groupio assistant. How can I help?";
+  const [thinkingMsgIdx, setThinkingMsgIdx] = useState(0);
+  const [isSlowResponse, setIsSlowResponse] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome',
@@ -119,6 +128,26 @@ export function AIChat({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Rotate thinking status messages while loading
+  useEffect(() => {
+    if (!isLoading) return;
+    const interval = setInterval(
+      () => setThinkingMsgIdx((i) => (i + 1) % AI_THINKING_MESSAGES.length),
+      2000,
+    );
+    return () => clearInterval(interval);
+  }, [isLoading]);
+
+  // Show slow-response notice after 30 seconds
+  useEffect(() => {
+    if (!isLoading) {
+      setIsSlowResponse(false);
+      return;
+    }
+    const timer = setTimeout(() => setIsSlowResponse(true), 30_000);
+    return () => clearTimeout(timer);
+  }, [isLoading]);
+
   // ---- Send handler ----
   const sendMessage = useCallback(
     async (text: string) => {
@@ -134,6 +163,8 @@ export function AIChat({
       setMessages((prev) => [...prev, userMsg]);
       setInput('');
       setIsLoading(true);
+      setIsSlowResponse(false);
+      setThinkingMsgIdx(0);
 
       // Placeholder assistant message for streaming
       const assistantId = generateId();
@@ -199,6 +230,7 @@ export function AIChat({
       } finally {
         if (timeoutId !== undefined) clearTimeout(timeoutId);
         setIsLoading(false);
+        setIsSlowResponse(false);
       }
     },
     [accessToken, baseUrl, buildingId, isLoading, userId],
@@ -274,7 +306,7 @@ export function AIChat({
               )}
             >
               {msg.isStreaming && !msg.content ? (
-                <TypingIndicator />
+                <TypingIndicator thinkingMsg={AI_THINKING_MESSAGES[thinkingMsgIdx]} />
               ) : (
                 <p className="whitespace-pre-wrap">{msg.content}</p>
               )}
@@ -303,6 +335,18 @@ export function AIChat({
               {s}
             </button>
           ))}
+        </div>
+      )}
+
+      {/* ---- AI disclosure banner ---- */}
+      <div className="px-4 py-2 bg-amber-50 border-t border-amber-200 text-xs text-amber-800">
+        תוצאות מחיפוש זה מופקות על ידי בינה מלאכותית ועשויות לדרוש בדיקה אנושית.
+      </div>
+
+      {/* ---- Slow-response notice ---- */}
+      {isSlowResponse && (
+        <div className="px-4 py-1.5 text-xs text-center text-gray-400">
+          This is taking longer than expected...
         </div>
       )}
 
@@ -354,12 +398,25 @@ export function AIChat({
 // Typing indicator sub-component
 // ---------------------------------------------------------------------------
 
-function TypingIndicator() {
+function TypingIndicator({ thinkingMsg }: { thinkingMsg?: string }) {
   return (
-    <div data-testid="typing-indicator" className="flex items-center gap-1 py-1" aria-label="חושב...">
-      <span className="h-2 w-2 animate-bounce rounded-full bg-gray-400 [animation-delay:0ms]" />
-      <span className="h-2 w-2 animate-bounce rounded-full bg-gray-400 [animation-delay:150ms]" />
-      <span className="h-2 w-2 animate-bounce rounded-full bg-gray-400 [animation-delay:300ms]" />
+    <div
+      data-testid="typing-indicator"
+      className="flex items-center gap-2 py-1"
+      aria-label="חושב..."
+    >
+      <div className="flex gap-1">
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            className="h-2 w-2 animate-bounce rounded-full bg-primary-400"
+            style={{ animationDelay: `${i * 150}ms` }}
+          />
+        ))}
+      </div>
+      {thinkingMsg && (
+        <span className="text-xs text-gray-400">{thinkingMsg}</span>
+      )}
     </div>
   );
 }
