@@ -5,7 +5,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi.testclient import TestClient
 
-
 # ---------------------------------------------------------------------------
 # GET /webhooks/whatsapp (verification)
 # ---------------------------------------------------------------------------

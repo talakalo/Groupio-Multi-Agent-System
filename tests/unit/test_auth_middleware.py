@@ -51,7 +51,7 @@ def mock_settings():
     s.JWT_ALGORITHM = "HS256"
     s.ACCESS_TOKEN_EXPIRE_MINUTES = 30
     s.REFRESH_TOKEN_EXPIRE_DAYS = 7
-    s.API_KEYS = ["valid-key-123"]
+    s.API_KEYS = ["valid-key-123"]  # gitleaks:allow
     return s
 
 
@@ -342,8 +342,8 @@ async def test_verify_api_key_missing():
 @pytest.mark.asyncio
 async def test_verify_api_key_valid(mock_settings):
     with patch("src.api.middleware.auth.get_settings", return_value=mock_settings):
-        result = await verify_api_key(api_key="valid-key-123")
-    assert result == "valid-key-123"
+        result = await verify_api_key(api_key="valid-key-123")  # gitleaks:allow
+    assert result == "valid-key-123"  # gitleaks:allow
 
 
 @pytest.mark.asyncio

@@ -762,7 +762,6 @@ class TestMatchContractor:
 
 class TestResolveUndersubscription:
     def test_extend_deadline_ok(self):
-        from datetime import timezone
 
         admin = _make_user(role=UserRole.ADMIN)
         db = AsyncMock()

@@ -521,7 +521,8 @@ class TestAddResident:
         db.get_building = AsyncMock(return_value=_make_building())
         db.is_user_in_building = AsyncMock(return_value=False)
         db.is_unit_taken = AsyncMock(return_value=False)
-        from datetime import UTC, datetime as _dt
+        from datetime import UTC
+        from datetime import datetime as _dt
 
         db.add_resident_to_building = AsyncMock(
             return_value={

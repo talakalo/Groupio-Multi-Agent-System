@@ -7,7 +7,6 @@ from fastapi.testclient import TestClient
 
 from src.models.user import UserInDB, UserRole
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

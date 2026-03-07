@@ -1,12 +1,11 @@
 """Unit tests for the authentication API routes."""
 
 from datetime import UTC, datetime
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
 
 from src.models.user import UserInDB, UserRole
-
 
 # ---------------------------------------------------------------------------
 # Helpers
