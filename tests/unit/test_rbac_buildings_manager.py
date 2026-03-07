@@ -132,13 +132,9 @@ class TestEscalationsRBAC:
             setattr(m, k, v)
         return m
 
-    def test_buildings_manager_can_list_escalations(
-        self, client, mock_db, _mock_escalation_data
-    ):
+    def test_buildings_manager_can_list_escalations(self, client, mock_db, _mock_escalation_data):
         """buildings_manager should receive 200 on GET /escalations."""
-        mock_db.list_escalations = AsyncMock(
-            return_value=([self._make_esc_mock(_mock_escalation_data)], 1)
-        )
+        mock_db.list_escalations = AsyncMock(return_value=([self._make_esc_mock(_mock_escalation_data)], 1))
         _override_auth(_make_user(UserRole.BUILDINGS_MANAGER))
 
         response = client.get(
@@ -150,9 +146,7 @@ class TestEscalationsRBAC:
 
     def test_admin_can_list_escalations(self, client, mock_db, _mock_escalation_data):
         """Sanity check: plain admin should still receive 200."""
-        mock_db.list_escalations = AsyncMock(
-            return_value=([self._make_esc_mock(_mock_escalation_data)], 1)
-        )
+        mock_db.list_escalations = AsyncMock(return_value=([self._make_esc_mock(_mock_escalation_data)], 1))
         _override_auth(_make_user(UserRole.ADMIN))
 
         response = client.get(
