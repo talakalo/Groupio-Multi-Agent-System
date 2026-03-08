@@ -228,12 +228,13 @@ async def login(
     # Update last login
     await db.update_user(user.id, {"last_login": datetime.now(UTC)})
 
-    # Set refresh token as HTTP-only cookie
+    # Set refresh token as HTTP-only cookie.
+    # secure=False in development so the cookie works over http://localhost.
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
         httponly=True,
-        secure=True,
+        secure=settings.ENVIRONMENT != "development",
         samesite="lax",
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
         path="/",
@@ -301,7 +302,7 @@ async def login_json(
         key="refresh_token",
         value=refresh_token,
         httponly=True,
-        secure=True,
+        secure=settings.ENVIRONMENT != "development",
         samesite="lax",
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
         path="/",
@@ -367,7 +368,7 @@ async def refresh_token(
         key="refresh_token",
         value=new_refresh_token,
         httponly=True,
-        secure=True,
+        secure=settings.ENVIRONMENT != "development",
         samesite="lax",
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
         path="/",
