@@ -142,6 +142,7 @@ async def api_root() -> dict[str, str]:
     """API root — confirms the service is reachable and shows the current version."""
     return {"version": "v1", "status": "ok", "docs": "/docs"}
 
+
 # WebSocket routes (mounted separately – no prefix collision with REST routes)
 from src.api.routes.websocket import router as ws_router
 
