@@ -51,14 +51,14 @@ def upgrade() -> None:
         ["created_at"],
     )
 
-    # 2. Partial index on chat_messages.created_at for old-row queries.
-    #    The predicate skips recent rows so the index stays small.
-    op.execute(
-        f"""
-        CREATE INDEX IF NOT EXISTS idx_chat_messages_old_rows
-            ON chat_messages (created_at)
-            WHERE created_at < NOW() - INTERVAL '{_RETENTION_DAYS} days'
-        """
+    # 2. Regular index on chat_messages.created_at for old-row queries.
+    #    Note: PostgreSQL requires IMMUTABLE functions in partial index
+    #    predicates. NOW() is VOLATILE, so a partial index is not possible
+    #    here. A plain index on created_at is sufficient for the cleanup query.
+    op.create_index(
+        "idx_chat_messages_created_at",
+        "chat_messages",
+        ["created_at"],
     )
 
     # 3. Immediately archive any existing messages older than 90 days.
@@ -112,5 +112,5 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.execute("DROP FUNCTION IF EXISTS archive_old_chat_messages()")
-    op.execute("DROP INDEX IF EXISTS idx_chat_messages_old_rows")
+    op.drop_index("idx_chat_messages_created_at", table_name="chat_messages")
     op.drop_table("chat_messages_archive")
