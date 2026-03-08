@@ -131,6 +131,17 @@ app.add_middleware(RequestLoggingMiddleware)
 # Include API routes (auth, offers, contractors, buildings, etc.)
 app.include_router(api_router, prefix="/api/v1")
 
+
+@app.get(
+    "/api/v1",
+    summary="API root",
+    description="Returns basic API information.",
+    tags=["Health"],
+)
+async def api_root() -> dict[str, str]:
+    """API root — confirms the service is reachable and shows the current version."""
+    return {"version": "v1", "status": "ok", "docs": "/docs"}
+
 # WebSocket routes (mounted separately – no prefix collision with REST routes)
 from src.api.routes.websocket import router as ws_router
 
