@@ -121,7 +121,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const { isAuthenticated, accessToken } = useAuthStore.getState();
     if (isAuthenticated && !accessToken) {
-      useAuthStore.getState().refreshAccessToken();
+      // Attach a no-op catch so the fire-and-forget Promise never becomes
+      // an unhandled rejection (which Next.js dev overlay shows as
+      // "[object Event]" when the rejection value is a DOM Event).
+      useAuthStore.getState().refreshAccessToken().catch(() => {});
     }
   }, []);
 

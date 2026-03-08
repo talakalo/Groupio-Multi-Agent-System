@@ -183,7 +183,7 @@ export function AIChat({
       try {
         // Use AbortController to enforce a 30-second timeout
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30_000);
+        timeoutId = setTimeout(() => controller.abort(), 30_000);
 
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
         if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
@@ -238,7 +238,10 @@ export function AIChat({
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    sendMessage(input);
+    // sendMessage is async; attach a no-op catch so the returned Promise
+    // never becomes an unhandled rejection (shown as "[object Event]" in
+    // Next.js dev overlay when the rejection value is a DOM Event).
+    sendMessage(input).catch(() => {});
   };
 
   const handleSuggestionClick = (suggestion: string) => {

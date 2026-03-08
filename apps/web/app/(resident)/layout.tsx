@@ -56,7 +56,11 @@ export default function ResidentLayout({ children }: { children: React.ReactNode
   }
 
   const handleLogout = async () => {
-    await logout();
+    try {
+      await logout();
+    } catch {
+      // Ignore logout errors — always redirect to login
+    }
     router.push('/login');
   };
 

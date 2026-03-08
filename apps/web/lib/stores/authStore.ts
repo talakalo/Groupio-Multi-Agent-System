@@ -114,6 +114,12 @@ export const useAuthStore = create<AuthState>()(
             const user = await userResponse.json();
             set({ user });
           }
+        } catch (err) {
+          // Always re-throw as a proper Error so callers never receive a raw
+          // DOM Event or other non-Error rejection value (which Next.js dev
+          // overlay would display as "[object Event]").
+          if (err instanceof Error) throw err;
+          throw new Error(String(err));
         } finally {
           set({ isLoading: false });
         }
@@ -188,6 +194,9 @@ export const useAuthStore = create<AuthState>()(
 
           // Auto-login after registration
           await get().login(data.email, data.password);
+        } catch (err) {
+          if (err instanceof Error) throw err;
+          throw new Error(String(err));
         } finally {
           set({ isLoading: false });
         }
@@ -220,6 +229,9 @@ export const useAuthStore = create<AuthState>()(
 
           const updatedUser = await response.json();
           set({ user: updatedUser });
+        } catch (err) {
+          if (err instanceof Error) throw err;
+          throw new Error(String(err));
         } finally {
           set({ isLoading: false });
         }
