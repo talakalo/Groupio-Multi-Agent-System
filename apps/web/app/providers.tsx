@@ -2,23 +2,10 @@
 
 import React, { Component, type ErrorInfo, type ReactNode, useState, useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import * as Sentry from "@sentry/nextjs";
 import { apiClient } from "@/lib/api/client";
 import { useAuthStore } from "@/lib/stores/authStore";
 import { ToastContainer } from "@/components/shared/ToastContainer";
-
-// PostHog analytics — optional, requires NEXT_PUBLIC_POSTHOG_KEY
-if (typeof window !== "undefined" && process.env.NEXT_PUBLIC_POSTHOG_KEY) {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const posthog = require("posthog-js").default;
-    posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY, {
-      api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://app.posthog.com",
-      capture_pageview: false,
-    });
-  } catch {
-    // posthog-js not installed
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Error boundary (class component, as required by React)
@@ -47,12 +34,11 @@ class AppErrorBoundary extends Component<
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error("[AppErrorBoundary]", error, info);
+    // Sentry.captureException is a no-op when no DSN is configured.
     try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { captureException } = require('@sentry/nextjs');
-      captureException(error);
+      Sentry.captureException(error);
     } catch {
-      // @sentry/nextjs not installed — silently skip
+      // Guard against any Sentry initialization errors
     }
   }
 
