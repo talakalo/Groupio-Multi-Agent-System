@@ -2,6 +2,14 @@ import createNextIntlPlugin from "next-intl/plugin";
 
 const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 
+const isDev = process.env.NODE_ENV !== "production";
+
+// In development, allow the local backend (localhost:8000) so fetch/WebSocket
+// calls are not blocked by CSP. In production, only the deployed API is allowed.
+const devApiOrigins = isDev
+  ? " http://localhost:8000 ws://localhost:8000"
+  : "";
+
 const securityHeaders = [
   {
     // CSP — tighten 'unsafe-eval' and 'unsafe-inline' after full audit.
@@ -14,7 +22,7 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: https://*.supabase.co",
       "font-src 'self'",
-      "connect-src 'self' https://api.groupio.co.il wss://api.groupio.co.il",
+      `connect-src 'self' https://api.groupio.co.il wss://api.groupio.co.il${devApiOrigins}`,
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",
