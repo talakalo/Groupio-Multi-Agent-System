@@ -108,7 +108,11 @@ export default function ResidentProfilePage() {
   const logoutAction = useAuthStore((s) => s.logout);
 
   const handleLogout = async () => {
-    await logoutAction();
+    try {
+      await logoutAction();
+    } catch {
+      // Ignore logout errors — always redirect to login
+    }
     router.push('/login');
   };
 

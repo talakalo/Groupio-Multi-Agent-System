@@ -55,7 +55,11 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
 
 
   const handleLogout = async () => {
-    await logout();
+    try {
+      await logout();
+    } catch {
+      // Ignore logout errors — always redirect to login
+    }
     router.push('/login');
   };
 
