@@ -76,8 +76,9 @@ async function setupCommonMocks(page: Page) {
   );
 }
 
-function setupContractorAuth(page: Page) {
-  return page.addInitScript(() => {
+async function setupContractorAuth(page: Page) {
+  // Set localStorage for the Zustand client-side auth store
+  await page.addInitScript(() => {
     localStorage.setItem(
       "groupio-auth",
       JSON.stringify({
@@ -91,6 +92,12 @@ function setupContractorAuth(page: Page) {
       })
     );
   });
+  // Set cookies the Next.js Edge middleware reads:
+  // refresh_token (presence = session valid) + groupio-auth (role for routing)
+  await page.context().addCookies([
+    { name: "refresh_token", value: "e2e-refresh-token", url: "http://localhost:3000" },
+    { name: "groupio-auth", value: encodeURIComponent(JSON.stringify({ state: { user: { role: "contractor" }, isAuthenticated: true } })), url: "http://localhost:3000" },
+  ]);
 }
 
 // ============================================================================

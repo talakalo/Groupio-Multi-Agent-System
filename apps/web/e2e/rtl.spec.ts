@@ -30,8 +30,11 @@ test.describe("RTL / Hebrew layout", () => {
 
   test("Signup page has ToS checkbox", async ({ page }) => {
     await page.goto("/signup");
+    // Step 1: select role then proceed to step 2 where the ToS checkbox renders
+    await page.click('button:has-text("דייר")');
+    await page.click('button:has-text("המשך")');
     const tosCheckbox = page.locator("#tos");
-    await expect(tosCheckbox).toBeVisible();
+    await expect(tosCheckbox).toBeVisible({ timeout: 10000 });
     await expect(tosCheckbox).toHaveAttribute("required");
     await expect(page.getByRole("link", { name: "תנאי השימוש" })).toBeVisible();
     await expect(page.getByRole("link", { name: "מדיניות הפרטיות" })).toBeVisible();

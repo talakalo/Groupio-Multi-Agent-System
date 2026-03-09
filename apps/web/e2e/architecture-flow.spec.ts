@@ -30,6 +30,13 @@ test.describe('Architecture Upload Flow', () => {
         })
       );
     });
+
+    // Set cookies the Next.js Edge middleware reads for auth decisions:
+    // refresh_token (presence = session valid) + groupio-auth (role hint for routing)
+    await page.context().addCookies([
+      { name: 'refresh_token', value: 'e2e-refresh-token', url: 'http://localhost:3000' },
+      { name: 'groupio-auth', value: encodeURIComponent(JSON.stringify({ state: { user: { role: 'resident' }, isAuthenticated: true } })), url: 'http://localhost:3000' },
+    ]);
   });
 
   test('should display upload page with dropzone', async ({ page }) => {

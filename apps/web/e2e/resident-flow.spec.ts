@@ -173,16 +173,22 @@ test.describe("Resident Registration Flow", () => {
   });
 
   test("should complete registration successfully", async ({ page }) => {
-    await page.route("**/api/v1/auth/signup", (route) =>
+    // Correct endpoint is /auth/register (not /auth/signup)
+    await page.route("**/api/v1/auth/register", (route) =>
       route.fulfill({
         status: 201,
+        headers: {
+          "Content-Type": "application/json",
+          // Set refresh_token so middleware allows navigation to /dashboard
+          "Set-Cookie": "refresh_token=e2e-refresh-token; Path=/; SameSite=Lax",
+        },
         body: JSON.stringify({
+          token: "jwt_token_here",
           user: {
             id: "user_new",
             email: TEST_RESIDENT.email,
             name: TEST_RESIDENT.name,
           },
-          token: "jwt_token_here",
         }),
       })
     );
@@ -196,6 +202,8 @@ test.describe("Resident Registration Flow", () => {
     await page.fill("#email", TEST_RESIDENT.email);
     await page.fill("#phone", TEST_RESIDENT.phone);
     await page.fill("#password", TEST_RESIDENT.password);
+    // Check the required ToS checkbox before submitting
+    await page.check("#tos");
 
     await page.click('button:has-text("הרשמה")');
 
@@ -223,12 +231,17 @@ test.describe("Resident Login Flow", () => {
   });
 
   test("should login successfully and redirect to dashboard", async ({ page }) => {
-    await page.route("**/api/v1/auth/login", (route) =>
+    // Correct endpoint is /auth/login/json; response must include access_token
+    await page.route("**/api/v1/auth/login/json", (route) =>
       route.fulfill({
         status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          // Set refresh_token so middleware allows navigation to /dashboard after login
+          "Set-Cookie": "refresh_token=e2e-refresh-token; Path=/; SameSite=Lax",
+        },
         body: JSON.stringify({
-          token: "jwt_token_here",
-          user: { id: "user_123", name: "יעל כהן", role: "resident" },
+          access_token: "jwt_token_here",
         }),
       })
     );
@@ -243,7 +256,7 @@ test.describe("Resident Login Flow", () => {
   });
 
   test("should show error for invalid credentials", async ({ page }) => {
-    await page.route("**/api/v1/auth/login", (route) =>
+    await page.route("**/api/v1/auth/login/json", (route) =>
       route.fulfill({
         status: 401,
         body: JSON.stringify({ detail: "Invalid credentials" }),
@@ -276,6 +289,11 @@ test.describe("Resident Login Flow", () => {
 test.describe("Resident Browse Offers Flow", () => {
   test.beforeEach(async ({ page }) => {
     await setupCommonMocks(page);
+    // Set cookies the middleware reads: refresh_token (session validity) + groupio-auth (role hint)
+    await page.context().addCookies([
+      { name: "refresh_token", value: "e2e-refresh-token", url: "http://localhost:3000" },
+      { name: "groupio-auth", value: encodeURIComponent(JSON.stringify({ state: { user: { role: "resident" }, isAuthenticated: true } })), url: "http://localhost:3000" },
+    ]);
 
     await page.route("**/api/v1/offers*", (route) => {
       const url = new URL(route.request().url());
@@ -340,6 +358,10 @@ test.describe("Resident Browse Offers Flow", () => {
 test.describe("Resident Join Offer Flow", () => {
   test.beforeEach(async ({ page }) => {
     await setupCommonMocks(page);
+    await page.context().addCookies([
+      { name: "refresh_token", value: "e2e-refresh-token", url: "http://localhost:3000" },
+      { name: "groupio-auth", value: encodeURIComponent(JSON.stringify({ state: { user: { role: "resident" }, isAuthenticated: true } })), url: "http://localhost:3000" },
+    ]);
 
     await page.route("**/api/v1/offers/offer_001", (route) =>
       route.fulfill({
@@ -419,6 +441,10 @@ test.describe("Resident Join Offer Flow", () => {
 test.describe("Resident Profile & Settings", () => {
   test.beforeEach(async ({ page }) => {
     await setupCommonMocks(page);
+    await page.context().addCookies([
+      { name: "refresh_token", value: "e2e-refresh-token", url: "http://localhost:3000" },
+      { name: "groupio-auth", value: encodeURIComponent(JSON.stringify({ state: { user: { role: "resident" }, isAuthenticated: true } })), url: "http://localhost:3000" },
+    ]);
 
     await page.route("**/api/v1/resident/profile", (route) =>
       route.fulfill({
@@ -567,13 +593,17 @@ test.describe("Critical User Journey — Register → Login → Join Offer", () 
     });
 
     await page.goto("/signup");
+    // Step 1: select resident role and continue (form inputs are in step 2 only)
+    await page.click('button:has-text("דייר")');
+    await page.click('button:has-text("המשך")');
 
-    // Quick fill and submit
-    await page.fill('input[name="name"]', "URL Test User");
-    await page.fill('input[name="email"]', "url-check@groupio-test.co.il");
-    await page.fill('input[name="phone"]', "0502345678");
-    await page.fill('input[name="password"]', "SecurePass123!");
-    await page.fill('input[name="buildingId"]', "bld_url_test");
+    // Step 2: fill form fields
+    await page.fill("#name", "URL Test User");
+    await page.fill("#email", "url-check@groupio-test.co.il");
+    await page.fill("#phone", "0502345678");
+    await page.fill("#password", "SecurePass123!");
+    // Check the required ToS checkbox — without it the browser blocks form submit
+    await page.check("#tos");
     await page.click('[type="submit"]');
 
     // Wait briefly for the network request

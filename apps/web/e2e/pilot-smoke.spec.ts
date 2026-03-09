@@ -73,12 +73,31 @@ const MOCK_STATS = {
 
 /**
  * Inject a Bearer token into localStorage so the frontend auth store
- * treats the session as logged in.
+ * treats the session as logged in, and set the cookies that the Next.js
+ * Edge middleware reads to determine authentication status.
+ *
+ * The middleware checks `refresh_token` (presence = authenticated) and
+ * `groupio-auth` (UX-only role hint for routing decisions).
  */
-async function setAuthToken(page: Page, token = "smoke-test-token") {
+async function setAuthToken(
+  page: Page,
+  token = "smoke-test-token",
+  role: "resident" | "contractor" | "admin" = "resident",
+) {
   await page.addInitScript((t) => {
     localStorage.setItem("auth_token", t);
   }, token);
+  // Set cookies before any navigation so the middleware sees them
+  await page.context().addCookies([
+    { name: "refresh_token", value: "e2e-refresh-token", url: "http://localhost:3000" },
+    {
+      name: "groupio-auth",
+      value: encodeURIComponent(
+        JSON.stringify({ state: { user: { role }, isAuthenticated: true } }),
+      ),
+      url: "http://localhost:3000",
+    },
+  ]);
 }
 
 /**
@@ -147,10 +166,15 @@ async function setupBaseMocks(page: Page) {
 test("1. Signup → onboarding → redirect to dashboard", async ({ page }) => {
   await setupBaseMocks(page);
 
-  // Mock signup → returns token + user
-  await page.route("**/api/v1/auth/signup", (r) =>
+  // Mock signup → correct endpoint is /auth/register (not /auth/signup)
+  await page.route("**/api/v1/auth/register", (r) =>
     r.fulfill({
       status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        // Set refresh_token so middleware allows navigation to /dashboard after signup
+        "Set-Cookie": "refresh_token=e2e-refresh-token; Path=/; SameSite=Lax",
+      },
       body: JSON.stringify({ token: "smoke-test-token", user: MOCK_USER }),
     })
   );
@@ -164,12 +188,16 @@ test("1. Signup → onboarding → redirect to dashboard", async ({ page }) => {
   );
 
   await page.goto("/signup");
-  // Fill signup form fields (Hebrew UI — target by id/label)
-  await page.fill('[name="name"], #name, input[placeholder*="שם"], input[type="text"]:first-of-type', "Pilot User");
-  await page.fill('[name="email"], #email, input[type="email"]', "pilot@example.com");
-  await page.fill('[name="phone"], #phone, input[type="tel"], input[placeholder*="טלפון"]', "0501234567");
-  await page.fill('[name="password"], #password, input[type="password"]', "SecurePass1!");
-
+  // Step 1: select resident role and continue to the details form
+  await page.click('button:has-text("דייר")');
+  await page.click('button:has-text("המשך")');
+  // Step 2: fill form fields (inputs are only rendered after step transition)
+  await page.fill("#name", "Pilot User");
+  await page.fill("#email", "pilot@example.com");
+  await page.fill("#phone", "0501234567");
+  await page.fill("#password", "SecurePass1!");
+  // Check the required ToS checkbox before submitting
+  await page.check("#tos");
   // Submit
   await page.click('button[type="submit"]');
 
@@ -186,9 +214,15 @@ test("2. Login → dashboard loads with building and offers", async ({ page }) =
   await setupBaseMocks(page);
   await setAuthToken(page);
 
-  await page.route("**/api/v1/auth/login", (r) =>
+  // Correct endpoint is /auth/login/json (JSON body, not form-encoded)
+  await page.route("**/api/v1/auth/login/json", (r) =>
     r.fulfill({
       status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        // Set refresh_token so middleware allows navigation to /dashboard after login
+        "Set-Cookie": "refresh_token=e2e-refresh-token; Path=/; SameSite=Lax",
+      },
       body: JSON.stringify({
         access_token: "smoke-test-token",
         token_type: "bearer",
@@ -236,7 +270,7 @@ test("3. Offer detail → join → leave flow (mocked)", async ({ page }) => {
 
 test("4. Contractor dashboard stats load", async ({ page }) => {
   await setupBaseMocks(page);
-  await setAuthToken(page, "contractor-token");
+  await setAuthToken(page, "contractor-token", "contractor");
 
   await page.route("**/api/v1/auth/me", (r) =>
     r.fulfill({ status: 200, body: JSON.stringify(MOCK_CONTRACTOR_USER) })
@@ -267,7 +301,7 @@ test("4. Contractor dashboard stats load", async ({ page }) => {
 
 test("5. Contractor create offer flow", async ({ page }) => {
   await setupBaseMocks(page);
-  await setAuthToken(page, "contractor-token");
+  await setAuthToken(page, "contractor-token", "contractor");
 
   await page.route("**/api/v1/auth/me", (r) =>
     r.fulfill({ status: 200, body: JSON.stringify(MOCK_CONTRACTOR_USER) })
