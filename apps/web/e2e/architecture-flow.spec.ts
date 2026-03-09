@@ -45,7 +45,7 @@ test.describe('Architecture Upload Flow', () => {
     // The page renders Hebrew text from i18n: "העלה את תוכנית הדירה שלך"
     // Also check for file input and the upload button
     await expect(
-      page.getByText(/תוכנית|העלה|floor plan|upload/i)
+      page.getByText(/תוכנית|העלה|floor plan|upload/i).first()
     ).toBeVisible({ timeout: 10000 });
   });
 
@@ -147,7 +147,7 @@ test.describe('Architecture Upload Flow', () => {
 
     // Should show an error message (Hebrew: "ההעלאה נכשלה" or "נסה שוב")
     await expect(
-      page.getByText(/נכשל|error|failed|נסה שוב|try again/i)
+      page.getByText(/נכשל|error|failed|נסה שוב|try again/i).first()
     ).toBeVisible({ timeout: 10000 });
   });
 

@@ -84,9 +84,29 @@ async function setAuthToken(
   token = "smoke-test-token",
   role: "resident" | "contractor" | "admin" = "resident",
 ) {
-  await page.addInitScript((t) => {
-    localStorage.setItem("auth_token", t);
-  }, token);
+  await page.addInitScript((params) => {
+    localStorage.setItem("auth_token", params.token);
+    // Populate the Zustand auth store persistence key (groupio-auth) so that
+    // the resident/contractor layout accessToken guard passes on page load.
+    // partialize only controls what Zustand WRITES; on hydration ALL stored
+    // fields are merged, so accessToken written here IS read back by Zustand.
+    localStorage.setItem("groupio-auth", JSON.stringify({
+      state: {
+        user: {
+          id: "user-pilot-1",
+          email: "pilot@example.com",
+          fullName: "Pilot User",
+          phone: "0501234567",
+          role: params.role,
+          preferredLanguage: "he",
+          isVerified: true,
+        },
+        accessToken: params.token,
+        isAuthenticated: true,
+      },
+      version: 0,
+    }));
+  }, { token, role });
   // Set cookies before any navigation so the middleware sees them
   await page.context().addCookies([
     { name: "refresh_token", value: "e2e-refresh-token", url: "http://localhost:3000" },
@@ -212,7 +232,10 @@ test("1. Signup → onboarding → redirect to dashboard", async ({ page }) => {
 
 test("2. Login → dashboard loads with building and offers", async ({ page }) => {
   await setupBaseMocks(page);
-  await setAuthToken(page);
+  // NOTE: setAuthToken is intentionally NOT called here — calling it sets the
+  // refresh_token cookie which causes Next.js middleware to redirect /login →
+  // /dashboard before the login form renders.  Auth is established via the
+  // mocked login endpoint response (Set-Cookie refresh_token).
 
   // Correct endpoint is /auth/login/json (JSON body, not form-encoded)
   await page.route("**/api/v1/auth/login/json", (r) =>

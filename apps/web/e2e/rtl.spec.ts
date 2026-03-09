@@ -37,8 +37,8 @@ test.describe("RTL / Hebrew layout", () => {
     const tosCheckbox = page.locator("#tos");
     await expect(tosCheckbox).toBeVisible({ timeout: 10000 });
     await expect(tosCheckbox).toHaveAttribute("required");
-    await expect(page.getByRole("link", { name: "תנאי השימוש" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "מדיניות הפרטיות" })).toBeVisible();
+    await expect(page.locator("form").getByRole("link", { name: "תנאי השימוש" })).toBeVisible();
+    await expect(page.locator("form").getByRole("link", { name: "מדיניות הפרטיות" })).toBeVisible();
   });
 
   test("ChevronLeft icons have rtl-flip class for RTL mode", async ({ page }) => {
