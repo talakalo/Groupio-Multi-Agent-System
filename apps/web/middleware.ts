@@ -11,14 +11,18 @@ const protectedRoutes = [
   '/chat',
   '/architecture',
   '/payments',
+  '/contractor',
+  '/admin',
+  '/buildings-manager',
 ];
 
 // Routes only for unauthenticated users
 const authRoutes = ['/login', '/signup'];
 
-// Routes that require specific roles
+// Routes that require specific roles (authentication already enforced above)
 const contractorRoutes = ['/contractor'];
 const adminRoutes = ['/admin'];
+const buildingsManagerRoutes = ['/buildings-manager'];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -69,6 +73,9 @@ export function middleware(request: NextRequest) {
     pathname.startsWith(route)
   );
   const isAdminRoute = adminRoutes.some((route) => pathname.startsWith(route));
+  const isBuildingsManagerRoute = buildingsManagerRoutes.some((route) =>
+    pathname.startsWith(route)
+  );
 
   // Redirect unauthenticated users from protected routes
   if (isProtectedRoute && !isAuthenticated) {
@@ -87,15 +94,23 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Check contractor routes
+  // Check role-gated routes (only reached when authenticated)
   if (isContractorRoute && userRole !== 'contractor') {
     const url = request.nextUrl.clone();
     url.pathname = '/dashboard';
     return NextResponse.redirect(url);
   }
 
-  // Check admin routes
   if (isAdminRoute && !['admin', 'super_admin'].includes(userRole || '')) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/dashboard';
+    return NextResponse.redirect(url);
+  }
+
+  if (
+    isBuildingsManagerRoute &&
+    !['buildings_manager', 'admin', 'super_admin'].includes(userRole || '')
+  ) {
     const url = request.nextUrl.clone();
     url.pathname = '/dashboard';
     return NextResponse.redirect(url);

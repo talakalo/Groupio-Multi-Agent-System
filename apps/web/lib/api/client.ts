@@ -244,7 +244,14 @@ class ApiClient {
       "/api/v1/auth/register",
       {
         method: "POST",
-        body: data,
+        body: {
+          full_name: data.name,
+          email: data.email,
+          phone: data.phone,
+          password: data.password,
+          role: data.role,
+          building_id: data.buildingId,
+        },
       }
     );
   }
