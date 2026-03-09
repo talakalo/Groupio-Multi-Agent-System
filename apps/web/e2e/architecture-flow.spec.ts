@@ -50,8 +50,8 @@ test.describe('Architecture Upload Flow', () => {
   });
 
   test('should upload and analyze a floor plan', async ({ page }) => {
-    // Mock the upload endpoint
-    await page.route('**/api/v1/uploads/architecture', (route) =>
+    // Mock the upload endpoint (** suffix covers ?building_id=... query params)
+    await page.route('**/api/v1/uploads/architecture**', (route) =>
       route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -126,8 +126,8 @@ test.describe('Architecture Upload Flow', () => {
   });
 
   test('should handle upload errors gracefully', async ({ page }) => {
-    // Mock the upload endpoint to return 500
-    await page.route('**/api/v1/uploads/architecture', (route) =>
+    // Mock the upload endpoint to return 500 (** suffix covers ?building_id=... query params)
+    await page.route('**/api/v1/uploads/architecture**', (route) =>
       route.fulfill({
         status: 500,
         contentType: 'application/json',
@@ -152,8 +152,9 @@ test.describe('Architecture Upload Flow', () => {
   });
 
   test('should show analyzing state during processing', async ({ page }) => {
-    // Mock upload to succeed
-    await page.route('**/api/v1/uploads/architecture', (route) =>
+    // Mock upload to succeed.  Use ** suffix to also catch ?building_id=... query params
+    // that get appended when the Zustand store has a populated buildingId.
+    await page.route('**/api/v1/uploads/architecture**', (route) =>
       route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -179,6 +180,8 @@ test.describe('Architecture Upload Flow', () => {
 
     await page.goto('/architecture');
 
+    // Wait for the upload zone to be rendered before interacting with the file input
+    await page.locator('input[type="file"]').waitFor({ state: 'attached' });
     const fileInput = page.locator('input[type="file"]');
     await fileInput.setInputFiles({
       name: 'plan.pdf',
