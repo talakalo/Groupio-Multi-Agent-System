@@ -269,7 +269,7 @@ class OutreachAgent(BaseAgent):
 
         # Check if there's an explicit campaign request
         user_message = self._get_last_user_message(state)
-        if "שת" in user_message or "invite" in user_message.lower() or "הזמן" in user_message:
+        if "שת" in user_message or "invite" in user_message.lower() or "זמן" in user_message:
             return "viral_invite_loop"
         if "momentum" in user_message.lower() or "offer" in user_message.lower():
             return "offer_momentum"
