@@ -7,20 +7,6 @@ import { apiClient } from "@/lib/api/client";
 import { useAuthStore } from "@/lib/stores/authStore";
 import { ToastContainer } from "@/components/shared/ToastContainer";
 
-// PostHog analytics — optional, requires NEXT_PUBLIC_POSTHOG_KEY
-if (typeof window !== "undefined" && process.env.NEXT_PUBLIC_POSTHOG_KEY) {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const posthog = require("posthog-js").default;
-    posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY, {
-      api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://app.posthog.com",
-      capture_pageview: false,
-    });
-  } catch {
-    // posthog-js not installed
-  }
-}
-
 // ---------------------------------------------------------------------------
 // Error boundary (class component, as required by React)
 // ---------------------------------------------------------------------------
