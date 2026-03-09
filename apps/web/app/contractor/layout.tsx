@@ -41,15 +41,21 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
   const t = useTranslations('contractorNav');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const token = useAuthStore((s) => s.accessToken);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const refreshAccessToken = useAuthStore((s) => s.refreshAccessToken);
   const logout = useAuthStore((s) => s.logout);
 
   useEffect(() => {
-    if (!token) {
+    if (!token && isAuthenticated) {
+      refreshAccessToken().then((success) => {
+        if (!success) router.replace('/login');
+      });
+    } else if (!token && !isAuthenticated) {
       router.replace('/login');
     }
-  }, [token, router]);
+  }, [token, isAuthenticated, router, refreshAccessToken]);
 
-  if (!token) {
+  if (!token && !isAuthenticated) {
     return null;
   }
 

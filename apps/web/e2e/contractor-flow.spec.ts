@@ -74,6 +74,14 @@ async function setupCommonMocks(page: Page) {
       }),
     })
   );
+
+  await page.route('**/api/v1/auth/refresh', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ access_token: 'e2e-access-token' }),
+    })
+  );
 }
 
 async function setupContractorAuth(page: Page) {

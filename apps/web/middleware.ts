@@ -50,7 +50,7 @@ export function middleware(request: NextRequest) {
   const authCookie = request.cookies.get('groupio-auth');
   if (authCookie) {
     try {
-      const authData = JSON.parse(authCookie.value);
+      const authData = JSON.parse(decodeURIComponent(authCookie.value));
       // Role is used for UX routing only — APIs enforce roles server-side.
       userRole = authData?.state?.user?.role ?? null;
       // If the Zustand cookie exists but there is no refresh cookie,

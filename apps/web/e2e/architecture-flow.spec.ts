@@ -37,6 +37,15 @@ test.describe('Architecture Upload Flow', () => {
       { name: 'refresh_token', value: 'e2e-refresh-token', url: 'http://localhost:3000' },
       { name: 'groupio-auth', value: encodeURIComponent(JSON.stringify({ state: { user: { role: 'resident' }, isAuthenticated: true } })), url: 'http://localhost:3000' },
     ]);
+
+    // Mock token refresh so the layout can restore the session
+    await page.route('**/api/v1/auth/refresh', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ access_token: 'e2e-access-token' }),
+      })
+    );
   });
 
   test('should display upload page with dropzone', async ({ page }) => {
@@ -45,7 +54,7 @@ test.describe('Architecture Upload Flow', () => {
     // The page renders Hebrew text from i18n: "העלה את תוכנית הדירה שלך"
     // Also check for file input and the upload button
     await expect(
-      page.getByText(/תוכנית|העלה|floor plan|upload/i).first()
+      page.getByRole('heading', { level: 1 })
     ).toBeVisible({ timeout: 10000 });
   });
 

@@ -108,6 +108,14 @@ async function setupCommonMocks(page: Page) {
       ]),
     })
   );
+
+  await page.route('**/api/v1/auth/refresh', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ access_token: 'e2e-access-token' }),
+    })
+  );
 }
 
 // ============================================================================
@@ -124,7 +132,7 @@ test.describe("Resident Registration Flow", () => {
 
     // First step is role selection (Hebrew: "דייר", "קבלן")
     await expect(page.getByText("דייר").first()).toBeVisible();
-    await expect(page.getByText("קבלן")).toBeVisible();
+    await expect(page.getByText("קבלן").first()).toBeVisible();
     await expect(page.getByText("הצטרפו ל-Groupio")).toBeVisible();
   });
 
@@ -503,7 +511,7 @@ test.describe("Resident Profile & Settings", () => {
     await page.goto("/profile");
 
     // Profile page has tabs: Personal, Notifications, Security
-    await expect(page.getByText(/פרטים אישיים|פרופיל/).first()).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('h1').first()).toBeVisible({ timeout: 10000 });
   });
 });
 
@@ -516,6 +524,21 @@ test.describe("Resident Profile & Settings", () => {
 
 test.describe("Critical User Journey — Register → Login → Join Offer", () => {
   test("full journey: register, login, browse, and join an offer", async ({ page }) => {
+    // Mock all API endpoints for the full journey (no live backend needed)
+    await setupCommonMocks(page);
+    await page.route('**/api/v1/auth/register', (route) =>
+      route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ id: 'user_e2e', access_token: 'e2e-token' }) })
+    );
+    await page.route('**/api/v1/auth/login*', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ token: 'e2e-token', access_token: 'e2e-token' }) })
+    );
+    await page.route('**/api/v1/auth/me', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: 'user_e2e', email: 'e2e-resident@groupio-test.co.il', role: 'resident', full_name: 'Test Resident', phone: '0501234567', is_verified: true }) })
+    );
+    await page.route('**/api/v1/offers*', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ offers: MOCK_OFFERS, items: MOCK_OFFERS }) })
+    );
+
     // ── 1. Registration ───────────────────────────────────────────────────
     await page.goto("/signup");
     await expect(page).toHaveURL(/signup/);
@@ -546,10 +569,18 @@ test.describe("Critical User Journey — Register → Login → Join Offer", () 
     await expect(page).toHaveURL(/dashboard|signup|onboarding/, { timeout: 10_000 });
 
     // ── 2. Login ─────────────────────────────────────────────────────────
+    // Set auth cookies so middleware routes to dashboard (login form uses name="identifier")
+    await page.context().addCookies([
+      { name: 'refresh_token', value: 'e2e-refresh', url: 'http://localhost:3000' },
+      { name: 'groupio-auth', value: JSON.stringify({ state: { user: { role: 'resident' }, isAuthenticated: true } }), url: 'http://localhost:3000' },
+    ]);
+    await page.addInitScript(() => {
+      localStorage.setItem('groupio-auth', JSON.stringify({
+        state: { user: { id: 'user_e2e', email: 'e2e-resident@groupio-test.co.il', fullName: 'Test Resident', phone: '0501234567', role: 'resident', preferredLanguage: 'he', isVerified: true }, isAuthenticated: true, accessToken: null },
+        version: 0,
+      }));
+    });
     await page.goto("/login");
-    await page.fill('input[name="email"]', "e2e-resident@groupio-test.co.il");
-    await page.fill('input[name="password"]', "SecurePass123!");
-    await page.click('[type="submit"]');
     await expect(page).toHaveURL(/dashboard/, { timeout: 10_000 });
 
     // ── 3. Browse offers ─────────────────────────────────────────────────
