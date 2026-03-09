@@ -14,7 +14,9 @@ export default defineConfig({
     baseURL: "http://localhost:3000",
     trace: "on-first-retry",
     locale: "he-IL",
+    actionTimeout: process.env.CI ? 15000 : 10000,
   },
+  timeout: process.env.CI ? 60000 : 30000,
   projects: [
     {
       name: "chromium",

@@ -5,11 +5,15 @@ const BASE_URL = "http://localhost:3000";
 /**
  * Set auth cookies so Next.js Edge middleware grants access to protected routes.
  * Middleware checks `refresh_token` cookie (authoritative) and `groupio-auth` (role).
+ *
+ * Must navigate to base URL first so the browser context has the correct origin
+ * for cookies (Playwright/cookies work better after establishing the origin).
  */
 export async function setAuthCookies(
   page: Page,
   role: "resident" | "contractor" = "resident"
 ): Promise<void> {
+  await page.goto(BASE_URL, { waitUntil: "domcontentloaded", timeout: 15000 });
   await page.context().addCookies([
     {
       name: "refresh_token",
