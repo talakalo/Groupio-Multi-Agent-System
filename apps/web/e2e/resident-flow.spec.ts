@@ -1,4 +1,5 @@
 import { test, expect, Page } from "@playwright/test";
+import { setAuthCookies } from "./auth-helpers";
 
 /**
  * E2E tests for Resident user flows
@@ -132,8 +133,8 @@ test.describe("Resident Registration Flow", () => {
     await page.goto("/signup");
 
     // Select resident role and continue
-    await page.click('button:has-text("דייר")');
-    await page.click('button:has-text("המשך")');
+    await page.getByRole("button", { name: /דייר/ }).first().click();
+    await page.getByRole("button", { name: "המשך" }).click();
 
     // Details form should appear
     await expect(page.locator("#name")).toBeVisible();
@@ -145,8 +146,8 @@ test.describe("Resident Registration Flow", () => {
   test("should validate email format", async ({ page }) => {
     await page.goto("/signup");
 
-    await page.click('button:has-text("דייר")');
-    await page.click('button:has-text("המשך")');
+    await page.getByRole("button", { name: /דייר/ }).first().click();
+    await page.getByRole("button", { name: "המשך" }).click();
 
     await page.fill("#email", "invalid-email");
     await page.fill("#name", TEST_RESIDENT.name);
@@ -160,8 +161,8 @@ test.describe("Resident Registration Flow", () => {
   test("should validate password strength", async ({ page }) => {
     await page.goto("/signup");
 
-    await page.click('button:has-text("דייר")');
-    await page.click('button:has-text("המשך")');
+    await page.getByRole("button", { name: /דייר/ }).first().click();
+    await page.getByRole("button", { name: "המשך" }).click();
 
     await page.fill("#email", TEST_RESIDENT.email);
     await page.fill("#name", TEST_RESIDENT.name);
@@ -173,31 +174,32 @@ test.describe("Resident Registration Flow", () => {
   });
 
   test("should complete registration successfully", async ({ page }) => {
-    await page.route("**/api/v1/auth/signup", (route) =>
+    await page.route("**/api/v1/auth/register", (route) =>
       route.fulfill({
         status: 201,
         body: JSON.stringify({
           user: {
             id: "user_new",
             email: TEST_RESIDENT.email,
-            name: TEST_RESIDENT.name,
+            fullName: TEST_RESIDENT.name,
           },
           token: "jwt_token_here",
         }),
+        headers: { "Set-Cookie": "refresh_token=mock-refresh; Path=/; HttpOnly" },
       })
     );
 
     await page.goto("/signup");
 
-    await page.click('button:has-text("דייר")');
-    await page.click('button:has-text("המשך")');
+    await page.getByRole("button", { name: /דייר/ }).first().click();
+    await page.getByRole("button", { name: "המשך" }).click();
 
     await page.fill("#name", TEST_RESIDENT.name);
     await page.fill("#email", TEST_RESIDENT.email);
     await page.fill("#phone", TEST_RESIDENT.phone);
     await page.fill("#password", TEST_RESIDENT.password);
-
-    await page.click('button:has-text("הרשמה")');
+    await page.check("#tos");
+    await page.getByRole("button", { name: "הרשמה" }).click();
 
     // Should redirect to dashboard after successful registration
     await expect(page).toHaveURL(/dashboard/, { timeout: 10000 });
@@ -223,13 +225,14 @@ test.describe("Resident Login Flow", () => {
   });
 
   test("should login successfully and redirect to dashboard", async ({ page }) => {
-    await page.route("**/api/v1/auth/login", (route) =>
+    await page.route("**/api/v1/auth/login/json", (route) =>
       route.fulfill({
         status: 200,
         body: JSON.stringify({
-          token: "jwt_token_here",
-          user: { id: "user_123", name: "יעל כהן", role: "resident" },
+          access_token: "jwt_token_here",
+          token_type: "bearer",
         }),
+        headers: { "Set-Cookie": "refresh_token=mock-refresh; Path=/; HttpOnly" },
       })
     );
 
@@ -237,13 +240,13 @@ test.describe("Resident Login Flow", () => {
 
     await page.fill("#identifier", TEST_RESIDENT.email);
     await page.fill("#password", TEST_RESIDENT.password);
-    await page.click('button[type="submit"]');
+    await page.getByRole("button", { name: "התחברות" }).click();
 
     await expect(page).toHaveURL(/dashboard/, { timeout: 10000 });
   });
 
   test("should show error for invalid credentials", async ({ page }) => {
-    await page.route("**/api/v1/auth/login", (route) =>
+    await page.route("**/api/v1/auth/login/json", (route) =>
       route.fulfill({
         status: 401,
         body: JSON.stringify({ detail: "Invalid credentials" }),
@@ -276,6 +279,7 @@ test.describe("Resident Login Flow", () => {
 test.describe("Resident Browse Offers Flow", () => {
   test.beforeEach(async ({ page }) => {
     await setupCommonMocks(page);
+    await setAuthCookies(page, "resident");
 
     await page.route("**/api/v1/offers*", (route) => {
       const url = new URL(route.request().url());
@@ -291,21 +295,6 @@ test.describe("Resident Browse Offers Flow", () => {
         contentType: "application/json",
         body: JSON.stringify({ offers, items: offers }),
       });
-    });
-
-    await page.addInitScript(() => {
-      localStorage.setItem(
-        "groupio-auth",
-        JSON.stringify({
-          state: {
-            user: { id: "user_123", email: "yael.cohen@example.com", fullName: "יעל כהן", phone: "0541234567", role: "resident", preferredLanguage: "he", isVerified: true, buildingId: "bld_001" },
-            accessToken: "jwt_token",
-            refreshToken: "jwt_refresh",
-            isAuthenticated: true,
-          },
-          version: 0,
-        })
-      );
     });
   });
 
@@ -340,6 +329,7 @@ test.describe("Resident Browse Offers Flow", () => {
 test.describe("Resident Join Offer Flow", () => {
   test.beforeEach(async ({ page }) => {
     await setupCommonMocks(page);
+    await setAuthCookies(page, "resident");
 
     await page.route("**/api/v1/offers/offer_001", (route) =>
       route.fulfill({
@@ -348,21 +338,6 @@ test.describe("Resident Join Offer Flow", () => {
         body: JSON.stringify(MOCK_OFFERS[0]),
       })
     );
-
-    await page.addInitScript(() => {
-      localStorage.setItem(
-        "groupio-auth",
-        JSON.stringify({
-          state: {
-            user: { id: "user_123", email: "yael.cohen@example.com", fullName: "יעל כהן", phone: "0541234567", role: "resident", preferredLanguage: "he", isVerified: true, buildingId: "bld_001" },
-            accessToken: "jwt_token",
-            refreshToken: "jwt_refresh",
-            isAuthenticated: true,
-          },
-          version: 0,
-        })
-      );
-    });
   });
 
   test("should display offer details page", async ({ page }) => {
@@ -419,50 +394,21 @@ test.describe("Resident Join Offer Flow", () => {
 test.describe("Resident Profile & Settings", () => {
   test.beforeEach(async ({ page }) => {
     await setupCommonMocks(page);
+    await setAuthCookies(page, "resident");
 
-    await page.route("**/api/v1/resident/profile", (route) =>
+    await page.route("**/api/v1/auth/me", (route) =>
       route.fulfill({
         status: 200,
-        contentType: "application/json",
         body: JSON.stringify({
           id: "user_123",
           email: TEST_RESIDENT.email,
-          name: TEST_RESIDENT.name,
+          full_name: TEST_RESIDENT.name,
           phone: TEST_RESIDENT.phone,
-          building: { id: "bld_001", address: "רוטשילד 15", city: "תל אביב" },
-          apartmentNumber: "12",
-          notifications: { email: true, whatsapp: true, push: false },
+          role: "resident",
+          building_id: "bld_001",
         }),
       })
     );
-
-    await page.route("**/api/v1/users/me", (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          id: "user_123",
-          email: TEST_RESIDENT.email,
-          name: TEST_RESIDENT.name,
-          phone: TEST_RESIDENT.phone,
-        }),
-      })
-    );
-
-    await page.addInitScript(() => {
-      localStorage.setItem(
-        "groupio-auth",
-        JSON.stringify({
-          state: {
-            user: { id: "user_123", email: "yael.cohen@example.com", fullName: "יעל כהן", phone: "0541234567", role: "resident", preferredLanguage: "he", isVerified: true, buildingId: "bld_001" },
-            accessToken: "jwt_token",
-            refreshToken: "jwt_refresh",
-            isAuthenticated: true,
-          },
-          version: 0,
-        })
-      );
-    });
   });
 
   test("should display profile page", async ({ page }) => {
@@ -482,34 +428,53 @@ test.describe("Resident Profile & Settings", () => {
 
 test.describe("Critical User Journey — Register → Login → Join Offer", () => {
   test("full journey: register, login, browse, and join an offer", async ({ page }) => {
+    await setupCommonMocks(page);
+
+    await page.route("**/api/v1/auth/register", (r) =>
+      r.fulfill({
+        status: 201,
+        body: JSON.stringify({ token: "journey-token", user: { id: "journey-user", email: "e2e-resident@groupio-test.co.il", fullName: "Test Resident", role: "resident" } }),
+        headers: { "Set-Cookie": "refresh_token=journey-refresh; Path=/; HttpOnly" },
+      })
+    );
+    await page.route("**/api/v1/auth/login/json", (r) =>
+      r.fulfill({
+        status: 200,
+        body: JSON.stringify({ access_token: "journey-token", token_type: "bearer" }),
+        headers: { "Set-Cookie": "refresh_token=journey-refresh; Path=/; HttpOnly" },
+      })
+    );
+    await page.route("**/api/v1/offers*", (r) =>
+      r.fulfill({ status: 200, body: JSON.stringify({ items: MOCK_OFFERS, total: MOCK_OFFERS.length }) })
+    );
+    await page.route("**/api/v1/offers/offer_001*", (r) =>
+      r.fulfill({ status: 200, body: JSON.stringify(MOCK_OFFERS[0]) })
+    );
+    await page.route("**/api/v1/offers/offer_001/join", (r) =>
+      r.fulfill({ status: 200, body: JSON.stringify({ status: "joined" }) })
+    );
+
     // ── 1. Registration ───────────────────────────────────────────────────
     await page.goto("/signup");
     await expect(page).toHaveURL(/signup/);
 
-    // Select resident role
-    const residentCard = page.locator('[data-testid="role-resident"]');
-    if (await residentCard.count() > 0) {
-      await residentCard.click();
-    }
+    await page.getByRole("button", { name: /דייר/ }).first().click();
+    await page.getByRole("button", { name: "המשך" }).click();
 
-    // Fill registration form
-    await page.fill('input[name="name"]', "Test Resident");
-    await page.fill('input[name="email"]', "e2e-resident@groupio-test.co.il");
-    await page.fill('input[name="phone"]', "0501234567");
-    await page.fill('input[name="password"]', "SecurePass123!");
-    await page.fill('input[name="buildingId"]', "bld_e2e");
+    await page.fill("#name", "Test Resident");
+    await page.fill("#email", "e2e-resident@groupio-test.co.il");
+    await page.fill("#phone", "0501234567");
+    await page.fill("#password", "SecurePass123!");
+    await page.check("#tos");
+    await page.getByRole("button", { name: "הרשמה" }).click();
 
-    // Submit — validates that the correct /api/v1/auth/register endpoint is called
-    await page.click('[type="submit"]');
+    await expect(page).toHaveURL(/dashboard|onboarding/, { timeout: 10_000 });
 
-    // After registration, expect redirect to dashboard or a success indicator
-    await expect(page).toHaveURL(/dashboard|signup|onboarding/, { timeout: 10_000 });
-
-    // ── 2. Login ─────────────────────────────────────────────────────────
+    // ── 2. Login (if redirected to login or for explicit re-auth) ───────────
     await page.goto("/login");
-    await page.fill('input[name="email"]', "e2e-resident@groupio-test.co.il");
-    await page.fill('input[name="password"]', "SecurePass123!");
-    await page.click('[type="submit"]');
+    await page.fill("#identifier", "e2e-resident@groupio-test.co.il");
+    await page.fill("#password", "SecurePass123!");
+    await page.getByRole("button", { name: "התחברות" }).click();
     await expect(page).toHaveURL(/dashboard/, { timeout: 10_000 });
 
     // ── 3. Browse offers ─────────────────────────────────────────────────
@@ -556,7 +521,8 @@ test.describe("Critical User Journey — Register → Login → Join Offer", () 
   });
 
   test("signup form sends request to correct endpoint (/auth/register)", async ({ page }) => {
-    // Capture the outgoing fetch request to verify endpoint URL
+    await setupCommonMocks(page);
+
     let registrationUrl = "";
     await page.route("**/api/v1/**", async (route) => {
       const url = route.request().url();
@@ -568,21 +534,19 @@ test.describe("Critical User Journey — Register → Login → Join Offer", () 
 
     await page.goto("/signup");
 
-    // Quick fill and submit
-    await page.fill('input[name="name"]', "URL Test User");
-    await page.fill('input[name="email"]', "url-check@groupio-test.co.il");
-    await page.fill('input[name="phone"]', "0502345678");
-    await page.fill('input[name="password"]', "SecurePass123!");
-    await page.fill('input[name="buildingId"]', "bld_url_test");
-    await page.click('[type="submit"]');
+    await page.getByRole("button", { name: /דייר/ }).first().click();
+    await page.getByRole("button", { name: "המשך" }).click();
 
-    // Wait briefly for the network request
+    await page.fill("#name", "URL Test User");
+    await page.fill("#email", "url-check@groupio-test.co.il");
+    await page.fill("#phone", "0502345678");
+    await page.fill("#password", "SecurePass123!");
+    await page.check("#tos");
+    await page.getByRole("button", { name: "הרשמה" }).click();
+
     await page.waitForTimeout(2000);
 
-    if (registrationUrl) {
-      // Must use /auth/register, NOT /auth/signup
-      expect(registrationUrl).toContain("/auth/register");
-      expect(registrationUrl).not.toContain("/auth/signup");
-    }
+    expect(registrationUrl).toContain("/auth/register");
+    expect(registrationUrl).not.toContain("/auth/signup");
   });
 });

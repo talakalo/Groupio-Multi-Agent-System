@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test';
+import { setAuthCookies } from './auth-helpers';
 
 test.describe('Architecture Upload Flow', () => {
   test.beforeEach(async ({ page }) => {
-    // Mock auth
     await page.route('**/api/v1/auth/me', (route) =>
       route.fulfill({
         status: 200,
@@ -10,26 +10,11 @@ test.describe('Architecture Upload Flow', () => {
           id: 'user-1',
           email: 'test@test.com',
           role: 'resident',
-          buildingId: 'bld-001',
+          building_id: 'bld-001',
         }),
       })
     );
-
-    // Mock auth state in localStorage (Zustand persist key: groupio-auth)
-    await page.addInitScript(() => {
-      localStorage.setItem(
-        'groupio-auth',
-        JSON.stringify({
-          state: {
-            user: { id: 'user-1', email: 'test@test.com', fullName: 'Test User', phone: '0541234567', role: 'resident', preferredLanguage: 'he', isVerified: true, buildingId: 'bld-001' },
-            accessToken: 'test-jwt-token',
-            refreshToken: 'test-jwt-refresh',
-            isAuthenticated: true,
-          },
-          version: 0,
-        })
-      );
-    });
+    await setAuthCookies(page, 'resident');
   });
 
   test('should display upload page with dropzone', async ({ page }) => {

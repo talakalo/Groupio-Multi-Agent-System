@@ -16,6 +16,7 @@
  */
 
 import { test, expect, type Page } from "@playwright/test";
+import { setAuthCookies } from "./auth-helpers";
 
 // ---------------------------------------------------------------------------
 // Shared mock helpers
@@ -72,13 +73,11 @@ const MOCK_STATS = {
 };
 
 /**
- * Inject a Bearer token into localStorage so the frontend auth store
- * treats the session as logged in.
+ * Set auth cookies so middleware grants access to protected routes.
+ * Replaces setAuthToken — middleware checks cookies, not localStorage.
  */
-async function setAuthToken(page: Page, token = "smoke-test-token") {
-  await page.addInitScript((t) => {
-    localStorage.setItem("auth_token", t);
-  }, token);
+async function setAuthForProtectedRoutes(page: Page, role: "resident" | "contractor" = "resident") {
+  await setAuthCookies(page, role);
 }
 
 /**
@@ -147,11 +146,14 @@ async function setupBaseMocks(page: Page) {
 test("1. Signup → onboarding → redirect to dashboard", async ({ page }) => {
   await setupBaseMocks(page);
 
-  // Mock signup → returns token + user
-  await page.route("**/api/v1/auth/signup", (r) =>
+  // Mock signup (actual endpoint: auth/register)
+  await page.route("**/api/v1/auth/register", (r) =>
     r.fulfill({
-      status: 200,
+      status: 201,
       body: JSON.stringify({ token: "smoke-test-token", user: MOCK_USER }),
+      headers: {
+        "Set-Cookie": "refresh_token=mock-refresh-token; Path=/; HttpOnly",
+      },
     })
   );
 
@@ -164,14 +166,16 @@ test("1. Signup → onboarding → redirect to dashboard", async ({ page }) => {
   );
 
   await page.goto("/signup");
-  // Fill signup form fields (Hebrew UI — target by id/label)
-  await page.fill('[name="name"], #name, input[placeholder*="שם"], input[type="text"]:first-of-type', "Pilot User");
-  await page.fill('[name="email"], #email, input[type="email"]', "pilot@example.com");
-  await page.fill('[name="phone"], #phone, input[type="tel"], input[placeholder*="טלפון"]', "0501234567");
-  await page.fill('[name="password"], #password, input[type="password"]', "SecurePass1!");
-
-  // Submit
-  await page.click('button[type="submit"]');
+  // Step 1: select resident role and continue
+  await page.getByRole("button", { name: /דייר/ }).first().click();
+  await page.getByRole("button", { name: "המשך" }).click();
+  // Step 2: fill form
+  await page.fill("#name", "Pilot User");
+  await page.fill("#email", "pilot@example.com");
+  await page.fill("#phone", "0501234567");
+  await page.fill("#password", "SecurePass1!");
+  await page.check("#tos");
+  await page.getByRole("button", { name: "הרשמה" }).click();
 
   // After signup the app goes to /onboarding — mock the page load
   // We just verify navigation away from /signup or arrival at onboarding/dashboard
@@ -184,9 +188,8 @@ test("1. Signup → onboarding → redirect to dashboard", async ({ page }) => {
 
 test("2. Login → dashboard loads with building and offers", async ({ page }) => {
   await setupBaseMocks(page);
-  await setAuthToken(page);
 
-  await page.route("**/api/v1/auth/login", (r) =>
+  await page.route("**/api/v1/auth/login/json", (r) =>
     r.fulfill({
       status: 200,
       body: JSON.stringify({
@@ -194,13 +197,16 @@ test("2. Login → dashboard loads with building and offers", async ({ page }) =
         token_type: "bearer",
         expires_in: 3600,
       }),
+      headers: {
+        "Set-Cookie": "refresh_token=mock-refresh-token; Path=/; HttpOnly",
+      },
     })
   );
 
   await page.goto("/login");
-  await page.fill('input[type="email"]', "pilot@example.com");
-  await page.fill('input[type="password"]', "SecurePass1!");
-  await page.click('button[type="submit"]');
+  await page.fill("#identifier", "pilot@example.com");
+  await page.fill("#password", "SecurePass1!");
+  await page.getByRole("button", { name: "התחברות" }).click();
 
   await expect(page).toHaveURL(/\/dashboard/, { timeout: 10_000 });
 });
@@ -211,7 +217,7 @@ test("2. Login → dashboard loads with building and offers", async ({ page }) =
 
 test("3. Offer detail → join → leave flow (mocked)", async ({ page }) => {
   await setupBaseMocks(page);
-  await setAuthToken(page);
+  await setAuthForProtectedRoutes(page);
 
   await page.route("**/api/v1/offers/offer-pilot-1", (r) =>
     r.fulfill({ status: 200, body: JSON.stringify(MOCK_OFFER) })
@@ -236,12 +242,12 @@ test("3. Offer detail → join → leave flow (mocked)", async ({ page }) => {
 
 test("4. Contractor dashboard stats load", async ({ page }) => {
   await setupBaseMocks(page);
-  await setAuthToken(page, "contractor-token");
+  await setAuthForProtectedRoutes(page, "contractor");
 
   await page.route("**/api/v1/auth/me", (r) =>
     r.fulfill({ status: 200, body: JSON.stringify(MOCK_CONTRACTOR_USER) })
   );
-  await page.route("**/api/v1/contractors/ctr-pilot-1/stats", (r) =>
+  await page.route("**/api/v1/contractors/*/stats", (r) =>
     r.fulfill({ status: 200, body: JSON.stringify(MOCK_STATS) })
   );
   await page.route("**/api/v1/contractors/ctr-pilot-1*", (r) =>
@@ -267,7 +273,7 @@ test("4. Contractor dashboard stats load", async ({ page }) => {
 
 test("5. Contractor create offer flow", async ({ page }) => {
   await setupBaseMocks(page);
-  await setAuthToken(page, "contractor-token");
+  await setAuthForProtectedRoutes(page, "contractor");
 
   await page.route("**/api/v1/auth/me", (r) =>
     r.fulfill({ status: 200, body: JSON.stringify(MOCK_CONTRACTOR_USER) })
@@ -300,7 +306,7 @@ test("5. Contractor create offer flow", async ({ page }) => {
 
 test("6. Avatar upload API accepts valid image (mocked)", async ({ page }) => {
   await setupBaseMocks(page);
-  await setAuthToken(page);
+  await setAuthForProtectedRoutes(page);
 
   await page.route("**/api/v1/uploads/avatar", (r) =>
     r.fulfill({
@@ -338,7 +344,7 @@ test("6. Avatar upload API accepts valid image (mocked)", async ({ page }) => {
 
 test("7. Contractor doc upload API works (mocked)", async ({ page }) => {
   await setupBaseMocks(page);
-  await setAuthToken(page, "contractor-token");
+  await setAuthForProtectedRoutes(page, "contractor");
 
   await page.route("**/api/v1/uploads/contractor-docs", (r) =>
     r.fulfill({
@@ -420,7 +426,7 @@ test("8. Admin users page loads without error", async ({ page }) => {
 
 test("9. Payments page loads and shows test-mode indicator", async ({ page }) => {
   await setupBaseMocks(page);
-  await setAuthToken(page);
+  await setAuthForProtectedRoutes(page);
 
   await page.route("**/api/v1/payments/methods*", (r) =>
     r.fulfill({
@@ -450,7 +456,7 @@ test("9. Payments page loads and shows test-mode indicator", async ({ page }) =>
 
 test("10. Chat sends message and history loads on mount", async ({ page }) => {
   await setupBaseMocks(page);
-  await setAuthToken(page);
+  await setAuthForProtectedRoutes(page);
 
   // Mock POST /message
   await page.route("**/api/v1/message", (r) =>

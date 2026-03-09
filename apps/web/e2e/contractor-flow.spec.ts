@@ -1,4 +1,5 @@
 import { test, expect, Page } from "@playwright/test";
+import { setAuthCookies } from "./auth-helpers";
 
 /**
  * E2E tests for Contractor user flows
@@ -76,21 +77,8 @@ async function setupCommonMocks(page: Page) {
   );
 }
 
-function setupContractorAuth(page: Page) {
-  return page.addInitScript(() => {
-    localStorage.setItem(
-      "groupio-auth",
-      JSON.stringify({
-        state: {
-          user: { id: "con_001", email: "moshe@coolair.co.il", fullName: "Moshe", phone: "0521234567", role: "contractor", preferredLanguage: "he", isVerified: true, contractorId: "con_001" },
-          accessToken: "jwt_token",
-          refreshToken: "jwt_refresh",
-          isAuthenticated: true,
-        },
-        version: 0,
-      })
-    );
-  });
+async function setupContractorAuth(page: Page) {
+  await setAuthCookies(page, "contractor");
 }
 
 // ============================================================================
@@ -102,7 +90,21 @@ test.describe("Contractor Dashboard", () => {
     await setupCommonMocks(page);
     await setupContractorAuth(page);
 
-    await page.route("**/api/contractor/stats", (route) =>
+    await page.route("**/api/v1/auth/me", (route) =>
+      route.fulfill({
+        status: 200,
+        body: JSON.stringify({
+          id: "con_001",
+          email: "moshe@coolair.co.il",
+          full_name: "Moshe",
+          phone: "0521234567",
+          role: "contractor",
+          contractor_id: "con_001",
+        }),
+      })
+    );
+
+    await page.route("**/api/v1/contractors/con_001/stats", (route) =>
       route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -110,16 +112,16 @@ test.describe("Contractor Dashboard", () => {
           activeOffers: 3,
           completedProjects: 120,
           totalRevenue: 45000,
-          rating: 4.8,
+          averageRating: 4.8,
         }),
       })
     );
 
-    await page.route("**/api/contractor/offers*", (route) =>
+    await page.route("**/api/v1/offers*", (route) =>
       route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({ offers: MOCK_CONTRACTOR_OFFERS }),
+        body: JSON.stringify({ items: MOCK_CONTRACTOR_OFFERS, total: MOCK_CONTRACTOR_OFFERS.length }),
       })
     );
   });
@@ -163,15 +165,26 @@ test.describe("Contractor Create Offer Flow", () => {
   test.beforeEach(async ({ page }) => {
     await setupCommonMocks(page);
     await setupContractorAuth(page);
+
+    await page.route("**/api/v1/auth/me", (route) =>
+      route.fulfill({
+        status: 200,
+        body: JSON.stringify({
+          id: "con_001",
+          email: "moshe@coolair.co.il",
+          role: "contractor",
+          contractor_id: "con_001",
+        }),
+      })
+    );
   });
 
   test("should display offer creation form", async ({ page }) => {
     await page.goto("/contractor/offers/create");
 
-    // Form has title, description, category, basePrice inputs
-    await expect(page.locator("#title")).toBeVisible({ timeout: 10000 });
-    await expect(page.locator("#category")).toBeVisible();
-    await expect(page.locator("#basePrice")).toBeVisible();
+    await expect(page.locator('input[name="title"]')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('select[name="category"]')).toBeVisible();
+    await expect(page.locator('input[name="basePrice"]')).toBeVisible();
   });
 
   test("should fill in and submit offer form", async ({ page }) => {
@@ -179,24 +192,26 @@ test.describe("Contractor Create Offer Flow", () => {
       route.fulfill({
         status: 201,
         contentType: "application/json",
-        body: JSON.stringify({
-          id: "offer_new",
-          status: "active",
-        }),
+        body: JSON.stringify({ id: "offer_new", status: "active" }),
       })
     );
 
     await page.goto("/contractor/offers/create");
 
-    await page.fill("#title", "התקנת מזגנים מקצועית");
-    await page.fill("#description", "שירות מקצועי ואחריות מלאה");
-    await page.selectOption("#category", "ac_installation");
-    await page.fill("#basePrice", "4500");
+    await page.fill('input[name="title"]', "התקנת מזגנים מקצועית");
+    await page.fill('textarea[name="description"]', "שירות מקצועי ואחריות מלאה. התקנה מקצועית עם אחריות לשנה מלאה.");
+    await page.selectOption('select[name="category"]', "ac_installation");
+    await page.selectOption('select[name="region"]', "center");
+    await page.fill('input[name="buildingId"]', "bld_001");
+    await page.fill('input[name="basePrice"]', "4500");
+    await page.fill('input[name="validUntil"]', "2026-12-31");
+    await page.fill('input[name="minParticipants"]', "5");
+    await page.fill('input[name="maxParticipants"]', "20");
+    await page.check('input[value="installation"]');
 
-    await page.click('button[type="submit"]');
+    await page.getByRole("button", { name: /יצירה|create/i }).click();
 
-    // Should navigate to offer page or show success
-    await page.waitForTimeout(2000);
+    await expect(page).toHaveURL(/contractor\/offers\/offer_new/, { timeout: 10000 });
   });
 });
 
@@ -209,11 +224,23 @@ test.describe("Contractor Manage Offers", () => {
     await setupCommonMocks(page);
     await setupContractorAuth(page);
 
-    await page.route("**/api/contractor/offers*", (route) =>
+    await page.route("**/api/v1/auth/me", (route) =>
+      route.fulfill({
+        status: 200,
+        body: JSON.stringify({
+          id: "con_001",
+          email: "moshe@coolair.co.il",
+          role: "contractor",
+          contractor_id: "con_001",
+        }),
+      })
+    );
+
+    await page.route("**/api/v1/offers*", (route) =>
       route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({ offers: MOCK_CONTRACTOR_OFFERS }),
+        body: JSON.stringify({ items: MOCK_CONTRACTOR_OFFERS, total: MOCK_CONTRACTOR_OFFERS.length }),
       })
     );
   });
