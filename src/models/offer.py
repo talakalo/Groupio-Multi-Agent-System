@@ -114,6 +114,7 @@ class OfferJoinRequest(BaseModel):
 
     user_id: str
     unit_count: int = Field(default=1, ge=1)
+    invite_token: str | None = None
 
 
 class OfferMatchRequest(BaseModel):

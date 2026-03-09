@@ -7,6 +7,7 @@ from langgraph.graph import END, StateGraph
 
 from src.agents.analytics import AnalyticsAgent
 from src.agents.architecture import ArchitectureAgent
+from src.agents.influencer import InfluencerAgent
 from src.agents.matching import MatchingAgent
 from src.agents.outreach import OutreachAgent
 from src.agents.pricing import PricingAgent
@@ -38,6 +39,10 @@ INTENT_AGENT_MAP = {
     "technical_support": "support",
     "architecture_analysis": "architecture",
     "payment_query": "payment",
+    # Graph-powered GMV features
+    "viral_invite_query": "outreach",
+    "building_social_proof": "pricing",
+    "influencer_campaign": "influencer",
 }
 
 
@@ -60,6 +65,7 @@ class GroupioOrchestrator:
             "outreach": OutreachAgent(),
             "analytics": AnalyticsAgent(),
             "architecture": ArchitectureAgent(),
+            "influencer": InfluencerAgent(),
         }
         # Payment agent imported lazily to avoid circular imports during Phase 3
         try:
@@ -120,6 +126,7 @@ class GroupioOrchestrator:
         workflow.add_node("outreach", self._run_agent_safe("outreach"))
         workflow.add_node("analytics", self._run_agent_safe("analytics"))
         workflow.add_node("architecture", self._run_agent_safe("architecture"))
+        workflow.add_node("influencer", self._run_agent_safe("influencer"))
         if "payment" in self.agents:
             workflow.add_node("payment", self._run_agent_safe("payment"))
         workflow.add_node("human_handoff", self._handoff_to_human)
@@ -137,6 +144,7 @@ class GroupioOrchestrator:
             "outreach": "outreach",
             "analytics": "analytics",
             "architecture": "architecture",
+            "influencer": "influencer",
             "human": "human_handoff",
             "end": "final_response",
         }
@@ -157,6 +165,7 @@ class GroupioOrchestrator:
             "outreach",
             "analytics",
             "architecture",
+            "influencer",
         ]
         if "payment" in self.agents:
             specialist_agents.append("payment")

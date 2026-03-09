@@ -19,6 +19,9 @@ Available intent categories:
 - technical_support: Technical questions about installations or services
 - architecture_analysis: User uploaded a floor plan or asks about renovation suggestions based on their home layout
 - payment_query: User asks about payments, invoices, billing, refunds, or how much they owe
+- viral_invite_query: User asks about sharing an offer with neighbours, getting an invite link, or receiving a discount from inviting others
+- building_social_proof: User asks how many similar buildings joined a deal, or wants social proof data about neighbouring buildings
+- influencer_campaign: Admin-triggered request about top resident connectors, influence scores, or ₪500 credit awards for top inviters
 
 If confidence < 0.7, formulate a clarifying question in Hebrew.
 

@@ -127,7 +127,7 @@ class LLMResponseCache:
 _llm_cache = LLMResponseCache(default_ttl=1800)  # 30 min default
 
 # Agents whose decisions require human review in recommend mode
-_REVIEW_AGENTS: frozenset[str] = frozenset({"matching", "pricing", "vetting"})
+_REVIEW_AGENTS: frozenset[str] = frozenset({"matching", "pricing", "vetting", "influencer"})
 
 _THINKING_RE = re.compile(r"<thinking>(.*?)</thinking>", re.DOTALL)
 
