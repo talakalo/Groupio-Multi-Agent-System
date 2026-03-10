@@ -107,8 +107,9 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     if _has_auth_schema():
-        for table in ("users", "offer_participants", "payments"):
-            op.execute(f"DROP POLICY IF EXISTS service_role_all ON {table}")
+        op.execute("DROP POLICY IF EXISTS service_role_all ON users")
+        op.execute("DROP POLICY IF EXISTS service_role_all ON offer_participants")
+        op.execute("DROP POLICY IF EXISTS service_role_all ON payments")
 
         op.execute("DROP POLICY IF EXISTS payments_owner ON payments")
         op.execute(

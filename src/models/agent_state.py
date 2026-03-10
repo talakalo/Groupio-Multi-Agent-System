@@ -33,6 +33,8 @@ class AgentState(TypedDict):
         "human",
         "architecture",
         "payment",
+        "notification",
+        "influencer",
     ]
     intent: str | None
     confidence: float
@@ -60,6 +62,12 @@ class AgentState(TypedDict):
     # Handoff
     needs_human: bool
     escalation_reason: str | None
+
+    # Graph feature contexts (Features 1–3)
+    viral_invite_chain: dict[str, Any] | None
+    invite_momentum: dict[str, Any] | None
+    building_similarity_clusters: list[dict[str, Any]] | None
+    influencer_data: dict[str, Any] | None
 
     # Response
     final_response: dict[str, Any] | None

@@ -65,6 +65,7 @@
   },
   "offers": {
     "title": "הצעות",
+    "groupOffer": "הצעה קבוצתית",
     "active": "פעילות",
     "expired": "פגו תוקף",
     "completed": "הושלמו",

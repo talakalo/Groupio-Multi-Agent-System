@@ -10,6 +10,7 @@ from src.api.routes.buildings import router as buildings_router
 from src.api.routes.contractors import router as contractors_router
 from src.api.routes.conversations import router as conversations_router
 from src.api.routes.escalations import router as escalations_router
+from src.api.routes.graph_features import router as graph_features_router
 from src.api.routes.offers import router as offers_router
 from src.api.routes.onboarding import router as onboarding_router
 from src.api.routes.payments import admin_router as payments_admin_router
@@ -102,6 +103,12 @@ api_router.include_router(
     conversations_router,
     prefix="/conversations",
     tags=["Conversations"],
+)
+
+api_router.include_router(
+    graph_features_router,
+    prefix="/graph",
+    tags=["Graph Features"],
 )
 
 __all__ = ["api_router"]

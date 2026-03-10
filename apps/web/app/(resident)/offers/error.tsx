@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import * as Sentry from "@sentry/nextjs";
 
 interface ErrorPageProps {
   error: Error & { digest?: string };
@@ -11,11 +12,9 @@ export default function OffersError({ error, reset }: ErrorPageProps) {
   React.useEffect(() => {
     console.error("Offers page error:", error);
     try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { captureException } = require('@sentry/nextjs');
-      captureException(error);
+      Sentry.captureException(error);
     } catch {
-      // @sentry/nextjs not installed
+      // Guard against Sentry initialization errors (no DSN configured)
     }
   }, [error]);
 

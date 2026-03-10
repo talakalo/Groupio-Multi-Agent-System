@@ -65,6 +65,7 @@
   },
   "offers": {
     "title": "Offers",
+    "groupOffer": "Group Offer",
     "active": "Active",
     "expired": "Expired",
     "completed": "Completed",
