@@ -162,6 +162,7 @@ def _build_orchestrator(llm, pg, graph, rag, redis):
 
 class TestE2EViralInviteFlow:
     @pytest.mark.asyncio
+    @pytest.mark.timeout(60)
     async def test_viral_intent_routes_to_outreach_and_queues_campaign(
         self, llm_mock, pg_mock, graph_mock, rag_mock, redis_mock
     ):
@@ -190,6 +191,7 @@ class TestE2EViralInviteFlow:
         pg_mock.create_outreach_pending.assert_awaited()
 
     @pytest.mark.asyncio
+    @pytest.mark.timeout(60)
     async def test_influencer_intent_routes_to_influencer_agent(
         self, llm_mock, pg_mock, graph_mock, rag_mock, redis_mock
     ):
@@ -233,6 +235,7 @@ class TestE2EViralInviteFlow:
 
 class TestE2EBuildingSocialProofFlow:
     @pytest.mark.asyncio
+    @pytest.mark.timeout(60)
     async def test_pricing_query_fetches_similarity_clusters(self, llm_mock, pg_mock, graph_mock, rag_mock, redis_mock):
         """A pricing query causes PricingAgent to fetch similarity clusters."""
         llm_mock.create_structured_output = AsyncMock(
@@ -279,6 +282,7 @@ class TestE2EBuildingSocialProofFlow:
 
 class TestE2EInviteConversionOnJoin:
     @pytest.mark.asyncio
+    @pytest.mark.timeout(60)
     async def test_join_with_valid_invite_token_marks_converted(self):
         """When a resident joins an offer with an invite_token, the graph records
         the conversion (mark_invite_converted called)."""
@@ -356,6 +360,7 @@ class TestE2EInviteConversionOnJoin:
 
 class TestSchedulerJobsE2E:
     @pytest.mark.asyncio
+    @pytest.mark.timeout(30)
     async def test_refresh_building_similarity_completes(self):
         """refresh_building_similarity scheduler task completes without error."""
         from src.workers.scheduler import refresh_building_similarity
@@ -376,6 +381,7 @@ class TestSchedulerJobsE2E:
         assert mock_graph.compute_and_store_similarity_edges.await_count == 2
 
     @pytest.mark.asyncio
+    @pytest.mark.timeout(30)
     async def test_refresh_influencer_scores_completes(self):
         """refresh_influencer_scores scheduler task completes without error."""
         from src.workers.scheduler import refresh_influencer_scores
@@ -395,6 +401,7 @@ class TestSchedulerJobsE2E:
         assert mock_graph.refresh_influence_scores_for_city.await_count == 2
 
     @pytest.mark.asyncio
+    @pytest.mark.timeout(30)
     async def test_refresh_building_similarity_fallback_when_no_regions(self):
         """When get_distinct_regions returns [], falls back to a single global pass."""
         from src.workers.scheduler import refresh_building_similarity
