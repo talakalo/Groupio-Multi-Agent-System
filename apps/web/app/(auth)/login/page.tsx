@@ -70,18 +70,25 @@ export default function LoginPage() {
         if (meRes.ok) {
           const meData = await meRes.json();
           user = { role: meData.role };
+          const prefLang = (meData.preferred_language ?? meData.preferredLanguage ?? "he") as "he" | "en";
           useAuthStore.getState().setUser({
             id: meData.id,
             email: meData.email,
             fullName: meData.full_name ?? meData.fullName ?? "",
             phone: meData.phone ?? "",
             role: meData.role,
-            preferredLanguage: (meData.preferred_language ?? meData.preferredLanguage ?? "he") as "he" | "en",
+            preferredLanguage: prefLang,
             avatarUrl: meData.avatar_url ?? meData.avatarUrl,
             buildingId: meData.building_id ?? meData.buildingId,
             contractorId: meData.contractor_id ?? meData.contractorId,
             isVerified: meData.is_verified ?? meData.isVerified ?? false,
           });
+          await fetch("/api/locale", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ locale: prefLang }),
+            credentials: "same-origin",
+          }).catch(() => {});
         }
       } catch {
         // /me failed; still set cookie with token so middleware allows access

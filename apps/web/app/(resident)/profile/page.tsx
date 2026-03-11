@@ -276,8 +276,18 @@ export default function ResidentProfilePage() {
       if (!res.ok) throw new Error('Failed to save profile');
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: async (data: { preferred_language?: string }) => {
       queryClient.invalidateQueries({ queryKey: ['resident', 'profile'] });
+      const lang = data?.preferred_language;
+      if (lang) {
+        await fetch('/api/locale', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ locale: lang }),
+          credentials: 'same-origin',
+        }).catch(() => {});
+        router.refresh();
+      }
     },
   });
 
@@ -412,7 +422,7 @@ export default function ResidentProfilePage() {
               <Globe className="absolute top-3.5 end-3 h-4 w-4 text-gray-400" />
               <select
                 id="language"
-                value={profile.language ?? 'he'}
+                value={profile.language ?? profile.preferredLanguage ?? 'he'}
                 onChange={(e) => updateField('language' as keyof ResidentProfile, e.target.value)}
                 className="input-field pe-10"
               >
