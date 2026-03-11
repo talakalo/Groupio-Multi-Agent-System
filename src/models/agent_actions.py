@@ -25,6 +25,7 @@ class AgentActionEnvelope(BaseModel):
     @classmethod
     def coerce_none_to_empty(cls, v: str | None) -> str:
         return v if v is not None else ""
+
     entities_to_pass: dict[str, Any] = Field(default_factory=dict)
 
 
