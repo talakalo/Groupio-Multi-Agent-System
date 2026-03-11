@@ -1,4 +1,5 @@
-# Groupio Multi-Agent System - Local Setup Guide
+curl http://localhost:8000/api/v1/health
+{"status":"degraded","services":{"vector_db":true,"graph_db":true,"redis":true,"postgres":false}}Mac# Groupio Multi-Agent System - Local Setup Guide
 
 This guide walks you through setting up and running the Groupio system locally for development.
 

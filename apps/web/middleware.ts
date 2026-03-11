@@ -85,11 +85,20 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Redirect authenticated users from auth routes
+  // Redirect authenticated users from auth routes (role-based default)
   if (isAuthRoute && isAuthenticated) {
     const redirect = request.nextUrl.searchParams.get('redirect');
     const url = request.nextUrl.clone();
-    url.pathname = redirect || '/dashboard';
+    if (redirect) {
+      url.pathname = redirect;
+    } else if (['admin', 'super_admin', 'buildings_manager'].includes(userRole || '')) {
+      const adminUrl = process.env.NEXT_PUBLIC_ADMIN_URL || 'http://localhost:3001';
+      return NextResponse.redirect(`${adminUrl}/dashboard`);
+    } else if (userRole === 'contractor') {
+      url.pathname = '/contractor/dashboard';
+    } else {
+      url.pathname = '/dashboard';
+    }
     url.searchParams.delete('redirect');
     return NextResponse.redirect(url);
   }

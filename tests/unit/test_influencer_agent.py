@@ -1,11 +1,10 @@
 """Unit tests for InfluencerAgent."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from src.agents.influencer import InfluencerAgent
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -48,10 +47,22 @@ def _base_state(city: str = "Tel Aviv") -> dict:
 
 
 TOP_INFLUENCERS = [
-    {"resident_id": "r1", "name": "Yael", "city": "Tel Aviv",
-     "total_score": 42.0, "total_invites": 10, "total_conversions": 7},
-    {"resident_id": "r2", "name": "Dan", "city": "Tel Aviv",
-     "total_score": 12.0, "total_invites": 4, "total_conversions": 3},
+    {
+        "resident_id": "r1",
+        "name": "Yael",
+        "city": "Tel Aviv",
+        "total_score": 42.0,
+        "total_invites": 10,
+        "total_conversions": 7,
+    },
+    {
+        "resident_id": "r2",
+        "name": "Dan",
+        "city": "Tel Aviv",
+        "total_score": 12.0,
+        "total_invites": 4,
+        "total_conversions": 3,
+    },
 ]
 
 
@@ -139,13 +150,8 @@ class TestRunWithInfluencers:
         # LLM decides r1 qualifies
         agent.llm_client.create_structured_output = AsyncMock(
             return_value={
-                "qualified": [
-                    {"resident_id": "r1", "name": "Yael",
-                     "reason": "ציון השפעה גבוה", "credit_amount": 500}
-                ],
-                "disqualified": [
-                    {"resident_id": "r2", "reason": "ניקוד נמוך מדי"}
-                ],
+                "qualified": [{"resident_id": "r1", "name": "Yael", "reason": "ציון השפעה גבוה", "credit_amount": 500}],
+                "disqualified": [{"resident_id": "r2", "reason": "ניקוד נמוך מדי"}],
                 "summary": "זיהינו 1 משפיען בתל אביב.",
             }
         )
@@ -199,9 +205,7 @@ class TestRunWithInfluencers:
     @pytest.mark.asyncio
     async def test_llm_failure_results_in_empty_qualified(self, agent):
         agent._graph.get_top_influencers_by_city = AsyncMock(return_value=TOP_INFLUENCERS)
-        agent.llm_client.create_structured_output = AsyncMock(
-            side_effect=Exception("LLM timeout")
-        )
+        agent.llm_client.create_structured_output = AsyncMock(side_effect=Exception("LLM timeout"))
         state = _base_state()
         result = await agent.run(state)
         assert result["influencer_data"]["qualified"] == []

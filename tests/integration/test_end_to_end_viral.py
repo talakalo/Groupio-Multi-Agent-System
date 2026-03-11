@@ -6,7 +6,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Shared fixtures
 # ---------------------------------------------------------------------------
@@ -39,43 +38,66 @@ def llm_mock():
 @pytest.fixture
 def pg_mock():
     pg = AsyncMock()
-    pg.get_user_profile = AsyncMock(return_value={
-        "id": "user-1", "name": "Yael", "building_id": "b1"
-    })
-    pg.get_building = AsyncMock(return_value={
-        "id": "b1", "address": "Rothschild 15", "city": "Tel Aviv",
-        "region": "center", "type": "apartment"
-    })
+    pg.get_user_profile = AsyncMock(return_value={"id": "user-1", "name": "Yael", "building_id": "b1"})
+    pg.get_building = AsyncMock(
+        return_value={
+            "id": "b1",
+            "address": "Rothschild 15",
+            "city": "Tel Aviv",
+            "region": "center",
+            "type": "apartment",
+        }
+    )
     pg.get_active_offers = AsyncMock(return_value=[])
     pg.create_outreach_pending = AsyncMock()
     pg.create_agent_audit_entry = AsyncMock()
-    pg.get_market_data = AsyncMock(return_value={
-        "avg_price": 5000, "median_price": 4800, "min_price": 3000,
-        "max_price": 8000, "price_stddev": 800, "avg_participants": 10,
-        "sample_size": 50,
-    })
+    pg.get_market_data = AsyncMock(
+        return_value={
+            "avg_price": 5000,
+            "median_price": 4800,
+            "min_price": 3000,
+            "max_price": 8000,
+            "price_stddev": 800,
+            "avg_participants": 10,
+            "sample_size": 50,
+        }
+    )
     return pg
 
 
 @pytest.fixture
 def graph_mock():
     g = AsyncMock()
-    g.get_viral_invite_chain = AsyncMock(return_value={
-        "root_id": "user-1",
-        "chain_nodes": [{"id": "r2", "first_name": "Dan", "converted": True}],
-        "total_invites": 1,
-        "conversions": 1,
-        "depth": 4,
-    })
-    g.get_invite_momentum_for_offer = AsyncMock(return_value={
-        "building_residents": 20, "joined_count": 5,
-        "total_invites": 8, "converted_invites": 5,
-    })
+    g.get_viral_invite_chain = AsyncMock(
+        return_value={
+            "root_id": "user-1",
+            "chain_nodes": [{"id": "r2", "first_name": "Dan", "converted": True}],
+            "total_invites": 1,
+            "conversions": 1,
+            "depth": 4,
+        }
+    )
+    g.get_invite_momentum_for_offer = AsyncMock(
+        return_value={
+            "building_residents": 20,
+            "joined_count": 5,
+            "total_invites": 8,
+            "converted_invites": 5,
+        }
+    )
     g.get_building_similarity_clusters = AsyncMock(return_value=[])
-    g.get_top_influencers_by_city = AsyncMock(return_value=[
-        {"resident_id": "r1", "name": "Yael", "city": "Tel Aviv",
-         "total_score": 42.0, "total_invites": 10, "total_conversions": 7},
-    ])
+    g.get_top_influencers_by_city = AsyncMock(
+        return_value=[
+            {
+                "resident_id": "r1",
+                "name": "Yael",
+                "city": "Tel Aviv",
+                "total_score": 42.0,
+                "total_invites": 10,
+                "total_conversions": 7,
+            },
+        ]
+    )
     g.refresh_influence_scores_for_city = AsyncMock(return_value=15)
     g.compute_and_store_similarity_edges = AsyncMock(return_value=88)
     g.health_check = AsyncMock(return_value=True)
@@ -98,6 +120,8 @@ def redis_mock():
     r.ab_test_get_results = AsyncMock(return_value={"impressions": 0, "conversions": 0})
     r.cache_get = AsyncMock(return_value=None)
     r.cache_set = AsyncMock()
+    r.get_conversation_context = AsyncMock(return_value=[])
+    r.add_conversation_message = AsyncMock()
     return r
 
 
@@ -113,6 +137,7 @@ def _build_orchestrator(llm, pg, graph, rag, redis):
     patches = [
         patch("src.agents.base.get_llm_client", return_value=llm),
         patch("src.agents.base.get_rag_pipeline", return_value=rag),
+        patch("src.databases.redis_client.get_redis_client", return_value=redis),
         patch("src.agents.outreach.get_postgres_client", return_value=pg),
         patch("src.agents.outreach.get_redis_client", return_value=redis),
         patch("src.agents.influencer.get_postgres_client", return_value=pg),
@@ -127,7 +152,7 @@ def _build_orchestrator(llm, pg, graph, rag, redis):
         patch("src.orchestration.graph.get_postgres_client", return_value=pg),
         patch("src.orchestration.graph.get_rag_pipeline", return_value=rag),
     ]
-    entered = [p.__enter__() for p in patches]
+    _ = [p.__enter__() for p in patches]
     orch = GroupioOrchestrator()
     # Return both the orchestrator and patches so caller can __exit__
     return orch, patches
@@ -140,24 +165,34 @@ def _build_orchestrator(llm, pg, graph, rag, redis):
 
 class TestE2EViralInviteFlow:
     @pytest.mark.asyncio
+    @pytest.mark.timeout(30)
     async def test_viral_intent_routes_to_outreach_and_queues_campaign(
         self, llm_mock, pg_mock, graph_mock, rag_mock, redis_mock
     ):
         """A viral_invite_query intent ends up calling create_outreach_pending."""
+        # First call: router classifies viral_invite -> outreach. Second call: outreach returns
+        # requires_followup=True so graph loops to router; return general_info to end via support.
         llm_mock.create_structured_output = AsyncMock(
-            return_value={
-                "intent": "viral_invite_query",
-                "entities": {"offer_id": "offer-42"},
-                "confidence": 0.95,
-                "clarifying_question": None,
-                "suggested_agent": "outreach",
-            }
+            side_effect=[
+                {
+                    "intent": "viral_invite_query",
+                    "entities": {"offer_id": "offer-42"},
+                    "confidence": 0.95,
+                    "clarifying_question": None,
+                    "suggested_agent": "outreach",
+                },
+                {
+                    "intent": "general_info",
+                    "entities": {},
+                    "confidence": 0.9,
+                    "clarifying_question": None,
+                    "suggested_agent": "support",
+                },
+            ]
         )
-        orch, patches = _build_orchestrator(
-            llm_mock, pg_mock, graph_mock, rag_mock, redis_mock
-        )
+        orch, patches = _build_orchestrator(llm_mock, pg_mock, graph_mock, rag_mock, redis_mock)
         try:
-            result = await orch.run(
+            await orch.run(
                 user_message="רוצה לשתף עם השכן שלי",
                 user_id="user-1",
                 building_id="b1",
@@ -170,6 +205,7 @@ class TestE2EViralInviteFlow:
         pg_mock.create_outreach_pending.assert_awaited()
 
     @pytest.mark.asyncio
+    @pytest.mark.timeout(30)
     async def test_influencer_intent_routes_to_influencer_agent(
         self, llm_mock, pg_mock, graph_mock, rag_mock, redis_mock
     ):
@@ -191,11 +227,9 @@ class TestE2EViralInviteFlow:
             }
         )
 
-        orch, patches = _build_orchestrator(
-            llm_mock, pg_mock, graph_mock, rag_mock, redis_mock
-        )
+        orch, patches = _build_orchestrator(llm_mock, pg_mock, graph_mock, rag_mock, redis_mock)
         try:
-            result = await orch.run(
+            await orch.run(
                 user_message="הפעל קמפיין משפיענים בתל אביב",
                 user_id="admin-1",
                 building_id="b1",
@@ -215,18 +249,27 @@ class TestE2EViralInviteFlow:
 
 class TestE2EBuildingSocialProofFlow:
     @pytest.mark.asyncio
-    async def test_pricing_query_fetches_similarity_clusters(
-        self, llm_mock, pg_mock, graph_mock, rag_mock, redis_mock
-    ):
+    @pytest.mark.timeout(30)
+    async def test_pricing_query_fetches_similarity_clusters(self, llm_mock, pg_mock, graph_mock, rag_mock, redis_mock):
         """A pricing query causes PricingAgent to fetch similarity clusters."""
+        # First: building_social_proof -> pricing. Second: pricing returns requires_followup -> general_info to end.
         llm_mock.create_structured_output = AsyncMock(
-            return_value={
-                "intent": "building_social_proof",
-                "entities": {"category": "ac_installation"},
-                "confidence": 0.92,
-                "clarifying_question": None,
-                "suggested_agent": "pricing",
-            }
+            side_effect=[
+                {
+                    "intent": "building_social_proof",
+                    "entities": {"category": "ac_installation"},
+                    "confidence": 0.92,
+                    "clarifying_question": None,
+                    "suggested_agent": "pricing",
+                },
+                {
+                    "intent": "general_info",
+                    "entities": {},
+                    "confidence": 0.9,
+                    "clarifying_question": None,
+                    "suggested_agent": "support",
+                },
+            ]
         )
         graph_mock.get_building_similarity_clusters = AsyncMock(
             return_value=[
@@ -242,11 +285,9 @@ class TestE2EBuildingSocialProofFlow:
             ]
         )
 
-        orch, patches = _build_orchestrator(
-            llm_mock, pg_mock, graph_mock, rag_mock, redis_mock
-        )
+        orch, patches = _build_orchestrator(llm_mock, pg_mock, graph_mock, rag_mock, redis_mock)
         try:
-            result = await orch.run(
+            await orch.run(
                 user_message="כמה בניינים דומים הצטרפו לעסקת מזגן?",
                 user_id="user-1",
                 building_id="b1",
@@ -265,6 +306,7 @@ class TestE2EBuildingSocialProofFlow:
 
 class TestE2EInviteConversionOnJoin:
     @pytest.mark.asyncio
+    @pytest.mark.timeout(30)
     async def test_join_with_valid_invite_token_marks_converted(self):
         """When a resident joins an offer with an invite_token, the graph records
         the conversion (mark_invite_converted called)."""
@@ -342,6 +384,7 @@ class TestE2EInviteConversionOnJoin:
 
 class TestSchedulerJobsE2E:
     @pytest.mark.asyncio
+    @pytest.mark.timeout(30)
     async def test_refresh_building_similarity_completes(self):
         """refresh_building_similarity scheduler task completes without error."""
         from src.workers.scheduler import refresh_building_similarity
@@ -362,6 +405,7 @@ class TestSchedulerJobsE2E:
         assert mock_graph.compute_and_store_similarity_edges.await_count == 2
 
     @pytest.mark.asyncio
+    @pytest.mark.timeout(30)
     async def test_refresh_influencer_scores_completes(self):
         """refresh_influencer_scores scheduler task completes without error."""
         from src.workers.scheduler import refresh_influencer_scores
@@ -381,6 +425,7 @@ class TestSchedulerJobsE2E:
         assert mock_graph.refresh_influence_scores_for_city.await_count == 2
 
     @pytest.mark.asyncio
+    @pytest.mark.timeout(30)
     async def test_refresh_building_similarity_fallback_when_no_regions(self):
         """When get_distinct_regions returns [], falls back to a single global pass."""
         from src.workers.scheduler import refresh_building_similarity

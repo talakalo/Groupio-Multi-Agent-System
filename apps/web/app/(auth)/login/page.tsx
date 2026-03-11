@@ -87,6 +87,16 @@ export default function LoginPage() {
         // /me failed; still set cookie with token so middleware allows access
       }
       setAuthCookie(response.token, user);
+      const role = user?.role ?? "";
+      if (["admin", "super_admin", "buildings_manager"].includes(role)) {
+        const adminUrl = process.env.NEXT_PUBLIC_ADMIN_URL || "http://localhost:3001";
+        window.location.href = `${adminUrl}/dashboard#token=${encodeURIComponent(response.token)}`;
+        return;
+      }
+      if (role === "contractor") {
+        router.push("/contractor/dashboard");
+        return;
+      }
       router.push("/dashboard");
     } catch (err) {
       const rawMessage = err instanceof Error ? err.message : String(err);

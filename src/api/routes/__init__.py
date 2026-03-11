@@ -9,6 +9,7 @@ from src.api.routes.auth import router as auth_router
 from src.api.routes.buildings import router as buildings_router
 from src.api.routes.contractors import router as contractors_router
 from src.api.routes.conversations import router as conversations_router
+from src.api.routes.enrichment import router as enrichment_router
 from src.api.routes.escalations import router as escalations_router
 from src.api.routes.graph_features import router as graph_features_router
 from src.api.routes.offers import router as offers_router
@@ -26,6 +27,12 @@ api_router.include_router(
     auth_router,
     prefix="/auth",
     tags=["Authentication"],
+)
+
+api_router.include_router(
+    enrichment_router,
+    prefix="/enrichment",
+    tags=["Enrichment"],
 )
 
 api_router.include_router(

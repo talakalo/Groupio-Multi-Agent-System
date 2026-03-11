@@ -68,9 +68,8 @@ export default function LoginPage() {
         }
 
         // Store in sessionStorage: tab-scoped, cleared when browser tab is closed.
-        // Short-lived access token (15 min) + HTTP-only refresh cookie provides
-        // a reasonable security posture for the admin panel.
-        sessionStorage.setItem("admin_token", token);
+        // Use "auth_token" key so AdminShell, users/offers pages, and hooks find it.
+        sessionStorage.setItem("auth_token", token);
 
         router.push("/dashboard");
       } catch (err: unknown) {

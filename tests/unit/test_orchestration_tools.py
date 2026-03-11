@@ -53,6 +53,9 @@ def test_list_tools(registry):
     assert "analyze_sentiment" in tools
     assert "escalate_to_human" in tools
     assert "create_support_ticket" in tools
+    assert "normalize_address" in tools
+    assert "verify_contractor_license" in tools
+    assert "get_municipality_info" in tools
 
 
 def test_get_tool_exists(registry):
@@ -205,3 +208,37 @@ async def test_escalate_to_human_delegates(registry):
                 priority="high",
             )
     assert result.get("id") == "ticket-1"
+
+
+# ---------------------------------------------------------------------------
+# Enrichment tools (normalize_address, verify_contractor_license, get_municipality_info)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_normalize_address_tool(registry):
+    result = await registry._normalize_address("רחוב הרצל 10", "תל אביב")
+    assert "address" in result
+    assert "city" in result
+    assert "confidence" in result
+    assert "source" in result
+    assert result["address"] == "רחוב הרצל 10"
+    assert result["city"] == "תל אביב"
+    assert result["source"] == "stub"
+
+
+@pytest.mark.asyncio
+async def test_verify_contractor_license_tool(registry):
+    result = await registry._verify_contractor_license("12345", "Acme Ltd")
+    assert "verified" in result
+    assert "confidence" in result
+    assert "source" in result
+    assert "verified_at" in result
+    assert result["verified"] is False
+    assert result["confidence"] == 0.0
+
+
+@pytest.mark.asyncio
+async def test_get_municipality_info_tool(registry):
+    result = await registry._get_municipality_info("תל אביב")
+    assert result is None

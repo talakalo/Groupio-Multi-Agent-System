@@ -68,7 +68,7 @@ const ROLE_BADGE_CLASSES: Record<string, string> = {
 
 function getAuthHeaders(): Record<string, string> {
   const token =
-    typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
+    typeof window !== "undefined" ? sessionStorage.getItem("auth_token") : null;
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (token) headers["Authorization"] = `Bearer ${token}`;
   return headers;
@@ -80,7 +80,16 @@ async function fetchUsers(): Promise<User[]> {
   });
   if (!res.ok) throw new Error("Failed to fetch users");
   const data = await res.json();
-  return data.users ?? data.items ?? data;
+  const raw = data.users ?? data.items ?? data;
+  return (Array.isArray(raw) ? raw : []).map((u: Record<string, unknown>) => ({
+    id: String(u.id ?? ""),
+    name: String(u.name ?? u.full_name ?? ""),
+    email: String(u.email ?? ""),
+    phone: u.phone != null ? String(u.phone) : undefined,
+    role: (u.role ?? "resident") as User["role"],
+    status: u.is_active === false ? "suspended" : "active",
+    created_at: String(u.created_at ?? ""),
+  }));
 }
 
 async function updateUser(
@@ -445,15 +454,15 @@ export default function UsersPage() {
                   <td className="table-cell">
                     <div className="flex items-center gap-3">
                       <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary-100 text-primary-700 font-semibold text-xs flex-shrink-0">
-                        {user.name
+                        {(user.name || "")
                           .split(" ")
                           .map((n) => n[0])
                           .join("")
                           .toUpperCase()
-                          .slice(0, 2)}
+                          .slice(0, 2) || "?"}
                       </div>
                       <span className="font-medium text-surface-900">
-                        {user.name}
+                        {user.name || user.email || "—"}
                       </span>
                     </div>
                   </td>

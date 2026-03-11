@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useMemo, useCallback, Fragment, useRef } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import React, { useState, useMemo, useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import {
   Search,
@@ -157,6 +157,87 @@ function TrustScoreBar({
 }
 
 // ---------------------------------------------------------------------------
+// Verification Metadata (Phase 2)
+// ---------------------------------------------------------------------------
+
+interface VerificationMetadataItem {
+  id: string;
+  contractor_id: string;
+  source: string;
+  verified: boolean;
+  confidence: number;
+  verified_at: string;
+  raw_response?: Record<string, unknown>;
+  created_at: string;
+}
+
+function VerificationMetadataSection({ contractorId }: { contractorId: string }) {
+  const rawApiUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "") || "http://localhost:8000";
+  const API_BASE = rawApiUrl.endsWith("/api/v1") ? rawApiUrl : `${rawApiUrl}/api/v1`;
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["admin", "contractors", contractorId, "verification-metadata"],
+    queryFn: async () => {
+      const token = typeof window !== "undefined" ? sessionStorage.getItem("auth_token") : null;
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      const res = await fetch(
+        `${API_BASE}/admin/contractors/${encodeURIComponent(contractorId)}/verification-metadata`,
+        { headers }
+      );
+      if (!res.ok) throw new Error("Failed to fetch verification metadata");
+      return res.json() as Promise<{ items: VerificationMetadataItem[] }>;
+    },
+    enabled: !!contractorId,
+  });
+
+  const items = data?.items ?? [];
+
+  return (
+    <div className="space-y-2">
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-surface-500">
+        External Verification Records
+      </h3>
+      {isLoading && (
+        <p className="text-sm text-surface-400">Loading verification data...</p>
+      )}
+      {!isLoading && items.length === 0 && (
+        <p className="text-sm text-surface-500 italic">
+          No external verification records. Status above reflects internal/admin review only.
+        </p>
+      )}
+      {!isLoading && items.length > 0 && (
+        <div className="space-y-2">
+          {items.map((m) => (
+            <div
+              key={m.id}
+              className="p-3 rounded-lg border border-surface-200 bg-surface-50 text-sm"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span
+                  className={clsx(
+                    "font-medium",
+                    m.verified ? "text-success-700" : "text-surface-600"
+                  )}
+                >
+                  {m.verified ? "Verified" : "Not verified"} — {m.source}
+                </span>
+                <span className="text-xs text-surface-500">
+                  {(m.confidence * 100).toFixed(0)}% confidence
+                </span>
+              </div>
+              <p className="text-xs text-surface-500 mt-1">
+                Verified at: {new Date(m.verified_at).toLocaleString()}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Page component
 // ---------------------------------------------------------------------------
 
@@ -182,7 +263,7 @@ export default function ContractorsPage() {
 
   function getAuthHeaders(): Record<string, string> {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
-    const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
+    const token = typeof window !== "undefined" ? sessionStorage.getItem("auth_token") : null;
     if (token) headers["Authorization"] = `Bearer ${token}`;
     return headers;
   }
@@ -842,6 +923,9 @@ export default function ContractorsPage() {
                   ))}
                 </div>
               </div>
+
+              {/* Verification Metadata (Phase 2 - external/official verification) */}
+              <VerificationMetadataSection contractorId={detailContractor.id} />
 
               {/* Trust Score Breakdown */}
               <div className="space-y-3">

@@ -110,7 +110,8 @@ class InfluencerAgent(BaseAgent):
                 },
                 "response": {
                     "type": "influencer_summary",
-                    "message": summary or (
+                    "message": summary
+                    or (
                         f"זיהינו {len(qualified)} משפיענים ב{city}. "
                         f"זיכוי של ₪500 ממתין לאישור ל-{len(credit_actions)} דיירים."
                     ),

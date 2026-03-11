@@ -8,7 +8,6 @@ import pytest
 
 from src.databases.graph_store import GraphStore
 
-
 # ---------------------------------------------------------------------------
 # Shared fixture
 # ---------------------------------------------------------------------------
@@ -70,9 +69,7 @@ class TestRecordInviteEvent:
         }
         _wire_session(store, [row])
 
-        result = await store.record_invite_event(
-            inviter_id="r1", invitee_id="r2", offer_id="o1"
-        )
+        result = await store.record_invite_event(inviter_id="r1", invitee_id="r2", offer_id="o1")
 
         assert result["inviter_id"] == "r1"
         assert result["invitee_id"] == "r2"
@@ -88,8 +85,9 @@ class TestRecordInviteEvent:
     @pytest.mark.asyncio
     async def test_record_custom_channel(self, store):
         """Channel parameter is forwarded correctly."""
-        row = {"invite": {"channel": "qr", "inviter_id": "r1", "invitee_id": "r2",
-                           "offer_id": "o1", "converted": False}}
+        row = {
+            "invite": {"channel": "qr", "inviter_id": "r1", "invitee_id": "r2", "offer_id": "o1", "converted": False}
+        }
         session = _wire_session(store, [row])
         result = await store.record_invite_event("r1", "r2", "o1", channel="qr")
         assert result["channel"] == "qr"
@@ -163,8 +161,7 @@ class TestGetViralInviteChain:
 
     @pytest.mark.asyncio
     async def test_chain_max_depth_forwarded(self, store):
-        row = {"chain": {"root_id": "r1", "chain_nodes": [], "total_invites": 0,
-                          "conversions": 0, "depth": 2}}
+        row = {"chain": {"root_id": "r1", "chain_nodes": [], "total_invites": 0, "conversions": 0, "depth": 2}}
         session = _wire_session(store, [row])
         await store.get_viral_invite_chain("o1", "r1", max_depth=2)
         params = session.run.call_args[0][1]
@@ -334,10 +331,26 @@ class TestGetTopInfluencersByCity:
     @pytest.mark.asyncio
     async def test_returns_ranked_list(self, store):
         rows = [
-            {"influencer": {"resident_id": "r1", "name": "Yael", "city": "Tel Aviv",
-                             "total_score": 42.0, "total_invites": 10, "total_conversions": 7}},
-            {"influencer": {"resident_id": "r2", "name": "Dan", "city": "Tel Aviv",
-                             "total_score": 18.5, "total_invites": 5, "total_conversions": 3}},
+            {
+                "influencer": {
+                    "resident_id": "r1",
+                    "name": "Yael",
+                    "city": "Tel Aviv",
+                    "total_score": 42.0,
+                    "total_invites": 10,
+                    "total_conversions": 7,
+                }
+            },
+            {
+                "influencer": {
+                    "resident_id": "r2",
+                    "name": "Dan",
+                    "city": "Tel Aviv",
+                    "total_score": 18.5,
+                    "total_invites": 5,
+                    "total_conversions": 3,
+                }
+            },
         ]
         _wire_session(store, rows)
         result = await store.get_top_influencers_by_city("Tel Aviv", top_n=2)

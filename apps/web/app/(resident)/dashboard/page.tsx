@@ -199,6 +199,7 @@ export default function ResidentDashboardPage() {
   const tCommon = useTranslations('common');
 
   const accessToken = useAuthStore((s) => s.accessToken);
+  const userName = useAuthStore((s) => s.user?.fullName) ?? '';
   const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
   const headers: Record<string, string> = {};
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
@@ -253,7 +254,7 @@ export default function ResidentDashboardPage() {
       {/* Welcome header */}
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
-          {t('welcome', { name: stats?.buildingName ?? '' })}
+          {t('welcome', { name: userName || (stats?.buildingName !== '-' ? stats?.buildingName : null) || t('guestName') })}
         </h1>
         <p className="text-gray-500 mt-1">{t('dashboardSubtitle')}</p>
       </div>

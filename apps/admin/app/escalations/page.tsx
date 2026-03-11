@@ -51,7 +51,7 @@ export default function EscalationsPage() {
 
   function getAuthHeaders(): Record<string, string> {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
-    const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
+    const token = typeof window !== "undefined" ? sessionStorage.getItem("auth_token") : null;
     if (token) headers["Authorization"] = `Bearer ${token}`;
     return headers;
   }

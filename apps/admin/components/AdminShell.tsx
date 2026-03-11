@@ -4,7 +4,7 @@
 // Keeping this separate allows app/layout.tsx to remain a Server Component
 // (Next.js requirement: root layouts must be RSC for metadata/SEO to work).
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { clsx } from "clsx";
@@ -50,6 +50,18 @@ function makeQueryClient() {
 }
 
 let browserQueryClient: QueryClient | undefined;
+
+/** Read token from URL hash (e.g. when redirected from web app login) and store in sessionStorage. */
+function consumeTokenFromHash() {
+  if (typeof window === "undefined") return;
+  const hash = window.location.hash;
+  const match = hash.match(/[#&]token=([^&]*)/);
+  if (match) {
+    const token = decodeURIComponent(match[1]);
+    if (token) sessionStorage.setItem("auth_token", token);
+    window.history.replaceState(null, "", window.location.pathname + window.location.search);
+  }
+}
 
 function getQueryClient() {
   if (typeof window === "undefined") return makeQueryClient();
@@ -140,7 +152,7 @@ function Header({ sidebarCollapsed }: { sidebarCollapsed: boolean }) {
   const email = user?.email ?? "—";
 
   async function handleLogout() {
-    const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
+    const token = typeof window !== "undefined" ? sessionStorage.getItem("auth_token") : null;
     const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "") || "http://localhost:8000";
     const url = baseUrl.endsWith("/api/v1")
       ? `${baseUrl.replace(/\/api\/v1$/, "")}/api/v1/auth/logout`
@@ -153,7 +165,7 @@ function Header({ sidebarCollapsed }: { sidebarCollapsed: boolean }) {
       });
     } finally {
       if (typeof window !== "undefined") {
-        localStorage.removeItem("auth_token");
+        sessionStorage.removeItem("auth_token");
         router.push("/login");
       }
     }
@@ -218,6 +230,10 @@ function Header({ sidebarCollapsed }: { sidebarCollapsed: boolean }) {
 export function AdminShell({ children }: { children: ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const queryClient = getQueryClient();
+
+  useEffect(() => {
+    consumeTokenFromHash();
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>

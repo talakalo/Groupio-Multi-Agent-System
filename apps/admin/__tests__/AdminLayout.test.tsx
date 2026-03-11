@@ -82,8 +82,8 @@ describe('AdminLayout — header logout navigation', () => {
     });
   });
 
-  it('removes auth_token from localStorage on logout', async () => {
-    localStorage.setItem('auth_token', 'test-admin-token');
+  it('removes auth_token from sessionStorage on logout', async () => {
+    sessionStorage.setItem('auth_token', 'test-admin-token');
 
     renderLayout();
 
@@ -91,7 +91,7 @@ describe('AdminLayout — header logout navigation', () => {
     fireEvent.click(signOutBtn);
 
     await waitFor(() => {
-      expect(localStorage.getItem('auth_token')).toBeNull();
+      expect(sessionStorage.getItem('auth_token')).toBeNull();
     });
   });
 });
