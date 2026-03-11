@@ -1,7 +1,5 @@
 """Unit tests for enrichment service (address, municipality, contractor verification)."""
 
-import pytest
-
 from src.services.enrichment import (
     ContractorVerificationResult,
     EnrichmentService,

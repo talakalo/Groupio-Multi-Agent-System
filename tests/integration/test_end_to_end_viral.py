@@ -6,7 +6,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Shared fixtures
 # ---------------------------------------------------------------------------
@@ -127,7 +126,7 @@ def _build_orchestrator(llm, pg, graph, rag, redis):
         patch("src.orchestration.graph.get_postgres_client", return_value=pg),
         patch("src.orchestration.graph.get_rag_pipeline", return_value=rag),
     ]
-    entered = [p.__enter__() for p in patches]
+    _ = [p.__enter__() for p in patches]
     orch = GroupioOrchestrator()
     # Return both the orchestrator and patches so caller can __exit__
     return orch, patches
@@ -157,7 +156,7 @@ class TestE2EViralInviteFlow:
             llm_mock, pg_mock, graph_mock, rag_mock, redis_mock
         )
         try:
-            result = await orch.run(
+            await orch.run(
                 user_message="רוצה לשתף עם השכן שלי",
                 user_id="user-1",
                 building_id="b1",
@@ -195,7 +194,7 @@ class TestE2EViralInviteFlow:
             llm_mock, pg_mock, graph_mock, rag_mock, redis_mock
         )
         try:
-            result = await orch.run(
+            await orch.run(
                 user_message="הפעל קמפיין משפיענים בתל אביב",
                 user_id="admin-1",
                 building_id="b1",
@@ -246,7 +245,7 @@ class TestE2EBuildingSocialProofFlow:
             llm_mock, pg_mock, graph_mock, rag_mock, redis_mock
         )
         try:
-            result = await orch.run(
+            await orch.run(
                 user_message="כמה בניינים דומים הצטרפו לעסקת מזגן?",
                 user_id="user-1",
                 building_id="b1",

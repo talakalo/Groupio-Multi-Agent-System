@@ -82,13 +82,13 @@ async function fetchUsers(): Promise<User[]> {
   const data = await res.json();
   const raw = data.users ?? data.items ?? data;
   return (Array.isArray(raw) ? raw : []).map((u: Record<string, unknown>) => ({
-    id: u.id,
-    name: u.name ?? u.full_name ?? "",
-    email: u.email ?? "",
-    phone: u.phone,
-    role: u.role ?? "resident",
+    id: String(u.id ?? ""),
+    name: String(u.name ?? u.full_name ?? ""),
+    email: String(u.email ?? ""),
+    phone: u.phone != null ? String(u.phone) : undefined,
+    role: (u.role ?? "resident") as User["role"],
     status: u.is_active === false ? "suspended" : "active",
-    created_at: u.created_at ?? "",
+    created_at: String(u.created_at ?? ""),
   }));
 }
 
