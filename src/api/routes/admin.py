@@ -945,3 +945,20 @@ async def get_agent_audit_entry(
     if not entry:
         raise HTTPException(status_code=404, detail="Audit entry not found")
     return dict(entry)
+
+
+# --------------- Contractor verification metadata (Phase 2) ---------------
+
+
+@router.get("/contractors/{contractor_id}/verification-metadata")
+async def get_contractor_verification_metadata(
+    contractor_id: str,
+    admin: UserInDB = Depends(get_admin_user),
+) -> dict[str, Any]:
+    """Get verification metadata for a contractor (external/official verification records)."""
+    db = get_postgres_client()
+    contractor = await db.get_contractor(contractor_id)
+    if not contractor:
+        raise HTTPException(status_code=404, detail="Contractor not found")
+    items = await db.get_contractor_verification_metadata(contractor_id)
+    return {"items": items, "contractor_id": contractor_id}

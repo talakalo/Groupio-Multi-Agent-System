@@ -4,6 +4,7 @@ from fastapi import APIRouter
 
 from src.api.routes.activity import router as activity_router
 from src.api.routes.admin import router as admin_router
+from src.api.routes.enrichment import router as enrichment_router
 from src.api.routes.agents import router as agents_router
 from src.api.routes.auth import router as auth_router
 from src.api.routes.buildings import router as buildings_router
@@ -26,6 +27,12 @@ api_router.include_router(
     auth_router,
     prefix="/auth",
     tags=["Authentication"],
+)
+
+api_router.include_router(
+    enrichment_router,
+    prefix="/enrichment",
+    tags=["Enrichment"],
 )
 
 api_router.include_router(

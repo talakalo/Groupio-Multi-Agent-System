@@ -21,6 +21,7 @@ import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
 import { NotificationPanel } from '@/components/shared/NotificationPanel';
+import { LanguageToggle } from '@/components/shared/LanguageToggle';
 
 interface NavItem {
   href: string;
@@ -184,6 +185,7 @@ export default function ResidentLayout({ children }: { children: React.ReactNode
             <div className="flex-1" />
 
             <div className="flex items-center gap-3">
+              <LanguageToggle />
               <NotificationPanel />
 
               <button

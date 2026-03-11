@@ -408,10 +408,15 @@ class PostgresClient:
             client = await self._get_client()
             result = await client.table("buildings").insert(building_data).execute()
             return result.data[0] if result.data else building_data
+        cols = (
+            "id, name, address, city, region, total_units, floors, year_built, admin_user_id, "
+            "resident_count, active_offers, completed_offers, total_savings, whatsapp_group_id, "
+            "municipality_code, municipality_name, address_normalized, enrichment_confidence, "
+            "enrichment_source, enriched_at"
+        )
         await self._pg_execute(
-            """INSERT INTO buildings (id, name, address, city, region, total_units, floors, year_built, admin_user_id,
-               resident_count, active_offers, completed_offers, total_savings, whatsapp_group_id)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)""",
+            f"""INSERT INTO buildings ({cols})
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)""",
             building_data["id"],
             building_data["name"],
             building_data["address"],
@@ -426,6 +431,12 @@ class PostgresClient:
             building_data.get("completed_offers", 0),
             building_data.get("total_savings", 0),
             building_data.get("whatsapp_group_id"),
+            building_data.get("municipality_code"),
+            building_data.get("municipality_name"),
+            building_data.get("address_normalized"),
+            building_data.get("enrichment_confidence"),
+            building_data.get("enrichment_source"),
+            building_data.get("enriched_at"),
         )
         return await self.get_building(building_data["id"]) or building_data
 
@@ -1227,6 +1238,30 @@ class PostgresClient:
             result = await client.table("contractors").select("*").eq("id", contractor_id).limit(1).execute()
             return result.data[0] if result.data else None
         return await self._pg_fetch_one("SELECT * FROM contractors WHERE id = $1", contractor_id)
+
+    async def get_contractor_verification_metadata(
+        self, contractor_id: str
+    ) -> list[dict[str, Any]]:
+        """Get verification metadata for a contractor (Phase 2)."""
+        if self._use_supabase_client():
+            try:
+                client = await self._get_client()
+                result = (
+                    await client.table("contractor_verification_metadata")
+                    .select("*")
+                    .eq("contractor_id", contractor_id)
+                    .order("verified_at", desc=True)
+                    .execute()
+                )
+                return result.data or []
+            except Exception:
+                return []
+        rows = await self._pg_fetch_all(
+            """SELECT id, contractor_id, source, verified, confidence, verified_at, raw_response, created_at
+               FROM contractor_verification_metadata WHERE contractor_id = $1 ORDER BY verified_at DESC""",
+            contractor_id,
+        )
+        return rows or []
 
     async def get_contractors_by_ids(self, contractor_ids: list[str]) -> list[dict[str, Any]]:
         """Get contractors by list of IDs (preserve order)."""
