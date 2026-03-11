@@ -119,6 +119,8 @@ class Settings(BaseSettings):
     GOV_ADDRESS_API_URL: str = ""
     GOV_CONTRACTOR_API_URL: str = ""
     GOV_MUNICIPALITY_API_URL: str = ""
+    # Phase 3: data.gov.il integration. Set to "1" or "true" to enable.
+    ENABLE_DATAGOV_IL: str = "1"
 
     # Email Settings (for verification emails)
     SMTP_HOST: str = ""
