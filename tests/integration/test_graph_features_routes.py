@@ -128,7 +128,7 @@ class TestRecordInviteEndpoint:
             mock_redis.return_value = redis
 
             with patch(
-                "src.api.routes.graph_features.get_postgres_client",
+                "src.databases.postgres.get_postgres_client",
                 return_value=mock_db,
             ):
                 resp = client.post(
@@ -144,7 +144,7 @@ class TestRecordInviteEndpoint:
 
     def test_invitee_not_found_returns_404(self, client, resident):
         with patch("src.api.routes.graph_features.get_graph_store"):
-            with patch("src.api.routes.graph_features.get_postgres_client") as mock_db_factory:
+            with patch("src.databases.postgres.get_postgres_client") as mock_db_factory:
                 mock_db = AsyncMock()
                 mock_db.get_user_by_phone = AsyncMock(return_value=None)
                 mock_db_factory.return_value = mock_db

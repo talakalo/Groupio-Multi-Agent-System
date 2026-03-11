@@ -37,6 +37,8 @@ class AgentStateContract(BaseModel):
         "analytics",
         "architecture",
         "payment",
+        "notification",
+        "influencer",
         "human",
     ]
     intent: str | None = None
