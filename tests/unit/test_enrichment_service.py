@@ -1,5 +1,7 @@
 """Unit tests for enrichment service (address, municipality, contractor verification)."""
 
+from unittest.mock import patch
+
 from src.services.enrichment import (
     ContractorVerificationResult,
     EnrichmentService,
@@ -8,9 +10,15 @@ from src.services.enrichment import (
 )
 
 
+def _stub_enrichment_service():
+    """Create EnrichmentService with datagov disabled (stub mode)."""
+    with patch("src.services.enrichment._is_datagov_enabled", return_value=False):
+        return EnrichmentService()
+
+
 def test_normalize_address_returns_stub():
     """Stub returns input with confidence=0 when no API configured."""
-    svc = EnrichmentService()
+    svc = _stub_enrichment_service()
     result = svc.normalize_address("רחוב הרצל 10", "תל אביב")
     assert isinstance(result, NormalizedAddress)
     assert result.address == "רחוב הרצל 10"
@@ -24,7 +32,7 @@ def test_normalize_address_returns_stub():
 
 def test_normalize_address_empty_input():
     """Empty address/city returns safe defaults."""
-    svc = EnrichmentService()
+    svc = _stub_enrichment_service()
     result = svc.normalize_address("", "tel aviv")
     assert result.address == ""
     assert result.city == "tel aviv"
@@ -37,21 +45,21 @@ def test_normalize_address_empty_input():
 
 def test_get_municipality_info_returns_none():
     """Stub returns None when no API configured."""
-    svc = EnrichmentService()
+    svc = _stub_enrichment_service()
     result = svc.get_municipality_info("תל אביב")
     assert result is None
 
 
 def test_get_municipality_info_empty_city():
     """Empty city returns None."""
-    svc = EnrichmentService()
+    svc = _stub_enrichment_service()
     assert svc.get_municipality_info("") is None
     assert svc.get_municipality_info("   ") is None
 
 
 def test_verify_contractor_license_returns_stub():
     """Stub returns verified=False, confidence=0 when no API configured."""
-    svc = EnrichmentService()
+    svc = _stub_enrichment_service()
     result = svc.verify_contractor_license("12345", "Acme Ltd")
     assert isinstance(result, ContractorVerificationResult)
     assert result.verified is False
@@ -64,7 +72,7 @@ def test_verify_contractor_license_returns_stub():
 
 def test_verify_contractor_license_empty_license():
     """Empty license returns verified=False with error in raw_response."""
-    svc = EnrichmentService()
+    svc = _stub_enrichment_service()
     result = svc.verify_contractor_license("", "Acme")
     assert result.verified is False
     assert result.confidence == 0.0

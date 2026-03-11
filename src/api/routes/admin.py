@@ -3,7 +3,7 @@
 import csv
 import io
 import logging
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import Any
 from uuid import uuid4
 
@@ -955,10 +955,34 @@ async def get_contractor_verification_metadata(
     contractor_id: str,
     admin: UserInDB = Depends(get_admin_user),
 ) -> dict[str, Any]:
-    """Get verification metadata for a contractor (external/official verification records)."""
+    """Get verification metadata for a contractor (external/official verification records).
+
+    Phase 3: Augments with data.gov.il company registry lookup when available.
+    Company registry is NOT contractor license verification — it is business name lookup only.
+    """
     db = get_postgres_client()
     contractor = await db.get_contractor(contractor_id)
     if not contractor:
         raise HTTPException(status_code=404, detail="Contractor not found")
     items = await db.get_contractor_verification_metadata(contractor_id)
+
+    # Phase 3: augment with data.gov.il company registry lookup (not license verification)
+    from src.services.enrichment import get_enrichment_service
+
+    svc = get_enrichment_service()
+    business_name = (contractor.get("business_name") or "").strip()
+    if business_name and hasattr(svc, "search_registered_company"):
+        companies = svc.search_registered_company(business_name)
+        for c in companies:
+            items.append(
+                {
+                    "id": f"datagov-{c.get('company_id', '')}",
+                    "source": "data.gov.il (company registry)",
+                    "verified": c.get("status") == "פעילה",
+                    "confidence": 0.7 if c.get("status") == "פעילה" else 0.5,
+                    "verified_at": datetime.now(UTC).isoformat(),
+                    "raw_response": c,
+                }
+            )
+
     return {"items": items, "contractor_id": contractor_id}

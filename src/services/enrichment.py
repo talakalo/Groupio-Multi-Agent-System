@@ -1,14 +1,16 @@
 """Enrichment service for address normalization, municipality lookup, and contractor verification.
 
 Provides a trust/enrichment layer that can be backed by government or open-data sources.
-Stub implementations return safe defaults until real APIs are configured via env vars.
+Phase 3: data.gov.il integration when ENABLE_DATAGOV_IL=1.
 """
 
 import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import Any
 
 from src.config.settings import get_settings
+from src.services.datagov_provider import DataGovIlProvider
 
 logger = logging.getLogger(__name__)
 
@@ -47,20 +49,25 @@ class ContractorVerificationResult:
     raw_response: dict | None = None
 
 
+def _is_datagov_enabled(settings: object) -> bool:
+    val = getattr(settings, "ENABLE_DATAGOV_IL", "") or ""
+    return str(val).lower() in ("1", "true", "yes")
+
+
 class EnrichmentService:
     """Service for address, municipality, and contractor enrichment.
 
-    Stub implementations return safe defaults. Wire real APIs by setting
-    GOV_ADDRESS_API_URL, GOV_CONTRACTOR_API_URL in settings.
+    Phase 3: Uses data.gov.il when ENABLE_DATAGOV_IL=1. Fallback to stub otherwise.
     """
 
     def __init__(self) -> None:
         self._settings = get_settings()
+        self._datagov: DataGovIlProvider | None = DataGovIlProvider() if _is_datagov_enabled(self._settings) else None
 
     def normalize_address(self, address: str, city: str) -> NormalizedAddress:
         """Normalize an address to canonical form.
 
-        Returns structured fields and confidence. Stub returns input with confidence=0.
+        Returns structured fields and confidence. Uses data.gov.il when enabled.
         """
         address = (address or "").strip()
         city = (city or "").strip()
@@ -75,22 +82,37 @@ class EnrichmentService:
                 source="stub",
             )
 
-        # Stub: no external API configured
-        api_url = self._settings.GOV_ADDRESS_API_URL or ""
-        if not api_url:
-            return NormalizedAddress(
-                address=address,
-                city=city,
-                street=None,
-                house_number=None,
-                municipality=None,
-                confidence=0.0,
-                source="stub",
-            )
+        if self._datagov:
+            try:
+                parts = address.split()
+                street = None
+                house_num = None
+                for i, p in enumerate(parts):
+                    if p.isdigit():
+                        house_num = p
+                        street = " ".join(parts[:i]).strip() if i else None
+                        break
+                if not street and parts:
+                    street = address
+                result = self._datagov.normalize_address(
+                    city=city,
+                    street=street,
+                    house_number=house_num,
+                    free_text=address,
+                )
+                if result and result.get("confidence", 0) >= 0.5:
+                    return NormalizedAddress(
+                        address=result.get("address", address),
+                        city=result.get("city", city),
+                        street=result.get("street"),
+                        house_number=result.get("house_number"),
+                        municipality=result.get("municipality"),
+                        confidence=float(result.get("confidence", 0.7)),
+                        source=result.get("source", "data.gov.il"),
+                    )
+            except Exception as e:
+                logger.warning("data.gov.il normalize_address failed: %s", e)
 
-        # Placeholder for future: call external API
-        # result = await self._call_address_api(api_url, address, city)
-        logger.debug("Address API URL configured but not implemented: %s", api_url[:50])
         return NormalizedAddress(
             address=address,
             city=city,
@@ -104,20 +126,39 @@ class EnrichmentService:
     def get_municipality_info(self, city: str) -> MunicipalityInfo | None:
         """Get municipality metadata for a city.
 
-        Returns None if not found or no data source configured.
+        Returns None if not found. Uses data.gov.il when enabled.
         """
         city = (city or "").strip()
         if not city:
             return None
 
-        # Stub: no reference data or API
-        api_url = self._settings.GOV_MUNICIPALITY_API_URL or ""
-        if not api_url:
-            return None
+        if self._datagov:
+            try:
+                result = self._datagov.get_municipality_info(city)
+                if result:
+                    return MunicipalityInfo(
+                        city=result.get("city", city),
+                        municipality_name=result.get("municipality_name", city),
+                        district=result.get("district"),
+                        region=result.get("region"),
+                    )
+            except Exception as e:
+                logger.warning("data.gov.il get_municipality_info failed: %s", e)
 
-        # Placeholder for future
-        logger.debug("Municipality API URL configured but not implemented: %s", api_url[:50])
         return None
+
+    def search_registered_company(self, business_name: str) -> list[dict[str, Any]]:
+        """Search ICA company registry by business name. NOT contractor license verification."""
+        if not self._datagov or not (business_name or "").strip():
+            return []
+        try:
+            return self._datagov.search_registered_entity(
+                name=business_name.strip(),
+                limit=5,
+            )
+        except Exception as e:
+            logger.warning("data.gov.il company search failed: %s", e)
+            return []
 
     def verify_contractor_license(
         self,

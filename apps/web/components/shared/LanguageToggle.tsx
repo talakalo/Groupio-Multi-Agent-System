@@ -4,6 +4,8 @@ import { Globe } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useLocale } from 'next-intl';
 
+import { useAuthStore } from '@/lib/stores/authStore';
+
 const LOCALES = [
   { value: 'he', label: 'עברית' },
   { value: 'en', label: 'English' },
@@ -12,6 +14,7 @@ const LOCALES = [
 export function LanguageToggle() {
   const router = useRouter();
   const locale = useLocale();
+  const accessToken = useAuthStore((s) => s.accessToken);
 
   const setLocale = async (newLocale: string) => {
     if (newLocale === locale) return;
@@ -21,7 +24,24 @@ export function LanguageToggle() {
       body: JSON.stringify({ locale: newLocale }),
       credentials: 'same-origin',
     });
-    if (res.ok) router.refresh();
+    if (res.ok) {
+      if (accessToken) {
+        try {
+          const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+          await fetch(`${apiBase}/api/v1/auth/me`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${accessToken}`,
+            },
+            body: JSON.stringify({ preferred_language: newLocale }),
+          });
+        } catch {
+          // ignore profile sync failure
+        }
+      }
+      router.refresh();
+    }
   };
 
   return (
