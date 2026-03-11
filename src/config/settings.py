@@ -115,6 +115,11 @@ class Settings(BaseSettings):
     # API Keys for service-to-service auth
     API_KEYS: list[str] = []
 
+    # Government / open-data enrichment (optional; stub used when empty)
+    GOV_ADDRESS_API_URL: str = ""
+    GOV_CONTRACTOR_API_URL: str = ""
+    GOV_MUNICIPALITY_API_URL: str = ""
+
     # Email Settings (for verification emails)
     SMTP_HOST: str = ""
     SMTP_PORT: int = 587

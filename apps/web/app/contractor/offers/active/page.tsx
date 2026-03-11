@@ -13,6 +13,8 @@ type OfferStatus = 'all' | 'pending' | 'accepted' | 'in_progress' | 'completed';
 export default function ContractorActiveOffersPage() {
   const t = useTranslations('contractor.offers');
   const accessToken = useAuthStore((s) => s.accessToken);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const refreshAccessToken = useAuthStore((s) => s.refreshAccessToken);
   const [offers, setOffers] = useState<Offer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<OfferStatus>('all');
@@ -21,6 +23,14 @@ export default function ContractorActiveOffersPage() {
 
   useEffect(() => {
     async function fetchOffers() {
+      let token = accessToken;
+      if (isAuthenticated && !token) {
+        const ok = await refreshAccessToken();
+        if (!ok) return;
+        token = useAuthStore.getState().accessToken;
+      }
+      if (!token) return;
+
       setIsLoading(true);
       try {
         const params = new URLSearchParams();
@@ -29,9 +39,9 @@ export default function ContractorActiveOffersPage() {
         params.set('sort', sortBy);
 
         const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-        const token = accessToken;
-        const headers: Record<string, string> = {};
-        if (token) headers['Authorization'] = `Bearer ${token}`;
+        const headers: Record<string, string> = {
+          Authorization: `Bearer ${token}`,
+        };
 
         const res = await fetch(`${apiBase}/api/v1/offers?${params}`, { headers });
         if (res.ok) {
@@ -45,8 +55,8 @@ export default function ContractorActiveOffersPage() {
       }
     }
 
-    fetchOffers();
-  }, [statusFilter, categoryFilter, sortBy, accessToken]);
+    fetchOffers().catch(() => {});
+  }, [statusFilter, categoryFilter, sortBy, accessToken, isAuthenticated, refreshAccessToken]);
 
   const statusOptions: { value: OfferStatus; label: string }[] = [
     { value: 'all', label: t('filters.allStatuses') },

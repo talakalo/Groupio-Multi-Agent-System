@@ -245,7 +245,7 @@ export function AIChat({
   };
 
   const handleSuggestionClick = (suggestion: string) => {
-    sendMessage(suggestion);
+    sendMessage(suggestion).catch(() => {});
   };
 
   // ---- Render ----
