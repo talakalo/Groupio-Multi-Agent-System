@@ -38,43 +38,66 @@ def llm_mock():
 @pytest.fixture
 def pg_mock():
     pg = AsyncMock()
-    pg.get_user_profile = AsyncMock(return_value={
-        "id": "user-1", "name": "Yael", "building_id": "b1"
-    })
-    pg.get_building = AsyncMock(return_value={
-        "id": "b1", "address": "Rothschild 15", "city": "Tel Aviv",
-        "region": "center", "type": "apartment"
-    })
+    pg.get_user_profile = AsyncMock(return_value={"id": "user-1", "name": "Yael", "building_id": "b1"})
+    pg.get_building = AsyncMock(
+        return_value={
+            "id": "b1",
+            "address": "Rothschild 15",
+            "city": "Tel Aviv",
+            "region": "center",
+            "type": "apartment",
+        }
+    )
     pg.get_active_offers = AsyncMock(return_value=[])
     pg.create_outreach_pending = AsyncMock()
     pg.create_agent_audit_entry = AsyncMock()
-    pg.get_market_data = AsyncMock(return_value={
-        "avg_price": 5000, "median_price": 4800, "min_price": 3000,
-        "max_price": 8000, "price_stddev": 800, "avg_participants": 10,
-        "sample_size": 50,
-    })
+    pg.get_market_data = AsyncMock(
+        return_value={
+            "avg_price": 5000,
+            "median_price": 4800,
+            "min_price": 3000,
+            "max_price": 8000,
+            "price_stddev": 800,
+            "avg_participants": 10,
+            "sample_size": 50,
+        }
+    )
     return pg
 
 
 @pytest.fixture
 def graph_mock():
     g = AsyncMock()
-    g.get_viral_invite_chain = AsyncMock(return_value={
-        "root_id": "user-1",
-        "chain_nodes": [{"id": "r2", "first_name": "Dan", "converted": True}],
-        "total_invites": 1,
-        "conversions": 1,
-        "depth": 4,
-    })
-    g.get_invite_momentum_for_offer = AsyncMock(return_value={
-        "building_residents": 20, "joined_count": 5,
-        "total_invites": 8, "converted_invites": 5,
-    })
+    g.get_viral_invite_chain = AsyncMock(
+        return_value={
+            "root_id": "user-1",
+            "chain_nodes": [{"id": "r2", "first_name": "Dan", "converted": True}],
+            "total_invites": 1,
+            "conversions": 1,
+            "depth": 4,
+        }
+    )
+    g.get_invite_momentum_for_offer = AsyncMock(
+        return_value={
+            "building_residents": 20,
+            "joined_count": 5,
+            "total_invites": 8,
+            "converted_invites": 5,
+        }
+    )
     g.get_building_similarity_clusters = AsyncMock(return_value=[])
-    g.get_top_influencers_by_city = AsyncMock(return_value=[
-        {"resident_id": "r1", "name": "Yael", "city": "Tel Aviv",
-         "total_score": 42.0, "total_invites": 10, "total_conversions": 7},
-    ])
+    g.get_top_influencers_by_city = AsyncMock(
+        return_value=[
+            {
+                "resident_id": "r1",
+                "name": "Yael",
+                "city": "Tel Aviv",
+                "total_score": 42.0,
+                "total_invites": 10,
+                "total_conversions": 7,
+            },
+        ]
+    )
     g.refresh_influence_scores_for_city = AsyncMock(return_value=15)
     g.compute_and_store_similarity_edges = AsyncMock(return_value=88)
     g.health_check = AsyncMock(return_value=True)
@@ -152,9 +175,7 @@ class TestE2EViralInviteFlow:
                 "suggested_agent": "outreach",
             }
         )
-        orch, patches = _build_orchestrator(
-            llm_mock, pg_mock, graph_mock, rag_mock, redis_mock
-        )
+        orch, patches = _build_orchestrator(llm_mock, pg_mock, graph_mock, rag_mock, redis_mock)
         try:
             await orch.run(
                 user_message="רוצה לשתף עם השכן שלי",
@@ -190,9 +211,7 @@ class TestE2EViralInviteFlow:
             }
         )
 
-        orch, patches = _build_orchestrator(
-            llm_mock, pg_mock, graph_mock, rag_mock, redis_mock
-        )
+        orch, patches = _build_orchestrator(llm_mock, pg_mock, graph_mock, rag_mock, redis_mock)
         try:
             await orch.run(
                 user_message="הפעל קמפיין משפיענים בתל אביב",
@@ -214,9 +233,7 @@ class TestE2EViralInviteFlow:
 
 class TestE2EBuildingSocialProofFlow:
     @pytest.mark.asyncio
-    async def test_pricing_query_fetches_similarity_clusters(
-        self, llm_mock, pg_mock, graph_mock, rag_mock, redis_mock
-    ):
+    async def test_pricing_query_fetches_similarity_clusters(self, llm_mock, pg_mock, graph_mock, rag_mock, redis_mock):
         """A pricing query causes PricingAgent to fetch similarity clusters."""
         llm_mock.create_structured_output = AsyncMock(
             return_value={
@@ -241,9 +258,7 @@ class TestE2EBuildingSocialProofFlow:
             ]
         )
 
-        orch, patches = _build_orchestrator(
-            llm_mock, pg_mock, graph_mock, rag_mock, redis_mock
-        )
+        orch, patches = _build_orchestrator(llm_mock, pg_mock, graph_mock, rag_mock, redis_mock)
         try:
             await orch.run(
                 user_message="כמה בניינים דומים הצטרפו לעסקת מזגן?",

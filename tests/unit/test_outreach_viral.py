@@ -59,8 +59,15 @@ class TestCampaignsDict:
 
     def test_viral_template_has_required_placeholders(self):
         tpl = CAMPAIGNS["viral_invite_loop"]["template_he"]
-        for key in ("{name}", "{neighbor_name}", "{category}",
-                    "{joined_count}", "{needed}", "{next_discount}", "{invite_link}"):
+        for key in (
+            "{name}",
+            "{neighbor_name}",
+            "{category}",
+            "{joined_count}",
+            "{needed}",
+            "{next_discount}",
+            "{invite_link}",
+        ):
             assert key in tpl, f"Missing placeholder: {key}"
 
     def test_viral_trigger_is_share_requested(self):

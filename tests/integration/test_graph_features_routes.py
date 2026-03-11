@@ -144,9 +144,7 @@ class TestRecordInviteEndpoint:
 
     def test_invitee_not_found_returns_404(self, client, resident):
         with patch("src.api.routes.graph_features.get_graph_store"):
-            with patch(
-                "src.api.routes.graph_features.get_postgres_client"
-            ) as mock_db_factory:
+            with patch("src.api.routes.graph_features.get_postgres_client") as mock_db_factory:
                 mock_db = AsyncMock()
                 mock_db.get_user_by_phone = AsyncMock(return_value=None)
                 mock_db_factory.return_value = mock_db
@@ -203,9 +201,7 @@ class TestSimilarBuildingsEndpoint:
     def test_graph_error_returns_500(self, client, resident):
         with patch("src.api.routes.graph_features.get_graph_store") as mock_graph:
             graph = AsyncMock()
-            graph.get_building_similarity_clusters = AsyncMock(
-                side_effect=Exception("timeout")
-            )
+            graph.get_building_similarity_clusters = AsyncMock(side_effect=Exception("timeout"))
             mock_graph.return_value = graph
 
             resp = client.get("/api/v1/graph/buildings/b1/similar")
@@ -275,8 +271,14 @@ class TestInfluenceScoreEndpoint:
 class TestTopInfluencersEndpoint:
     def test_admin_gets_influencer_list(self, client, admin):
         influencers = [
-            {"resident_id": "r1", "name": "Yael", "city": "Tel Aviv",
-             "total_score": 42.0, "total_invites": 10, "total_conversions": 7},
+            {
+                "resident_id": "r1",
+                "name": "Yael",
+                "city": "Tel Aviv",
+                "total_score": 42.0,
+                "total_invites": 10,
+                "total_conversions": 7,
+            },
         ]
         with patch("src.api.routes.graph_features.get_graph_store") as mock_graph:
             graph = AsyncMock()
@@ -311,9 +313,7 @@ class TestTopInfluencersEndpoint:
     def test_graph_error_returns_500(self, client, admin):
         with patch("src.api.routes.graph_features.get_graph_store") as mock_graph:
             graph = AsyncMock()
-            graph.get_top_influencers_by_city = AsyncMock(
-                side_effect=Exception("db error")
-            )
+            graph.get_top_influencers_by_city = AsyncMock(side_effect=Exception("db error"))
             mock_graph.return_value = graph
 
             resp = client.get("/api/v1/graph/cities/Haifa/top-influencers")

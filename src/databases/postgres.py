@@ -1239,9 +1239,7 @@ class PostgresClient:
             return result.data[0] if result.data else None
         return await self._pg_fetch_one("SELECT * FROM contractors WHERE id = $1", contractor_id)
 
-    async def get_contractor_verification_metadata(
-        self, contractor_id: str
-    ) -> list[dict[str, Any]]:
+    async def get_contractor_verification_metadata(self, contractor_id: str) -> list[dict[str, Any]]:
         """Get verification metadata for a contractor (Phase 2)."""
         if self._use_supabase_client():
             try:
