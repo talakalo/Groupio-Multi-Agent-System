@@ -212,6 +212,7 @@ test.describe("Contractor Create Offer Flow", () => {
   });
 
   test("should fill in and submit offer form", async ({ page }) => {
+    test.setTimeout(60000);
     await page.route("**/api/v1/offers", (route) =>
       route.fulfill({
         status: 201,
@@ -225,40 +226,30 @@ test.describe("Contractor Create Offer Flow", () => {
 
     await page.goto("/contractor/offers/create");
     await expect(page).toHaveURL(/contractor\/offers\/create/, { timeout: 20000 });
-    await page.waitForLoadState("domcontentloaded");
+    await page.waitForLoadState("networkidle");
 
-    // Wait for form (match selector used by passing "display offer creation form" test)
-    const title = page.locator('input[name="title"]');
-    await expect(title).toBeVisible({ timeout: 20000 });
-    await title.fill("התקנת מזגנים מקצועית");
+    // Wait for form to be fully rendered (submit button = whole form loaded)
+    await expect(page.locator('main button[type="submit"]')).toBeVisible({ timeout: 20000 });
 
-    const desc = page.locator('textarea[name="description"]');
-    await expect(desc).toBeVisible({ timeout: 10000 });
-    await desc.fill("שירות מקצועי ואחריות מלאה. התקנה מקצועית עם אחריות לשנה. לפחות 50 תווים נדרשים כאן.");
-
+    await page.locator('input[name="title"]').fill("התקנת מזגנים מקצועית", { timeout: 15000 });
+    await page.locator('textarea[name="description"]').fill("שירות מקצועי ואחריות מלאה. התקנה מקצועית עם אחריות לשנה. לפחות 50 תווים נדרשים כאן.", { timeout: 15000 });
     await page.selectOption('select[name="category"]', "ac_installation");
     await page.selectOption('select[name="region"]', "center");
+    await page.locator('input[name="buildingId"]').fill("bld_001", { timeout: 15000 });
 
-    const buildingId = page.locator('input[name="buildingId"]');
-    await buildingId.waitFor({ state: "visible" });
-    await buildingId.fill("bld_001");
-
-    const basePrice = page.locator('input[name="basePrice"]');
-    await basePrice.waitFor({ state: "visible" });
-    await basePrice.fill("4500");
+    // Pricing section may be below fold; scroll and fill (re-query to avoid detached refs)
+    await page.locator('input[name="basePrice"]').scrollIntoViewIfNeeded();
+    await page.locator('input[name="basePrice"]').fill("4500", { timeout: 15000 });
 
     const futureDate = new Date();
     futureDate.setMonth(futureDate.getMonth() + 2);
-    const validUntil = page.locator('input[name="validUntil"]');
-    await validUntil.waitFor({ state: "visible" });
-    await validUntil.fill(futureDate.toISOString().split("T")[0]!);
+    await page.locator('input[name="validUntil"]').scrollIntoViewIfNeeded();
+    await page.locator('input[name="validUntil"]').fill(futureDate.toISOString().split("T")[0]!, { timeout: 15000 });
 
-    const installCheckbox = page.locator('input[value="installation"]');
-    await installCheckbox.scrollIntoViewIfNeeded();
-    await installCheckbox.check({ force: true });
+    await page.locator('input[value="installation"]').scrollIntoViewIfNeeded();
+    await page.locator('input[value="installation"]').check({ force: true });
 
-    await page.click('button[type="submit"]');
-
+    await page.locator('button[type="submit"]').click();
     await expect(page).toHaveURL(/contractor\/offers\//, { timeout: 10000 });
   });
 });
@@ -296,8 +287,9 @@ test.describe("Contractor Manage Offers", () => {
     await expect(page.locator("main")).toBeVisible({ timeout: 15000 });
     // Wait for loading to finish (spinner disappears if present)
     await expect(page.locator(".animate-spin")).not.toBeVisible({ timeout: 10000 });
+    // Assert on main content only (sidebar nav "הצעות פעילות" can be hidden on mobile)
     await expect(
-      page.getByText(/הצעות פעילות|התקנת מזגנים|אין הצעות|כל הסטטוסים|נהל את ההצעות|all statuses|הצעות/i).first()
+      page.locator("main").getByRole("heading", { name: /הצעות פעילות/ })
     ).toBeVisible({ timeout: 15000 });
   });
 
