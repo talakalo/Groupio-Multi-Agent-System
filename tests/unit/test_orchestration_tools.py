@@ -216,7 +216,11 @@ async def test_escalate_to_human_delegates(registry):
 
 
 @pytest.mark.asyncio
-async def test_normalize_address_tool(registry):
+@patch("src.services.enrichment._is_datagov_enabled", return_value=False)
+async def test_normalize_address_tool(_mock_datagov, registry):
+    from src.services import enrichment as enrichment_module
+
+    enrichment_module._enrichment_service = None
     result = await registry._normalize_address("רחוב הרצל 10", "תל אביב")
     assert "address" in result
     assert "city" in result
@@ -239,6 +243,10 @@ async def test_verify_contractor_license_tool(registry):
 
 
 @pytest.mark.asyncio
-async def test_get_municipality_info_tool(registry):
+@patch("src.services.enrichment._is_datagov_enabled", return_value=False)
+async def test_get_municipality_info_tool(_mock_datagov, registry):
+    from src.services import enrichment as enrichment_module
+
+    enrichment_module._enrichment_service = None
     result = await registry._get_municipality_info("תל אביב")
     assert result is None
