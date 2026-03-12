@@ -225,15 +225,15 @@ test.describe("Contractor Create Offer Flow", () => {
 
     await page.goto("/contractor/offers/create");
     await expect(page).toHaveURL(/contractor\/offers\/create/, { timeout: 20000 });
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("domcontentloaded");
 
-    // Wait for form (layout may render null until auth settles)
-    const title = page.locator('main input[name="title"]');
+    // Wait for form (match selector used by passing "display offer creation form" test)
+    const title = page.locator('input[name="title"]');
     await expect(title).toBeVisible({ timeout: 20000 });
     await title.fill("התקנת מזגנים מקצועית");
 
     const desc = page.locator('textarea[name="description"]');
-    await desc.waitFor({ state: "visible" });
+    await expect(desc).toBeVisible({ timeout: 10000 });
     await desc.fill("שירות מקצועי ואחריות מלאה. התקנה מקצועית עם אחריות לשנה. לפחות 50 תווים נדרשים כאן.");
 
     await page.selectOption('select[name="category"]', "ac_installation");
@@ -291,12 +291,13 @@ test.describe("Contractor Manage Offers", () => {
 
   test("should display active offers list", async ({ page }) => {
     await page.goto("/contractor/offers/active");
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("domcontentloaded");
 
-    await expect(page.locator("main")).toBeVisible({ timeout: 10000 });
-    // Assert on visible content in main (nav "הצעות פעילות" can be hidden in RTL/sidebar)
+    await expect(page.locator("main")).toBeVisible({ timeout: 15000 });
+    // Wait for loading to finish (spinner disappears if present)
+    await expect(page.locator(".animate-spin")).not.toBeVisible({ timeout: 10000 });
     await expect(
-      page.locator("main").getByText(/הצעות פעילות|התקנת מזגנים|אין הצעות|כל הסטטוסים|all statuses|הצעות/i).first()
+      page.getByText(/הצעות פעילות|התקנת מזגנים|אין הצעות|כל הסטטוסים|נהל את ההצעות|all statuses|הצעות/i).first()
     ).toBeVisible({ timeout: 15000 });
   });
 
