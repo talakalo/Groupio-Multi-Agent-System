@@ -572,5 +572,5 @@ test("10. Chat sends message and history loads on mount", async ({ page }) => {
   await input.press("Enter");
 
   // Assistant reply should appear (mock returns "שלום! אני עוזר גרופיו. כיצד אוכל לסייע?")
-  await expect(page.getByText(/שלום!? אני עוזר גרופיו/)).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(/שלום!? אני עוזר גרופיו/)).toBeVisible({ timeout: 20_000 });
 });

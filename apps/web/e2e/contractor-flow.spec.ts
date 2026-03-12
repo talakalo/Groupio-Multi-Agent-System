@@ -246,16 +246,19 @@ test.describe("Contractor Create Offer Flow", () => {
 
     await page.goto("/contractor/offers/create");
     await expect(page).toHaveURL(/contractor\/offers\/create/, { timeout: 20000 });
+    await page.waitForLoadState("domcontentloaded");
     await page.waitForLoadState("networkidle");
 
-    // Wait for form to be fully rendered (submit button = whole form loaded)
-    await expect(page.locator('main button[type="submit"]')).toBeVisible({ timeout: 20000 });
-
-    await page.locator('input[name="title"]').fill("התקנת מזגנים מקצועית", { timeout: 15000 });
-    await page.locator('textarea[name="description"]').fill("שירות מקצועי ואחריות מלאה. התקנה מקצועית עם אחריות לשנה. לפחות 50 תווים נדרשים כאן.", { timeout: 15000 });
-    await page.selectOption('select[name="category"]', "ac_installation");
-    await page.selectOption('select[name="region"]', "center");
-    await page.locator('input[name="buildingId"]').fill("bld_001", { timeout: 15000 });
+    // Wait for create form (title input only exists on create page, not login)
+    const titleInput = page.locator('input[name="title"]');
+    await expect(titleInput).toBeVisible({ timeout: 20000 });
+    await titleInput.scrollIntoViewIfNeeded();
+    await titleInput.fill("התקנת מזגנים מקצועית", { timeout: 10000 });
+    await page.locator('textarea[name="description"]').scrollIntoViewIfNeeded();
+    await page.locator('textarea[name="description"]').fill("שירות מקצועי ואחריות מלאה. התקנה מקצועית עם אחריות לשנה. לפחות 50 תווים נדרשים כאן.", { timeout: 10000 });
+    await page.locator('select[name="category"]').selectOption("ac_installation");
+    await page.locator('select[name="region"]').selectOption("center");
+    await page.locator('input[name="buildingId"]').fill("bld_001", { timeout: 10000 });
 
     // Pricing section may be below fold; scroll and fill (re-query to avoid detached refs)
     await page.locator('input[name="basePrice"]').scrollIntoViewIfNeeded();
