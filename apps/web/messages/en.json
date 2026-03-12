@@ -32,6 +32,7 @@
     "contractors": "Contractors",
     "building": "Building",
     "profile": "Profile",
+    "payments": "Payments",
     "aiAssistant": "AI Assistant",
     "myAccount": "My Account"
   },
@@ -417,7 +418,17 @@
       "startedAt": "Started",
       "completedAt": "Completed",
       "viewDetails": "View Details",
-      "requestReview": "Request Review"
+      "requestReview": "Request Review",
+      "statuses": {
+        "draft": "Draft",
+        "pending": "Pending",
+        "matching": "Matching",
+        "matched": "Matched",
+        "in_progress": "In Progress",
+        "completed": "Completed",
+        "cancelled": "Cancelled",
+        "active": "Active"
+      }
     }
   },
   "onboarding": {

@@ -511,14 +511,23 @@ test("10. Chat sends message and history loads on mount", async ({ page }) => {
   await setupBaseMocks(page);
   await setAuthToken(page);
 
-  // Mock POST /message
+  // Mock POST /message (MessageResponse shape)
   await page.route("**/api/v1/message", (r) =>
     r.fulfill({
       status: 200,
       body: JSON.stringify({
+        conversationId: "conv-e2e-1",
         response: {
+          type: "text",
           message: "שלום! אני עוזר גרופיו. כיצד אוכל לסייע?",
-          metadata: { agent: "support" },
+        },
+        metadata: {
+          intent: null,
+          confidence: 1,
+          agentsUsed: ["support"],
+          tokensUsed: 0,
+          durationMs: 0,
+          needsHuman: false,
         },
       }),
     })
@@ -562,6 +571,6 @@ test("10. Chat sends message and history loads on mount", async ({ page }) => {
   await input.fill("כמה עולה מזגן?");
   await input.press("Enter");
 
-  // Assistant reply should appear
-  await expect(page.locator("text=שלום! אני עוזר גרופיו")).toBeVisible({ timeout: 10_000 });
+  // Assistant reply should appear (mock returns "שלום! אני עוזר גרופיו. כיצד אוכל לסייע?")
+  await expect(page.getByText(/שלום!? אני עוזר גרופיו/)).toBeVisible({ timeout: 15_000 });
 });

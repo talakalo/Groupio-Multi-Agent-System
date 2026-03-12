@@ -288,19 +288,8 @@ export default function ContractorsPage() {
     return res.json();
   }
 
-  async function requestDocuments(id: string) {
-    const res = await fetch(`${API_BASE}/contractors/${encodeURIComponent(id)}/request-docs`, {
-      method: "POST",
-      headers: getAuthHeaders(),
-    });
-    // Gracefully handle 404 (endpoint may not exist yet)
-    if (res.status === 404) {
-      console.warn(`request-docs endpoint not found for contractor ${id}`);
-      return null;
-    }
-    if (!res.ok) throw new Error(`Failed to request documents for contractor ${id}: ${res.status}`);
-    return res.json();
-  }
+  // Request Documents: backend endpoint not implemented yet. UI disabled until available.
+  // async function requestDocuments(id: string) { ... }
 
   // ---- Filtering ----
   const filtered = useMemo(() => {
@@ -440,20 +429,6 @@ export default function ContractorsPage() {
       setSelectedIds(new Set());
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to suspend contractors");
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleBulkRequestDocs = async () => {
-    setActionLoading(true);
-    try {
-      const ids = Array.from(selectedIds);
-      await Promise.allSettled(ids.map((id) => requestDocuments(id)));
-      await queryClient.invalidateQueries({ queryKey: ["admin", "contractors"] });
-      setSelectedIds(new Set());
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to request documents");
     } finally {
       setActionLoading(false);
     }
@@ -624,11 +599,12 @@ export default function ContractorsPage() {
               Suspend
             </button>
             <button
-              className="btn-secondary btn-sm"
-              onClick={handleBulkRequestDocs}
+              className="btn-secondary btn-sm opacity-60 cursor-not-allowed"
+              disabled
+              title="Request documents — coming soon"
             >
               <FileText className="w-3.5 h-3.5" />
-              Request Docs
+              Request Docs (soon)
             </button>
             <button
               className="btn-ghost btn-sm"
@@ -1022,25 +998,12 @@ export default function ContractorsPage() {
                   </button>
                 )}
                 <button
-                  className="btn-secondary flex-1"
-                  disabled={actionLoading}
-                  onClick={async () => {
-                    setActionLoading(true);
-                    try {
-                      const result = await requestDocuments(detailContractor.id);
-                      if (result === null) {
-                        alert("Document request endpoint is not available yet. Please try again later.");
-                      }
-                      await queryClient.invalidateQueries({ queryKey: ["admin", "contractors"] });
-                    } catch (err) {
-                      alert(err instanceof Error ? err.message : "Failed to request documents");
-                    } finally {
-                      setActionLoading(false);
-                    }
-                  }}
+                  className="btn-secondary flex-1 opacity-60 cursor-not-allowed"
+                  disabled
+                  title="Request documents — coming soon"
                 >
                   <FileText className="w-4 h-4" />
-                  {actionLoading ? "Requesting..." : "Request Documents"}
+                  Request Documents (soon)
                 </button>
               </div>
             </div>

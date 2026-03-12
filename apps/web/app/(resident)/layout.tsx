@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  CreditCard,
   LayoutDashboard,
   Tag,
   Wrench,
@@ -36,6 +37,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/architecture', labelKey: 'architecture', icon: FileImage },
   { href: '/building', labelKey: 'building', icon: Building2 },
   { href: '/profile', labelKey: 'profile', icon: UserCircle },
+  { href: '/payments', labelKey: 'payments', icon: CreditCard },
 ];
 
 export default function ResidentLayout({ children }: { children: React.ReactNode }) {

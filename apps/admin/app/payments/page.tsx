@@ -477,12 +477,23 @@ function PayoutsTable({
 
 type TabKey = "escrow" | "payouts";
 
-const API_BASE = "/api/v1";
+function getApiBase(): string {
+  const raw = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "") || "http://localhost:8000";
+  return raw.endsWith("/api/v1") ? raw : `${raw}/api/v1`;
+}
+
+function getAuthHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const token = typeof window !== "undefined" ? sessionStorage.getItem("auth_token") : null;
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  return headers;
+}
 
 async function fetchApi<T>(path: string, options?: RequestInit): Promise<T | null> {
   try {
-    const res = await fetch(`${API_BASE}${path}`, {
-      headers: { "Content-Type": "application/json" },
+    const res = await fetch(`${getApiBase()}${path}`, {
+      headers: getAuthHeaders(),
+      credentials: "include",
       ...options,
     });
     if (!res.ok) return null;

@@ -46,6 +46,7 @@ describe('ResidentLayout — sidebar navigation links', () => {
     '/architecture',
     '/building',
     '/profile',
+    '/payments',
     '/chat',
   ];
 
