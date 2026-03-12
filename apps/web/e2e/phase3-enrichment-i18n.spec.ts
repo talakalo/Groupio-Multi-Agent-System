@@ -210,7 +210,7 @@ test.describe("Phase 3: Language toggle persistence", () => {
     await expect(page.locator("html")).toHaveAttribute("dir", "ltr");
     // When accessToken is in store (e.g. after real login), profile PUT is sent
     if (putMePayload != null) {
-      expect(putMePayload["preferred_language"]).toBe("en");
+      expect(putMePayload["preferred_language"] === "en").toBe(true);
     }
   });
 });
