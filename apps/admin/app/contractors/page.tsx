@@ -178,12 +178,9 @@ function VerificationMetadataSection({ contractorId }: { contractorId: string })
   const { data, isLoading } = useQuery({
     queryKey: ["admin", "contractors", contractorId, "verification-metadata"],
     queryFn: async () => {
-      const token = typeof window !== "undefined" ? sessionStorage.getItem("auth_token") : null;
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (token) headers["Authorization"] = `Bearer ${token}`;
       const res = await fetch(
         `${API_BASE}/admin/contractors/${encodeURIComponent(contractorId)}/verification-metadata`,
-        { headers }
+        { credentials: "include" }
       );
       if (!res.ok) throw new Error("Failed to fetch verification metadata");
       return res.json() as Promise<{ items: VerificationMetadataItem[] }>;
@@ -261,17 +258,15 @@ export default function ContractorsPage() {
   const rawApiUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "") || "http://localhost:8000";
   const API_BASE = rawApiUrl.endsWith("/api/v1") ? rawApiUrl : `${rawApiUrl}/api/v1`;
 
-  function getAuthHeaders(): Record<string, string> {
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
-    const token = typeof window !== "undefined" ? sessionStorage.getItem("auth_token") : null;
-    if (token) headers["Authorization"] = `Bearer ${token}`;
-    return headers;
-  }
+  const fetchOpts = (): RequestInit => ({
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+  });
 
   async function approveContractor(id: string) {
     const res = await fetch(`${API_BASE}/contractors/${encodeURIComponent(id)}/verify`, {
       method: "POST",
-      headers: getAuthHeaders(),
+      ...fetchOpts(),
       body: JSON.stringify({ decision: "approved" }),
     });
     if (!res.ok) throw new Error(`Failed to approve contractor ${id}: ${res.status}`);
@@ -281,15 +276,22 @@ export default function ContractorsPage() {
   async function suspendContractor(id: string) {
     const res = await fetch(`${API_BASE}/contractors/${encodeURIComponent(id)}`, {
       method: "PUT",
-      headers: getAuthHeaders(),
+      ...fetchOpts(),
       body: JSON.stringify({ verification_status: "suspended" }),
     });
     if (!res.ok) throw new Error(`Failed to suspend contractor ${id}: ${res.status}`);
     return res.json();
   }
 
-  // Request Documents: backend endpoint not implemented yet. UI disabled until available.
-  // async function requestDocuments(id: string) { ... }
+  async function requestDocuments(id: string) {
+    const res = await fetch(`${API_BASE}/admin/contractors/${encodeURIComponent(id)}/request-docs`, {
+      method: "POST",
+      ...fetchOpts(),
+      body: JSON.stringify({ message: "Please upload additional documents to complete your verification." }),
+    });
+    if (!res.ok) throw new Error(`Failed to request documents: ${res.status}`);
+    return res.json();
+  }
 
   // ---- Filtering ----
   const filtered = useMemo(() => {
@@ -998,12 +1000,26 @@ export default function ContractorsPage() {
                   </button>
                 )}
                 <button
-                  className="btn-secondary flex-1 opacity-60 cursor-not-allowed"
-                  disabled
-                  title="Request documents — coming soon"
+                  type="button"
+                  className="btn-secondary flex-1"
+                  disabled={actionLoading}
+                  onClick={async () => {
+                    if (!detailContractor) return;
+                    setActionLoading(true);
+                    try {
+                      await requestDocuments(detailContractor.id);
+                      await queryClient.invalidateQueries({ queryKey: ["admin", "contractors"] });
+                      alert("Document request sent. The contractor will see it in their profile.");
+                    } catch (err) {
+                      alert(err instanceof Error ? err.message : "Failed to send request");
+                    } finally {
+                      setActionLoading(false);
+                    }
+                  }}
+                  title="Request the contractor to upload additional documents"
                 >
                   <FileText className="w-4 h-4" />
-                  Request Documents (soon)
+                  {actionLoading ? "Sending..." : "Request Documents"}
                 </button>
               </div>
             </div>

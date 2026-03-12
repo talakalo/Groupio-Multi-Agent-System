@@ -83,6 +83,8 @@ Groupio-Multi-Agent-System/
 
 For full setup (env vars, migrations, Docker, all apps), see **[LOCAL_SETUP.md](LOCAL_SETUP.md)**.
 
+For pilot release verification and go/no-go criteria, see **[FINAL_PILOT_RELEASE_GATE_REPORT.md](FINAL_PILOT_RELEASE_GATE_REPORT.md)** and **[docs/PILOT_RELEASE_CHECKLIST.md](docs/PILOT_RELEASE_CHECKLIST.md)**.
+
 Minimal steps:
 
 ```bash

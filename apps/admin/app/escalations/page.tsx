@@ -49,12 +49,10 @@ export default function EscalationsPage() {
   const rawApiUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "") || "http://localhost:8000";
   const API_BASE = rawApiUrl.endsWith("/api/v1") ? rawApiUrl : `${rawApiUrl}/api/v1`;
 
-  function getAuthHeaders(): Record<string, string> {
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
-    const token = typeof window !== "undefined" ? sessionStorage.getItem("auth_token") : null;
-    if (token) headers["Authorization"] = `Bearer ${token}`;
-    return headers;
-  }
+  const fetchOpts = (): RequestInit => ({
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+  });
 
   const PRIORITY_ESCALATION_MAP: Record<string, string> = {
     low: "normal",
@@ -173,7 +171,7 @@ export default function EscalationsPage() {
           `${API_BASE}/escalations/${encodeURIComponent(id)}/assign`,
           {
             method: "POST",
-            headers: getAuthHeaders(),
+            ...fetchOpts(),
             body: JSON.stringify({ assigned_to: adminUserId }),
           }
         );
@@ -203,7 +201,8 @@ export default function EscalationsPage() {
           `${API_BASE}/escalations/${encodeURIComponent(id)}`,
           {
             method: "PUT",
-            headers: getAuthHeaders(),
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
             body: JSON.stringify({ priority: newPriority }),
           }
         );

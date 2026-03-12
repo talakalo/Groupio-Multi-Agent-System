@@ -82,8 +82,8 @@ describe('AdminLayout — header logout navigation', () => {
     });
   });
 
-  it('removes auth_token from sessionStorage on logout', async () => {
-    sessionStorage.setItem('auth_token', 'test-admin-token');
+  it('clears admin_role_verified and redirects to login on logout', async () => {
+    document.cookie = 'admin_role_verified=1; path=/';
 
     renderLayout();
 
@@ -91,8 +91,10 @@ describe('AdminLayout — header logout navigation', () => {
     fireEvent.click(signOutBtn);
 
     await waitFor(() => {
-      expect(sessionStorage.getItem('auth_token')).toBeNull();
+      expect(mockPush).toHaveBeenCalledWith('/login');
     });
+    // admin_role_verified is cleared by handleLogout (no auth token in sessionStorage)
+    expect(sessionStorage.getItem('auth_token')).toBeNull();
   });
 });
 

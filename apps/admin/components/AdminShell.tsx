@@ -51,14 +51,13 @@ function makeQueryClient() {
 
 let browserQueryClient: QueryClient | undefined;
 
-/** Read token from URL hash (e.g. when redirected from web app login) and store in sessionStorage. */
+/** When redirected from web app login with token in hash: cookies are already set by API.
+ * Just set admin_role_verified and strip the hash. */
 function consumeTokenFromHash() {
   if (typeof window === "undefined") return;
   const hash = window.location.hash;
-  const match = hash.match(/[#&]token=([^&]*)/);
-  if (match) {
-    const token = decodeURIComponent(match[1]);
-    if (token) sessionStorage.setItem("auth_token", token);
+  if (hash && hash.includes("token=")) {
+    document.cookie = "admin_role_verified=1; path=/; SameSite=Strict; max-age=86400";
     window.history.replaceState(null, "", window.location.pathname + window.location.search);
   }
 }
@@ -152,20 +151,14 @@ function Header({ sidebarCollapsed }: { sidebarCollapsed: boolean }) {
   const email = user?.email ?? "—";
 
   async function handleLogout() {
-    const token = typeof window !== "undefined" ? sessionStorage.getItem("auth_token") : null;
     const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "") || "http://localhost:8000";
     const url = baseUrl.endsWith("/api/v1")
       ? `${baseUrl.replace(/\/api\/v1$/, "")}/api/v1/auth/logout`
       : `${baseUrl}/api/v1/auth/logout`;
     try {
-      await fetch(url, {
-        method: "POST",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        credentials: "include",
-      });
+      await fetch(url, { method: "POST", credentials: "include" });
     } finally {
       if (typeof window !== "undefined") {
-        sessionStorage.removeItem("auth_token");
         document.cookie = "admin_role_verified=; path=/; max-age=0";
         router.push("/login");
       }

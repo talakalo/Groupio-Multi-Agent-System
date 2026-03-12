@@ -45,6 +45,11 @@ htmlcov/
 .coverage.*
 coverage.xml
 
+# Playwright
+playwright-report/
+test-results/
+.blob-report/
+
 # Docker
 docker/data/
 

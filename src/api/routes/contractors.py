@@ -1,5 +1,6 @@
 """Contractor API routes."""
 
+import json
 import logging
 from uuid import uuid4
 
@@ -8,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from src.api.middleware.auth import get_current_user, is_admin
 from src.databases.graph_store import get_graph_store
 from src.databases.postgres import get_postgres_client
+from src.databases.redis_client import get_redis_client
 from src.databases.vector_store import get_vector_store
 from src.models.contractor import (
     ContractorCreate,
@@ -180,6 +182,31 @@ async def search_contractors(
         page_size=request.page_size,
         has_more=(request.page * request.page_size) < total,
     )
+
+
+@router.get("/me/doc-requests")
+async def get_my_doc_requests(
+    current_user: UserInDB = Depends(get_current_user),
+) -> dict:
+    """Get pending document requests for the current contractor (set by admin via request-docs)."""
+    if not current_user.contractor_id:
+        return {"items": [], "pending": False}
+
+    redis = get_redis_client()
+    raw = await redis.get(f"doc_request:{current_user.contractor_id}")
+    if not raw:
+        return {"items": [], "pending": False}
+
+    try:
+        payload = json.loads(raw)
+        return {
+            "items": [payload],
+            "pending": True,
+            "requested_at": payload.get("requested_at"),
+            "message": payload.get("message", ""),
+        }
+    except (json.JSONDecodeError, TypeError):
+        return {"items": [], "pending": False}
 
 
 @router.get("/{contractor_id}", response_model=ContractorResponse)

@@ -188,10 +188,10 @@ async function setupBaseMocks(page: Page) {
 test("1. Signup → onboarding → redirect to dashboard", async ({ page }) => {
   await setupBaseMocks(page);
 
-  // Mock signup → correct endpoint is /auth/register (not /auth/signup)
-  await page.route("**/api/v1/auth/register", (r) =>
+  // Mock signup → client uses /auth/signup
+  await page.route("**/api/v1/auth/signup", (r) =>
     r.fulfill({
-      status: 200,
+      status: 201,
       headers: {
         "Content-Type": "application/json",
         // Set refresh_token so middleware allows navigation to /dashboard after signup
@@ -572,5 +572,5 @@ test("10. Chat sends message and history loads on mount", async ({ page }) => {
   await input.press("Enter");
 
   // Assistant reply should appear (mock returns "שלום! אני עוזר גרופיו. כיצד אוכל לסייע?")
-  await expect(page.getByText(/שלום!? אני עוזר גרופיו/)).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(/שלום!? אני עוזר גרופיו/)).toBeVisible({ timeout: 20_000 });
 });

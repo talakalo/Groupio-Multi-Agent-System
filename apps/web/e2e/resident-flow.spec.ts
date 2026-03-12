@@ -187,8 +187,8 @@ test.describe("Resident Registration Flow", () => {
   });
 
   test("should complete registration successfully", async ({ page }) => {
-    // Correct endpoint is /auth/register (not /auth/signup)
-    await page.route("**/api/v1/auth/register", (route) =>
+    // Client uses /auth/signup (not /auth/register)
+    await page.route("**/api/v1/auth/signup", (route) =>
       route.fulfill({
         status: 201,
         headers: {
@@ -203,6 +203,21 @@ test.describe("Resident Registration Flow", () => {
             email: TEST_RESIDENT.email,
             name: TEST_RESIDENT.name,
           },
+        }),
+      })
+    );
+    // Signup page fetches /auth/me after signup
+    await page.route("**/api/v1/auth/me", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          id: "user_new",
+          email: TEST_RESIDENT.email,
+          full_name: TEST_RESIDENT.name,
+          role: "resident",
+          phone: TEST_RESIDENT.phone,
+          is_verified: true,
         }),
       })
     );
@@ -552,12 +567,15 @@ test.describe("Critical User Journey — Register → Login → Join Offer", () 
       });
     });
 
-    await page.route('**/api/v1/auth/register', (route) =>
+    await page.route('**/api/v1/auth/signup', (route) =>
       route.fulfill({
         status: 201,
         headers: { 'Set-Cookie': 'refresh_token=e2e-refresh; Path=/; SameSite=Lax' },
         contentType: 'application/json',
-        body: JSON.stringify({ id: 'user_e2e', access_token: 'e2e-token', token: 'e2e-token' }),
+        body: JSON.stringify({
+          token: 'e2e-token',
+          user: { id: 'user_e2e', email: 'e2e-resident@groupio-test.co.il', full_name: 'Test Resident', role: 'resident' },
+        }),
       })
     );
     await page.route('**/api/v1/auth/login*', (route) =>
@@ -602,7 +620,7 @@ test.describe("Critical User Journey — Register → Login → Join Offer", () 
       await buildingIdInput.fill("bld_e2e");
     }
 
-    // Submit — validates that the correct /api/v1/auth/register endpoint is called
+    // Submit — validates that the correct /api/v1/auth/signup endpoint is called
     await page.click('[type="submit"]');
 
     // After registration, expect redirect to dashboard or a success indicator
@@ -658,7 +676,7 @@ test.describe("Critical User Journey — Register → Login → Join Offer", () 
     }
   });
 
-  test("signup form sends request to correct endpoint (/auth/register)", async ({ page }) => {
+  test("signup form sends request to correct endpoint (/auth/signup)", async ({ page }) => {
     // Capture the outgoing fetch request to verify endpoint URL
     let registrationUrl = "";
     await page.route("**/api/v1/**", async (route) => {
@@ -687,9 +705,9 @@ test.describe("Critical User Journey — Register → Login → Join Offer", () 
     await page.waitForTimeout(2000);
 
     if (registrationUrl) {
-      // Must use /auth/register, NOT /auth/signup
-      expect(registrationUrl).toContain("/auth/register");
-      expect(registrationUrl).not.toContain("/auth/signup");
+      // Client uses /auth/signup (not legacy /auth/register)
+      expect(registrationUrl).toContain("/auth/signup");
+      expect(registrationUrl).not.toContain("/auth/register");
     }
   });
 });

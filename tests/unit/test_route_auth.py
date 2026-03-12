@@ -414,6 +414,40 @@ class TestLoginJson:
         finally:
             app.dependency_overrides.clear()
 
+    def test_login_json_unverified_when_enforced(self):
+        """When ENFORCE_EMAIL_VERIFICATION=True, unverified user gets 403."""
+        user = _make_user(is_verified=False)
+        db = AsyncMock()
+        db.get_user_by_email = AsyncMock(return_value=user)
+        db.get_user_password_hash = AsyncMock(return_value="hashed")
+
+        redis = AsyncMock()
+        redis.check_ip_rate_limit = AsyncMock(return_value=True)
+
+        mock_settings = AsyncMock()
+        mock_settings.ENFORCE_EMAIL_VERIFICATION = True
+        mock_settings.REFRESH_TOKEN_EXPIRE_DAYS = 7
+        mock_settings.ACCESS_TOKEN_EXPIRE_MINUTES = 15
+        mock_settings.ENVIRONMENT = "development"
+
+        from src.api.main import app
+
+        app.dependency_overrides.clear()
+        try:
+            with patch("src.api.routes.auth.get_postgres_client", return_value=db):
+                with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+                    with patch("src.api.routes.auth.verify_password", return_value=True):
+                        with patch("src.api.routes.auth.get_settings", return_value=mock_settings):
+                            client = TestClient(app, raise_server_exceptions=False)
+                            resp = client.post(
+                                "/api/v1/auth/login/json",
+                                json={"email": "user@example.com", "password": "password123"},
+                            )
+            assert resp.status_code == 403
+            assert "verified" in resp.json().get("detail", "").lower()
+        finally:
+            app.dependency_overrides.clear()
+
     def test_login_json_by_phone(self):
         user = _make_user()
         db = AsyncMock()
@@ -854,6 +888,96 @@ class TestVerifyEmail:
                 client = TestClient(app, raise_server_exceptions=False)
                 resp = client.post("/api/v1/auth/verify-email/bad-token")
             assert resp.status_code == 400
+        finally:
+            app.dependency_overrides.clear()
+
+
+# ---------------------------------------------------------------------------
+# POST /auth/resend-verification-by-email
+# ---------------------------------------------------------------------------
+
+
+class TestResendVerificationByEmail:
+    def test_resend_by_email_unverified_user_sends(self):
+        """When user exists and is unverified, sends email and returns 200."""
+        user = _make_user(is_verified=False)
+        db = AsyncMock()
+        db.get_user_by_email = AsyncMock(return_value=user)
+
+        redis = AsyncMock()
+        redis.set = AsyncMock()
+        redis.check_ip_rate_limit = AsyncMock(return_value=True)
+
+        email_svc = AsyncMock()
+        email_svc.send_verification_email = AsyncMock()
+
+        mock_settings = AsyncMock()
+        mock_settings.FRONTEND_URL = "https://app.example.com"
+
+        from src.api.main import app
+
+        app.dependency_overrides.clear()
+        try:
+            with patch("src.api.routes.auth.get_postgres_client", return_value=db):
+                with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+                    with patch("src.api.routes.auth.get_email_service", return_value=email_svc):
+                        with patch("src.api.routes.auth.get_settings", return_value=mock_settings):
+                            client = TestClient(app, raise_server_exceptions=False)
+                            resp = client.post(
+                                "/api/v1/auth/resend-verification-by-email",
+                                json={"email": "user@example.com"},
+                            )
+            assert resp.status_code == 200
+            assert resp.json()["status"] == "verification_email_sent"
+            email_svc.send_verification_email.assert_called_once()
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_resend_by_email_nonexistent_returns_200(self):
+        """Always returns 200 to avoid leaking whether email exists."""
+        db = AsyncMock()
+        db.get_user_by_email = AsyncMock(return_value=None)
+
+        redis = AsyncMock()
+        redis.check_ip_rate_limit = AsyncMock(return_value=True)
+
+        from src.api.main import app
+
+        app.dependency_overrides.clear()
+        try:
+            with patch("src.api.routes.auth.get_postgres_client", return_value=db):
+                with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+                    client = TestClient(app, raise_server_exceptions=False)
+                    resp = client.post(
+                        "/api/v1/auth/resend-verification-by-email",
+                        json={"email": "nonexistent@example.com"},
+                    )
+            assert resp.status_code == 200
+            assert resp.json()["status"] == "verification_email_sent"
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_resend_by_email_already_verified_returns_200(self):
+        """Does not send when user is already verified; still returns 200."""
+        user = _make_user(is_verified=True)
+        db = AsyncMock()
+        db.get_user_by_email = AsyncMock(return_value=user)
+
+        redis = AsyncMock()
+        redis.check_ip_rate_limit = AsyncMock(return_value=True)
+
+        from src.api.main import app
+
+        app.dependency_overrides.clear()
+        try:
+            with patch("src.api.routes.auth.get_postgres_client", return_value=db):
+                with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+                    client = TestClient(app, raise_server_exceptions=False)
+                    resp = client.post(
+                        "/api/v1/auth/resend-verification-by-email",
+                        json={"email": "user@example.com"},
+                    )
+            assert resp.status_code == 200
         finally:
             app.dependency_overrides.clear()
 

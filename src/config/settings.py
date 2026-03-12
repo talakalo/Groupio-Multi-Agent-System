@@ -129,6 +129,10 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     SMTP_FROM_EMAIL: str = "noreply@groupio.co.il"
     SMTP_FROM_NAME: str = "Groupio"
+    # When True, login rejects unverified users with 403. Set for broader launch.
+    ENFORCE_EMAIL_VERIFICATION: bool = False
+    # Base URL for verification links in emails (default for production)
+    FRONTEND_URL: str = "https://groupio.co.il"
     # Admin inbox for system alerts (vetting escalations, expiry errors, etc.)
     ADMIN_EMAIL: str = ""
 

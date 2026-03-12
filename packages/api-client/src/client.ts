@@ -279,6 +279,7 @@ export class GroupioApiClient {
         headers: this.buildHeaders(),
         body: body != null ? JSON.stringify(body) : undefined,
         signal: controller.signal,
+        credentials: "include", // Send HTTP-only cookies (e.g. access_token)
       });
     } catch (error: unknown) {
       if (error instanceof DOMException && error.name === "AbortError") {

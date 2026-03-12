@@ -2,6 +2,7 @@
 
 import csv
 import io
+import json
 import logging
 from datetime import UTC, date, datetime
 from typing import Any
@@ -13,6 +14,7 @@ from pydantic import BaseModel, EmailStr
 
 from src.api.middleware.auth import get_admin_user, hash_password
 from src.databases.postgres import get_postgres_client
+from src.databases.redis_client import get_redis_client
 from src.databases.vector_store import get_vector_store
 from src.models.user import UserInDB
 from src.orchestration.graph import get_orchestrator
@@ -986,3 +988,55 @@ async def get_contractor_verification_metadata(
             )
 
     return {"items": items, "contractor_id": contractor_id}
+
+
+# --------------- Request contractor documents ---------------
+
+
+class RequestDocsBody(BaseModel):
+    """Optional message when requesting documents from a contractor."""
+
+    message: str = "Please upload additional documents to complete your verification."
+
+
+@router.post("/contractors/{contractor_id}/request-docs")
+async def request_contractor_docs(
+    contractor_id: str,
+    request: Request,
+    body: RequestDocsBody | None = None,
+    admin: UserInDB = Depends(get_admin_user),
+) -> dict[str, str]:
+    """Request docs from contractor. Stored in Redis; contractor sees via GET /contractors/me/doc-requests."""
+    db = get_postgres_client()
+    contractor = await db.get_contractor(contractor_id)
+    if not contractor:
+        raise HTTPException(status_code=404, detail="Contractor not found")
+
+    redis = get_redis_client()
+    default_msg = "Please upload additional documents to complete your verification."
+    payload = {
+        "requested_at": datetime.now(UTC).isoformat(),
+        "requested_by": admin.id,
+        "requested_by_email": admin.email,
+        "message": (body.message if body else "") or default_msg,
+    }
+    await redis.set(
+        f"doc_request:{contractor_id}",
+        json.dumps(payload),
+        ex=30 * 24 * 60 * 60,  # 30 days
+    )
+
+    await db.create_audit_log(
+        {
+            "user_id": admin.id,
+            "action": "request_docs",
+            "resource_type": "contractor",
+            "resource_id": contractor_id,
+            "details": {"message": payload["message"]},
+            "ip_address": request.client.host if request.client else None,
+        }
+    )
+
+    logger.info("Admin %s requested docs from contractor %s", admin.email, contractor_id)
+
+    return {"status": "doc_request_sent", "contractor_id": contractor_id}
