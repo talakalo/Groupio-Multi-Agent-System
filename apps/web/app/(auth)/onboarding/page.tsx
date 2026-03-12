@@ -396,6 +396,7 @@ export default function OnboardingPage() {
             }
             className="btn-secondary flex items-center gap-2 shrink-0"
             title={t('suggestAddress')}
+            aria-label={t('suggestAddress')}
           >
             {normalizeMutation.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin" />

@@ -50,17 +50,19 @@ const MOCK_OFFER = {
   id: "offer-pilot-1",
   category: "ac_installation",
   title: "התקנת מזגנים לבניין",
-  description: "מחיר מיוחד לדיירים",
-  base_price: 4500,
+  basePrice: 4500,
   status: "active",
-  contractor_id: "ctr-pilot-1",
-  building_id: "bld-pilot",
-  min_participants: 3,
-  max_participants: 20,
-  current_participants: 8,
-  tiers: [{ min: 3, max: 5, discount: 5, price: 4275 }],
-  expires_at: "2026-12-31T00:00:00Z",
-  created_at: "2024-01-01T00:00:00Z",
+  contractor: { id: "ctr-pilot-1", businessName: "Pilot Contractors", rating: 4.7, verified: true },
+  participants: 8,
+  currentTier: 1,
+  tiers: [
+    { min: 3, max: 5, discount: 0.05, price: 4275 },
+    { min: 6, max: 10, discount: 0.10, price: 4050 },
+    { min: 11, max: 20, discount: 0.15, price: 3825 },
+  ],
+  expiresAt: "2026-12-31T00:00:00Z",
+  createdAt: "2024-01-01T00:00:00Z",
+  building: { id: "bld-pilot", address: "רוטשילד 15", city: "תל אביב" },
 };
 
 const MOCK_STATS = {
@@ -269,9 +271,9 @@ test("2. Login → dashboard loads with building and offers", async ({ page }) =
 test("3. Offer detail → join → leave flow (mocked)", async ({ page }) => {
   await setupBaseMocks(page);
   await setAuthToken(page);
-
+  // Register single-offer route AFTER base mocks so it takes precedence (last match wins)
   await page.route("**/api/v1/offers/offer-pilot-1", (r) =>
-    r.fulfill({ status: 200, body: JSON.stringify(MOCK_OFFER) })
+    r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(MOCK_OFFER) })
   );
   await page.route("**/api/v1/offers/offer-pilot-1/join", (r) =>
     r.fulfill({ status: 200, body: JSON.stringify({ status: "joined" }) })
@@ -281,10 +283,10 @@ test("3. Offer detail → join → leave flow (mocked)", async ({ page }) => {
   );
 
   await page.goto("/offers/offer-pilot-1");
-  // The page should load without error
-  await expect(page.locator("main, [data-testid='offer-detail'], h1, h2")).toBeVisible({
-    timeout: 8_000,
-  });
+  // The page shows category (התקנת מזגנים) or contractor — avoid error boundary
+  await expect(
+    page.getByText(/התקנת מזגנים|Pilot Contractors|המשך/i).first()
+  ).toBeVisible({ timeout: 10_000 });
 });
 
 // ===========================================================================

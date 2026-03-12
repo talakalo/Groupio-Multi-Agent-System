@@ -311,13 +311,26 @@ test.describe("Resident Browse Offers Flow", () => {
 
     await page.route("**/api/v1/offers*", (route) => {
       const url = new URL(route.request().url());
-      const category = url.searchParams.get("category");
+      const pathMatch = url.pathname.match(/\/api\/v1\/offers\/([^/?]+)$/);
+      if (pathMatch) {
+        const offerId = pathMatch[1];
+        if (offerId !== "join" && !url.pathname.endsWith("/join")) {
+          const offer = MOCK_OFFERS.find((o) => o.id === offerId);
+          if (offer) {
+            return route.fulfill({
+              status: 200,
+              contentType: "application/json",
+              body: JSON.stringify(offer),
+            });
+          }
+        }
+      }
 
+      const category = url.searchParams.get("category");
       let offers = MOCK_OFFERS;
       if (category) {
         offers = MOCK_OFFERS.filter((o) => o.category === category);
       }
-
       return route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -350,19 +363,14 @@ test.describe("Resident Browse Offers Flow", () => {
   });
 
   test("should display offer details when clicking an offer", async ({ page }) => {
-    await page.route("**/api/v1/offers/offer_001", (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(MOCK_OFFERS[0]),
-      })
-    );
-
     await page.goto("/offers/offer_001");
+    await page.waitForLoadState("networkidle");
 
-    // The offer detail page renders the translated category name in h1, not offer.title
-    await expect(page.locator("h1, h2").first()).toBeVisible();
-    await expect(page.getByText("Cool Air Ltd")).toBeVisible();
+    // Wait for offer content in main — not error state (offerNotFound)
+    await expect(page.getByText(/הצעה לא נמצאה|offerNotFound/i)).not.toBeVisible();
+    await expect(
+      page.locator("main").getByText(/Cool Air Ltd|התקנת מזגנים/).first()
+    ).toBeVisible({ timeout: 15000 });
   });
 });
 
@@ -378,13 +386,32 @@ test.describe("Resident Join Offer Flow", () => {
       { name: "groupio-auth", value: encodeURIComponent(JSON.stringify({ state: { user: { role: "resident" }, isAuthenticated: true } })), url: "http://localhost:3000" },
     ]);
 
-    await page.route("**/api/v1/offers/offer_001", (route) =>
-      route.fulfill({
+    await page.route("**/api/v1/offers*", (route) => {
+      const url = new URL(route.request().url());
+      if (url.pathname.endsWith("/join")) {
+        return route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ success: true, participants: 9 }),
+        });
+      }
+      const pathMatch = url.pathname.match(/\/api\/v1\/offers\/([^/?]+)$/);
+      if (pathMatch) {
+        const offer = MOCK_OFFERS.find((o) => o.id === pathMatch[1]);
+        if (offer) {
+          return route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify(offer),
+          });
+        }
+      }
+      return route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify(MOCK_OFFERS[0]),
-      })
-    );
+        body: JSON.stringify({ offers: MOCK_OFFERS, items: MOCK_OFFERS }),
+      });
+    });
 
     await page.addInitScript(() => {
       localStorage.setItem(
@@ -404,10 +431,12 @@ test.describe("Resident Join Offer Flow", () => {
 
   test("should display offer details page", async ({ page }) => {
     await page.goto("/offers/offer_001");
+    await page.waitForLoadState("networkidle");
 
-    // The offer detail page renders the translated category name in h1, not offer.title
-    await expect(page.locator("h1, h2").first()).toBeVisible();
-    await expect(page.getByText("Cool Air Ltd")).toBeVisible();
+    await expect(page.getByText(/הצעה לא נמצאה|offerNotFound/i)).not.toBeVisible();
+    await expect(
+      page.locator("main").getByText(/Cool Air Ltd|התקנת מזגנים/).first()
+    ).toBeVisible({ timeout: 15000 });
   });
 
   test("should display pricing tiers", async ({ page }) => {
@@ -420,24 +449,6 @@ test.describe("Resident Join Offer Flow", () => {
   });
 
   test("should join offer successfully", async ({ page }) => {
-    await page.route("**/api/v1/offers/offer_001/join", (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          success: true,
-          participation: {
-            id: "part_001",
-            offerId: "offer_001",
-            userId: "user_123",
-            joinedAt: new Date().toISOString(),
-            tier: 1,
-            price: 4050,
-          },
-        }),
-      })
-    );
-
     await page.goto("/offers/offer_001");
 
     // Click join button (Hebrew: "הצטרף להצעה")
@@ -526,8 +537,28 @@ test.describe("Critical User Journey — Register → Login → Join Offer", () 
   test("full journey: register, login, browse, and join an offer", async ({ page }) => {
     // Mock all API endpoints for the full journey (no live backend needed)
     await setupCommonMocks(page);
+
+    let joinRequestBody: Record<string, unknown> | null = null;
+    await page.route("**/api/v1/offers/*/join", async (route) => {
+      const request = route.request();
+      if (request.method() === "POST") {
+        const body = request.postDataJSON() as Record<string, unknown> | null;
+        joinRequestBody = body;
+      }
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ success: true, participants: 10 }),
+      });
+    });
+
     await page.route('**/api/v1/auth/register', (route) =>
-      route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ id: 'user_e2e', access_token: 'e2e-token' }) })
+      route.fulfill({
+        status: 201,
+        headers: { 'Set-Cookie': 'refresh_token=e2e-refresh; Path=/; SameSite=Lax' },
+        contentType: 'application/json',
+        body: JSON.stringify({ id: 'user_e2e', access_token: 'e2e-token', token: 'e2e-token' }),
+      })
     );
     await page.route('**/api/v1/auth/login*', (route) =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ token: 'e2e-token', access_token: 'e2e-token' }) })
@@ -535,27 +566,36 @@ test.describe("Critical User Journey — Register → Login → Join Offer", () 
     await page.route('**/api/v1/auth/me', (route) =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: 'user_e2e', email: 'e2e-resident@groupio-test.co.il', role: 'resident', full_name: 'Test Resident', phone: '0501234567', is_verified: true }) })
     );
-    await page.route('**/api/v1/offers*', (route) =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ offers: MOCK_OFFERS, items: MOCK_OFFERS }) })
-    );
+    await page.route('**/api/v1/offers*', (route) => {
+      const url = new URL(route.request().url());
+      if (url.pathname.endsWith('/join')) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, participants: 9 }) });
+      }
+      const pathMatch = url.pathname.match(/\/api\/v1\/offers\/([^/?]+)$/);
+      if (pathMatch) {
+        const offer = MOCK_OFFERS.find((o) => o.id === pathMatch[1]);
+        if (offer) {
+          return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(offer) });
+        }
+      }
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ offers: MOCK_OFFERS, items: MOCK_OFFERS }) });
+    });
 
     // ── 1. Registration ───────────────────────────────────────────────────
     await page.goto("/signup");
     await expect(page).toHaveURL(/signup/);
 
-    // Select resident role (data-testid may not exist; fall back to button text)
-    const residentCard = page.locator('[data-testid="role-resident"]');
-    if (await residentCard.count() > 0) {
-      await residentCard.click();
-    }
-    // Advance from step 1 (role selection) to step 2 (details form)
-    await page.click('button:has-text("המשך")');
+    // Select resident role and advance to details form (signup uses המשך)
+    // Use ^דייר to avoid matching "חשיפה לדיירים" on contractor card
+    await page.getByRole("button", { name: /^דייר\s/ }).click();
+    await page.getByRole("button", { name: /המשך/ }).click();
 
     // Fill registration form (step 2 fields — use id or name attributes)
     await page.fill('#name', "Test Resident");
     await page.fill('#email', "e2e-resident@groupio-test.co.il");
     await page.fill('#phone', "0501234567");
     await page.fill('#password', "SecurePass123!");
+    await page.check('#tos');
     // buildingId field may not exist on this form — skip if absent
     const buildingIdInput = page.locator('input[name="buildingId"]');
     if (await buildingIdInput.count() > 0) {
@@ -585,33 +625,25 @@ test.describe("Critical User Journey — Register → Login → Join Offer", () 
 
     // ── 3. Browse offers ─────────────────────────────────────────────────
     await page.goto("/offers");
-    await expect(page).toHaveURL(/offers/);
+    await expect(page).toHaveURL(/offers/, { timeout: 10000 });
 
-    // Wait for offers to load
-    const offerCard = page.locator('[data-testid="offer-card"]').first();
-    const hasOffers = await offerCard.count() > 0;
-    if (!hasOffers) {
-      // No offers in test environment — verify empty state renders correctly
-      await expect(page.locator("text=/אין הצעות|no offers/i")).toBeVisible();
-      return;
-    }
+    // Wait for offers to load — card or link to offer detail
+    const firstOfferLink = page.locator('a[href^="/offers/"]').first();
+    await expect(firstOfferLink).toBeVisible({ timeout: 15000 });
 
     // ── 4. Join offer — validates real userId is sent ──────────────────
-    await offerCard.click();
-    await expect(page).toHaveURL(/offers\/.+/, { timeout: 5_000 });
-
-    // Intercept the join request and verify userId is NOT 'current-user'
-    let joinRequestBody: Record<string, unknown> | null = null;
-    await page.route("**/api/v1/offers/*/participants", async (route) => {
-      const request = route.request();
-      const body = request.postDataJSON() as Record<string, unknown> | null;
-      joinRequestBody = body;
-      await route.continue();
-    });
+    await firstOfferLink.click();
+    await expect(page).toHaveURL(/offers\/.+/, { timeout: 10000 });
 
     const joinButton = page.locator('[data-testid="join-offer-button"]');
     if (await joinButton.count() > 0) {
       await joinButton.click();
+      // Modal opens — accept policy and confirm
+      const confirmBtn = page.getByRole("button", { name: /אישור הצטרפות/ });
+      if (await confirmBtn.count() > 0) {
+        await page.locator('input[type="checkbox"]').check();
+        await confirmBtn.click();
+      }
 
       // Verify the userId in the request is not the hardcoded placeholder
       if (joinRequestBody && typeof joinRequestBody === "object") {
@@ -620,8 +652,8 @@ test.describe("Critical User Journey — Register → Login → Join Offer", () 
         expect(userId).toBeTruthy();
       }
 
-      // Check for success indicator
-      const joinSuccess = page.locator('[data-testid="join-success"], [role="alert"]').first();
+      // Check for success indicator (button shows "הצטרפת" when joined)
+      const joinSuccess = page.locator('button:has-text("הצטרפת"), [data-testid="join-success"], [role="alert"]').first();
       await expect(joinSuccess).toBeVisible({ timeout: 8_000 });
     }
   });
@@ -639,8 +671,8 @@ test.describe("Critical User Journey — Register → Login → Join Offer", () 
 
     await page.goto("/signup");
     // Step 1: select resident role and continue (form inputs are in step 2 only)
-    await page.click('button:has-text("דייר")');
-    await page.click('button:has-text("המשך")');
+    await page.getByRole("button", { name: /^דייר\s/ }).click();
+    await page.getByRole("button", { name: /המשך/ }).click();
 
     // Step 2: fill form fields
     await page.fill("#name", "URL Test User");

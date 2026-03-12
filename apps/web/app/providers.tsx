@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import * as Sentry from "@sentry/nextjs";
 import { apiClient } from "@/lib/api/client";
 import { useAuthStore } from "@/lib/stores/authStore";
+import { LocaleSyncProvider } from "@/lib/providers/LocaleSyncProvider";
 import { ToastContainer } from "@/components/shared/ToastContainer";
 
 // ---------------------------------------------------------------------------
@@ -131,8 +132,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- React 19 ReactNode typing conflict */}
-        {children as any}
+        <LocaleSyncProvider>
+          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- React 19 ReactNode typing conflict */}
+          {children as any}
+        </LocaleSyncProvider>
       </QueryClientProvider>
     </ErrorBoundary>
   );
