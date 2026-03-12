@@ -111,7 +111,7 @@ class DataGovIlProvider:
             return None
         records = self.datastore_search(
             RESOURCE_SETTLEMENTS,
-            fields=[FLD_SYMBOL_YESHUV, FLD_NAME_YESHUV, FLD_NAME_NAFA, FLD_LISHKA],
+            fields=[FLD_SYMBOL_YESHUV, FLD_NAME_YESHUV, FLD_NAME_NAFA,             FLD_LISHKA],
             limit=20,
             q=city,
         )
