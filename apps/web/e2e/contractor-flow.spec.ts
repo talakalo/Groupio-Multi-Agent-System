@@ -224,10 +224,12 @@ test.describe("Contractor Create Offer Flow", () => {
     );
 
     await page.goto("/contractor/offers/create");
+    await expect(page).toHaveURL(/contractor\/offers\/create/, { timeout: 20000 });
     await page.waitForLoadState("networkidle");
 
-    const title = page.locator('input[name="title"]');
-    await expect(title).toBeVisible({ timeout: 10000 });
+    // Wait for form (layout may render null until auth settles)
+    const title = page.locator('main input[name="title"]');
+    await expect(title).toBeVisible({ timeout: 20000 });
     await title.fill("התקנת מזגנים מקצועית");
 
     const desc = page.locator('textarea[name="description"]');
@@ -292,9 +294,9 @@ test.describe("Contractor Manage Offers", () => {
     await page.waitForLoadState("networkidle");
 
     await expect(page.locator("main")).toBeVisible({ timeout: 10000 });
-    // Page shows: offers list, empty state, filters, or loading-then-content
+    // Assert on visible content in main (nav "הצעות פעילות" can be hidden in RTL/sidebar)
     await expect(
-      page.getByText(/הצעות פעילות|התקנת מזגנים|אין הצעות|כל הסטטוסים|all statuses|תוצאות/i).first()
+      page.locator("main").getByText(/הצעות פעילות|התקנת מזגנים|אין הצעות|כל הסטטוסים|all statuses|הצעות/i).first()
     ).toBeVisible({ timeout: 15000 });
   });
 

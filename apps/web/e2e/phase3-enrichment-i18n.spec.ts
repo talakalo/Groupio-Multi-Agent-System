@@ -47,7 +47,8 @@ test.describe("Phase 3: Address suggestion flow", () => {
     // Onboarding role buttons use t('resident') + description; match by leading "דייר"
     await expect(page.getByRole("button", { name: /^דייר\s/ }).first()).toBeVisible({ timeout: 5000 });
     await page.getByRole("button", { name: /^דייר\s/ }).first().click();
-    await page.getByRole("button", { name: /הבא|Next/ }).click();
+    // Use exact "הבא" to avoid matching Next.js Dev Tools button (contains "Next")
+    await page.getByRole("button", { name: "הבא" }).click();
 
     await expect(page.locator("#buildingAddress")).toBeVisible({ timeout: 5000 });
     await page.fill("#buildingAddress", "רוטשילד 15");
@@ -82,7 +83,7 @@ test.describe("Phase 3: Address suggestion flow", () => {
 
     await page.goto("/onboarding");
     await page.getByRole("button", { name: /^דייר\s/ }).first().click();
-    await page.getByRole("button", { name: /הבא|Next/ }).click();
+    await page.getByRole("button", { name: "הבא" }).click();
     await expect(page.locator("#buildingAddress")).toBeVisible({ timeout: 5000 });
 
     await page.fill("#buildingAddress", "רחוב לא ידוע 1");
@@ -100,7 +101,7 @@ test.describe("Phase 3: Address suggestion flow", () => {
 
     await page.goto("/onboarding");
     await page.getByRole("button", { name: /^דייר\s/ }).first().click();
-    await page.getByRole("button", { name: /הבא|Next/ }).click();
+    await page.getByRole("button", { name: "הבא" }).click();
     await expect(page.locator("#buildingAddress")).toBeVisible({ timeout: 5000 });
 
     await page.fill("#buildingAddress", "רוטשילד 15");
