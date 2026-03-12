@@ -191,7 +191,7 @@ test.describe("Phase 3: Language toggle persistence", () => {
     await page.waitForTimeout(1200);
 
     expect(putMePayload).not.toBeNull();
-    expect(putMePayload?.preferred_language).toBe("en");
+    expect(putMePayload!["preferred_language"]).toBe("en");
     await expect(page.locator("html")).toHaveAttribute("dir", "ltr");
   });
 });
