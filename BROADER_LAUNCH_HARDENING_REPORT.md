@@ -128,9 +128,8 @@
 
 ## 6. Chat / Realtime Improvements
 
-- Chat pagination: not implemented.
-- WebSocket/realtime: not validated.
-- Status: unchanged from pilot.
+- **Chat pagination:** Implemented; AIChat supports `before` cursor and "Load older messages" button.
+- **WebSocket/realtime:** Documented in BROADER_LAUNCH_DEPLOYMENT; existing tests in `tests/integration/test_websocket.py`.
 
 ---
 
@@ -171,11 +170,9 @@ pnpm --filter web run build
 
 ### Should Do Later
 
-1. Full accessibility audit and fixes.
-2. Chat history pagination if backend supports cursor.
-3. WebSocket/realtime validation or documentation.
-4. Secrets rotation docs and production checklist.
-5. Mobile/responsive pass on critical routes.
+1. Full accessibility audit (beyond forgot-password link fix).
+2. WebSocket/realtime runtime validation.
+3. Mobile/responsive pass beyond checklist.
 
 ---
 
