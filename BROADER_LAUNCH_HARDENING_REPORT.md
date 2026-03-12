@@ -21,14 +21,15 @@
 - Admin app builds (with existing lint).
 - Web app: new verify-email, resend-verification pages; signup uses `/signup` endpoint; api client updated.
 
-### What Remains
+### What Remains (see `feat/broader-launch-remaining-items` branch)
 
-- Admin E2E: may need cookie/credential setup for new auth model.
-- Accessibility: no targeted fixes in this branch.
-- Secrets/config: no doc updates in this branch.
-- Chat pagination: not implemented.
-- WebSocket/realtime: not validated.
-- Mobile/responsive: no targeted fixes.
+- **Admin E2E:** Updated for cookie auth; `setupAdminAuth` uses `addCookies` (refresh_token, admin_role_verified).
+- **Docs:** `docs/BROADER_LAUNCH_DEPLOYMENT.md` — ENFORCE_EMAIL_VERIFICATION, SMTP, CORS_ORIGINS, WebSocket.
+- **Secrets:** `docs/SECRETS_ROTATION.md` — rotation procedures.
+- **Chat pagination:** Implemented; AIChat supports `before` cursor and "Load older" button.
+- **Accessibility:** Forgot-password link fixed (href="#" → /forgot-password).
+- **WebSocket:** Documented in BROADER_LAUNCH_DEPLOYMENT; existing tests in `tests/integration/test_websocket.py`.
+- **Mobile:** Checklist in BROADER_LAUNCH_DEPLOYMENT.
 
 ### Launch Recommendation
 
@@ -127,9 +128,8 @@
 
 ## 6. Chat / Realtime Improvements
 
-- Chat pagination: not implemented.
-- WebSocket/realtime: not validated.
-- Status: unchanged from pilot.
+- **Chat pagination:** Implemented; AIChat supports `before` cursor and "Load older messages" button.
+- **WebSocket/realtime:** Documented in BROADER_LAUNCH_DEPLOYMENT; existing tests in `tests/integration/test_websocket.py`.
 
 ---
 
@@ -170,11 +170,9 @@ pnpm --filter web run build
 
 ### Should Do Later
 
-1. Full accessibility audit and fixes.
-2. Chat history pagination if backend supports cursor.
-3. WebSocket/realtime validation or documentation.
-4. Secrets rotation docs and production checklist.
-5. Mobile/responsive pass on critical routes.
+1. Full accessibility audit (beyond forgot-password link fix).
+2. WebSocket/realtime runtime validation.
+3. Mobile/responsive pass beyond checklist.
 
 ---
 

@@ -285,12 +285,12 @@ export default function LoginPage() {
               />
               <span className="text-gray-600">זכור אותי</span>
             </label>
-            <a
-              href="#"
+            <Link
+              href="/forgot-password"
               className="text-primary-600 hover:text-primary-700 font-medium"
             >
               שכחתי סיסמה
-            </a>
+            </Link>
           </div>
 
           <button

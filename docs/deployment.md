@@ -69,7 +69,7 @@ Before deploying to production, verify the following:
 - [ ] `JWT_SECRET_KEY` is a strong 64+ character hex string (`python -c "import secrets; print(secrets.token_hex(32))"`)
 - [ ] `API_KEYS` contains securely generated service-to-service keys
 - [ ] `DATABASE_URL` points to a production PostgreSQL instance
-- [ ] `CORS_ORIGINS` is restricted to your actual domains (no localhost)
+- [ ] `CORS_ORIGINS` includes both web and admin frontend origins (required for cookie-based admin auth). See `docs/BROADER_LAUNCH_DEPLOYMENT.md`.
 - [ ] `SENTRY_DSN` is configured for error tracking
 - [ ] Database migrations are up to date: `alembic upgrade head`
 - [ ] Payment provider is configured (see Payment section below)
