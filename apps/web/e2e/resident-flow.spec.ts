@@ -311,13 +311,26 @@ test.describe("Resident Browse Offers Flow", () => {
 
     await page.route("**/api/v1/offers*", (route) => {
       const url = new URL(route.request().url());
-      const category = url.searchParams.get("category");
+      const pathMatch = url.pathname.match(/\/api\/v1\/offers\/([^/?]+)$/);
+      if (pathMatch) {
+        const offerId = pathMatch[1];
+        if (offerId !== "join" && !url.pathname.endsWith("/join")) {
+          const offer = MOCK_OFFERS.find((o) => o.id === offerId);
+          if (offer) {
+            return route.fulfill({
+              status: 200,
+              contentType: "application/json",
+              body: JSON.stringify(offer),
+            });
+          }
+        }
+      }
 
+      const category = url.searchParams.get("category");
       let offers = MOCK_OFFERS;
       if (category) {
         offers = MOCK_OFFERS.filter((o) => o.category === category);
       }
-
       return route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -350,14 +363,6 @@ test.describe("Resident Browse Offers Flow", () => {
   });
 
   test("should display offer details when clicking an offer", async ({ page }) => {
-    await page.route("**/api/v1/offers/offer_001", (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(MOCK_OFFERS[0]),
-      })
-    );
-
     await page.goto("/offers/offer_001");
 
     // The offer detail page renders the translated category name in h1, not offer.title
@@ -378,13 +383,32 @@ test.describe("Resident Join Offer Flow", () => {
       { name: "groupio-auth", value: encodeURIComponent(JSON.stringify({ state: { user: { role: "resident" }, isAuthenticated: true } })), url: "http://localhost:3000" },
     ]);
 
-    await page.route("**/api/v1/offers/offer_001", (route) =>
-      route.fulfill({
+    await page.route("**/api/v1/offers*", (route) => {
+      const url = new URL(route.request().url());
+      if (url.pathname.endsWith("/join")) {
+        return route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ success: true, participants: 9 }),
+        });
+      }
+      const pathMatch = url.pathname.match(/\/api\/v1\/offers\/([^/?]+)$/);
+      if (pathMatch) {
+        const offer = MOCK_OFFERS.find((o) => o.id === pathMatch[1]);
+        if (offer) {
+          return route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify(offer),
+          });
+        }
+      }
+      return route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify(MOCK_OFFERS[0]),
-      })
-    );
+        body: JSON.stringify({ offers: MOCK_OFFERS, items: MOCK_OFFERS }),
+      });
+    });
 
     await page.addInitScript(() => {
       localStorage.setItem(
@@ -420,24 +444,6 @@ test.describe("Resident Join Offer Flow", () => {
   });
 
   test("should join offer successfully", async ({ page }) => {
-    await page.route("**/api/v1/offers/offer_001/join", (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          success: true,
-          participation: {
-            id: "part_001",
-            offerId: "offer_001",
-            userId: "user_123",
-            joinedAt: new Date().toISOString(),
-            tier: 1,
-            price: 4050,
-          },
-        }),
-      })
-    );
-
     await page.goto("/offers/offer_001");
 
     // Click join button (Hebrew: "הצטרף להצעה")
@@ -526,6 +532,21 @@ test.describe("Critical User Journey — Register → Login → Join Offer", () 
   test("full journey: register, login, browse, and join an offer", async ({ page }) => {
     // Mock all API endpoints for the full journey (no live backend needed)
     await setupCommonMocks(page);
+
+    let joinRequestBody: Record<string, unknown> | null = null;
+    await page.route("**/api/v1/offers/*/join", async (route) => {
+      const request = route.request();
+      if (request.method() === "POST") {
+        const body = request.postDataJSON() as Record<string, unknown> | null;
+        joinRequestBody = body;
+      }
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ success: true, participants: 10 }),
+      });
+    });
+
     await page.route('**/api/v1/auth/register', (route) =>
       route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ id: 'user_e2e', access_token: 'e2e-token' }) })
     );
@@ -535,9 +556,20 @@ test.describe("Critical User Journey — Register → Login → Join Offer", () 
     await page.route('**/api/v1/auth/me', (route) =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: 'user_e2e', email: 'e2e-resident@groupio-test.co.il', role: 'resident', full_name: 'Test Resident', phone: '0501234567', is_verified: true }) })
     );
-    await page.route('**/api/v1/offers*', (route) =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ offers: MOCK_OFFERS, items: MOCK_OFFERS }) })
-    );
+    await page.route('**/api/v1/offers*', (route) => {
+      const url = new URL(route.request().url());
+      if (url.pathname.endsWith('/join')) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, participants: 9 }) });
+      }
+      const pathMatch = url.pathname.match(/\/api\/v1\/offers\/([^/?]+)$/);
+      if (pathMatch) {
+        const offer = MOCK_OFFERS.find((o) => o.id === pathMatch[1]);
+        if (offer) {
+          return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(offer) });
+        }
+      }
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ offers: MOCK_OFFERS, items: MOCK_OFFERS }) });
+    });
 
     // ── 1. Registration ───────────────────────────────────────────────────
     await page.goto("/signup");
@@ -600,18 +632,15 @@ test.describe("Critical User Journey — Register → Login → Join Offer", () 
     await offerCard.click();
     await expect(page).toHaveURL(/offers\/.+/, { timeout: 5_000 });
 
-    // Intercept the join request and verify userId is NOT 'current-user'
-    let joinRequestBody: Record<string, unknown> | null = null;
-    await page.route("**/api/v1/offers/*/participants", async (route) => {
-      const request = route.request();
-      const body = request.postDataJSON() as Record<string, unknown> | null;
-      joinRequestBody = body;
-      await route.continue();
-    });
-
     const joinButton = page.locator('[data-testid="join-offer-button"]');
     if (await joinButton.count() > 0) {
       await joinButton.click();
+      // Modal opens — accept policy and confirm
+      const confirmBtn = page.getByRole("button", { name: /אישור הצטרפות/ });
+      if (await confirmBtn.count() > 0) {
+        await page.locator('input[type="checkbox"]').check();
+        await confirmBtn.click();
+      }
 
       // Verify the userId in the request is not the hardcoded placeholder
       if (joinRequestBody && typeof joinRequestBody === "object") {
@@ -621,7 +650,7 @@ test.describe("Critical User Journey — Register → Login → Join Offer", () 
       }
 
       // Check for success indicator
-      const joinSuccess = page.locator('[data-testid="join-success"], [role="alert"]').first();
+      const joinSuccess = page.locator('[data-testid="join-success"], [role="alert"], button:has-text("הצטרפתי")').first();
       await expect(joinSuccess).toBeVisible({ timeout: 8_000 });
     }
   });

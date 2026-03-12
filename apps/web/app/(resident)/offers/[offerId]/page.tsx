@@ -429,6 +429,7 @@ export default function OfferDetailPage() {
           onClick={() => setShowJoinModal(true)}
           disabled={joinMutation.isPending || joinMutation.isSuccess || offer.status !== 'active' || !user?.id}
           className="btn-primary w-full flex items-center justify-center gap-2 text-lg py-3"
+          data-testid="join-offer-button"
         >
           {joinMutation.isPending ? (
             <>

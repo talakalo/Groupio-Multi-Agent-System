@@ -145,7 +145,16 @@ test.describe("Phase 3: Language toggle persistence", () => {
           }),
         });
       }
-      return route.continue();
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          id: "u1",
+          email: "resident@test.com",
+          preferred_language: "he",
+          role: "resident",
+        }),
+      });
     });
     await page.route("**/api/v1/auth/refresh", (route) =>
       route.fulfill({
@@ -176,6 +185,7 @@ test.describe("Phase 3: Language toggle persistence", () => {
         JSON.stringify({
           state: {
             user: { id: "u1", role: "resident", preferredLanguage: "he" },
+            accessToken: "e2e-jwt-token",
             isAuthenticated: true,
           },
           version: 0,
