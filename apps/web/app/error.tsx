@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import React from "react";
 
 interface ErrorPageProps {
@@ -70,12 +71,12 @@ export default function Error({ error, reset }: ErrorPageProps) {
           </a>
         </div>
 
-        {/* Support Link */}
+        {/* Support Link - /chat serves as AI assistant and support */}
         <p className="mt-8 text-sm text-gray-500 dark:text-gray-400">
           הבעיה נמשכת?{" "}
-          <a href="/support" className="text-blue-600 hover:underline">
-            צור קשר עם התמיכה
-          </a>
+          <Link href="/chat" className="text-blue-600 hover:underline">
+            פנה לעוזר AI
+          </Link>
         </p>
       </div>
     </div>

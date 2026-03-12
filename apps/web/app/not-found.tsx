@@ -64,7 +64,7 @@ export default function NotFound() {
               <span className="text-gray-700 dark:text-gray-300">קבלנים</span>
             </Link>
             <Link
-              href="/buildings"
+              href="/building"
               className="flex items-center gap-2 p-3 rounded-lg bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
             >
               <svg className="w-5 h-5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -73,13 +73,13 @@ export default function NotFound() {
               <span className="text-gray-700 dark:text-gray-300">הבניין שלי</span>
             </Link>
             <Link
-              href="/support"
+              href="/chat"
               className="flex items-center gap-2 p-3 rounded-lg bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
             >
               <svg className="w-5 h-5 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" />
               </svg>
-              <span className="text-gray-700 dark:text-gray-300">תמיכה</span>
+              <span className="text-gray-700 dark:text-gray-300">עוזר AI / תמיכה</span>
             </Link>
           </div>
         </div>

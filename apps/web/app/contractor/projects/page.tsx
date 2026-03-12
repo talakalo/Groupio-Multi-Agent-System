@@ -4,6 +4,7 @@ import type { Offer } from '@groupio/types';
 import { useTranslations } from 'next-intl';
 import { useState, useEffect } from 'react';
 
+import Link from 'next/link';
 import { useAuthStore } from '@/lib/stores/authStore';
 
 type ProjectStatus = 'all' | 'in_progress' | 'completed' | 'cancelled';
@@ -225,12 +226,12 @@ export default function ContractorProjectsPage() {
               )}
 
               <div className="mt-4 pt-4 border-t flex gap-2">
-                <a
+                <Link
                   href={`/contractor/projects/${project.id}`}
                   className="text-sky-600 hover:text-sky-700 text-sm font-medium"
                 >
                   {t('viewDetails')}
-                </a>
+                </Link>
                 {project.status === 'completed' && !project.review && (
                   <button className="text-gray-500 hover:text-gray-700 text-sm font-medium mr-4">
                     {t('requestReview')}

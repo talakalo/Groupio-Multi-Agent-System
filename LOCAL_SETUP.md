@@ -241,7 +241,7 @@ python -m pytest tests/unit/ -v
 # With coverage
 python -m pytest tests/unit/ --cov=src --cov-report=html
 
-# Integration tests (requires running services)
+# Integration tests (mocks Redis when unavailable; some tests require PostgreSQL)
 python -m pytest tests/integration/ -v
 ```
 

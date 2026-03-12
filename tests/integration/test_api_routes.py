@@ -535,8 +535,9 @@ class TestAuthAPI:
             data = response.json()
             assert "access_token" in data
 
-    def test_login_invalid_credentials(self, client, mock_db):
+    def test_login_invalid_credentials(self, client, mock_db, mock_redis):
         """Test login with invalid credentials."""
+        mock_redis.check_ip_rate_limit = AsyncMock(return_value=True)
         mock_db.get_user_by_email = AsyncMock(return_value=None)
 
         response = client.post(
@@ -609,8 +610,9 @@ class TestAuthAPI:
         assert data["token"]
         assert data["user"]["email"] == "new@example.com"
 
-    def test_signup_validation_fails(self, client, mock_db):
+    def test_signup_validation_fails(self, client, mock_db, mock_redis):
         """Test signup with invalid payload (short password, etc)."""
+        mock_redis.check_ip_rate_limit = AsyncMock(return_value=True)
         response = client.post(
             "/api/v1/auth/signup",
             json={
@@ -623,8 +625,9 @@ class TestAuthAPI:
         )
         assert response.status_code == 422
 
-    def test_signup_email_exists(self, client, mock_db):
+    def test_signup_email_exists(self, client, mock_db, mock_redis):
         """Test signup with existing email."""
+        mock_redis.check_ip_rate_limit = AsyncMock(return_value=True)
         mock_db.get_user_by_email = AsyncMock(return_value=MagicMock(id="existing"))
         response = client.post(
             "/api/v1/auth/signup",
