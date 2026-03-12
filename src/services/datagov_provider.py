@@ -81,13 +81,16 @@ class DataGovIlProvider:
         fields: list[str] | None = None,
         limit: int = 10,
         offset: int = 0,
+        q: str | None = None,
     ) -> list[dict[str, Any]]:
-        """Search datastore resource. Returns list of records."""
+        """Search datastore resource. Uses q for full-text search when provided."""
         data: dict[str, Any] = {
             "resource_id": resource_id,
             "limit": limit,
             "offset": offset,
         }
+        if q:
+            data["q"] = q
         if filters:
             data["filters"] = filters
         if fields:
@@ -110,6 +113,7 @@ class DataGovIlProvider:
             RESOURCE_SETTLEMENTS,
             fields=[FLD_SYMBOL_YESHUV, FLD_NAME_YESHUV, FLD_NAME_NAFA, FLD_LISHKA],
             limit=20,
+            q=city,
         )
         for rec in records:
             name = _normalize_hebrew(rec.get(FLD_NAME_YESHUV))
@@ -206,19 +210,20 @@ class DataGovIlProvider:
         name = _normalize_hebrew(name)
         if not name:
             return []
-        filters: dict[str, str | int] = {}
+        filters: dict[str, str | int] | None = None
         if company_id:
-            filters["מספר חברה"] = int(company_id) if str(company_id).isdigit() else company_id
+            filters = {"מספר חברה": int(company_id) if str(company_id).isdigit() else company_id}
         records = self.datastore_search(
             RESOURCE_COMPANIES,
-            filters=filters if filters else None,
+            filters=filters,
             fields=["מספר חברה", "שם חברה", "סטטוס חברה", "שם עיר", "שם רחוב", "מספר בית"],
             limit=limit,
+            q=name if not company_id else None,
         )
         out: list[dict[str, Any]] = []
         for rec in records:
             comp_name = _normalize_hebrew(rec.get("שם חברה"))
-            if not _fuzzy_match(name, comp_name) and not _fuzzy_match(comp_name, name):
+            if not company_id and not _fuzzy_match(name, comp_name) and not _fuzzy_match(comp_name, name):
                 continue
             out.append(
                 {

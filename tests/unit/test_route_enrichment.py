@@ -1,8 +1,11 @@
 """Unit tests for enrichment API routes (Phase 2)."""
 
+from unittest.mock import patch
+
 from fastapi.testclient import TestClient
 
 from src.api.main import app
+from src.services import enrichment as enrichment_module
 
 
 def test_normalize_address_returns_structured_result():
@@ -33,8 +36,10 @@ def test_normalize_address_empty_returns_400():
     assert response.status_code == 422
 
 
-def test_normalize_address_low_confidence_preserves_input():
+@patch("src.services.enrichment._is_datagov_enabled", return_value=False)
+def test_normalize_address_low_confidence_preserves_input(_mock):
     """Stub returns confidence=0; caller should preserve user input."""
+    enrichment_module._enrichment_service = None
     client = TestClient(app)
     response = client.post(
         "/api/v1/enrichment/normalize-address",
