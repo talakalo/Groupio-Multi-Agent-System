@@ -418,7 +418,17 @@
       "startedAt": "התחיל",
       "completedAt": "הושלם",
       "viewDetails": "צפה בפרטים",
-      "requestReview": "בקש חוות דעת"
+      "requestReview": "בקש חוות דעת",
+      "statuses": {
+        "draft": "טיוטה",
+        "pending": "ממתין",
+        "matching": "בהתאמה",
+        "matched": "הותאם",
+        "in_progress": "בתהליך",
+        "completed": "הושלם",
+        "cancelled": "בוטל",
+        "active": "פעיל"
+      }
     }
   },
   "onboarding": {

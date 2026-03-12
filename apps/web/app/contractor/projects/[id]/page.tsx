@@ -1,6 +1,5 @@
 'use client';
 
-import type { Offer } from '@groupio/types';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -8,14 +7,43 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { useAuthStore } from '@/lib/stores/authStore';
 
-interface ProjectDetail extends Offer {
+// API returns snake_case: title, building_id, current_participants, pricing_tiers, deadline, created_at
+// pricing_tiers: { min_participants, max_participants, discount_percent, price_per_unit }[]
+interface TierInput {
+  min?: number;
+  max?: number | null;
+  min_participants?: number;
+  max_participants?: number;
+  discount?: number;
+  discount_percent?: number;
+  price?: number;
+  price_per_unit?: number;
+}
+
+interface ProjectDetail {
+  id?: string;
   title?: string;
   description?: string;
+  category?: string;
+  status?: string;
+  building_id?: string;
+  building_name?: string;
+  buildingId?: string;
   building?: { id: string; name?: string; address?: string; city?: string };
-  finalPrice?: number;
+  current_participants?: number;
+  participants?: number;
   participantCount?: number;
+  base_price?: number;
+  basePrice?: number;
+  current_price?: number;
+  finalPrice?: number;
   completedAt?: string;
-  tiers?: { min: number; max: number | null; discount: number; price: number }[];
+  deadline?: string;
+  expiresAt?: string;
+  created_at?: string;
+  createdAt?: string;
+  pricing_tiers?: TierInput[];
+  tiers?: TierInput[];
   currentTier?: number;
 }
 
@@ -88,10 +116,13 @@ export default function ContractorProjectDetailPage() {
 
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
+      draft: 'bg-gray-100 text-gray-800',
+      pending: 'bg-amber-100 text-amber-800',
+      matching: 'bg-blue-100 text-blue-800',
+      matched: 'bg-indigo-100 text-indigo-800',
       in_progress: 'bg-blue-100 text-blue-800',
       completed: 'bg-green-100 text-green-800',
       cancelled: 'bg-red-100 text-red-800',
-      pending: 'bg-amber-100 text-amber-800',
       active: 'bg-emerald-100 text-emerald-800',
     };
     return styles[status] || 'bg-gray-100 text-gray-800';
@@ -123,14 +154,32 @@ export default function ContractorProjectDetailPage() {
     );
   }
 
-  const displayPrice = project.finalPrice ?? project.basePrice;
-  const tiers = project.tiers ?? [];
+  // Normalize tiers: API uses pricing_tiers with min_participants/max_participants/discount_percent/price_per_unit
+  const rawTiers = project.pricing_tiers ?? project.tiers ?? [];
+  const tiers = rawTiers.map((t: TierInput) => ({
+    min: t.min ?? t.min_participants ?? 0,
+    max: t.max ?? t.max_participants ?? null,
+    discount: (t.discount ?? (t.discount_percent ?? 0) / 100) ?? 0,
+    price: t.price ?? t.price_per_unit ?? 0,
+  }));
   const currentTierIdx = project.currentTier ?? 0;
   const currentTier = tiers[currentTierIdx];
-  const displayParticipants = project.participantCount ?? project.participants ?? 0;
+
+  const displayPrice =
+    project.finalPrice ??
+    project.current_price ??
+    project.basePrice ??
+    project.base_price ??
+    currentTier?.price ??
+    0;
+  const displayParticipants =
+    project.participantCount ?? project.participants ?? project.current_participants ?? 0;
+
   const buildingLabel = project.building
     ? [project.building.name, project.building.address, project.building.city].filter(Boolean).join(' • ') || project.building.id
-    : project.buildingId ?? '—';
+    : project.building_name ?? project.buildingId ?? project.building_id ?? '—';
+
+  const expiresAt = project.expiresAt ?? project.deadline;
 
   return (
     <div className="container mx-auto px-4 py-8" dir="rtl">
@@ -156,10 +205,10 @@ export default function ContractorProjectDetailPage() {
               </p>
               <span
                 className={`inline-block mt-2 px-2.5 py-1 rounded-full text-xs font-medium ${getStatusBadge(
-                  project.status
+                  project.status ?? 'draft'
                 )}`}
               >
-                {t(`statuses.${project.status}`)}
+                {t(`statuses.${project.status ?? 'draft'}`)}
               </span>
             </div>
             <div className="text-left">
@@ -188,20 +237,20 @@ export default function ContractorProjectDetailPage() {
               {t('startedAt')}
             </h2>
             <p className="text-gray-900">
-              {new Date(project.createdAt).toLocaleDateString('he-IL', {
+              {new Date(project.createdAt ?? project.created_at ?? '').toLocaleDateString('he-IL', {
                 year: 'numeric',
                 month: 'long',
                 day: 'numeric',
               })}
             </p>
           </div>
-          {project.expiresAt && (
+          {expiresAt && (
             <div>
               <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
                 תאריך יעד
               </h2>
               <p className="text-gray-900">
-                {new Date(project.expiresAt).toLocaleDateString('he-IL', {
+                {new Date(expiresAt).toLocaleDateString('he-IL', {
                   year: 'numeric',
                   month: 'long',
                   day: 'numeric',
@@ -236,13 +285,13 @@ export default function ContractorProjectDetailPage() {
             </h2>
             <p className="text-gray-900">{displayParticipants}</p>
           </div>
-          {currentTier && (
+          {currentTier && (currentTier.discount > 0 || currentTier.price > 0) && (
             <div>
               <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
                 דרגת הנחה נוכחית
               </h2>
               <p className="text-gray-900">
-                {Math.round((currentTier.discount ?? 0) * 100)}% — ₪{currentTier.price?.toLocaleString('he-IL')}
+                {Math.round((currentTier.discount ?? 0) * 100)}% — ₪{(currentTier.price ?? 0).toLocaleString('he-IL')}
               </p>
             </div>
           )}
@@ -260,8 +309,8 @@ export default function ContractorProjectDetailPage() {
                     idx === currentTierIdx ? 'bg-sky-100 text-sky-800' : 'bg-white border border-gray-200 text-gray-700'
                   }`}
                 >
-                  {tier.min}–{tier.max ?? '∞'} משתתפים: {Math.round((tier.discount ?? 0) * 100)}% → ₪
-                  {tier.price?.toLocaleString('he-IL')}
+                  {(tier.min ?? 0)}–{tier.max ?? '∞'} משתתפים: {Math.round((tier.discount ?? 0) * 100)}% → ₪
+                  {(tier.price ?? 0).toLocaleString('he-IL')}
                 </div>
               ))}
             </div>
