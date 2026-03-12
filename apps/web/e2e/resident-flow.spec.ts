@@ -365,9 +365,9 @@ test.describe("Resident Browse Offers Flow", () => {
   test("should display offer details when clicking an offer", async ({ page }) => {
     await page.goto("/offers/offer_001");
 
-    // The offer detail page renders the translated category name in h1, not offer.title
-    await expect(page.locator("h1, h2").first()).toBeVisible();
-    await expect(page.getByText("Cool Air Ltd")).toBeVisible();
+    // Wait for offer to load — avoid error boundary (שגיאה בטעינת)
+    await expect(page.getByText("Cool Air Ltd").first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText("התקנת מזגנים").first()).toBeVisible();
   });
 });
 
@@ -429,9 +429,8 @@ test.describe("Resident Join Offer Flow", () => {
   test("should display offer details page", async ({ page }) => {
     await page.goto("/offers/offer_001");
 
-    // The offer detail page renders the translated category name in h1, not offer.title
-    await expect(page.locator("h1, h2").first()).toBeVisible();
-    await expect(page.getByText("Cool Air Ltd")).toBeVisible();
+    await expect(page.getByText("Cool Air Ltd").first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText("התקנת מזגנים").first()).toBeVisible();
   });
 
   test("should display pricing tiers", async ({ page }) => {
@@ -548,7 +547,12 @@ test.describe("Critical User Journey — Register → Login → Join Offer", () 
     });
 
     await page.route('**/api/v1/auth/register', (route) =>
-      route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ id: 'user_e2e', access_token: 'e2e-token' }) })
+      route.fulfill({
+        status: 201,
+        headers: { 'Set-Cookie': 'refresh_token=e2e-refresh; Path=/; SameSite=Lax' },
+        contentType: 'application/json',
+        body: JSON.stringify({ id: 'user_e2e', access_token: 'e2e-token', token: 'e2e-token' }),
+      })
     );
     await page.route('**/api/v1/auth/login*', (route) =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ token: 'e2e-token', access_token: 'e2e-token' }) })
@@ -575,19 +579,16 @@ test.describe("Critical User Journey — Register → Login → Join Offer", () 
     await page.goto("/signup");
     await expect(page).toHaveURL(/signup/);
 
-    // Select resident role (data-testid may not exist; fall back to button text)
-    const residentCard = page.locator('[data-testid="role-resident"]');
-    if (await residentCard.count() > 0) {
-      await residentCard.click();
-    }
-    // Advance from step 1 (role selection) to step 2 (details form)
-    await page.click('button:has-text("המשך")');
+    // Select resident role and advance to details form
+    await page.getByRole("button", { name: /דייר/ }).click();
+    await page.getByRole("button", { name: /המשך/ }).click();
 
     // Fill registration form (step 2 fields — use id or name attributes)
     await page.fill('#name', "Test Resident");
     await page.fill('#email', "e2e-resident@groupio-test.co.il");
     await page.fill('#phone', "0501234567");
     await page.fill('#password', "SecurePass123!");
+    await page.check('#tos');
     // buildingId field may not exist on this form — skip if absent
     const buildingIdInput = page.locator('input[name="buildingId"]');
     if (await buildingIdInput.count() > 0) {
@@ -617,20 +618,15 @@ test.describe("Critical User Journey — Register → Login → Join Offer", () 
 
     // ── 3. Browse offers ─────────────────────────────────────────────────
     await page.goto("/offers");
-    await expect(page).toHaveURL(/offers/);
+    await expect(page).toHaveURL(/offers/, { timeout: 10000 });
 
     // Wait for offers to load
     const offerCard = page.locator('[data-testid="offer-card"]').first();
-    const hasOffers = await offerCard.count() > 0;
-    if (!hasOffers) {
-      // No offers in test environment — verify empty state renders correctly
-      await expect(page.locator("text=/אין הצעות|no offers/i")).toBeVisible();
-      return;
-    }
+    await expect(offerCard).toBeVisible({ timeout: 10000 });
 
     // ── 4. Join offer — validates real userId is sent ──────────────────
     await offerCard.click();
-    await expect(page).toHaveURL(/offers\/.+/, { timeout: 5_000 });
+    await expect(page).toHaveURL(/offers\/.+/, { timeout: 10000 });
 
     const joinButton = page.locator('[data-testid="join-offer-button"]');
     if (await joinButton.count() > 0) {
@@ -649,8 +645,8 @@ test.describe("Critical User Journey — Register → Login → Join Offer", () 
         expect(userId).toBeTruthy();
       }
 
-      // Check for success indicator
-      const joinSuccess = page.locator('[data-testid="join-success"], [role="alert"], button:has-text("הצטרפתי")').first();
+      // Check for success indicator (button shows "הצטרפת" when joined)
+      const joinSuccess = page.locator('button:has-text("הצטרפת"), [data-testid="join-success"], [role="alert"]').first();
       await expect(joinSuccess).toBeVisible({ timeout: 8_000 });
     }
   });

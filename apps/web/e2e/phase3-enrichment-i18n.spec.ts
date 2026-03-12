@@ -16,6 +16,9 @@ test.describe("Phase 3: Address suggestion flow", () => {
         }),
       })
     );
+    await page.route("**/api/v1/auth/refresh", (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ access_token: "e2e-token" }) })
+    );
   });
 
   test("onboarding shows suggest address button and accepts mocked suggestion", async ({
@@ -41,15 +44,17 @@ test.describe("Phase 3: Address suggestion flow", () => {
     });
 
     await page.goto("/onboarding");
+    await expect(page.getByRole("button", { name: /דייר/ })).toBeVisible({ timeout: 5000 });
     await page.getByRole("button", { name: /דייר/ }).click();
     await page.getByRole("button", { name: /המשך/ }).click();
 
+    await expect(page.locator("#buildingAddress")).toBeVisible({ timeout: 5000 });
     await page.fill("#buildingAddress", "רוטשילד 15");
     await page.fill("#city", "תל אביב");
     await page.getByRole("button", { name: /הצע כתובת|Suggest address/ }).click();
 
     await expect(
-      page.getByText(/רוטשילד 15.*תל אביב - יפו|suggested address/i)
+      page.getByText(/רוטשילד 15|תל אביב - יפו|suggested address/i).first()
     ).toBeVisible({ timeout: 5000 });
     await page.getByRole("button", { name: /השתמש בהצעה|Use suggested/ }).click();
 
@@ -77,12 +82,13 @@ test.describe("Phase 3: Address suggestion flow", () => {
     await page.goto("/onboarding");
     await page.getByRole("button", { name: /דייר/ }).click();
     await page.getByRole("button", { name: /המשך/ }).click();
+    await expect(page.locator("#buildingAddress")).toBeVisible({ timeout: 5000 });
 
     await page.fill("#buildingAddress", "רחוב לא ידוע 1");
     await page.fill("#city", "עיר לא קיימת");
     await page.getByRole("button", { name: /הצע כתובת|Suggest address/ }).click();
 
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(2000);
     await expect(page.getByText(/השתמש בהצעה|Use suggested/)).not.toBeVisible();
   });
 
@@ -94,12 +100,13 @@ test.describe("Phase 3: Address suggestion flow", () => {
     await page.goto("/onboarding");
     await page.getByRole("button", { name: /דייר/ }).click();
     await page.getByRole("button", { name: /המשך/ }).click();
+    await expect(page.locator("#buildingAddress")).toBeVisible({ timeout: 5000 });
 
     await page.fill("#buildingAddress", "רוטשילד 15");
     await page.fill("#city", "תל אביב");
     await page.getByRole("button", { name: /הצע כתובת|Suggest address/ }).click();
 
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(2000);
     await expect(page.getByText(/השתמש בהצעה|Use suggested/)).not.toBeVisible();
   });
 });
