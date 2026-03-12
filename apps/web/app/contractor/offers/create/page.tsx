@@ -97,7 +97,7 @@ export default function CreateOfferPage() {
         deadline,
         building_id: data.buildingId,
       });
-      router.push(`/contractor/offers/${offer.id}`);
+      router.push(`/contractor/projects/${offer.id}`);
     } catch (error) {
       const message =
         error instanceof ApiError ? error.message : t('errors.createFailed');

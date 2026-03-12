@@ -36,12 +36,16 @@ export function middleware(request: NextRequest): NextResponse {
   // This cookie cannot be read or written by client-side JavaScript, so
   // its presence is a reliable authentication signal.
   const refreshToken = request.cookies.get("refresh_token");
-
   if (!refreshToken?.value) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("from", pathname);
     return NextResponse.redirect(loginUrl);
   }
+
+  // NOTE: Admin role is enforced by the backend (get_admin_user) on API calls.
+  // The login page also verifies role before granting access. A future hardening
+  // could require the admin_role_verified cookie (set by login after role check)
+  // in addition to refresh_token, once all users have re-logged.
 
   return addSecurityHeaders(NextResponse.next());
 }

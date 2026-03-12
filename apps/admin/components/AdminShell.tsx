@@ -166,6 +166,7 @@ function Header({ sidebarCollapsed }: { sidebarCollapsed: boolean }) {
     } finally {
       if (typeof window !== "undefined") {
         sessionStorage.removeItem("auth_token");
+        document.cookie = "admin_role_verified=; path=/; max-age=0";
         router.push("/login");
       }
     }
