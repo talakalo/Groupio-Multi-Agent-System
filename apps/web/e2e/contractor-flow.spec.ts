@@ -85,15 +85,15 @@ async function setupCommonMocks(page: Page) {
 }
 
 async function setupContractorAuth(page: Page) {
-  // Set cookies so Next.js middleware allows access to /contractor routes
+  // Set cookies so Next.js middleware allows access to /contractor routes.
+  // Playwright requires url OR path, not both.
   await page.context().addCookies([
-    { name: "refresh_token", value: "e2e-contractor-refresh", path: "/", url: "http://localhost:3000" },
+    { name: "refresh_token", value: "e2e-contractor-refresh", url: "http://localhost:3000" },
     {
       name: "groupio-auth",
       value: encodeURIComponent(JSON.stringify({
         state: { user: { role: "contractor" }, isAuthenticated: true },
       })),
-      path: "/",
       url: "http://localhost:3000",
     },
   ]);
@@ -112,12 +112,6 @@ async function setupContractorAuth(page: Page) {
       })
     );
   });
-  // Set cookies the Next.js Edge middleware reads:
-  // refresh_token (presence = session valid) + groupio-auth (role for routing)
-  await page.context().addCookies([
-    { name: "refresh_token", value: "e2e-refresh-token", url: "http://localhost:3000" },
-    { name: "groupio-auth", value: encodeURIComponent(JSON.stringify({ state: { user: { role: "contractor" }, isAuthenticated: true } })), url: "http://localhost:3000" },
-  ]);
 }
 
 // ============================================================================
