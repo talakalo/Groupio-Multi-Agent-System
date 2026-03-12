@@ -49,11 +49,6 @@ const RESOURCE_TYPES = [
   { value: 'setting', label: 'Setting' },
 ];
 
-function getToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return sessionStorage.getItem('auth_token');
-}
-
 async function fetchAuditLogs(params: {
   page: number;
   page_size: number;
@@ -62,7 +57,6 @@ async function fetchAuditLogs(params: {
   date_from?: string;
   date_to?: string;
 }): Promise<AuditLogsResponse> {
-  const token = getToken();
   const searchParams = new URLSearchParams();
   searchParams.set('page', String(params.page));
   searchParams.set('page_size', String(params.page_size));
@@ -72,10 +66,8 @@ async function fetchAuditLogs(params: {
   if (params.date_to) searchParams.set('date_to', params.date_to);
 
   const res = await fetch(`${API_URL}/api/v1/admin/audit-logs?${searchParams.toString()}`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
   });
 
   if (!res.ok) {

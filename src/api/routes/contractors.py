@@ -182,6 +182,34 @@ async def search_contractors(
     )
 
 
+@router.get("/me/doc-requests")
+async def get_my_doc_requests(
+    current_user: UserInDB = Depends(get_current_user),
+) -> dict:
+    """Get pending document requests for the current contractor (set by admin via request-docs)."""
+    if not current_user.contractor_id:
+        return {"items": [], "pending": False}
+
+    import json
+    from src.databases.redis_client import get_redis_client
+
+    redis = get_redis_client()
+    raw = await redis.get(f"doc_request:{current_user.contractor_id}")
+    if not raw:
+        return {"items": [], "pending": False}
+
+    try:
+        payload = json.loads(raw)
+        return {
+            "items": [payload],
+            "pending": True,
+            "requested_at": payload.get("requested_at"),
+            "message": payload.get("message", ""),
+        }
+    except (json.JSONDecodeError, TypeError):
+        return {"items": [], "pending": False}
+
+
 @router.get("/{contractor_id}", response_model=ContractorResponse)
 async def get_contractor(contractor_id: str) -> ContractorResponse:
     """Get contractor by ID."""

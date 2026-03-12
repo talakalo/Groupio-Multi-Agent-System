@@ -986,3 +986,57 @@ async def get_contractor_verification_metadata(
             )
 
     return {"items": items, "contractor_id": contractor_id}
+
+
+# --------------- Request contractor documents ---------------
+
+
+class RequestDocsBody(BaseModel):
+    """Optional message when requesting documents from a contractor."""
+
+    message: str = "Please upload additional documents to complete your verification."
+
+
+@router.post("/contractors/{contractor_id}/request-docs")
+async def request_contractor_docs(
+    contractor_id: str,
+    request: Request,
+    body: RequestDocsBody | None = None,
+    admin: UserInDB = Depends(get_admin_user),
+) -> dict[str, str]:
+    """Request additional documents from a contractor. Persisted in Redis; contractor can see via GET /contractors/me/doc-requests."""
+    db = get_postgres_client()
+    contractor = await db.get_contractor(contractor_id)
+    if not contractor:
+        raise HTTPException(status_code=404, detail="Contractor not found")
+
+    import json
+    from src.databases.redis_client import get_redis_client
+
+    redis = get_redis_client()
+    payload = {
+        "requested_at": datetime.now(UTC).isoformat(),
+        "requested_by": admin.id,
+        "requested_by_email": admin.email,
+        "message": (body.message if body else "") or "Please upload additional documents to complete your verification.",
+    }
+    await redis.set(
+        f"doc_request:{contractor_id}",
+        json.dumps(payload),
+        ex=30 * 24 * 60 * 60,  # 30 days
+    )
+
+    await db.create_audit_log(
+        {
+            "user_id": admin.id,
+            "action": "request_docs",
+            "resource_type": "contractor",
+            "resource_id": contractor_id,
+            "details": {"message": payload["message"]},
+            "ip_address": request.client.host if request.client else None,
+        }
+    )
+
+    logger.info("Admin %s requested docs from contractor %s", admin.email, contractor_id)
+
+    return {"status": "doc_request_sent", "contractor_id": contractor_id}

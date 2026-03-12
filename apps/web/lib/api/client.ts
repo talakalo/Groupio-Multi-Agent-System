@@ -241,19 +241,39 @@ class ApiClient {
     buildingId?: string;
   }) {
     return this.request<{ token: string; user: import("@groupio/types").Resident }>(
-      "/api/v1/auth/register",
+      "/api/v1/auth/signup",
       {
         method: "POST",
         body: {
-          full_name: data.name,
+          name: data.name,
           email: data.email,
           phone: data.phone,
           password: data.password,
           role: data.role,
-          building_id: data.buildingId,
+          buildingId: data.buildingId,
         },
       }
     );
+  }
+
+  async verifyEmail(token: string) {
+    return this.request<{ status: string }>(`/api/v1/auth/verify-email/${encodeURIComponent(token)}`, {
+      method: "POST",
+    });
+  }
+
+  async resendVerificationByEmail(email: string) {
+    return this.request<{ status: string }>("/api/v1/auth/resend-verification-by-email", {
+      method: "POST",
+      body: { email },
+    });
+  }
+
+  /** Resend verification (requires auth). */
+  async resendVerification() {
+    return this.request<{ status: string }>("/api/v1/auth/resend-verification", {
+      method: "POST",
+    });
   }
 
   // ---- Payment endpoints ----

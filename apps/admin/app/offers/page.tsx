@@ -115,18 +115,10 @@ const CATEGORY_LABELS: Record<string, string> = {
 // API helpers
 // ---------------------------------------------------------------------------
 
-function getAuthHeaders(): Record<string, string> {
-  const token =
-    typeof window !== "undefined" ? sessionStorage.getItem("auth_token") : null;
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-  return headers;
-}
+const fetchOpts = (): RequestInit => ({ credentials: "include", headers: { "Content-Type": "application/json" } });
 
 async function fetchOffers(): Promise<Offer[]> {
-  const res = await fetch(`${API_URL}/api/v1/admin/offers`, {
-    headers: getAuthHeaders(),
-  });
+  const res = await fetch(`${API_URL}/api/v1/admin/offers`, fetchOpts());
   if (!res.ok) throw new Error("Failed to fetch offers");
   const data = await res.json();
   return data.offers ?? data.items ?? data;
@@ -135,7 +127,7 @@ async function fetchOffers(): Promise<Offer[]> {
 async function approveOffer(id: string): Promise<void> {
   const res = await fetch(`${API_URL}/api/v1/admin/offers/${id}/approve`, {
     method: "POST",
-    headers: getAuthHeaders(),
+    ...fetchOpts(),
   });
   if (!res.ok) throw new Error("Failed to approve offer");
 }
@@ -143,7 +135,7 @@ async function approveOffer(id: string): Promise<void> {
 async function cancelOffer(id: string): Promise<void> {
   const res = await fetch(`${API_URL}/api/v1/admin/offers/${id}/cancel`, {
     method: "POST",
-    headers: getAuthHeaders(),
+    ...fetchOpts(),
   });
   if (!res.ok) throw new Error("Failed to cancel offer");
 }
@@ -151,13 +143,13 @@ async function cancelOffer(id: string): Promise<void> {
 async function flagOffer(id: string): Promise<void> {
   const res = await fetch(`${API_URL}/api/v1/admin/offers/${id}/flag`, {
     method: "POST",
-    headers: getAuthHeaders(),
+    ...fetchOpts(),
   });
   if (!res.ok) throw new Error("Failed to flag offer");
 }
 
 async function downloadCsv(url: string, filename: string): Promise<void> {
-  const res = await fetch(url, { headers: getAuthHeaders() });
+  const res = await fetch(url, fetchOpts());
   if (!res.ok) throw new Error("Export failed");
   const blob = await res.blob();
   const href = URL.createObjectURL(blob);

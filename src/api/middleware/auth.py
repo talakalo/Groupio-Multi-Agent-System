@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 
 import bcrypt
 import jwt
-from fastapi import Depends, HTTPException, Security
+from fastapi import Depends, HTTPException, Request, Security
 from fastapi.security import APIKeyHeader, OAuth2PasswordBearer
 
 from src.config.settings import get_settings
@@ -15,6 +15,16 @@ logger = logging.getLogger(__name__)
 
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
+
+
+async def _get_token_from_header_or_cookie(
+    request: Request,
+    header_token: str | None = Depends(oauth2_scheme),
+) -> str | None:
+    """Return token from Authorization header first, else from access_token cookie."""
+    if header_token:
+        return header_token
+    return request.cookies.get("access_token")
 
 
 def _utcnow() -> datetime:
@@ -130,7 +140,7 @@ def verify_refresh_token(token: str) -> dict | None:
 
 
 async def get_current_user(
-    token: str | None = Depends(oauth2_scheme),
+    token: str | None = Depends(_get_token_from_header_or_cookie),
 ) -> UserInDB:
     """Get the current authenticated user from the token."""
     if not token:

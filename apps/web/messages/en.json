@@ -368,6 +368,7 @@
         "regions": "Regions"
       },
       "documents": {
+        "requestBannerTitle": "Additional documents requested",
         "license": "License",
         "insurance": "Insurance",
         "certifications": "Certifications",

@@ -66,18 +66,10 @@ const ROLE_BADGE_CLASSES: Record<string, string> = {
 // API helpers
 // ---------------------------------------------------------------------------
 
-function getAuthHeaders(): Record<string, string> {
-  const token =
-    typeof window !== "undefined" ? sessionStorage.getItem("auth_token") : null;
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-  return headers;
-}
+const fetchOpts = (): RequestInit => ({ credentials: "include", headers: { "Content-Type": "application/json" } });
 
 async function fetchUsers(): Promise<User[]> {
-  const res = await fetch(`${API_URL}/api/v1/admin/users`, {
-    headers: getAuthHeaders(),
-  });
+  const res = await fetch(`${API_URL}/api/v1/admin/users`, fetchOpts());
   if (!res.ok) throw new Error("Failed to fetch users");
   const data = await res.json();
   const raw = data.users ?? data.items ?? data;
@@ -98,7 +90,7 @@ async function updateUser(
 ): Promise<User> {
   const res = await fetch(`${API_URL}/api/v1/admin/users/${id}`, {
     method: "PUT",
-    headers: getAuthHeaders(),
+    ...fetchOpts(),
     body: JSON.stringify(payload),
   });
   if (!res.ok) throw new Error("Failed to update user");
@@ -113,7 +105,7 @@ async function createUser(payload: {
 }): Promise<User> {
   const res = await fetch(`${API_URL}/api/v1/admin/users`, {
     method: "POST",
-    headers: getAuthHeaders(),
+    ...fetchOpts(),
     body: JSON.stringify({ ...payload, role: "admin" }),
   });
   if (!res.ok) {

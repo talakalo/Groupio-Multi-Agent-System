@@ -482,18 +482,11 @@ function getApiBase(): string {
   return raw.endsWith("/api/v1") ? raw : `${raw}/api/v1`;
 }
 
-function getAuthHeaders(): Record<string, string> {
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  const token = typeof window !== "undefined" ? sessionStorage.getItem("auth_token") : null;
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-  return headers;
-}
-
 async function fetchApi<T>(path: string, options?: RequestInit): Promise<T | null> {
   try {
     const res = await fetch(`${getApiBase()}${path}`, {
-      headers: getAuthHeaders(),
       credentials: "include",
+      headers: { "Content-Type": "application/json" },
       ...options,
     });
     if (!res.ok) return null;

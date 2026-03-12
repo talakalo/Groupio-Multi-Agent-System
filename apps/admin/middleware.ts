@@ -33,8 +33,6 @@ export function middleware(request: NextRequest): NextResponse {
   }
 
   // Check for the HTTP-only refresh token set by the backend at login.
-  // This cookie cannot be read or written by client-side JavaScript, so
-  // its presence is a reliable authentication signal.
   const refreshToken = request.cookies.get("refresh_token");
   if (!refreshToken?.value) {
     const loginUrl = new URL("/login", request.url);
@@ -42,10 +40,15 @@ export function middleware(request: NextRequest): NextResponse {
     return NextResponse.redirect(loginUrl);
   }
 
-  // NOTE: Admin role is enforced by the backend (get_admin_user) on API calls.
-  // The login page also verifies role before granting access. A future hardening
-  // could require the admin_role_verified cookie (set by login after role check)
-  // in addition to refresh_token, once all users have re-logged.
+  // Require admin_role_verified cookie set by login page after role check.
+  // Reduces exposure: non-admin users who never complete admin login won't have it.
+  // Backend API remains source of truth for authorization.
+  const adminRoleVerified = request.cookies.get("admin_role_verified");
+  if (!adminRoleVerified?.value) {
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("from", pathname);
+    return NextResponse.redirect(loginUrl);
+  }
 
   return addSecurityHeaders(NextResponse.next());
 }
