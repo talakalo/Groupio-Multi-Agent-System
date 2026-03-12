@@ -188,10 +188,10 @@ async function setupBaseMocks(page: Page) {
 test("1. Signup → onboarding → redirect to dashboard", async ({ page }) => {
   await setupBaseMocks(page);
 
-  // Mock signup → correct endpoint is /auth/register (not /auth/signup)
-  await page.route("**/api/v1/auth/register", (r) =>
+  // Mock signup → client uses /auth/signup
+  await page.route("**/api/v1/auth/signup", (r) =>
     r.fulfill({
-      status: 200,
+      status: 201,
       headers: {
         "Content-Type": "application/json",
         // Set refresh_token so middleware allows navigation to /dashboard after signup

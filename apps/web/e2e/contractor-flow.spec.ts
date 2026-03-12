@@ -85,6 +85,18 @@ async function setupCommonMocks(page: Page) {
 }
 
 async function setupContractorAuth(page: Page) {
+  // Set cookies so Next.js middleware allows access to /contractor routes
+  await page.context().addCookies([
+    { name: "refresh_token", value: "e2e-contractor-refresh", path: "/", url: "http://localhost:3000" },
+    {
+      name: "groupio-auth",
+      value: encodeURIComponent(JSON.stringify({
+        state: { user: { role: "contractor" }, isAuthenticated: true },
+      })),
+      path: "/",
+      url: "http://localhost:3000",
+    },
+  ]);
   // Set localStorage for the Zustand client-side auth store
   await page.addInitScript(() => {
     localStorage.setItem(
