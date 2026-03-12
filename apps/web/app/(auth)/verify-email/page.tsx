@@ -3,7 +3,7 @@
 import { Building2, CheckCircle, XCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 
 import { apiClient, ApiError } from "@/lib/api/client";
 import { cn } from "@/lib/utils/cn";
@@ -14,30 +14,29 @@ function VerifyEmailContent() {
   const [status, setStatus] = useState<"pending" | "success" | "error">("pending");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const verify = useCallback(async () => {
-    if (!token) {
-      setStatus("error");
-      setErrorMessage("קישור לאימות לא תקין. נא לבדוק את הדוא״ל או לבקש שליחה חוזרת.");
-      return;
-    }
-    try {
-      await apiClient.verifyEmail(token);
-      setStatus("success");
-    } catch (err) {
-      setStatus("error");
-      const msg = err instanceof ApiError ? err.message : "שגיאה באימות. נסו שוב או בקשו שליחה חוזרת.";
-      setErrorMessage(msg);
-    }
-  }, [token]);
+  const displayStatus = !token ? "error" : status;
+  const displayMessage = !token ? "קישור לאימות לא תקין." : errorMessage;
 
   useEffect(() => {
-    if (token && status === "pending") {
-      verify();
-    } else if (!token) {
-      setStatus("error");
-      setErrorMessage("קישור לאימות לא תקין.");
-    }
-  }, [token, status, verify]);
+    if (!token || status !== "pending") return;
+    let cancelled = false;
+    apiClient
+      .verifyEmail(token)
+      .then(() => {
+        if (!cancelled) setStatus("success");
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setStatus("error");
+          setErrorMessage(
+            err instanceof ApiError ? err.message : "שגיאה באימות. נסו שוב או בקשו שליחה חוזרת."
+          );
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, status]);
 
   return (
     <div className="w-full max-w-md space-y-6">
@@ -49,7 +48,7 @@ function VerifyEmailContent() {
       </div>
 
       <div className="card text-center">
-        {status === "pending" && (
+        {displayStatus === "pending" && (
           <div className="flex flex-col items-center gap-4 py-8">
             <Loader2 className="h-12 w-12 text-primary-500 animate-spin" aria-hidden />
             <h2 className="text-lg font-semibold text-gray-900">מאמתים את האימייל שלכם...</h2>
@@ -57,7 +56,7 @@ function VerifyEmailContent() {
           </div>
         )}
 
-        {status === "success" && (
+        {displayStatus === "success" && (
           <div className="flex flex-col items-center gap-4 py-8">
             <CheckCircle className="h-14 w-14 text-emerald-500" aria-hidden />
             <h2 className="text-lg font-semibold text-gray-900">האימייל אומת בהצלחה</h2>
@@ -71,11 +70,11 @@ function VerifyEmailContent() {
           </div>
         )}
 
-        {status === "error" && (
+        {displayStatus === "error" && (
           <div className="flex flex-col items-center gap-4 py-8">
             <XCircle className="h-14 w-14 text-red-500" aria-hidden />
             <h2 className="text-lg font-semibold text-gray-900">אימות נכשל</h2>
-            <p className={cn("text-sm text-gray-600", "text-red-600")}>{errorMessage}</p>
+            <p className={cn("text-sm text-gray-600", "text-red-600")}>{displayMessage}</p>
             <div className="flex flex-wrap justify-center gap-3 mt-2">
               <Link href="/login" className="btn-secondary">
                 חזרה להתחברות

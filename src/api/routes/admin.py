@@ -2,6 +2,7 @@
 
 import csv
 import io
+import json
 import logging
 from datetime import UTC, date, datetime
 from typing import Any
@@ -13,6 +14,7 @@ from pydantic import BaseModel, EmailStr
 
 from src.api.middleware.auth import get_admin_user, hash_password
 from src.databases.postgres import get_postgres_client
+from src.databases.redis_client import get_redis_client
 from src.databases.vector_store import get_vector_store
 from src.models.user import UserInDB
 from src.orchestration.graph import get_orchestrator
@@ -1004,21 +1006,19 @@ async def request_contractor_docs(
     body: RequestDocsBody | None = None,
     admin: UserInDB = Depends(get_admin_user),
 ) -> dict[str, str]:
-    """Request additional documents from a contractor. Persisted in Redis; contractor can see via GET /contractors/me/doc-requests."""
+    """Request docs from contractor. Stored in Redis; contractor sees via GET /contractors/me/doc-requests."""
     db = get_postgres_client()
     contractor = await db.get_contractor(contractor_id)
     if not contractor:
         raise HTTPException(status_code=404, detail="Contractor not found")
 
-    import json
-    from src.databases.redis_client import get_redis_client
-
     redis = get_redis_client()
+    default_msg = "Please upload additional documents to complete your verification."
     payload = {
         "requested_at": datetime.now(UTC).isoformat(),
         "requested_by": admin.id,
         "requested_by_email": admin.email,
-        "message": (body.message if body else "") or "Please upload additional documents to complete your verification.",
+        "message": (body.message if body else "") or default_msg,
     }
     await redis.set(
         f"doc_request:{contractor_id}",
