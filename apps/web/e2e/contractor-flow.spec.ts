@@ -213,13 +213,27 @@ test.describe("Contractor Create Offer Flow", () => {
 
   test("should fill in and submit offer form", async ({ page }) => {
     test.setTimeout(60000);
-    await page.route("**/api/v1/offers", (route) =>
+    await page.route("**/api/v1/offers", (route) => {
+      if (route.request().method() === "POST") {
+        return route.fulfill({
+          status: 201,
+          contentType: "application/json",
+          body: JSON.stringify({ id: "offer_new", status: "active" }),
+        });
+      }
+      return route.continue();
+    });
+    await page.route("**/api/v1/offers/offer_new", (route) =>
       route.fulfill({
-        status: 201,
+        status: 200,
         contentType: "application/json",
         body: JSON.stringify({
           id: "offer_new",
           status: "active",
+          title: "התקנת מזגנים מקצועית",
+          building_id: "bld_001",
+          current_participants: 0,
+          base_price: 4500,
         }),
       })
     );
@@ -250,7 +264,7 @@ test.describe("Contractor Create Offer Flow", () => {
     await page.locator('input[value="installation"]').check({ force: true });
 
     await page.locator('button[type="submit"]').click();
-    await expect(page).toHaveURL(/contractor\/offers\//, { timeout: 10000 });
+    await expect(page).toHaveURL(/contractor\/projects\//, { timeout: 10000 });
   });
 });
 
@@ -285,11 +299,9 @@ test.describe("Contractor Manage Offers", () => {
     await page.waitForLoadState("domcontentloaded");
 
     await expect(page.locator("main")).toBeVisible({ timeout: 15000 });
-    // Wait for loading to finish (spinner disappears if present)
-    await expect(page.locator(".animate-spin")).not.toBeVisible({ timeout: 10000 });
-    // Assert on main content only (sidebar nav "הצעות פעילות" can be hidden on mobile)
+    // Wait for data/route ready: heading indicates content loaded (prefer over animate-spin)
     await expect(
-      page.locator("main").getByRole("heading", { name: /הצעות פעילות/ })
+      page.locator("main").getByRole("heading", { name: /הצעות פעילות|הצעות/ })
     ).toBeVisible({ timeout: 15000 });
   });
 

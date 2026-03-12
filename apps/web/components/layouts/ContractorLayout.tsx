@@ -43,7 +43,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'לוח בקרה', href: '/contractor/dashboard', icon: LayoutDashboard },
-  { label: 'הצעות פעילות', href: '/contractor/offers', icon: Tag },
+  { label: 'הצעות פעילות', href: '/contractor/offers/active', icon: Tag },
   { label: 'צור הצעה', href: '/contractor/offers/create', icon: PlusCircle },
   { label: 'פרויקטים', href: '/contractor/projects', icon: FolderKanban },
   { label: 'פרופיל', href: '/contractor/profile', icon: UserCircle },

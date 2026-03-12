@@ -15,9 +15,9 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
  * will be added in Phase 1 once the backend endpoint is implemented.
  *
  * Token storage: stored in sessionStorage (tab-scoped, cleared on close).
+ * Do NOT store in localStorage; avoid URLs/logs. See apps/admin/SECURITY.md.
  * The HTTP-only refresh_token cookie set by the backend handles silent
- * refresh. The admin middleware.ts ensures all admin routes require the
- * refresh_token cookie to be present.
+ * refresh. The admin middleware ensures all admin routes require refresh_token.
  */
 export default function LoginPage() {
   const router = useRouter();
@@ -70,6 +70,14 @@ export default function LoginPage() {
         // Store in sessionStorage: tab-scoped, cleared when browser tab is closed.
         // Use "auth_token" key so AdminShell, users/offers pages, and hooks find it.
         sessionStorage.setItem("auth_token", token);
+
+        // Set admin-role cookie for middleware. Middleware requires both refresh_token
+        // and this cookie so non-admin users (who never complete admin login) cannot
+        // reach protected routes. Backend remains source of truth for API authorization.
+        if (typeof document !== "undefined") {
+          document.cookie =
+            "admin_role_verified=1; path=/; SameSite=Strict; max-age=86400";
+        }
 
         router.push("/dashboard");
       } catch (err: unknown) {
