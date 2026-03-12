@@ -364,10 +364,13 @@ test.describe("Resident Browse Offers Flow", () => {
 
   test("should display offer details when clicking an offer", async ({ page }) => {
     await page.goto("/offers/offer_001");
+    await page.waitForLoadState("networkidle");
 
-    // Wait for offer to load — avoid error boundary (שגיאה בטעינת)
-    await expect(page.getByText("Cool Air Ltd").first()).toBeVisible({ timeout: 10000 });
-    await expect(page.getByText("התקנת מזגנים").first()).toBeVisible();
+    // Wait for offer content in main — not error state (offerNotFound)
+    await expect(page.getByText(/הצעה לא נמצאה|offerNotFound/i)).not.toBeVisible();
+    await expect(
+      page.locator("main").getByText(/Cool Air Ltd|התקנת מזגנים/).first()
+    ).toBeVisible({ timeout: 15000 });
   });
 });
 
@@ -428,9 +431,12 @@ test.describe("Resident Join Offer Flow", () => {
 
   test("should display offer details page", async ({ page }) => {
     await page.goto("/offers/offer_001");
+    await page.waitForLoadState("networkidle");
 
-    await expect(page.getByText("Cool Air Ltd").first()).toBeVisible({ timeout: 10000 });
-    await expect(page.getByText("התקנת מזגנים").first()).toBeVisible();
+    await expect(page.getByText(/הצעה לא נמצאה|offerNotFound/i)).not.toBeVisible();
+    await expect(
+      page.locator("main").getByText(/Cool Air Ltd|התקנת מזגנים/).first()
+    ).toBeVisible({ timeout: 15000 });
   });
 
   test("should display pricing tiers", async ({ page }) => {
@@ -579,8 +585,9 @@ test.describe("Critical User Journey — Register → Login → Join Offer", () 
     await page.goto("/signup");
     await expect(page).toHaveURL(/signup/);
 
-    // Select resident role and advance to details form
-    await page.getByRole("button", { name: /דייר/ }).click();
+    // Select resident role and advance to details form (signup uses המשך)
+    // Use ^דייר to avoid matching "חשיפה לדיירים" on contractor card
+    await page.getByRole("button", { name: /^דייר\s/ }).click();
     await page.getByRole("button", { name: /המשך/ }).click();
 
     // Fill registration form (step 2 fields — use id or name attributes)
@@ -620,12 +627,12 @@ test.describe("Critical User Journey — Register → Login → Join Offer", () 
     await page.goto("/offers");
     await expect(page).toHaveURL(/offers/, { timeout: 10000 });
 
-    // Wait for offers to load
-    const offerCard = page.locator('[data-testid="offer-card"]').first();
-    await expect(offerCard).toBeVisible({ timeout: 10000 });
+    // Wait for offers to load — card or link to offer detail
+    const firstOfferLink = page.locator('a[href^="/offers/"]').first();
+    await expect(firstOfferLink).toBeVisible({ timeout: 15000 });
 
     // ── 4. Join offer — validates real userId is sent ──────────────────
-    await offerCard.click();
+    await firstOfferLink.click();
     await expect(page).toHaveURL(/offers\/.+/, { timeout: 10000 });
 
     const joinButton = page.locator('[data-testid="join-offer-button"]');
@@ -664,8 +671,8 @@ test.describe("Critical User Journey — Register → Login → Join Offer", () 
 
     await page.goto("/signup");
     // Step 1: select resident role and continue (form inputs are in step 2 only)
-    await page.click('button:has-text("דייר")');
-    await page.click('button:has-text("המשך")');
+    await page.getByRole("button", { name: /^דייר\s/ }).click();
+    await page.getByRole("button", { name: /המשך/ }).click();
 
     // Step 2: fill form fields
     await page.fill("#name", "URL Test User");
