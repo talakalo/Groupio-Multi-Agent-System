@@ -7,16 +7,12 @@ const MOCK_ADMIN_USER = {
 };
 
 async function setupAdminAuth(page: Page) {
-  await page.addInitScript(() => {
-    localStorage.setItem(
-      'auth',
-      JSON.stringify({
-        user: { id: 'admin-1', email: 'admin@groupio.co.il', role: 'admin' },
-        token: 'admin_jwt_token',
-      })
-    );
-    localStorage.setItem('auth_token', 'admin_jwt_token');
-  });
+  // Admin uses cookie-based auth: refresh_token + admin_role_verified (no sessionStorage)
+  const baseUrl = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3001';
+  await page.context().addCookies([
+    { name: 'refresh_token', value: 'e2e-admin-refresh', url: baseUrl },
+    { name: 'admin_role_verified', value: '1', url: baseUrl },
+  ]);
 }
 
 test.describe('Admin Management Flows', () => {

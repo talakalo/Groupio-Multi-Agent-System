@@ -21,14 +21,15 @@
 - Admin app builds (with existing lint).
 - Web app: new verify-email, resend-verification pages; signup uses `/signup` endpoint; api client updated.
 
-### What Remains
+### What Remains (see `feat/broader-launch-remaining-items` branch)
 
-- Admin E2E: may need cookie/credential setup for new auth model.
-- Accessibility: no targeted fixes in this branch.
-- Secrets/config: no doc updates in this branch.
-- Chat pagination: not implemented.
-- WebSocket/realtime: not validated.
-- Mobile/responsive: no targeted fixes.
+- **Admin E2E:** Updated for cookie auth; `setupAdminAuth` uses `addCookies` (refresh_token, admin_role_verified).
+- **Docs:** `docs/BROADER_LAUNCH_DEPLOYMENT.md` — ENFORCE_EMAIL_VERIFICATION, SMTP, CORS_ORIGINS, WebSocket.
+- **Secrets:** `docs/SECRETS_ROTATION.md` — rotation procedures.
+- **Chat pagination:** Implemented; AIChat supports `before` cursor and "Load older" button.
+- **Accessibility:** Forgot-password link fixed (href="#" → /forgot-password).
+- **WebSocket:** Documented in BROADER_LAUNCH_DEPLOYMENT; existing tests in `tests/integration/test_websocket.py`.
+- **Mobile:** Checklist in BROADER_LAUNCH_DEPLOYMENT.
 
 ### Launch Recommendation
 
