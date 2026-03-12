@@ -201,7 +201,8 @@ export default function EscalationsPage() {
           `${API_BASE}/escalations/${encodeURIComponent(id)}`,
           {
             method: "PUT",
-            headers: getAuthHeaders(),
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
             body: JSON.stringify({ priority: newPriority }),
           }
         );
