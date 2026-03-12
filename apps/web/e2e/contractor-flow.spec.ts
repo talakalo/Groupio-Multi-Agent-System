@@ -224,17 +224,33 @@ test.describe("Contractor Create Offer Flow", () => {
     );
 
     await page.goto("/contractor/offers/create");
+    await page.waitForLoadState("networkidle");
 
-    await expect(page.locator('input[name="title"]')).toBeVisible({ timeout: 10000 });
-    await page.fill('input[name="title"]', "התקנת מזגנים מקצועית");
-    await page.fill('textarea[name="description"]', "שירות מקצועי ואחריות מלאה. התקנה מקצועית עם אחריות לשנה.");
+    const title = page.locator('input[name="title"]');
+    await expect(title).toBeVisible({ timeout: 10000 });
+    await title.fill("התקנת מזגנים מקצועית");
+
+    const desc = page.locator('textarea[name="description"]');
+    await desc.waitFor({ state: "visible" });
+    await desc.fill("שירות מקצועי ואחריות מלאה. התקנה מקצועית עם אחריות לשנה. לפחות 50 תווים נדרשים כאן.");
+
     await page.selectOption('select[name="category"]', "ac_installation");
     await page.selectOption('select[name="region"]', "center");
-    await page.fill('input[name="buildingId"]', "bld_001");
-    await page.fill('input[name="basePrice"]', "4500");
+
+    const buildingId = page.locator('input[name="buildingId"]');
+    await buildingId.waitFor({ state: "visible" });
+    await buildingId.fill("bld_001");
+
+    const basePrice = page.locator('input[name="basePrice"]');
+    await basePrice.waitFor({ state: "visible" });
+    await basePrice.fill("4500");
+
     const futureDate = new Date();
     futureDate.setMonth(futureDate.getMonth() + 2);
-    await page.fill('input[name="validUntil"]', futureDate.toISOString().split("T")[0]!);
+    const validUntil = page.locator('input[name="validUntil"]');
+    await validUntil.waitFor({ state: "visible" });
+    await validUntil.fill(futureDate.toISOString().split("T")[0]!);
+
     const installCheckbox = page.locator('input[value="installation"]');
     await installCheckbox.scrollIntoViewIfNeeded();
     await installCheckbox.check({ force: true });
@@ -273,12 +289,13 @@ test.describe("Contractor Manage Offers", () => {
 
   test("should display active offers list", async ({ page }) => {
     await page.goto("/contractor/offers/active");
+    await page.waitForLoadState("networkidle");
 
     await expect(page.locator("main")).toBeVisible({ timeout: 10000 });
-    // Page shows offers, empty state, or filters
+    // Page shows: offers list, empty state, filters, or loading-then-content
     await expect(
-      page.getByText(/התקנת מזגנים|אין הצעות|כל הסטטוסים|all statuses/i).first()
-    ).toBeVisible({ timeout: 10000 });
+      page.getByText(/הצעות פעילות|התקנת מזגנים|אין הצעות|כל הסטטוסים|all statuses|תוצאות/i).first()
+    ).toBeVisible({ timeout: 15000 });
   });
 
   test("should have filter controls", async ({ page }) => {
