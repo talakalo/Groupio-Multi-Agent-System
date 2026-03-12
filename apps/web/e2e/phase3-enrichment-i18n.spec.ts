@@ -85,6 +85,23 @@ test.describe("Phase 3: Address suggestion flow", () => {
     await page.waitForTimeout(1500);
     await expect(page.getByText(/השתמש בהצעה|Use suggested/)).not.toBeVisible();
   });
+
+  test("no suggestion when provider returns 5xx", async ({ page }) => {
+    await page.route("**/api/v1/enrichment/normalize-address", (route) =>
+      route.fulfill({ status: 503, body: "Service Unavailable" })
+    );
+
+    await page.goto("/onboarding");
+    await page.getByRole("button", { name: /דייר/ }).click();
+    await page.getByRole("button", { name: /המשך/ }).click();
+
+    await page.fill("#buildingAddress", "רוטשילד 15");
+    await page.fill("#city", "תל אביב");
+    await page.getByRole("button", { name: /הצע כתובת|Suggest address/ }).click();
+
+    await page.waitForTimeout(1500);
+    await expect(page.getByText(/השתמש בהצעה|Use suggested/)).not.toBeVisible();
+  });
 });
 
 test.describe("Phase 3: Language toggle persistence", () => {
@@ -111,6 +128,71 @@ test.describe("Phase 3: Language toggle persistence", () => {
     await page.waitForTimeout(500);
     const dir = await page.locator("html").getAttribute("dir");
     expect(["ltr", "rtl"]).toContain(dir);
+  });
+
+  test("authenticated language toggle persists to profile", async ({ page }) => {
+    let putMePayload: Record<string, unknown> | null = null;
+    await page.route("**/api/v1/auth/me", (route) => {
+      if (route.request().method() === "PUT") {
+        putMePayload = route.request().postDataJSON();
+        return route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            id: "user-e2e",
+            email: "resident@test.com",
+            preferred_language: putMePayload?.preferred_language ?? "he",
+          }),
+        });
+      }
+      return route.continue();
+    });
+    await page.route("**/api/v1/auth/refresh", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ access_token: "e2e-jwt-token" }),
+      })
+    );
+    await page.context().addCookies([
+      { name: "refresh_token", value: "e2e-session", path: "/", url: "http://localhost:3000" },
+      {
+        name: "groupio-auth",
+        value: encodeURIComponent(
+          JSON.stringify({
+            state: {
+              user: { id: "u1", role: "resident", preferredLanguage: "he" },
+              isAuthenticated: true,
+            },
+          })
+        ),
+        path: "/",
+        url: "http://localhost:3000",
+      },
+    ]);
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        "groupio-auth",
+        JSON.stringify({
+          state: {
+            user: { id: "u1", role: "resident", preferredLanguage: "he" },
+            isAuthenticated: true,
+          },
+          version: 0,
+        })
+      );
+    });
+
+    await page.goto("/onboarding");
+    await page.waitForTimeout(800);
+    const englishBtn = page.getByRole("button", { name: "English" });
+    await expect(englishBtn).toBeVisible();
+    await englishBtn.click();
+    await page.waitForTimeout(1200);
+
+    expect(putMePayload).not.toBeNull();
+    expect(putMePayload?.preferred_language).toBe("en");
+    await expect(page.locator("html")).toHaveAttribute("dir", "ltr");
   });
 });
 
