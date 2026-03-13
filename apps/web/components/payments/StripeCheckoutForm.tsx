@@ -13,7 +13,7 @@
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
 import { loadStripe, type Stripe } from "@stripe/stripe-js";
 import { Loader2, AlertCircle } from "lucide-react";
-import { useRef, useState } from "react";
+import { useMemo, useState } from "react";
 
 interface StripeFormProps {
   clientSecret: string;
@@ -104,7 +104,8 @@ function InnerForm({ onSuccess, onError }: { onSuccess: () => void; onError: (ms
 
 export default function StripeCheckoutForm({ clientSecret, onSuccess, onError }: StripeFormProps) {
   const stripeKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
-  const stripePromiseRef = useRef(getStripePromise());
+  // useMemo ensures single initialization (module-level singleton in getStripePromise)
+  const stripePromise = useMemo(() => getStripePromise(), []);
 
   if (!stripeKey) {
     return (
@@ -120,7 +121,7 @@ export default function StripeCheckoutForm({ clientSecret, onSuccess, onError }:
 
   return (
     <Elements
-      stripe={stripePromiseRef.current}
+      stripe={stripePromise}
       options={{
         clientSecret,
         appearance: {

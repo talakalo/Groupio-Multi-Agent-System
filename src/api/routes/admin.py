@@ -936,6 +936,76 @@ async def get_agent_autonomy_modes(
     }
 
 
+# --------------- Pending agent decisions (Task 3.1 approval workflow) ---------------
+
+
+@router.get("/agents/pending-decisions")
+async def list_pending_decisions(
+    status: str = "pending",
+    agent_name: str | None = None,
+    page: int = 1,
+    page_size: int = 20,
+    admin: UserInDB = Depends(get_admin_user),
+) -> dict[str, Any]:
+    """List agent decisions queued for admin review (matching, pricing, vetting in gated/recommend mode)."""
+    db = get_postgres_client()
+    offset = (page - 1) * page_size
+    items, total = await db.list_pending_decisions(status=status, agent_name=agent_name, limit=page_size, offset=offset)
+    return {"items": items, "total": total, "page": page, "page_size": page_size}
+
+
+@router.post("/agents/pending-decisions/{decision_id}/approve")
+async def approve_pending_decision(
+    decision_id: str,
+    note: str = "",
+    admin: UserInDB = Depends(get_admin_user),
+) -> dict[str, Any]:
+    """Approve a pending agent decision."""
+    db = get_postgres_client()
+    entry = await db.get_pending_decision(decision_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Pending decision not found")
+    if entry.get("status") != "pending":
+        raise HTTPException(status_code=409, detail=f"Decision already resolved: {entry['status']}")
+    updated = await db.update_pending_decision(
+        decision_id,
+        {
+            "status": "approved",
+            "decided_by": admin.id,
+            "decision_note": note,
+            "decided_at": datetime.now(UTC),
+        },
+    )
+    logger.info("Admin %s approved decision %s (agent=%s)", admin.id, decision_id, entry.get("agent_name"))
+    return updated
+
+
+@router.post("/agents/pending-decisions/{decision_id}/reject")
+async def reject_pending_decision(
+    decision_id: str,
+    note: str = "",
+    admin: UserInDB = Depends(get_admin_user),
+) -> dict[str, Any]:
+    """Reject a pending agent decision."""
+    db = get_postgres_client()
+    entry = await db.get_pending_decision(decision_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Pending decision not found")
+    if entry.get("status") != "pending":
+        raise HTTPException(status_code=409, detail=f"Decision already resolved: {entry['status']}")
+    updated = await db.update_pending_decision(
+        decision_id,
+        {
+            "status": "rejected",
+            "decided_by": admin.id,
+            "decision_note": note,
+            "decided_at": datetime.now(UTC),
+        },
+    )
+    logger.info("Admin %s rejected decision %s (agent=%s)", admin.id, decision_id, entry.get("agent_name"))
+    return updated
+
+
 @router.get("/agents/audit/{audit_id}")
 async def get_agent_audit_entry(
     audit_id: str,
@@ -1040,3 +1110,51 @@ async def request_contractor_docs(
     logger.info("Admin %s requested docs from contractor %s", admin.email, contractor_id)
 
     return {"status": "doc_request_sent", "contractor_id": contractor_id}
+
+
+# ---------------------------------------------------------------------------
+# Credit Awards admin endpoints
+# ---------------------------------------------------------------------------
+
+
+@router.get("/credit-awards")
+async def list_credit_awards(
+    resident_id: str | None = None,
+    status: str | None = None,
+    admin: UserInDB = Depends(get_admin_user),
+) -> dict[str, Any]:
+    """List credit awards, optionally filtered by resident or status."""
+    db = get_postgres_client()
+    items = await db.list_credit_awards(resident_id=resident_id, status=status)
+    return {"items": items, "total": len(items)}
+
+
+@router.post("/credit-awards/{award_id}/approve")
+async def approve_credit_award(
+    award_id: str,
+    admin: UserInDB = Depends(get_admin_user),
+) -> dict[str, Any]:
+    """Approve a pending credit award and mark it for application."""
+    db = get_postgres_client()
+    updated = await db.update_credit_award(
+        award_id,
+        {
+            "status": "approved",
+            "approved_by": admin.id,
+            "approved_at": datetime.now(UTC),
+        },
+    )
+    logger.info("Admin %s approved credit award %s", admin.id, award_id)
+    return updated
+
+
+@router.post("/credit-awards/{award_id}/reject")
+async def reject_credit_award(
+    award_id: str,
+    admin: UserInDB = Depends(get_admin_user),
+) -> dict[str, Any]:
+    """Reject a pending credit award."""
+    db = get_postgres_client()
+    updated = await db.update_credit_award(award_id, {"status": "rejected", "approved_by": admin.id})
+    logger.info("Admin %s rejected credit award %s", admin.id, award_id)
+    return updated

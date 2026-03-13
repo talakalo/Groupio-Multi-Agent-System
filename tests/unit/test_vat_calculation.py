@@ -32,9 +32,9 @@ class TestVATRateConstant:
 
     def test_vat_rate_is_18_percent(self):
         """VAT_RATE constant equals 0.18 (Israeli מע"מ since 2025)."""
-        from src.api.routes.payments import VAT_RATE as route_vat_rate
+        from src.api.routes.payments import VAT_RATE
 
-        assert route_vat_rate == pytest.approx(0.18)
+        assert VAT_RATE == pytest.approx(0.18)
 
 
 # ---------------------------------------------------------------------------
@@ -80,9 +80,9 @@ class TestInvoiceServiceVAT:
 
         call_data = mock_db.create_invoice.call_args[0][0]
         assert call_data["subtotal"] == 1000
-        assert call_data["tax"] == pytest.approx(180.0)        # 18%
+        assert call_data["tax"] == pytest.approx(180.0)  # 18%
         assert call_data["platform_fee"] == pytest.approx(50.0)  # 5%
-        assert call_data["total"] == pytest.approx(1230.0)      # 1000+180+50
+        assert call_data["total"] == pytest.approx(1230.0)  # 1000+180+50
 
     @pytest.mark.asyncio
     async def test_db_data_uses_tax_column_key(self, svc, mock_db):
@@ -95,10 +95,11 @@ class TestInvoiceServiceVAT:
     @pytest.mark.asyncio
     async def test_invoice_number_format(self, svc, mock_db):
         """Invoice number follows INV-{year}-{seq} format."""
-        import datetime
+        from datetime import UTC
+        from datetime import datetime as dt
 
         result = await svc.generate_invoice_number()
-        year = datetime.datetime.now(datetime.timezone.utc).year
+        year = dt.now(UTC).year
         assert result == f"INV-{year}-00001"
 
     @pytest.mark.asyncio
@@ -301,7 +302,7 @@ class TestPostgresCreateInvoiceVATDefault:
             "id": "inv-test2",
             "offer_id": "off-2",
             "subtotal": 500.0,
-            "tax_amount": 90.0,   # Using the API response key, not the DB column key
+            "tax_amount": 90.0,  # Using the API response key, not the DB column key
         }
 
         await pg_client.create_invoice(invoice_data)

@@ -3,6 +3,7 @@
 import hashlib
 import hmac
 import logging
+import time as _time
 from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
@@ -44,10 +45,10 @@ class PaymentResponse(BaseModel):
     id: str
     user_id: str
     offer_id: str
-    subtotal: float       # Price before VAT
+    subtotal: float  # Price before VAT
     tax_rate: float = VAT_RATE
-    tax_amount: float     # VAT amount (18%)
-    amount: float         # Total charged (subtotal + VAT)
+    tax_amount: float  # VAT amount (18%)
+    amount: float  # Total charged (subtotal + VAT)
     currency: str
     status: str
     payment_type: str = "direct"  # "escrow" or "direct"
@@ -64,7 +65,7 @@ class InvoiceResponse(BaseModel):
     subtotal: float = 0.0
     tax_rate: float = VAT_RATE
     tax_amount: float = 0.0
-    amount: float         # Total (subtotal + VAT)
+    amount: float  # Total (subtotal + VAT)
     currency: str
     status: str
     payment_type: str = "direct"
@@ -77,48 +78,88 @@ class InvoiceResponse(BaseModel):
 # Escrow decision logic
 # ---------------------------------------------------------------------------
 
-# Configurable thresholds (should move to system_settings table)
-MIN_ESCROW_PARTICIPANTS = 2
-MIN_ESCROW_AMOUNT = 5000  # ILS
-TRUSTED_CONTRACTOR_THRESHOLD = 80  # trust score out of 100
-HIGH_VALUE_CATEGORIES = {"renovations", "kitchen", "electrical", "plumbing", "ac_installation"}
+# Configurable thresholds — defaults used when system_settings row is absent
+_DEFAULT_MIN_ESCROW_PARTICIPANTS = 2
+_DEFAULT_MIN_ESCROW_AMOUNT = 5000  # ILS
+_DEFAULT_TRUSTED_CONTRACTOR_THRESHOLD = 80  # trust score out of 100
+_DEFAULT_HIGH_VALUE_CATEGORIES = {"renovations", "kitchen", "electrical", "plumbing", "ac_installation"}
 MIN_PAYMENT_AMOUNT = 1  # Minimum valid payment in ILS
+
+# In-process cache so we don't hit the DB on every request (TTL: 5 minutes)
+_escrow_thresholds_cache: dict[str, Any] = {}
+_escrow_thresholds_fetched_at: float = 0.0
+_ESCROW_THRESHOLDS_TTL = 300  # seconds
+
+
+async def _get_escrow_thresholds() -> dict[str, Any]:
+    """Load escrow thresholds from system_settings, falling back to defaults."""
+    global _escrow_thresholds_cache, _escrow_thresholds_fetched_at
+    if _time.monotonic() - _escrow_thresholds_fetched_at < _ESCROW_THRESHOLDS_TTL and _escrow_thresholds_cache:
+        return _escrow_thresholds_cache
+    db = get_postgres_client()
+    settings_rows = await db.get_system_settings()
+    settings_map = {row["key"]: row["value"] for row in settings_rows}
+    thresholds = {
+        "min_escrow_participants": int(settings_map.get("escrow_min_participants", _DEFAULT_MIN_ESCROW_PARTICIPANTS)),
+        "min_escrow_amount": float(settings_map.get("escrow_min_amount_ils", _DEFAULT_MIN_ESCROW_AMOUNT)),
+        "trusted_contractor_threshold": float(
+            settings_map.get("escrow_trusted_contractor_threshold", _DEFAULT_TRUSTED_CONTRACTOR_THRESHOLD)
+        ),
+        "high_value_categories": set(
+            settings_map.get("escrow_high_value_categories", list(_DEFAULT_HIGH_VALUE_CATEGORIES))
+            if isinstance(settings_map.get("escrow_high_value_categories"), list)
+            else _DEFAULT_HIGH_VALUE_CATEGORIES
+        ),
+    }
+    _escrow_thresholds_cache = thresholds
+    _escrow_thresholds_fetched_at = _time.monotonic()
+    return thresholds
 
 
 def determine_payment_type(
     offer: dict,
     contractor_trust_score: float | None = None,
     force_escrow: bool = False,
+    thresholds: dict[str, Any] | None = None,
 ) -> str:
     """Decide whether an offer's payments go through escrow or direct.
 
     Returns "escrow" or "direct".
 
     Escrow is used when ANY of:
-      1. Offer has >= MIN_ESCROW_PARTICIPANTS participants (group buying)
-      2. Offer total price >= MIN_ESCROW_AMOUNT (high value)
-      3. Contractor trust score < TRUSTED_CONTRACTOR_THRESHOLD (unverified)
-      4. Offer category is in HIGH_VALUE_CATEGORIES
+      1. Offer has >= min_escrow_participants participants (group buying)
+      2. Offer total price >= min_escrow_amount (high value)
+      3. Contractor trust score < trusted_contractor_threshold (unverified)
+      4. Offer category is in high_value_categories
       5. Resident explicitly requested escrow (force_escrow=True)
 
+    Thresholds are loaded from system_settings (with module-level defaults as fallback).
     Direct payment is used ONLY when ALL conditions are false.
     """
+    if thresholds is None:
+        thresholds = {
+            "min_escrow_participants": _DEFAULT_MIN_ESCROW_PARTICIPANTS,
+            "min_escrow_amount": _DEFAULT_MIN_ESCROW_AMOUNT,
+            "trusted_contractor_threshold": _DEFAULT_TRUSTED_CONTRACTOR_THRESHOLD,
+            "high_value_categories": _DEFAULT_HIGH_VALUE_CATEGORIES,
+        }
+
     if force_escrow:
         return "escrow"
 
     participants = offer.get("participants", 1)
-    if participants >= MIN_ESCROW_PARTICIPANTS:
+    if participants >= thresholds["min_escrow_participants"]:
         return "escrow"
 
     total_price = offer.get("base_price", 0) * participants
-    if total_price >= MIN_ESCROW_AMOUNT:
+    if total_price >= thresholds["min_escrow_amount"]:
         return "escrow"
 
     category = offer.get("category", "")
-    if category in HIGH_VALUE_CATEGORIES:
+    if category in thresholds["high_value_categories"]:
         return "escrow"
 
-    if contractor_trust_score is not None and contractor_trust_score < TRUSTED_CONTRACTOR_THRESHOLD:
+    if contractor_trust_score is not None and contractor_trust_score < thresholds["trusted_contractor_threshold"]:
         return "escrow"
 
     return "direct"
@@ -141,19 +182,21 @@ async def get_my_payments(
         raw_amount = p.get("amount", 0)
         subtotal = p.get("subtotal", round(raw_amount / (1 + VAT_RATE), 2))
         tax_amount = p.get("tax_amount", round(subtotal * VAT_RATE, 2))
-        result.append(PaymentResponse(
-            id=p.get("id", ""),
-            user_id=p.get("user_id", current_user.id),
-            offer_id=p.get("offer_id", ""),
-            subtotal=subtotal,
-            tax_rate=p.get("tax_rate", VAT_RATE),
-            tax_amount=tax_amount,
-            amount=raw_amount,
-            currency=p.get("currency", "ILS"),
-            status=p.get("status", "unknown"),
-            transaction_id=p.get("transaction_id"),
-            created_at=p.get("created_at", datetime.now(UTC).isoformat()),
-        ))
+        result.append(
+            PaymentResponse(
+                id=p.get("id", ""),
+                user_id=p.get("user_id", current_user.id),
+                offer_id=p.get("offer_id", ""),
+                subtotal=subtotal,
+                tax_rate=p.get("tax_rate", VAT_RATE),
+                tax_amount=tax_amount,
+                amount=raw_amount,
+                currency=p.get("currency", "ILS"),
+                status=p.get("status", "unknown"),
+                transaction_id=p.get("transaction_id"),
+                created_at=p.get("created_at", datetime.now(UTC).isoformat()),
+            )
+        )
     return result
 
 
@@ -196,10 +239,12 @@ async def initiate_payment(
         except Exception:
             pass  # Contractor lookup failure doesn't block payment
 
+    thresholds = await _get_escrow_thresholds()
     payment_type = determine_payment_type(
         offer,
         contractor_trust_score=contractor_trust,
         force_escrow=request.force_escrow,
+        thresholds=thresholds,
     )
 
     # Check for existing unpaid invoice or create one
@@ -224,7 +269,7 @@ async def initiate_payment(
             "subtotal": subtotal,
             "tax_rate": VAT_RATE,
             "tax_amount": tax_amount,  # API response key
-            "tax": tax_amount,         # DB column key (invoices.tax)
+            "tax": tax_amount,  # DB column key (invoices.tax)
             "amount": total,
             "currency": "ILS",
             "status": "pending",
@@ -528,6 +573,81 @@ async def payment_webhook(
     return {"status": "processed", "payment_id": payment["id"], "new_status": new_status}
 
 
+class RefundRequest(BaseModel):
+    """Request body for initiating a refund."""
+
+    reason: str = ""
+    amount: float | None = None  # None means full refund
+
+
+@router.post("/{payment_id}/refund")
+async def request_refund(
+    payment_id: str,
+    body: RefundRequest,
+    current_user: UserInDB = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Initiate a refund for a specific payment.
+
+    Residents can request a refund for their own payments. The refund is processed
+    immediately via the payment provider for succeeded payments, or cancelled for
+    pending/processing payments.
+    """
+    db = get_postgres_client()
+    payment = await db.get_payment(payment_id)
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    if payment.get("user_id") != current_user.id:
+        raise HTTPException(status_code=403, detail="Not your payment")
+
+    current_status = payment.get("status", "")
+    if current_status in ("refunded", "failed"):
+        raise HTTPException(status_code=409, detail=f"Cannot refund payment with status: {current_status}")
+
+    provider = get_payment_provider()
+    transaction_id = str(payment.get("transaction_id") or payment.get("id") or "")
+    refund_amount = body.amount or payment.get("amount")
+
+    try:
+        if current_status == "succeeded":
+            result = await provider.refund(
+                transaction_id=transaction_id,
+                amount=refund_amount,
+            )
+            new_status = result.get("status", "refunded")
+            refund_id = result.get("refund_id", "")
+        else:
+            # Payment not yet captured — mark as cancelled
+            new_status = "cancelled"
+            refund_id = f"cancel_{uuid4().hex[:8]}"
+    except Exception as exc:
+        logger.error("Refund failed for payment %s: %s", payment_id, exc)
+        raise HTTPException(status_code=502, detail=f"Refund failed: {exc}") from exc
+
+    await db.update_payment(payment_id, {"status": new_status})
+
+    # Also update invoice status if linked
+    invoice_id = payment.get("invoice_id")
+    if invoice_id:
+        await db.update_invoice(invoice_id, {"status": "refunded"})
+
+    logger.info(
+        "Refund processed: payment=%s refund_id=%s amount=%s status=%s user=%s reason=%s",
+        payment_id,
+        refund_id,
+        refund_amount,
+        new_status,
+        current_user.id,
+        body.reason,
+    )
+    return {
+        "payment_id": payment_id,
+        "refund_id": refund_id,
+        "status": new_status,
+        "amount": refund_amount,
+        "reason": body.reason,
+    }
+
+
 @router.get("/invoices/{invoice_id}", response_model=InvoiceResponse)
 async def get_invoice(
     invoice_id: str,
@@ -640,12 +760,15 @@ async def download_invoice_pdf(
   .invoice-info p {{ margin: 3px 0; color: #555; font-size: 13px; }}
   .divider {{ border: none; border-top: 2px solid #eee; margin: 0 0 24px; }}
   table {{ width: 100%; border-collapse: collapse; margin: 0 0 8px; }}
-  th {{ background: #f5f7fa; padding: 10px 12px; text-align: right; border-bottom: 2px solid #ddd; font-size: 13px; color: #555; }}
+  th {{ background: #f5f7fa; padding: 10px 12px; text-align: right;
+    border-bottom: 2px solid #ddd; font-size: 13px; color: #555; }}
   td {{ padding: 10px 12px; border-bottom: 1px solid #f0f0f0; font-size: 13px; }}
   .subtotal-section td {{ border-bottom: none; font-size: 13px; color: #555; padding: 6px 12px; }}
   .vat-row td {{ color: #555; font-size: 13px; padding: 6px 12px; border-bottom: none; }}
-  .total-row td {{ font-weight: bold; font-size: 16px; border-top: 2px solid #222; padding: 12px; background: #f9fafb; }}
-  .status {{ display: inline-block; padding: 3px 10px; border-radius: 10px; font-size: 12px; font-weight: bold; }}
+  .total-row td {{ font-weight: bold; font-size: 16px;
+    border-top: 2px solid #222; padding: 12px; background: #f9fafb; }}
+  .status {{ display: inline-block; padding: 3px 10px;
+    border-radius: 10px; font-size: 12px; font-weight: bold; }}
   .status-paid {{ background: #e8f5e9; color: #2e7d32; }}
   .status-pending {{ background: #fff3e0; color: #e65100; }}
   .legal-note {{ margin-top: 32px; padding: 12px 16px; background: #f9fafb; border-radius: 8px;
@@ -668,8 +791,8 @@ async def download_invoice_pdf(
     <p><strong>תאריך:</strong> {issued_at[:10] if issued_at else "—"}</p>
     <p><strong>הצעה:</strong> {offer_id[:12] if offer_id else "—"}</p>
     <p><strong>סטטוס:</strong>
-      <span class="status {'status-paid' if is_paid else 'status-pending'}">
-        {'שולם' if is_paid else 'ממתין'}
+      <span class="status {"status-paid" if is_paid else "status-pending"}">
+        {"שולם" if is_paid else "ממתין"}
       </span>
     </p>
   </div>

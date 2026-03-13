@@ -159,13 +159,23 @@ class VettingAgent(BaseAgent):
         # Task 3.1 — Autonomy mode: in recommend/gated mode, flag for human confirmation
         settings = get_settings()
         if settings.VETTING_AGENT_MODE in ("recommend", "gated"):
+            reason = f"Vetting result requires admin confirmation (mode={settings.VETTING_AGENT_MODE})"
             state["needs_human"] = True
-            state.setdefault(
-                "escalation_reason",
-                (f"Vetting result requires admin confirmation (mode={settings.VETTING_AGENT_MODE})"),
-            )
+            state.setdefault("escalation_reason", reason)
             if state["actions_taken"]:
                 state["actions_taken"][-1]["requires_human_confirmation"] = True
+            last_action = state["actions_taken"][-1] if state["actions_taken"] else {}
+            await self._enqueue_pending_decision(
+                state=state,
+                action_type="vetting_decision",
+                payload={
+                    "contractor_id": last_action.get("contractor_id", ""),
+                    "decision": last_action.get("decision", ""),
+                    "trust_score": last_action.get("trust_score"),
+                    "mode": settings.VETTING_AGENT_MODE,
+                },
+                escalation_reason=state.get("escalation_reason", reason),
+            )
 
         self._metrics["calls"] += 1
         return state

@@ -24,8 +24,8 @@ from src.api.middleware.auth import get_current_user
 # ---------------------------------------------------------------------------
 
 VAT_RATE = 0.18
-PRICE_PER_UNIT = 1000.0       # offer base price
-EXPECTED_TAX = round(PRICE_PER_UNIT * VAT_RATE, 2)   # 180.00
+PRICE_PER_UNIT = 1000.0  # offer base price
+EXPECTED_TAX = round(PRICE_PER_UNIT * VAT_RATE, 2)  # 180.00
 EXPECTED_TOTAL = round(PRICE_PER_UNIT + EXPECTED_TAX, 2)  # 1180.00
 
 
@@ -143,17 +143,13 @@ class TestInitiatePaymentVAT:
         )
 
         mock_provider.create_charge.assert_awaited_once()
-        charged_amount = mock_provider.create_charge.call_args.kwargs.get(
-            "amount", mock_provider.create_charge.call_args[0][0]
-        )
         # Accept both positional (amount=X) and keyword calling conventions
         call_kwargs = mock_provider.create_charge.call_args[1]
         call_args = mock_provider.create_charge.call_args[0]
         amount_charged = call_kwargs.get("amount") if call_kwargs else call_args[0]
 
         assert amount_charged == pytest.approx(EXPECTED_TOTAL), (
-            f"Provider should be charged {EXPECTED_TOTAL} (incl. VAT) "
-            f"not {PRICE_PER_UNIT} (excl. VAT)"
+            f"Provider should be charged {EXPECTED_TOTAL} (incl. VAT) not {PRICE_PER_UNIT} (excl. VAT)"
         )
 
     def test_invoice_data_contains_both_tax_keys(self, client, mock_db, mock_offer, mock_provider):
@@ -234,11 +230,10 @@ class TestInitiatePaymentVAT:
         )
 
         assert resp.status_code == 200
-        data = resp.json()
         # Provider should charge the existing invoice total (944), not recalculate
-        amount_charged = mock_provider.create_charge.call_args[1].get(
-            "amount"
-        ) or mock_provider.create_charge.call_args[0][0]
+        amount_charged = (
+            mock_provider.create_charge.call_args[1].get("amount") or mock_provider.create_charge.call_args[0][0]
+        )
         assert amount_charged == pytest.approx(944.0)
         # New invoice must NOT be created (one already exists)
         mock_db.create_invoice.assert_not_awaited()
@@ -286,7 +281,7 @@ class TestGetMyPaymentsVAT:
             "id": "pay-legacy",
             "user_id": "u-vat",
             "offer_id": "offer-1",
-            "amount": 1180.0,   # total only — no subtotal/tax fields
+            "amount": 1180.0,  # total only — no subtotal/tax fields
             "currency": "ILS",
             "status": "succeeded",
             "created_at": datetime.now(UTC).isoformat(),
@@ -376,7 +371,7 @@ class TestGetInvoiceVAT:
         legacy_invoice = {
             "id": "inv-legacy",
             "offer_id": "offer-1",
-            "amount": 1180.0,   # total only, no subtotal/tax_amount
+            "amount": 1180.0,  # total only, no subtotal/tax_amount
             "currency": "ILS",
             "status": "pending",
             "payment_type": "escrow",
@@ -593,7 +588,7 @@ class TestInvoicePDFVAT:
         )
 
         assert resp.status_code == 200
-        assert "590.00" in resp.text   # total is rendered somewhere in the page
+        assert "590.00" in resp.text  # total is rendered somewhere in the page
 
 
 # ---------------------------------------------------------------------------
@@ -633,9 +628,7 @@ class TestPaymentAgentVATHandover:
     async def test_invoice_request_for_vat_query(self, payment_agent, payment_state):
         """Message asking about 'חשבונית' is classified as invoice_request."""
         agent, mock_db = payment_agent
-        payment_state["messages"] = [
-            {"role": "user", "content": "אני רוצה לקבל את החשבונית שלי עם פירוט המע\"מ"}
-        ]
+        payment_state["messages"] = [{"role": "user", "content": 'אני רוצה לקבל את החשבונית שלי עם פירוט המע"מ'}]
         payment_state["offer_id"] = "offer-vat-1"
 
         mock_db.get_invoice_for_offer = AsyncMock(
@@ -650,7 +643,7 @@ class TestPaymentAgentVATHandover:
         )
         agent.llm_client.create_message = AsyncMock(
             return_value={
-                "content": "החשבונית שלך מצורפת, כולל פירוט מע\"מ 18%.",
+                "content": 'החשבונית שלך מצורפת, כולל פירוט מע"מ 18%.',
                 "usage": {"input_tokens": 80, "output_tokens": 30},
             }
         )
@@ -684,7 +677,7 @@ class TestPaymentAgentVATHandover:
         )
         agent.llm_client.create_message = AsyncMock(
             return_value={
-                "content": "תשלומך הושלם. שילמת ₪1,180 (כולל מע\"מ).",
+                "content": 'תשלומך הושלם. שילמת ₪1,180 (כולל מע"מ).',
                 "usage": {"input_tokens": 100, "output_tokens": 50},
             }
         )
@@ -696,9 +689,7 @@ class TestPaymentAgentVATHandover:
         assert action["details"]["payments_found"] == 1
 
     @pytest.mark.asyncio
-    async def test_router_routes_payment_query_to_payment_agent(
-        self, payment_state, sample_agent_state
-    ):
+    async def test_router_routes_payment_query_to_payment_agent(self, payment_state, sample_agent_state):
         """Router classifies 'מע\"מ' payment query → routes to payment agent."""
         with (
             patch("src.agents.base.get_llm_client") as mock_llm,
@@ -722,9 +713,7 @@ class TestPaymentAgentVATHandover:
             )
 
             state = dict(sample_agent_state)
-            state["messages"] = [
-                {"role": "user", "content": "כמה מע\"מ שילמתי על ההזמנה שלי?"}
-            ]
+            state["messages"] = [{"role": "user", "content": 'כמה מע"מ שילמתי על ההזמנה שלי?'}]
 
             result = await router.run(state)
 

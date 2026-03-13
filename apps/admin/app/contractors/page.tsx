@@ -436,6 +436,30 @@ export default function ContractorsPage() {
     }
   };
 
+  const handleBulkRequestDocs = async () => {
+    setActionLoading(true);
+    try {
+      const ids = Array.from(selectedIds);
+      const results = await Promise.allSettled(
+        ids.map((id) =>
+          fetch(`${API_BASE}/admin/contractors/${encodeURIComponent(id)}/request-documents`, {
+            method: "POST",
+            ...fetchOpts(),
+            body: JSON.stringify({ message: "Please upload your license, insurance, and business registration documents to complete your verification." }),
+          })
+        )
+      );
+      const succeeded = results.filter((r) => r.status === "fulfilled").length;
+      await queryClient.invalidateQueries({ queryKey: ["admin", "contractors"] });
+      setSelectedIds(new Set());
+      alert(`Document requests sent to ${succeeded} of ${ids.length} contractors.`);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to send document requests");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* ---- Page header ---- */}
@@ -601,12 +625,13 @@ export default function ContractorsPage() {
               Suspend
             </button>
             <button
-              className="btn-secondary btn-sm opacity-60 cursor-not-allowed"
-              disabled
-              title="Request documents — coming soon"
+              className="btn-secondary btn-sm"
+              onClick={handleBulkRequestDocs}
+              disabled={actionLoading}
+              title="Request documents from selected contractors"
             >
               <FileText className="w-3.5 h-3.5" />
-              Request Docs (soon)
+              Request Docs
             </button>
             <button
               className="btn-ghost btn-sm"

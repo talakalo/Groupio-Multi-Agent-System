@@ -700,3 +700,36 @@ async def delete_account(
     logger.info("Account deleted (GDPR erasure) for user: %s", current_user.id)
 
     return {"status": "account_deleted"}
+
+
+# ---------------------------------------------------------------------------
+# Push notification device token registration
+# ---------------------------------------------------------------------------
+
+
+class PushTokenRequest(BaseModel):
+    """Request body for registering a push notification device token."""
+
+    token: str = Field(..., min_length=10, description="FCM device registration token")
+
+
+@router.post("/push-token")
+async def register_push_token(
+    body: PushTokenRequest,
+    current_user: UserInDB = Depends(get_current_user),
+) -> dict[str, str]:
+    """Register or update the FCM push notification token for the current user's device."""
+    db = get_postgres_client()
+    await db.update_user(current_user.id, {"push_token": body.token})
+    logger.info("Push token registered for user: %s", current_user.id)
+    return {"status": "registered"}
+
+
+@router.delete("/push-token")
+async def unregister_push_token(
+    current_user: UserInDB = Depends(get_current_user),
+) -> dict[str, str]:
+    """Remove the FCM push notification token for the current user."""
+    db = get_postgres_client()
+    await db.update_user(current_user.id, {"push_token": None})
+    return {"status": "unregistered"}

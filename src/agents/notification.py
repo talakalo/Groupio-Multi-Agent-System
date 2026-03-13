@@ -287,6 +287,24 @@ class NotificationAgent(BaseAgent):
                 user_name,
                 body_preview,
             )
+            # Send push notification via FCM if a device token is registered for the user.
+            # The token is stored in user_profile["push_token"] (set during mobile app login).
+            push_token = user_profile.get("push_token", "")
+            if push_token:
+                try:
+                    from src.services.push import get_push_service  # noqa: PLC0415
+
+                    push_svc = get_push_service()
+                    await push_svc.send(
+                        token=push_token,
+                        title=message.get("subject", "Groupio"),
+                        body=message.get("body", ""),
+                        data=message.get("data", {}),
+                    )
+                except Exception as exc:
+                    logger.warning("Push notification failed for user %s: %s", user_name, exc)
+            else:
+                logger.debug("NOTIFICATION [push] no push_token for user %s, skipping", user_name)
         elif channel == "in_app":
             logger.info(
                 "NOTIFICATION [in_app] user=%s body='%s...'",

@@ -199,43 +199,87 @@ class PaymentAgent(BaseAgent):
         return state
 
     async def _handle_refund_request(self, state: AgentState, user_id: str, user_message: str) -> AgentState:
-        """Handle refund requests – escalate to human support."""
-        system_prompt = self._build_system_prompt(state)
+        """Handle refund requests — attempt automatic refund, escalate only if unresolvable."""
+        db = get_postgres_client()
+        refund_result: dict[str, Any] | None = None
+        refund_error: str | None = None
 
-        result = await self._call_llm(
-            messages=[
-                {
-                    "role": "user",
-                    "content": (
-                        f"{user_message}\n\n"
-                        "--- Note ---\n"
-                        "Refund requests must be reviewed by a human agent. "
-                        "Please let the user know their request has been received "
-                        "and will be handled by the support team."
-                    ),
-                }
-            ],
+        # Try to find a refundable payment for this user
+        try:
+            payments = await db.list_payments_for_user(user_id)
+            # Pick the most recent succeeded payment that hasn't been refunded
+            candidate = next(
+                (p for p in payments if p.get("status") == "succeeded"),
+                None,
+            )
+            if candidate:
+                from src.services.payment import get_payment_provider
+
+                provider = get_payment_provider()
+                transaction_id = candidate.get("transaction_id") or candidate.get("id")
+                result = await provider.refund(transaction_id=transaction_id, amount=candidate.get("amount"))
+                await db.update_payment(candidate["id"], {"status": result.get("status", "refunded")})
+                invoice_id = candidate.get("invoice_id")
+                if invoice_id:
+                    await db.update_invoice(invoice_id, {"status": "refunded"})
+                refund_result = result
+                logger.info(
+                    "Payment agent auto-refund: user=%s payment=%s refund_id=%s",
+                    user_id,
+                    candidate["id"],
+                    result.get("refund_id"),
+                )
+        except Exception as exc:
+            refund_error = str(exc)
+            logger.warning("Payment agent: auto-refund failed for user %s: %s", user_id, exc)
+
+        system_prompt = self._build_system_prompt(state)
+        if refund_result:
+            llm_note = (
+                f"{user_message}\n\n--- Note ---\n"
+                f"The refund has been processed automatically. "
+                f"Refund ID: {refund_result.get('refund_id', 'N/A')}. "
+                "Please confirm the refund to the user in Hebrew."
+            )
+        else:
+            llm_note = (
+                f"{user_message}\n\n--- Note ---\n"
+                "The refund could not be processed automatically"
+                + (f" ({refund_error})" if refund_error else "")
+                + ". A human support agent will handle this. Please inform the user."
+            )
+
+        result_llm = await self._call_llm(
+            messages=[{"role": "user", "content": llm_note}],
             system=system_prompt,
         )
+        response_text = self._extract_text(result_llm)
 
-        response_text = self._extract_text(result)
-
-        state["needs_human"] = True
-        state["escalation_reason"] = "refund_request"
-        state["actions_taken"] = [
-            {
-                "agent": "payment",
-                "action": "refund_escalated",
-                "details": {"user_id": user_id},
-                "response": {
-                    "type": "refund_escalation",
-                    "message": response_text,
-                },
-                "requires_followup": True,
-                "summary_for_next_agent": "Refund request escalated to human support.",
-                "suggested_next_agent": "support",
-            }
-        ]
+        if refund_result:
+            state["actions_taken"] = [
+                {
+                    "agent": "payment",
+                    "action": "refund_processed",
+                    "details": {"user_id": user_id, **refund_result},
+                    "response": {"type": "refund_confirmation", "message": response_text},
+                    "requires_followup": False,
+                    "summary_for_next_agent": f"Refund processed: {refund_result.get('refund_id')}",
+                }
+            ]
+        else:
+            state["needs_human"] = True
+            state["escalation_reason"] = "refund_request"
+            state["actions_taken"] = [
+                {
+                    "agent": "payment",
+                    "action": "refund_escalated",
+                    "details": {"user_id": user_id, "error": refund_error},
+                    "response": {"type": "refund_escalation", "message": response_text},
+                    "requires_followup": True,
+                    "summary_for_next_agent": "Refund could not be processed automatically; escalated to support.",
+                    "suggested_next_agent": "support",
+                }
+            ]
         return state
 
     async def _handle_general(self, state: AgentState, user_message: str) -> AgentState:

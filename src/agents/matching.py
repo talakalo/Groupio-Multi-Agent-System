@@ -136,12 +136,22 @@ class MatchingAgent(BaseAgent):
         # Task 3.1 — Autonomy mode: in recommend mode, flag for human confirmation
         settings = get_settings()
         if settings.MATCHING_AGENT_MODE in ("recommend", "gated"):
+            reason = f"Matching results require admin confirmation (mode={settings.MATCHING_AGENT_MODE})"
             state["needs_human"] = True
-            state["escalation_reason"] = (
-                f"Matching results require admin confirmation (mode={settings.MATCHING_AGENT_MODE})"
-            )
+            state["escalation_reason"] = reason
             if state["actions_taken"]:
                 state["actions_taken"][-1]["requires_human_confirmation"] = True
+            await self._enqueue_pending_decision(
+                state=state,
+                action_type="contractor_match",
+                payload={
+                    "contractor_ids": state.get("actions_taken", [{}])[-1].get("contractor_ids", []),
+                    "category": state.get("actions_taken", [{}])[-1].get("category", ""),
+                    "building_id": state.get("actions_taken", [{}])[-1].get("building_id", ""),
+                    "mode": settings.MATCHING_AGENT_MODE,
+                },
+                escalation_reason=reason,
+            )
 
         self._metrics["calls"] += 1
         return state
