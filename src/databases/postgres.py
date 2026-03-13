@@ -2188,7 +2188,7 @@ class PostgresClient:
             data["offer_id"],
             data.get("contractor_id"),
             data.get("subtotal", data.get("amount", 0)),
-            data.get("tax_rate", 0.18),          # Israeli VAT — 18% as of 2025
+            data.get("tax_rate", 0.18),  # Israeli VAT — 18% as of 2025
             data.get("tax", data.get("tax_amount", 0)),  # accept either key
             data.get("platform_fee_rate", 0.05),
             data.get("platform_fee", 0),
@@ -2322,6 +2322,7 @@ class PostgresClient:
         existing_provider_data = data.get("provider_data") or {}
         if isinstance(existing_provider_data, str):
             import json as _json
+
             try:
                 existing_provider_data = _json.loads(existing_provider_data)
             except Exception:
@@ -2550,9 +2551,9 @@ class PostgresClient:
             args.append(status)
             conditions.append("status = $%d" % len(args))
         where = " AND ".join(conditions) if conditions else "1=1"
-        return await self._pg_fetch_all(
-            f"SELECT * FROM credit_awards WHERE {where} ORDER BY created_at DESC", *args
-        ) or []
+        return (
+            await self._pg_fetch_all(f"SELECT * FROM credit_awards WHERE {where} ORDER BY created_at DESC", *args) or []
+        )
 
     async def update_credit_award(self, award_id: str, update_data: dict[str, Any]) -> dict[str, Any]:
         """Update a credit award (e.g., approve or reject)."""
@@ -2572,7 +2573,8 @@ class PostgresClient:
             *args,
         )
         return await self._pg_fetch_one("SELECT * FROM credit_awards WHERE id = $1", award_id) or {
-            "id": award_id, **update_data
+            "id": award_id,
+            **update_data,
         }
 
     # ------------------------------------------------------------------
@@ -2651,9 +2653,7 @@ class PostgresClient:
                 row["recorded_at"],
             )
 
-    async def get_agent_metrics_history(
-        self, agent_name: str, limit: int = 100
-    ) -> list[dict[str, Any]]:
+    async def get_agent_metrics_history(self, agent_name: str, limit: int = 100) -> list[dict[str, Any]]:
         """Return historical metrics rows for a given agent, newest first."""
         if self._use_supabase_client():
             client = await self._get_client()
@@ -2753,7 +2753,8 @@ class PostgresClient:
             *args,
         )
         return await self._pg_fetch_one("SELECT * FROM pending_agent_decisions WHERE id = $1", decision_id) or {
-            "id": decision_id, **update_data
+            "id": decision_id,
+            **update_data,
         }
 
     async def get_pending_decision(self, decision_id: str) -> dict[str, Any] | None:
@@ -2762,9 +2763,7 @@ class PostgresClient:
             client = await self._get_client()
             result = await client.table("pending_agent_decisions").select("*").eq("id", decision_id).execute()
             return result.data[0] if result.data else None
-        return await self._pg_fetch_one(
-            "SELECT * FROM pending_agent_decisions WHERE id = $1", decision_id
-        )
+        return await self._pg_fetch_one("SELECT * FROM pending_agent_decisions WHERE id = $1", decision_id)
 
     async def get_agent_system_prompt(self, agent_name: str) -> str | None:
         """Load an agent's system prompt override from system_settings (key: agent_prompt_{name})."""

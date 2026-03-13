@@ -950,9 +950,7 @@ async def list_pending_decisions(
     """List agent decisions queued for admin review (matching, pricing, vetting in gated/recommend mode)."""
     db = get_postgres_client()
     offset = (page - 1) * page_size
-    items, total = await db.list_pending_decisions(
-        status=status, agent_name=agent_name, limit=page_size, offset=offset
-    )
+    items, total = await db.list_pending_decisions(status=status, agent_name=agent_name, limit=page_size, offset=offset)
     return {"items": items, "total": total, "page": page, "page_size": page_size}
 
 

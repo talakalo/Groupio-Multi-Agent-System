@@ -45,10 +45,10 @@ class PaymentResponse(BaseModel):
     id: str
     user_id: str
     offer_id: str
-    subtotal: float       # Price before VAT
+    subtotal: float  # Price before VAT
     tax_rate: float = VAT_RATE
-    tax_amount: float     # VAT amount (18%)
-    amount: float         # Total charged (subtotal + VAT)
+    tax_amount: float  # VAT amount (18%)
+    amount: float  # Total charged (subtotal + VAT)
     currency: str
     status: str
     payment_type: str = "direct"  # "escrow" or "direct"
@@ -65,7 +65,7 @@ class InvoiceResponse(BaseModel):
     subtotal: float = 0.0
     tax_rate: float = VAT_RATE
     tax_amount: float = 0.0
-    amount: float         # Total (subtotal + VAT)
+    amount: float  # Total (subtotal + VAT)
     currency: str
     status: str
     payment_type: str = "direct"
@@ -100,12 +100,8 @@ async def _get_escrow_thresholds() -> dict[str, Any]:
     settings_rows = await db.get_system_settings()
     settings_map = {row["key"]: row["value"] for row in settings_rows}
     thresholds = {
-        "min_escrow_participants": int(
-            settings_map.get("escrow_min_participants", _DEFAULT_MIN_ESCROW_PARTICIPANTS)
-        ),
-        "min_escrow_amount": float(
-            settings_map.get("escrow_min_amount_ils", _DEFAULT_MIN_ESCROW_AMOUNT)
-        ),
+        "min_escrow_participants": int(settings_map.get("escrow_min_participants", _DEFAULT_MIN_ESCROW_PARTICIPANTS)),
+        "min_escrow_amount": float(settings_map.get("escrow_min_amount_ils", _DEFAULT_MIN_ESCROW_AMOUNT)),
         "trusted_contractor_threshold": float(
             settings_map.get("escrow_trusted_contractor_threshold", _DEFAULT_TRUSTED_CONTRACTOR_THRESHOLD)
         ),
@@ -186,19 +182,21 @@ async def get_my_payments(
         raw_amount = p.get("amount", 0)
         subtotal = p.get("subtotal", round(raw_amount / (1 + VAT_RATE), 2))
         tax_amount = p.get("tax_amount", round(subtotal * VAT_RATE, 2))
-        result.append(PaymentResponse(
-            id=p.get("id", ""),
-            user_id=p.get("user_id", current_user.id),
-            offer_id=p.get("offer_id", ""),
-            subtotal=subtotal,
-            tax_rate=p.get("tax_rate", VAT_RATE),
-            tax_amount=tax_amount,
-            amount=raw_amount,
-            currency=p.get("currency", "ILS"),
-            status=p.get("status", "unknown"),
-            transaction_id=p.get("transaction_id"),
-            created_at=p.get("created_at", datetime.now(UTC).isoformat()),
-        ))
+        result.append(
+            PaymentResponse(
+                id=p.get("id", ""),
+                user_id=p.get("user_id", current_user.id),
+                offer_id=p.get("offer_id", ""),
+                subtotal=subtotal,
+                tax_rate=p.get("tax_rate", VAT_RATE),
+                tax_amount=tax_amount,
+                amount=raw_amount,
+                currency=p.get("currency", "ILS"),
+                status=p.get("status", "unknown"),
+                transaction_id=p.get("transaction_id"),
+                created_at=p.get("created_at", datetime.now(UTC).isoformat()),
+            )
+        )
     return result
 
 
@@ -271,7 +269,7 @@ async def initiate_payment(
             "subtotal": subtotal,
             "tax_rate": VAT_RATE,
             "tax_amount": tax_amount,  # API response key
-            "tax": tax_amount,         # DB column key (invoices.tax)
+            "tax": tax_amount,  # DB column key (invoices.tax)
             "amount": total,
             "currency": "ILS",
             "status": "pending",
@@ -793,8 +791,8 @@ async def download_invoice_pdf(
     <p><strong>תאריך:</strong> {issued_at[:10] if issued_at else "—"}</p>
     <p><strong>הצעה:</strong> {offer_id[:12] if offer_id else "—"}</p>
     <p><strong>סטטוס:</strong>
-      <span class="status {'status-paid' if is_paid else 'status-pending'}">
-        {'שולם' if is_paid else 'ממתין'}
+      <span class="status {"status-paid" if is_paid else "status-pending"}">
+        {"שולם" if is_paid else "ממתין"}
       </span>
     </p>
   </div>
