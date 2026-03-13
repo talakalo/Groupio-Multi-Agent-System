@@ -133,7 +133,8 @@ export default function ContractorProfilePage() {
     if (!contractorId) return;
     setIsSaving(true);
     const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+    // Access token lives only in Zustand memory — never in localStorage.
+    const token = useAuthStore.getState().accessToken;
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (token) headers['Authorization'] = `Bearer ${token}`;
 

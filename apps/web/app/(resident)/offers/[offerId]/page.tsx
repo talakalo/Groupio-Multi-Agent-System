@@ -450,6 +450,25 @@ export default function OfferDetailPage() {
           <p className="text-red-500 text-sm mt-2 text-center">{t('joinError')}</p>
         )}
 
+        {/* After joining: prompt resident to proceed to payment */}
+        {joinMutation.isSuccess && (
+          <div className="mt-3 bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-emerald-800">הצטרפתם בהצלחה!</p>
+              <p className="text-xs text-emerald-700 mt-0.5">
+                כדי להבטיח את מקומכם, יש להשלים את התשלום.
+              </p>
+            </div>
+            <Link
+              href={`/checkout?offerId=${offerId}`}
+              className="btn-primary text-sm whitespace-nowrap flex-shrink-0"
+              data-testid="proceed-to-payment-button"
+            >
+              לתשלום →
+            </Link>
+          </div>
+        )}
+
         {/* Cancellation policy summary — always visible */}
         <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
           <h3 className="font-semibold text-amber-900 text-sm mb-1.5">מדיניות ביטול</h3>

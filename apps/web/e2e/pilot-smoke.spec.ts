@@ -574,3 +574,87 @@ test("10. Chat sends message and history loads on mount", async ({ page }) => {
   // Assistant reply should appear (mock returns "שלום! אני עוזר גרופיו. כיצד אוכל לסייע?")
   await expect(page.getByText(/שלום!? אני עוזר גרופיו/)).toBeVisible({ timeout: 20_000 });
 });
+
+// ===========================================================================
+// 11. Forgot-password → sends reset request → shows success state
+// ===========================================================================
+
+test("11. Forgot-password page — sends reset request and shows confirmation", async ({ page }) => {
+  await page.route("**/api/v1/auth/password/reset", (r) =>
+    r.fulfill({ status: 200, body: JSON.stringify({ status: "sent" }) })
+  );
+
+  await page.goto("/forgot-password");
+
+  // Heading is rendered
+  await expect(page.getByRole("heading", { name: /שכחתי סיסמה/i })).toBeVisible({ timeout: 5_000 });
+
+  // Fill email and submit
+  await page.fill("#forgot-email", "pilot@example.com");
+  await page.getByRole("button", { name: /שלח קישור לאיפוס/i }).click();
+
+  // Success state: message about email sent
+  await expect(page.getByText(/אם כתובת האימייל קיימת/i)).toBeVisible({ timeout: 8_000 });
+});
+
+// ===========================================================================
+// 12. Reset-password page — shows invalid-token state when no token in URL
+// ===========================================================================
+
+test("12. Reset-password page — shows invalid-token error when no token provided", async ({ page }) => {
+  await page.goto("/reset-password");
+
+  // Should show "invalid link" card (no token in query string)
+  await expect(page.getByText(/קישור לא תקין/i)).toBeVisible({ timeout: 8_000 });
+  // Should have a link back to forgot-password
+  await expect(page.getByRole("link", { name: /בקשת קישור חדש/i })).toBeVisible();
+});
+
+// ===========================================================================
+// 13. Reset-password page — shows form when valid token provided
+// ===========================================================================
+
+test("13. Reset-password page — renders form with valid token in URL", async ({ page }) => {
+  await page.goto("/reset-password?token=fake-valid-reset-token");
+
+  // Form heading is rendered
+  await expect(page.getByRole("heading", { name: /איפוס סיסמה/i })).toBeVisible({ timeout: 8_000 });
+  // Password fields are rendered
+  await expect(page.locator("#reset-password")).toBeVisible();
+  await expect(page.locator("#reset-confirm-password")).toBeVisible();
+  // Submit button
+  await expect(page.getByRole("button", { name: /אפס סיסמה/i })).toBeVisible();
+});
+
+// ===========================================================================
+// 14. Checkout page (mock mode) — shows success immediately (no client_secret)
+// ===========================================================================
+
+test("14. Checkout page — mock payment succeeds immediately without Stripe UI", async ({ page }) => {
+  await setupBaseMocks(page);
+  await setAuthToken(page);
+
+  // Mock payment initiate — mock provider returns "succeeded" with no client_secret
+  await page.route("**/api/v1/payments/initiate", (r) =>
+    r.fulfill({
+      status: 200,
+      body: JSON.stringify({
+        id: "pay-smoke-1",
+        status: "succeeded",
+        amount: 4050,
+        currency: "ILS",
+        client_secret: null,
+        offer_id: "offer-pilot-1",
+      }),
+    })
+  );
+
+  await page.goto("/checkout?offerId=offer-pilot-1");
+
+  // Should show success state (no Stripe card form in mock mode)
+  await expect(page.getByText(/התשלום בוצע בהצלחה/i)).toBeVisible({ timeout: 10_000 });
+  // Escrow badge should be visible
+  await expect(page.getByText(/נאמנות|Escrow/i).first()).toBeVisible();
+  // Link to payments history
+  await expect(page.getByRole("link", { name: /להיסטוריית תשלומים/i })).toBeVisible();
+});

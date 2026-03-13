@@ -25,7 +25,7 @@ class InvoiceService:
         offer_id: str,
         contractor_id: str,
         subtotal: float,
-        tax_rate: float = 0.17,
+        tax_rate: float = 0.18,  # Israeli VAT (מע"מ) — 18% as of 2025
         platform_fee_rate: float = 0.05,
     ) -> dict[str, Any]:
         """Create an invoice record in the DB.

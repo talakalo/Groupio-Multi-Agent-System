@@ -35,13 +35,19 @@ class PaymentInitiateRequest(BaseModel):
     force_escrow: bool = False  # Resident can opt-in to escrow
 
 
+VAT_RATE = 0.18  # Israeli מע"מ — 18% as of 2025
+
+
 class PaymentResponse(BaseModel):
     """Standard payment response."""
 
     id: str
     user_id: str
     offer_id: str
-    amount: float
+    subtotal: float       # Price before VAT
+    tax_rate: float = VAT_RATE
+    tax_amount: float     # VAT amount (18%)
+    amount: float         # Total charged (subtotal + VAT)
     currency: str
     status: str
     payment_type: str = "direct"  # "escrow" or "direct"
@@ -55,7 +61,10 @@ class InvoiceResponse(BaseModel):
 
     id: str
     offer_id: str
-    amount: float
+    subtotal: float = 0.0
+    tax_rate: float = VAT_RATE
+    tax_amount: float = 0.0
+    amount: float         # Total (subtotal + VAT)
     currency: str
     status: str
     payment_type: str = "direct"
@@ -127,19 +136,25 @@ async def get_my_payments(
     """Get the current user's payment history."""
     db = get_postgres_client()
     payments = await db.list_payments_for_user(current_user.id)
-    return [
-        PaymentResponse(
+    result = []
+    for p in payments:
+        raw_amount = p.get("amount", 0)
+        subtotal = p.get("subtotal", round(raw_amount / (1 + VAT_RATE), 2))
+        tax_amount = p.get("tax_amount", round(subtotal * VAT_RATE, 2))
+        result.append(PaymentResponse(
             id=p.get("id", ""),
             user_id=p.get("user_id", current_user.id),
             offer_id=p.get("offer_id", ""),
-            amount=p.get("amount", 0),
+            subtotal=subtotal,
+            tax_rate=p.get("tax_rate", VAT_RATE),
+            tax_amount=tax_amount,
+            amount=raw_amount,
             currency=p.get("currency", "ILS"),
             status=p.get("status", "unknown"),
             transaction_id=p.get("transaction_id"),
             created_at=p.get("created_at", datetime.now(UTC).isoformat()),
-        )
-        for p in payments
-    ]
+        ))
+    return result
 
 
 @router.post("/initiate", response_model=PaymentResponse)
@@ -200,10 +215,17 @@ async def initiate_payment(
                 detail=f"Payment amount {amount} is below minimum ({MIN_PAYMENT_AMOUNT} ILS)",
             )
 
+        subtotal = amount
+        tax_amount = round(subtotal * VAT_RATE, 2)
+        total = round(subtotal + tax_amount, 2)
         invoice_data = {
             "id": invoice_id,
             "offer_id": request.offer_id,
-            "amount": amount,
+            "subtotal": subtotal,
+            "tax_rate": VAT_RATE,
+            "tax_amount": tax_amount,  # API response key
+            "tax": tax_amount,         # DB column key (invoices.tax)
+            "amount": total,
             "currency": "ILS",
             "status": "pending",
             "payment_type": payment_type,
@@ -212,39 +234,54 @@ async def initiate_payment(
                 {
                     "description": offer.get("title", "Group offer"),
                     "quantity": 1,
-                    "unit_price": amount,
+                    "unit_price": subtotal,
+                    "tax_amount": tax_amount,
+                    "total": total,
                 }
             ],
         }
         existing_invoice = invoice_data
     else:
-        amount = existing_invoice.get("amount", 0)
+        subtotal = existing_invoice.get("subtotal", existing_invoice.get("amount", 0))
+        tax_amount = existing_invoice.get("tax_amount", round(subtotal * VAT_RATE, 2))
+        total = existing_invoice.get("amount", round(subtotal + tax_amount, 2))
+        amount = total
         payment_type = existing_invoice.get("payment_type", "escrow")
 
-    # Create payment record
+    # Create payment record — amount is the VAT-inclusive total
     payment_id = str(uuid4())
+    charge_subtotal: float = existing_invoice.get("subtotal", amount)
+    charge_tax: float = existing_invoice.get("tax_amount", round(charge_subtotal * VAT_RATE, 2))
+    charge_total: float = existing_invoice.get("amount", round(charge_subtotal + charge_tax, 2))
+
     payment_data = {
         "id": payment_id,
         "user_id": current_user.id,
         "offer_id": request.offer_id,
         "invoice_id": existing_invoice.get("id"),
-        "amount": amount,
+        "subtotal": charge_subtotal,
+        "tax_rate": VAT_RATE,
+        "tax_amount": charge_tax,
+        "amount": charge_total,
         "currency": "ILS",
         "status": "processing",
         "payment_method_id": request.payment_method_id,
         "created_at": datetime.now(UTC).isoformat(),
     }
 
-    # Call payment provider
+    # Call payment provider with the VAT-inclusive total
     try:
         charge_result = await provider.create_charge(
-            amount=amount,
+            amount=charge_total,
             currency="ILS",
             customer_id=current_user.id,
             metadata={
                 "offer_id": request.offer_id,
                 "payment_id": payment_id,
                 "user_email": current_user.email,
+                "subtotal": str(charge_subtotal),
+                "tax_amount": str(charge_tax),
+                "tax_rate": str(VAT_RATE),
             },
         )
         payment_data["transaction_id"] = charge_result.get("transaction_id")
@@ -269,7 +306,10 @@ async def initiate_payment(
         id=payment_data["id"],
         user_id=payment_data["user_id"],
         offer_id=payment_data["offer_id"],
-        amount=payment_data["amount"],
+        subtotal=charge_subtotal,
+        tax_rate=VAT_RATE,
+        tax_amount=charge_tax,
+        amount=charge_total,
         currency=payment_data["currency"],
         status=payment_data["status"],
         payment_type=payment_type,
@@ -368,11 +408,17 @@ async def get_payment(
     if payment.get("user_id") != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized to view this payment")
 
+    raw_amount = payment.get("amount", 0)
+    pay_subtotal = payment.get("subtotal", round(raw_amount / (1 + VAT_RATE), 2))
+    pay_tax_amount = payment.get("tax_amount", round(pay_subtotal * VAT_RATE, 2))
     return PaymentResponse(
         id=payment["id"],
         user_id=payment["user_id"],
         offer_id=payment.get("offer_id", ""),
-        amount=payment.get("amount", 0),
+        subtotal=pay_subtotal,
+        tax_rate=payment.get("tax_rate", VAT_RATE),
+        tax_amount=pay_tax_amount,
+        amount=raw_amount,
         currency=payment.get("currency", "ILS"),
         status=payment.get("status", "unknown"),
         transaction_id=payment.get("transaction_id"),
@@ -504,10 +550,16 @@ async def get_invoice(
     if not has_access:
         raise HTTPException(status_code=403, detail="Not authorized to view this invoice")
 
+    raw_total = invoice.get("total", invoice.get("amount", 0))
+    inv_subtotal = invoice.get("subtotal", round(raw_total / (1 + VAT_RATE), 2))
+    inv_tax_amount = invoice.get("tax_amount", round(inv_subtotal * VAT_RATE, 2))
     return InvoiceResponse(
         id=invoice["id"],
         offer_id=invoice.get("offer_id", ""),
-        amount=invoice.get("total", invoice.get("amount", 0)),
+        subtotal=inv_subtotal,
+        tax_rate=invoice.get("tax_rate", VAT_RATE),
+        tax_amount=inv_tax_amount,
+        amount=raw_total,
         currency=invoice.get("currency", "ILS"),
         status=invoice.get("status", "unknown"),
         payment_type=invoice.get("payment_type", "escrow"),
@@ -562,72 +614,108 @@ async def download_invoice_pdf(
         )
 
     total_amount = invoice.get("total", invoice.get("amount", 0))
+    pdf_subtotal = invoice.get("subtotal", round(total_amount / (1 + VAT_RATE), 2))
+    pdf_tax_rate = invoice.get("tax_rate", VAT_RATE)
+    pdf_tax_amount = invoice.get("tax_amount", round(pdf_subtotal * pdf_tax_rate, 2))
+    pdf_tax_pct = int(round(pdf_tax_rate * 100))
     currency = invoice.get("currency", "ILS")
     issued_at = invoice.get("issued_at", invoice.get("created_at", ""))
     offer_id = invoice.get("offer_id", "")
     status = invoice.get("status", "")
+    invoice_number = invoice.get("invoice_number", invoice_id[:12])
+    is_paid = status in ("paid", "released")
 
     html = f"""<!DOCTYPE html>
 <html dir="rtl" lang="he">
 <head>
 <meta charset="utf-8">
-<title>Invoice {invoice_id[:8]}</title>
+<title>חשבונית {invoice_number}</title>
 <style>
-  body {{ font-family: Arial, sans-serif; margin: 40px; color: #333; }}
+  body {{ font-family: Arial, 'Segoe UI', sans-serif; margin: 40px; color: #222; direction: rtl; }}
   .header {{ display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; }}
   .logo {{ font-size: 28px; font-weight: bold; color: #1976D2; }}
-  .invoice-info {{ text-align: left; }}
-  .invoice-info h2 {{ margin: 0; color: #1976D2; }}
-  .invoice-info p {{ margin: 4px 0; color: #666; font-size: 14px; }}
-  table {{ width: 100%; border-collapse: collapse; margin: 24px 0; }}
-  th {{ background: #f5f5f5; padding: 12px; text-align: right; border-bottom: 2px solid #ddd; font-size: 14px; }}
-  td {{ padding: 12px; border-bottom: 1px solid #eee; font-size: 14px; }}
-  .total-row {{ font-weight: bold; font-size: 16px; border-top: 2px solid #333; }}
-  .status {{ display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: bold; }}
+  .logo span {{ font-size: 13px; font-weight: normal; color: #666; display: block; margin-top: 2px; }}
+  .invoice-info {{ text-align: left; direction: ltr; }}
+  .invoice-info h2 {{ margin: 0 0 8px; color: #1976D2; font-size: 20px; }}
+  .invoice-info p {{ margin: 3px 0; color: #555; font-size: 13px; }}
+  .divider {{ border: none; border-top: 2px solid #eee; margin: 0 0 24px; }}
+  table {{ width: 100%; border-collapse: collapse; margin: 0 0 8px; }}
+  th {{ background: #f5f7fa; padding: 10px 12px; text-align: right; border-bottom: 2px solid #ddd; font-size: 13px; color: #555; }}
+  td {{ padding: 10px 12px; border-bottom: 1px solid #f0f0f0; font-size: 13px; }}
+  .subtotal-section td {{ border-bottom: none; font-size: 13px; color: #555; padding: 6px 12px; }}
+  .vat-row td {{ color: #555; font-size: 13px; padding: 6px 12px; border-bottom: none; }}
+  .total-row td {{ font-weight: bold; font-size: 16px; border-top: 2px solid #222; padding: 12px; background: #f9fafb; }}
+  .status {{ display: inline-block; padding: 3px 10px; border-radius: 10px; font-size: 12px; font-weight: bold; }}
   .status-paid {{ background: #e8f5e9; color: #2e7d32; }}
   .status-pending {{ background: #fff3e0; color: #e65100; }}
-  .footer {{ margin-top: 60px; padding-top: 20px; border-top: 1px solid #eee;
-    font-size: 12px; color: #999; text-align: center; }}
+  .legal-note {{ margin-top: 32px; padding: 12px 16px; background: #f9fafb; border-radius: 8px;
+    font-size: 11px; color: #888; line-height: 1.6; }}
+  .footer {{ margin-top: 40px; padding-top: 16px; border-top: 1px solid #eee;
+    font-size: 11px; color: #aaa; text-align: center; }}
   @media print {{ body {{ margin: 20px; }} }}
 </style>
 </head>
 <body>
+
 <div class="header">
-  <div class="logo">Groupio</div>
+  <div class="logo">
+    Groupio
+    <span>פלטפורמת רכישה קבוצתית לבניינים</span>
+  </div>
   <div class="invoice-info">
-    <h2>Invoice</h2>
-    <p><strong>Invoice ID:</strong> {invoice_id[:12]}</p>
-    <p><strong>Date:</strong> {issued_at[:10] if issued_at else "N/A"}</p>
-    <p><strong>Offer:</strong> {offer_id[:12] if offer_id else "N/A"}</p>
-    <p><strong>Status:</strong> <span class="status status-{"paid" if status in ("paid", "released") else "pending"}">{
-        status
-    }</span></p>
+    <h2>חשבונית מס</h2>
+    <p><strong>מספר חשבונית:</strong> {invoice_number}</p>
+    <p><strong>תאריך:</strong> {issued_at[:10] if issued_at else "—"}</p>
+    <p><strong>הצעה:</strong> {offer_id[:12] if offer_id else "—"}</p>
+    <p><strong>סטטוס:</strong>
+      <span class="status {'status-paid' if is_paid else 'status-pending'}">
+        {'שולם' if is_paid else 'ממתין'}
+      </span>
+    </p>
   </div>
 </div>
+<hr class="divider">
 
 <table>
   <thead>
     <tr>
-      <th>Description</th>
-      <th style="text-align:center">Qty</th>
-      <th style="text-align:right">Unit Price</th>
-      <th style="text-align:right">Total</th>
+      <th>תיאור</th>
+      <th style="text-align:center">כמות</th>
+      <th style="text-align:left">מחיר יחידה</th>
+      <th style="text-align:left">סה"כ לפני מע"מ</th>
     </tr>
   </thead>
   <tbody>
     {items_html}
   </tbody>
-  <tfoot>
-    <tr class="total-row">
-      <td colspan="3" style="text-align:right">Total</td>
-      <td style="text-align:right">{total_amount:,.2f} {currency}</td>
-    </tr>
-  </tfoot>
 </table>
 
+<table>
+  <tbody>
+    <tr class="subtotal-section">
+      <td colspan="3" style="text-align:right">סכום לפני מע"מ:</td>
+      <td style="text-align:left">{pdf_subtotal:,.2f} {currency}</td>
+    </tr>
+    <tr class="vat-row">
+      <td colspan="3" style="text-align:right">מע"מ {pdf_tax_pct}%:</td>
+      <td style="text-align:left">{pdf_tax_amount:,.2f} {currency}</td>
+    </tr>
+    <tr class="total-row">
+      <td colspan="3" style="text-align:right">סה"כ לתשלום (כולל מע"מ):</td>
+      <td style="text-align:left">{total_amount:,.2f} {currency}</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="legal-note">
+  עוסק מורשה מס׳: [מספר ע.מ של Groupio]<br>
+  חשבונית זו הופקה אוטומטית ומהווה מסמך חוקי בהתאם לתקנות מס ערך מוסף, התשל"ו–1975.<br>
+  שיעור מע"מ הנוכחי: {pdf_tax_pct}%.
+</div>
+
 <div class="footer">
-  <p>Groupio Platform &bull; group purchasing for building residents</p>
-  <p>This document was generated automatically and is valid without a signature.</p>
+  <p>Groupio Platform &bull; רכישה קבוצתית לדיירים</p>
+  <p>מסמך זה הופק אוטומטית ותקף ללא חתימה.</p>
 </div>
 </body>
 </html>"""
