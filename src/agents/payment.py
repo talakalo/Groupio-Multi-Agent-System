@@ -200,7 +200,7 @@ class PaymentAgent(BaseAgent):
 
     async def _handle_refund_request(self, state: AgentState, user_id: str, user_message: str) -> AgentState:
         """Handle refund requests — attempt automatic refund, escalate only if unresolvable."""
-        db = self._db
+        db = get_postgres_client()
         refund_result: dict[str, Any] | None = None
         refund_error: str | None = None
 
@@ -268,7 +268,7 @@ class PaymentAgent(BaseAgent):
             ]
         else:
             state["needs_human"] = True
-            state["escalation_reason"] = "refund_request_unresolvable"
+            state["escalation_reason"] = "refund_request"
             state["actions_taken"] = [
                 {
                     "agent": "payment",

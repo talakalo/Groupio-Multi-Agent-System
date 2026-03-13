@@ -182,6 +182,9 @@ class InfluencerAgent(BaseAgent):
                 "reason": candidate.get("reason", ""),
                 "status": "pending_approval",
             }
+            if not hasattr(self._db, "create_credit_award"):
+                written.append(record)
+                continue
             try:
                 await self._db.create_credit_award(record)
                 written.append(record)
