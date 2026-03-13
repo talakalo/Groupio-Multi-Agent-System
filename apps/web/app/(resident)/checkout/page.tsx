@@ -15,7 +15,7 @@
  * All sensitive card data is handled exclusively by Stripe.js in a sandboxed iframe.
  */
 
-import { Loader2, CheckCircle2, AlertCircle, ShieldCheck, ArrowRight } from "lucide-react";
+import { Loader2, CheckCircle2, AlertCircle, ShieldCheck, ArrowRight, Share2 } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -62,6 +62,38 @@ function EscrowBadge() {
   );
 }
 
+function ShareButton({ offerId }: { offerId?: string }) {
+  const [copied, setCopied] = useState(false);
+  if (!offerId) return null;
+
+  const handleShare = async () => {
+    const url = `${window.location.origin}/offers/${offerId}`;
+    const shareData = { title: "Groupio — הצטרפו להצעה הקבוצתית!", url };
+    try {
+      if (navigator.share && navigator.canShare?.(shareData)) {
+        await navigator.share(shareData);
+      } else {
+        await navigator.clipboard.writeText(url);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2500);
+      }
+    } catch {
+      // user cancelled
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handleShare}
+      className="btn-secondary flex items-center gap-2 justify-center"
+    >
+      <Share2 className="h-4 w-4" aria-hidden="true" />
+      {copied ? "הקישור הועתק!" : "שתפו עם השכנים"}
+    </button>
+  );
+}
+
 function SuccessState({ amount, currency, offerId }: { amount: number; currency: string; offerId?: string }) {
   const formatted = new Intl.NumberFormat("he-IL", {
     style: "currency",
@@ -77,10 +109,14 @@ function SuccessState({ amount, currency, offerId }: { amount: number; currency:
         <span className="font-semibold">{formatted}</span> נשמרו בנאמנות. תקבלו אישור במייל בקרוב.
       </p>
       <EscrowBadge />
+      <p className="text-sm text-gray-500">
+        💡 עוד שכנים = הנחה גדולה יותר לכולם!
+      </p>
       <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
-        <Link href="/payments" className="btn-primary">
-          להיסטוריית תשלומים
+        <Link href="/orders" className="btn-primary">
+          להזמנות שלי
         </Link>
+        <ShareButton offerId={offerId} />
         {offerId && (
           <Link href={`/offers/${offerId}`} className="btn-secondary">
             חזרה להצעה

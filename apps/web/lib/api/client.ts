@@ -320,6 +320,30 @@ class ApiClient {
   async getMyInvoices() {
     return this.request<import("@groupio/types").Invoice[]>("/api/v1/payments/invoices/my");
   }
+
+  // ---- Review endpoints ----
+
+  async addContractorReview(
+    contractorId: string,
+    data: { offer_id: string; rating: number; comment?: string }
+  ) {
+    return this.request<{ id: string; contractor_id: string; rating: number; comment?: string; created_at: string }>(
+      `/api/v1/contractors/${encodeURIComponent(contractorId)}/reviews`,
+      { method: "POST", body: data }
+    );
+  }
+
+  // ---- Offer participants ----
+
+  async getOfferParticipants(offerId: string, params?: { page?: number; page_size?: number }) {
+    const search = new URLSearchParams();
+    if (params?.page != null) search.set("page", String(params.page));
+    if (params?.page_size != null) search.set("page_size", String(params.page_size));
+    const qs = search.toString();
+    return this.request<{ items: unknown[]; total: number; page: number; page_size: number }>(
+      `/api/v1/offers/${encodeURIComponent(offerId)}/participants${qs ? `?${qs}` : ""}`
+    );
+  }
 }
 
 export class ApiError extends Error {
