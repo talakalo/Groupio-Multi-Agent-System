@@ -12,26 +12,32 @@ import pytest
 class TestContractorsShim:
     def test_imports_contractor(self):
         from src.models.contractors import Contractor
+
         assert Contractor is not None
 
     def test_imports_contractor_base(self):
         from src.models.contractors import ContractorBase
+
         assert ContractorBase is not None
 
     def test_imports_contractor_create(self):
         from src.models.contractors import ContractorCreate
+
         assert ContractorCreate is not None
 
     def test_imports_contractor_document(self):
         from src.models.contractors import ContractorDocument
+
         assert ContractorDocument is not None
 
     def test_imports_contractor_match(self):
         from src.models.contractors import ContractorMatch
+
         assert ContractorMatch is not None
 
     def test_imports_vetting_result(self):
         from src.models.contractors import VettingResult
+
         assert VettingResult is not None
 
 
@@ -43,26 +49,32 @@ class TestContractorsShim:
 class TestOffersShim:
     def test_imports_offer(self):
         from src.models.offers import Offer
+
         assert Offer is not None
 
     def test_imports_offer_base(self):
         from src.models.offers import OfferBase
+
         assert OfferBase is not None
 
     def test_imports_offer_create(self):
         from src.models.offers import OfferCreate
+
         assert OfferCreate is not None
 
     def test_imports_pricing_tier(self):
         from src.models.offers import PricingTier
+
         assert PricingTier is not None
 
     def test_imports_seasonality_factors(self):
         from src.models.offers import SEASONALITY_FACTORS
+
         assert isinstance(SEASONALITY_FACTORS, dict)
 
     def test_imports_completed_offer(self):
         from src.models.offers import CompletedOffer
+
         assert CompletedOffer is not None
 
 
@@ -74,16 +86,19 @@ class TestOffersShim:
 class TestServicesInit:
     def test_getattr_whatsapp_bot_service(self):
         import src.services as services_mod
+
         cls = services_mod.__getattr__("WhatsAppBotService")
         assert cls is not None
 
     def test_getattr_get_whatsapp_bot(self):
         import src.services as services_mod
+
         fn = services_mod.__getattr__("get_whatsapp_bot")
         assert callable(fn)
 
     def test_getattr_unknown_raises(self):
         import src.services as services_mod
+
         with pytest.raises(AttributeError, match="has no attribute"):
             services_mod.__getattr__("NonExistentName")
 
@@ -96,14 +111,14 @@ class TestServicesInit:
 class TestEmbeddingClient:
     @pytest.fixture
     def client(self):
-        with patch("src.rag.embeddings.get_settings") as mock_settings, \
-             patch("src.rag.embeddings.AsyncOpenAI"):
+        with patch("src.rag.embeddings.get_settings") as mock_settings, patch("src.rag.embeddings.AsyncOpenAI"):
             settings = MagicMock()
             settings.OPENAI_API_KEY = "test-key"
             settings.EMBEDDING_MODEL = "text-embedding-3-small"
             settings.EMBEDDING_DIMENSIONS = 1536
             mock_settings.return_value = settings
             from src.rag.embeddings import EmbeddingClient
+
             c = EmbeddingClient()
             yield c
 
@@ -156,13 +171,12 @@ class TestEmbeddingClient:
 class TestGetEmbeddingClient:
     def test_singleton(self):
         import src.rag.embeddings as emb_mod
+
         emb_mod._embedding_client = None
-        with patch("src.rag.embeddings.get_settings") as mock_settings, \
-             patch("src.rag.embeddings.AsyncOpenAI"):
-            mock_settings.return_value = MagicMock(
-                OPENAI_API_KEY="k", EMBEDDING_MODEL="m", EMBEDDING_DIMENSIONS=512
-            )
+        with patch("src.rag.embeddings.get_settings") as mock_settings, patch("src.rag.embeddings.AsyncOpenAI"):
+            mock_settings.return_value = MagicMock(OPENAI_API_KEY="k", EMBEDDING_MODEL="m", EMBEDDING_DIMENSIONS=512)
             from src.rag.embeddings import get_embedding_client
+
             c1 = get_embedding_client()
             c2 = get_embedding_client()
             assert c1 is c2
@@ -180,14 +194,17 @@ class TestAgentWorkerLifecycle:
         with patch("src.workers.agent_worker.get_settings") as mock_settings:
             mock_settings.return_value = MagicMock(REDIS_URL="redis://localhost:6379")
             from src.workers.agent_worker import AgentWorker
+
             return AgentWorker()
 
     @pytest.mark.asyncio
     async def test_connect(self, worker):
         mock_redis = AsyncMock()
         mock_redis.ping = AsyncMock()
-        with patch("src.workers.agent_worker.redis.from_url", return_value=mock_redis), \
-             patch("src.workers.agent_worker.RouterAgent") as mock_router:
+        with (
+            patch("src.workers.agent_worker.redis.from_url", return_value=mock_redis),
+            patch("src.workers.agent_worker.RouterAgent") as mock_router,
+        ):
             mock_router.return_value = MagicMock()
             await worker.connect()
             mock_redis.ping.assert_awaited_once()
@@ -212,8 +229,10 @@ class TestAgentWorkerLifecycle:
 
     @pytest.mark.asyncio
     async def test_main_function(self):
-        with patch("src.workers.agent_worker.get_settings") as mock_settings, \
-             patch("src.workers.agent_worker.AgentWorker") as mock_worker_cls:
+        with (
+            patch("src.workers.agent_worker.get_settings") as mock_settings,
+            patch("src.workers.agent_worker.AgentWorker") as mock_worker_cls,
+        ):
             mock_settings.return_value = MagicMock(REDIS_URL="redis://localhost")
             mock_worker = AsyncMock()
             mock_worker.connect = AsyncMock()
@@ -223,6 +242,7 @@ class TestAgentWorkerLifecycle:
 
             with patch("src.workers.agent_worker.signal.signal"):
                 from src.workers.agent_worker import main
+
                 await main()
 
             mock_worker.connect.assert_awaited_once()
@@ -239,13 +259,12 @@ class TestSchedulerTasks:
     @pytest.mark.asyncio
     async def test_recalculate_trust_scores(self):
         mock_db = AsyncMock()
-        mock_db.list_contractors = AsyncMock(
-            return_value=([{"id": "c1"}, {"id": "c2"}], 2)
-        )
+        mock_db.list_contractors = AsyncMock(return_value=([{"id": "c1"}, {"id": "c2"}], 2))
         mock_db.update_contractor_rating = AsyncMock()
 
         with patch("src.workers.scheduler.get_postgres_client", return_value=mock_db):
             from src.workers.scheduler import recalculate_trust_scores
+
             await recalculate_trust_scores()
             assert mock_db.update_contractor_rating.await_count == 2
 
@@ -257,12 +276,14 @@ class TestSchedulerTasks:
 
         with patch("src.workers.scheduler.get_postgres_client", return_value=mock_db):
             from src.workers.scheduler import recalculate_trust_scores
+
             await recalculate_trust_scores()  # should not raise
 
     @pytest.mark.asyncio
     async def test_cleanup_stale_conversations(self):
         with patch("src.workers.scheduler.get_redis_client") as mock_redis:
             from src.workers.scheduler import cleanup_stale_conversations
+
             await cleanup_stale_conversations()
             mock_redis.assert_called_once()
 
@@ -274,9 +295,12 @@ class TestSchedulerTasks:
         mock_redis = AsyncMock()
         mock_redis.set = AsyncMock()
 
-        with patch("src.workers.scheduler.get_postgres_client", return_value=mock_db), \
-             patch("src.workers.scheduler.get_redis_client", return_value=mock_redis):
+        with (
+            patch("src.workers.scheduler.get_postgres_client", return_value=mock_db),
+            patch("src.workers.scheduler.get_redis_client", return_value=mock_redis),
+        ):
             from src.workers.scheduler import generate_daily_analytics
+
             await generate_daily_analytics()
             mock_redis.set.assert_awaited_once()
 
@@ -285,9 +309,12 @@ class TestSchedulerTasks:
         mock_db = AsyncMock()
         mock_db.list_offers = AsyncMock(side_effect=Exception("DB error"))
 
-        with patch("src.workers.scheduler.get_postgres_client", return_value=mock_db), \
-             patch("src.workers.scheduler.get_redis_client"):
+        with (
+            patch("src.workers.scheduler.get_postgres_client", return_value=mock_db),
+            patch("src.workers.scheduler.get_redis_client"),
+        ):
             from src.workers.scheduler import generate_daily_analytics
+
             await generate_daily_analytics()  # should not raise
 
     @pytest.mark.asyncio
@@ -297,9 +324,12 @@ class TestSchedulerTasks:
         mock_graph = AsyncMock()
         mock_graph.compute_and_store_similarity_edges = AsyncMock(return_value=10)
 
-        with patch("src.workers.scheduler.get_postgres_client", return_value=mock_db), \
-             patch("src.workers.scheduler.get_graph_store", return_value=mock_graph, create=True):
+        with (
+            patch("src.workers.scheduler.get_postgres_client", return_value=mock_db),
+            patch("src.workers.scheduler.get_graph_store", return_value=mock_graph, create=True),
+        ):
             from src.workers.scheduler import refresh_building_similarity
+
             with patch("src.databases.graph_store.get_graph_store", return_value=mock_graph, create=True):
                 await refresh_building_similarity()
 
@@ -313,6 +343,7 @@ class TestSchedulerTasks:
         with patch("src.workers.scheduler.get_postgres_client", return_value=mock_db):
             with patch("src.databases.graph_store.get_graph_store", return_value=mock_graph, create=True):
                 from src.workers.scheduler import refresh_building_similarity
+
                 await refresh_building_similarity()
 
     @pytest.mark.asyncio
@@ -325,6 +356,7 @@ class TestSchedulerTasks:
         with patch("src.workers.scheduler.get_postgres_client", return_value=mock_db):
             with patch("src.databases.graph_store.get_graph_store", return_value=mock_graph, create=True):
                 from src.workers.scheduler import refresh_influencer_scores
+
                 await refresh_influencer_scores()
             assert mock_graph.refresh_influence_scores_for_city.await_count == 2
 
@@ -338,6 +370,7 @@ class TestSchedulerTasks:
         with patch("src.workers.scheduler.get_postgres_client", return_value=mock_db):
             with patch("src.databases.graph_store.get_graph_store", return_value=mock_graph, create=True):
                 from src.workers.scheduler import refresh_influencer_scores
+
                 await refresh_influencer_scores()  # should not raise
 
 
@@ -349,35 +382,36 @@ class TestSchedulerTasks:
 class TestNLToSQL:
     @pytest.fixture
     def nl_to_sql(self):
-        with patch("src.agents.analytics.get_postgres_client"), \
-             patch("src.agents.base.get_llm_client"), \
-             patch("src.agents.base.get_rag_pipeline"):
+        with (
+            patch("src.agents.analytics.get_postgres_client"),
+            patch("src.agents.base.get_llm_client"),
+            patch("src.agents.base.get_rag_pipeline"),
+        ):
             from src.agents.analytics import NLToSQL
+
             llm = AsyncMock()
             return NLToSQL(llm)
 
     @pytest.mark.asyncio
     async def test_generate_sql_success(self, nl_to_sql):
-        nl_to_sql._llm.create_message = AsyncMock(return_value={
-            "content": [{"text": "SELECT * FROM offers WHERE status = 'active'"}]
-        })
+        nl_to_sql._llm.create_message = AsyncMock(
+            return_value={"content": [{"text": "SELECT * FROM offers WHERE status = 'active'"}]}
+        )
         sql = await nl_to_sql.generate_sql("Show active offers")
         assert "SELECT" in sql
 
     @pytest.mark.asyncio
     async def test_generate_sql_strips_markdown(self, nl_to_sql):
-        nl_to_sql._llm.create_message = AsyncMock(return_value={
-            "content": [{"text": "```sql\nSELECT id FROM offers\n```"}]
-        })
+        nl_to_sql._llm.create_message = AsyncMock(
+            return_value={"content": [{"text": "```sql\nSELECT id FROM offers\n```"}]}
+        )
         sql = await nl_to_sql.generate_sql("list offer ids")
         assert "```" not in sql
         assert "SELECT" in sql
 
     @pytest.mark.asyncio
     async def test_generate_sql_invalid_raises(self, nl_to_sql):
-        nl_to_sql._llm.create_message = AsyncMock(return_value={
-            "content": [{"text": "DROP TABLE offers"}]
-        })
+        nl_to_sql._llm.create_message = AsyncMock(return_value={"content": [{"text": "DROP TABLE offers"}]})
         with pytest.raises(ValueError, match="Invalid SQL"):
             await nl_to_sql.generate_sql("delete everything")
 

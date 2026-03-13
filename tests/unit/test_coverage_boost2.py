@@ -12,6 +12,7 @@ import pytest
 class TestCircuitBreaker:
     def setup_method(self):
         from src.agents.base import CircuitBreaker
+
         self.cb = CircuitBreaker(failure_threshold=3, recovery_timeout=60.0)
 
     def test_initial_state_closed(self):
@@ -30,6 +31,7 @@ class TestCircuitBreaker:
 
     def test_half_open_after_timeout(self):
         import time
+
         for _ in range(3):
             self.cb.record_failure()
         # Manually set last failure time to far in the past
@@ -45,6 +47,7 @@ class TestCircuitBreaker:
 class TestLLMResponseCache:
     def setup_method(self):
         from src.agents.base import LLMResponseCache
+
         self.cache = LLMResponseCache(default_ttl=300)
 
     def test_make_key_deterministic(self):
@@ -98,10 +101,10 @@ class TestLLMResponseCache:
 class TestBaseAgentMethods:
     @pytest.fixture
     def agent(self):
-        with patch("src.agents.base.get_llm_client") as mock_llm, \
-             patch("src.agents.base.get_rag_pipeline"):
+        with patch("src.agents.base.get_llm_client") as mock_llm, patch("src.agents.base.get_rag_pipeline"):
             mock_llm.return_value = AsyncMock()
             from src.agents.router import RouterAgent
+
             a = RouterAgent()
             a.llm_client = AsyncMock()
             return a
@@ -142,10 +145,12 @@ class TestBaseAgentMethods:
     @pytest.mark.asyncio
     async def test_get_metrics_with_history(self, agent):
         mock_db = AsyncMock()
-        mock_db.get_agent_metrics_history = AsyncMock(return_value=[
-            {"metric_type": "calls", "value": 10},
-            {"metric_type": "tokens", "value": 500},
-        ])
+        mock_db.get_agent_metrics_history = AsyncMock(
+            return_value=[
+                {"metric_type": "calls", "value": 10},
+                {"metric_type": "tokens", "value": 500},
+            ]
+        )
         with patch("src.databases.postgres.get_postgres_client", return_value=mock_db):
             metrics = await agent.get_metrics()
         assert "historical" in metrics
@@ -164,8 +169,7 @@ class TestBaseAgentMethods:
         state = {"conversation_id": "conv1", "user_id": "user1"}
         with patch("src.databases.postgres.get_postgres_client", return_value=mock_db):
             await agent._enqueue_pending_decision(
-                state=state, action_type="test_action",
-                payload={"key": "val"}, escalation_reason="test"
+                state=state, action_type="test_action", payload={"key": "val"}, escalation_reason="test"
             )
         mock_db.create_pending_decision.assert_awaited_once()
 
@@ -185,6 +189,7 @@ class TestBaseAgentMethods:
 
     def test_extract_text_from_list_content(self):
         from src.agents.payment import PaymentAgent
+
         with patch("src.agents.base.get_llm_client"), patch("src.agents.base.get_rag_pipeline"):
             agent = PaymentAgent()
         response = {"content": [{"type": "text", "text": "Hello"}]}
@@ -193,6 +198,7 @@ class TestBaseAgentMethods:
 
     def test_extract_text_from_string_content(self):
         from src.agents.payment import PaymentAgent
+
         with patch("src.agents.base.get_llm_client"), patch("src.agents.base.get_rag_pipeline"):
             agent = PaymentAgent()
         response = {"content": "Direct string"}
@@ -201,6 +207,7 @@ class TestBaseAgentMethods:
 
     def test_extract_text_empty(self):
         from src.agents.payment import PaymentAgent
+
         with patch("src.agents.base.get_llm_client"), patch("src.agents.base.get_rag_pipeline"):
             agent = PaymentAgent()
         text = agent._extract_text({})
@@ -209,6 +216,7 @@ class TestBaseAgentMethods:
     @pytest.mark.asyncio
     async def test_call_llm_circuit_breaker_open(self, agent):
         import src.agents.base as base_mod
+
         original_state = base_mod._llm_circuit_breaker._state
         base_mod._llm_circuit_breaker._state = "open"
         base_mod._llm_circuit_breaker._last_failure_time = None
@@ -246,6 +254,7 @@ class TestStripePaymentProvider:
 
         with patch.dict("sys.modules", {"stripe": mock_stripe}):
             from src.services.payment import StripePaymentProvider
+
             provider = StripePaymentProvider(secret_key="sk_test_123")
             provider._stripe = mock_stripe
             return provider
@@ -258,9 +267,7 @@ class TestStripePaymentProvider:
         mock_intent.status = "requires_payment_method"
         stripe_provider._stripe.PaymentIntent.create_async = AsyncMock(return_value=mock_intent)
 
-        result = await stripe_provider.create_charge(
-            amount=1180.0, currency="ILS", customer_id="cus_123"
-        )
+        result = await stripe_provider.create_charge(amount=1180.0, currency="ILS", customer_id="cus_123")
         assert result["transaction_id"] == "pi_123"
         assert result["status"] == "requires_payment_method"
 
@@ -273,17 +280,14 @@ class TestStripePaymentProvider:
         stripe_provider._stripe.PaymentIntent.create_async = AsyncMock(return_value=mock_intent)
 
         result = await stripe_provider.create_charge(
-            amount=500.0, currency="ILS", customer_id="cus_456",
-            metadata={"payment_method_id": "pm_abc"}
+            amount=500.0, currency="ILS", customer_id="cus_456", metadata={"payment_method_id": "pm_abc"}
         )
         assert result["status"] == "succeeded"
 
     @pytest.mark.asyncio
     async def test_create_charge_stripe_error(self, stripe_provider):
         stripe_provider._stripe.StripeError = RuntimeError
-        stripe_provider._stripe.PaymentIntent.create_async = AsyncMock(
-            side_effect=RuntimeError("Card declined")
-        )
+        stripe_provider._stripe.PaymentIntent.create_async = AsyncMock(side_effect=RuntimeError("Card declined"))
         with pytest.raises(RuntimeError, match="Payment failed"):
             await stripe_provider.create_charge(100.0, "ILS", "cus_bad")
 
@@ -302,9 +306,7 @@ class TestStripePaymentProvider:
     @pytest.mark.asyncio
     async def test_refund_stripe_error(self, stripe_provider):
         stripe_provider._stripe.StripeError = RuntimeError
-        stripe_provider._stripe.Refund.create_async = AsyncMock(
-            side_effect=RuntimeError("Already refunded")
-        )
+        stripe_provider._stripe.Refund.create_async = AsyncMock(side_effect=RuntimeError("Already refunded"))
         with pytest.raises(RuntimeError, match="Refund failed"):
             await stripe_provider.refund("pi_bad")
 
@@ -324,9 +326,7 @@ class TestStripePaymentProvider:
     @pytest.mark.asyncio
     async def test_get_status_stripe_error(self, stripe_provider):
         stripe_provider._stripe.StripeError = RuntimeError
-        stripe_provider._stripe.PaymentIntent.retrieve_async = AsyncMock(
-            side_effect=RuntimeError("Not found")
-        )
+        stripe_provider._stripe.PaymentIntent.retrieve_async = AsyncMock(side_effect=RuntimeError("Not found"))
         with pytest.raises(RuntimeError, match="Status check failed"):
             await stripe_provider.get_status("pi_bad")
 
@@ -342,9 +342,7 @@ class TestStripePaymentProvider:
     @pytest.mark.asyncio
     async def test_create_customer_stripe_error(self, stripe_provider):
         stripe_provider._stripe.StripeError = RuntimeError
-        stripe_provider._stripe.Customer.create_async = AsyncMock(
-            side_effect=RuntimeError("Email invalid")
-        )
+        stripe_provider._stripe.Customer.create_async = AsyncMock(side_effect=RuntimeError("Email invalid"))
         with pytest.raises(RuntimeError, match="Customer creation failed"):
             await stripe_provider.create_customer("u1", "bad@email")
 
@@ -352,14 +350,17 @@ class TestStripePaymentProvider:
 class TestGetPaymentProvider:
     def setup_method(self):
         import src.services.payment as pay_mod
+
         pay_mod._payment_provider = None
 
     def teardown_method(self):
         import src.services.payment as pay_mod
+
         pay_mod._payment_provider = None
 
     def test_returns_mock_provider_when_configured(self):
         from src.services.payment import MockPaymentProvider, get_payment_provider
+
         with patch("src.config.settings.get_settings") as mock_settings:
             settings = MagicMock()
             settings.PAYMENT_PROVIDER = "mock"
@@ -370,6 +371,7 @@ class TestGetPaymentProvider:
 
     def test_raises_for_unknown_provider(self):
         from src.services.payment import get_payment_provider
+
         with patch("src.config.settings.get_settings") as mock_settings:
             settings = MagicMock()
             settings.PAYMENT_PROVIDER = "unknown_provider"
@@ -379,10 +381,13 @@ class TestGetPaymentProvider:
 
     def test_returns_stripe_provider(self):
         from src.services.payment import StripePaymentProvider, get_payment_provider
+
         mock_stripe = MagicMock()
         mock_stripe.StripeError = Exception
-        with patch("src.config.settings.get_settings") as mock_settings, \
-             patch.dict("sys.modules", {"stripe": mock_stripe}):
+        with (
+            patch("src.config.settings.get_settings") as mock_settings,
+            patch.dict("sys.modules", {"stripe": mock_stripe}),
+        ):
             settings = MagicMock()
             settings.PAYMENT_PROVIDER = "stripe"
             settings.STRIPE_SECRET_KEY = "sk_test_key"
@@ -392,6 +397,7 @@ class TestGetPaymentProvider:
 
     def test_stripe_raises_if_no_key(self):
         from src.services.payment import get_payment_provider
+
         with patch("src.config.settings.get_settings") as mock_settings:
             settings = MagicMock()
             settings.PAYMENT_PROVIDER = "stripe"
@@ -402,6 +408,7 @@ class TestGetPaymentProvider:
 
     def test_mock_logs_warning_in_production(self):
         from src.services.payment import MockPaymentProvider, get_payment_provider
+
         with patch("src.config.settings.get_settings") as mock_settings:
             settings = MagicMock()
             settings.PAYMENT_PROVIDER = "mock"
@@ -419,16 +426,19 @@ class TestGetPaymentProvider:
 class TestVettingAgentAnalysis:
     @pytest.fixture
     def vetting_agent(self):
-        with patch("src.agents.base.get_llm_client") as mock_llm, \
-             patch("src.agents.base.get_rag_pipeline"), \
-             patch("src.agents.vetting.get_postgres_client") as mock_db, \
-             patch("src.agents.vetting.get_graph_store") as mock_graph, \
-             patch("src.agents.vetting.get_settings") as mock_settings:
+        with (
+            patch("src.agents.base.get_llm_client") as mock_llm,
+            patch("src.agents.base.get_rag_pipeline"),
+            patch("src.agents.vetting.get_postgres_client") as mock_db,
+            patch("src.agents.vetting.get_graph_store") as mock_graph,
+            patch("src.agents.vetting.get_settings") as mock_settings,
+        ):
             mock_llm.return_value = AsyncMock()
             mock_db.return_value = AsyncMock()
             mock_graph.return_value = AsyncMock()
             mock_settings.return_value = MagicMock(VETTING_AGENT_MODE="autonomous")
             from src.agents.vetting import VettingAgent
+
             agent = VettingAgent()
             agent.llm_client = AsyncMock()
             return agent
@@ -441,13 +451,15 @@ class TestVettingAgentAnalysis:
 
     @pytest.mark.asyncio
     async def test_analyze_documents_with_docs(self, vetting_agent):
-        vetting_agent._call_llm_structured = AsyncMock(return_value={
-            "license_valid": True,
-            "insurance_valid": True,
-            "certificates_valid": True,
-            "issues": [],
-            "recommendations": [],
-        })
+        vetting_agent._call_llm_structured = AsyncMock(
+            return_value={
+                "license_valid": True,
+                "insurance_valid": True,
+                "certificates_valid": True,
+                "issues": [],
+                "recommendations": [],
+            }
+        )
         docs = [{"doc_type": "license", "extracted_text": "Valid license for plumbing"}]
         result = await vetting_agent._analyze_documents(docs, "ctr_1")
         assert result["license_valid"] is True
@@ -468,9 +480,7 @@ class TestVettingAgentAnalysis:
 
     @pytest.mark.asyncio
     async def test_analyze_reputation_graph_error(self, vetting_agent):
-        vetting_agent._graph_store.get_contractor_reputation = AsyncMock(
-            side_effect=Exception("Graph error")
-        )
+        vetting_agent._graph_store.get_contractor_reputation = AsyncMock(side_effect=Exception("Graph error"))
         vetting_agent._graph_store.detect_suspicious_patterns = AsyncMock(return_value={})
         vetting_agent.rag = None  # disable RAG to avoid AsyncMock issue
         result = await vetting_agent._analyze_reputation("ctr_1")
@@ -479,9 +489,7 @@ class TestVettingAgentAnalysis:
     @pytest.mark.asyncio
     async def test_analyze_reputation_suspicious_error(self, vetting_agent):
         vetting_agent._graph_store.get_contractor_reputation = AsyncMock(return_value={})
-        vetting_agent._graph_store.detect_suspicious_patterns = AsyncMock(
-            side_effect=Exception("Graph error")
-        )
+        vetting_agent._graph_store.detect_suspicious_patterns = AsyncMock(side_effect=Exception("Graph error"))
         vetting_agent.rag = None
         result = await vetting_agent._analyze_reputation("ctr_1")
         assert isinstance(result, dict)

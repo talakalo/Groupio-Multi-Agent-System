@@ -107,9 +107,7 @@ class TestPushServiceConfigured:
         mock_client.post = capture_post
 
         with patch("src.services.push.httpx.AsyncClient", return_value=mock_client):
-            await push_service.send(
-                token="tok", title="T", body="B", data={"offer_id": 42, "status": "pending"}
-            )
+            await push_service.send(token="tok", title="T", body="B", data={"offer_id": 42, "status": "pending"})
 
         assert captured_payload["data"] == {"offer_id": "42", "status": "pending"}
 
@@ -123,15 +121,14 @@ class TestPushServiceConfigured:
     @pytest.mark.asyncio
     async def test_send_multicast(self, push_service):
         """send_multicast aggregates results from individual sends."""
+
         async def fake_send(token, title, body, data=None):
             if token == "good":
                 return {"success": True, "message_id": "m1"}
             return {"success": False, "reason": "error"}
 
         push_service.send = fake_send
-        result = await push_service.send_multicast(
-            tokens=["good", "bad"], title="T", body="B"
-        )
+        result = await push_service.send_multicast(tokens=["good", "bad"], title="T", body="B")
         assert result["total"] == 2
         assert result["success"] == 1
         assert result["failed"] == 1
