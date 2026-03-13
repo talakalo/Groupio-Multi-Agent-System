@@ -15,7 +15,7 @@
  * All sensitive card data is handled exclusively by Stripe.js in a sandboxed iframe.
  */
 
-import { Loader2, CheckCircle2, AlertCircle, ShieldCheck, ArrowRight, Share2 } from "lucide-react";
+import { Loader2, CheckCircle2, AlertCircle, ShieldCheck, ArrowRight, Share2, CreditCard, Receipt } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -28,7 +28,10 @@ import { apiClient, ApiError } from "@/lib/api/client";
 interface PaymentResult {
   id: string;
   status: string;
-  amount: number;
+  subtotal: number;
+  tax_rate: number;
+  tax_amount: number;
+  amount: number;        // Total including VAT
   currency: string;
   client_secret?: string | null;
   offer_id?: string;
@@ -58,6 +61,77 @@ function EscrowBadge() {
       <span>
         התשלום מוגן בנאמנות (Escrow) — הכסף ישוחרר לקבלן רק לאחר אישורך על השלמת העבודה.
       </span>
+    </div>
+  );
+}
+
+function fmt(amount: number, currency = "ILS") {
+  return new Intl.NumberFormat("he-IL", {
+    style: "currency",
+    currency,
+    minimumFractionDigits: 2,
+  }).format(amount);
+}
+
+/**
+ * Order summary showing subtotal, מע"מ (18%), and total.
+ * Displayed before the Stripe card form.
+ */
+function OrderSummary({
+  subtotal,
+  taxRate,
+  taxAmount,
+  total,
+  currency,
+}: {
+  subtotal: number;
+  taxRate: number;
+  taxAmount: number;
+  total: number;
+  currency: string;
+}) {
+  const vatPct = Math.round(taxRate * 100);
+  return (
+    <div className="rounded-xl border border-gray-200 bg-gray-50 overflow-hidden">
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-200 bg-white">
+        <Receipt className="h-4 w-4 text-indigo-500" aria-hidden="true" />
+        <span className="text-sm font-semibold text-gray-900">סיכום הזמנה</span>
+      </div>
+      <dl className="px-4 py-3 space-y-2 text-sm">
+        <div className="flex justify-between text-gray-600">
+          <dt>מחיר לפני מע"מ</dt>
+          <dd dir="ltr">{fmt(subtotal, currency)}</dd>
+        </div>
+        <div className="flex justify-between text-gray-600">
+          <dt>מע"מ {vatPct}%</dt>
+          <dd dir="ltr">{fmt(taxAmount, currency)}</dd>
+        </div>
+        <div className="flex justify-between font-bold text-gray-900 border-t border-gray-200 pt-2 text-base">
+          <dt>סה"כ לתשלום</dt>
+          <dd dir="ltr">{fmt(total, currency)}</dd>
+        </div>
+      </dl>
+    </div>
+  );
+}
+
+/** Badge showing that payment is by credit card via Stripe. */
+function CreditCardBadge() {
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3">
+      <CreditCard className="h-5 w-5 text-indigo-600 flex-shrink-0" aria-hidden="true" />
+      <div>
+        <p className="text-sm font-semibold text-indigo-800">תשלום בכרטיס אשראי</p>
+        <p className="text-xs text-indigo-600">Visa · Mastercard · American Express · Diners</p>
+      </div>
+      <div className="ms-auto flex gap-1.5 text-gray-400" aria-hidden="true">
+        {/* Card network mini-icons (text placeholders) */}
+        {["VISA", "MC"].map((n) => (
+          <span key={n} className="text-[10px] font-bold border border-gray-300 rounded px-1 bg-white">
+            {n}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
@@ -94,25 +168,50 @@ function ShareButton({ offerId }: { offerId?: string }) {
   );
 }
 
-function SuccessState({ amount, currency, offerId }: { amount: number; currency: string; offerId?: string }) {
-  const formatted = new Intl.NumberFormat("he-IL", {
-    style: "currency",
-    currency: currency || "ILS",
-    minimumFractionDigits: 0,
-  }).format(amount);
+function SuccessState({
+  subtotal,
+  taxAmount,
+  taxRate,
+  amount,
+  currency,
+  offerId,
+}: {
+  subtotal?: number;
+  taxAmount?: number;
+  taxRate?: number;
+  amount: number;
+  currency: string;
+  offerId?: string;
+}) {
+  const vatPct = Math.round((taxRate ?? 0.18) * 100);
+  const sub = subtotal ?? Math.round(amount / 1.18 * 100) / 100;
+  const tax = taxAmount ?? Math.round(sub * 0.18 * 100) / 100;
 
   return (
-    <div className="text-center space-y-4 py-8">
-      <CheckCircle2 className="h-16 w-16 text-emerald-500 mx-auto" aria-hidden="true" />
-      <h2 className="text-xl font-bold text-gray-900">התשלום בוצע בהצלחה!</h2>
-      <p className="text-gray-600">
-        <span className="font-semibold">{formatted}</span> נשמרו בנאמנות. תקבלו אישור במייל בקרוב.
-      </p>
+    <div className="space-y-4 py-6">
+      <div className="text-center">
+        <CheckCircle2 className="h-14 w-14 text-emerald-500 mx-auto mb-3" aria-hidden="true" />
+        <h2 className="text-xl font-bold text-gray-900">התשלום בוצע בהצלחה!</h2>
+        <p className="text-sm text-gray-500 mt-1">תקבלו אישור במייל בקרוב.</p>
+      </div>
+      {/* VAT receipt */}
+      <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm space-y-1.5">
+        <div className="flex justify-between text-gray-600">
+          <span>מחיר לפני מע"מ</span>
+          <span dir="ltr">{fmt(sub, currency)}</span>
+        </div>
+        <div className="flex justify-between text-gray-600">
+          <span>מע"מ {vatPct}%</span>
+          <span dir="ltr">{fmt(tax, currency)}</span>
+        </div>
+        <div className="flex justify-between font-bold text-gray-900 border-t border-emerald-200 pt-1.5">
+          <span>שולם</span>
+          <span dir="ltr">{fmt(amount, currency)}</span>
+        </div>
+      </div>
       <EscrowBadge />
-      <p className="text-sm text-gray-500">
-        💡 עוד שכנים = הנחה גדולה יותר לכולם!
-      </p>
-      <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+      <p className="text-sm text-gray-500 text-center">💡 עוד שכנים = הנחה גדולה יותר לכולם!</p>
+      <div className="flex flex-col sm:flex-row gap-3 justify-center pt-1">
         <Link href="/orders" className="btn-primary">
           להזמנות שלי
         </Link>
@@ -230,6 +329,9 @@ function CheckoutContent() {
   if (phase === "success" && payment) {
     return (
       <SuccessState
+        subtotal={payment.subtotal}
+        taxAmount={payment.tax_amount}
+        taxRate={payment.tax_rate}
         amount={payment.amount}
         currency={payment.currency}
         offerId={payment.offer_id || offerId}
@@ -242,15 +344,18 @@ function CheckoutContent() {
       <div className="space-y-4">
         <div className="text-center pb-2">
           <h2 className="text-lg font-semibold text-gray-900">השלמת תשלום</h2>
-          <p className="text-sm text-gray-500 mt-1">
-            {new Intl.NumberFormat("he-IL", {
-              style: "currency",
-              currency: payment.currency || "ILS",
-              minimumFractionDigits: 0,
-            }).format(payment.amount)}
-          </p>
         </div>
+        {/* VAT order summary */}
+        <OrderSummary
+          subtotal={payment.subtotal ?? Math.round(payment.amount / 1.18 * 100) / 100}
+          taxRate={payment.tax_rate ?? 0.18}
+          taxAmount={payment.tax_amount ?? Math.round(payment.amount / 1.18 * 0.18 * 100) / 100}
+          total={payment.amount}
+          currency={payment.currency || "ILS"}
+        />
         <EscrowBadge />
+        {/* Credit card method indicator */}
+        <CreditCardBadge />
         <StripeCheckoutForm
           clientSecret={payment.client_secret}
           onSuccess={() => setPhase("success")}

@@ -2188,8 +2188,8 @@ class PostgresClient:
             data["offer_id"],
             data.get("contractor_id"),
             data.get("subtotal", data.get("amount", 0)),
-            data.get("tax_rate", 0.17),
-            data.get("tax", 0),
+            data.get("tax_rate", 0.18),          # Israeli VAT — 18% as of 2025
+            data.get("tax", data.get("tax_amount", 0)),  # accept either key
             data.get("platform_fee_rate", 0.05),
             data.get("platform_fee", 0),
             data.get("total", data.get("amount", 0)),
@@ -2317,6 +2317,21 @@ class PostgresClient:
 
     async def create_payment(self, data: dict[str, Any], conn: Any = None) -> dict[str, Any]:
         """Insert a payment record. Pass conn to reuse an existing transaction connection."""
+        # Merge VAT fields into provider_data so they are persisted even though the
+        # payments table doesn't have dedicated subtotal/tax columns.
+        existing_provider_data = data.get("provider_data") or {}
+        if isinstance(existing_provider_data, str):
+            import json as _json
+            try:
+                existing_provider_data = _json.loads(existing_provider_data)
+            except Exception:
+                existing_provider_data = {}
+        vat_meta: dict[str, Any] = {}
+        for key in ("subtotal", "tax_rate", "tax_amount"):
+            if key in data:
+                vat_meta[key] = data[key]
+        merged_provider_data = {**existing_provider_data, **vat_meta}
+
         if self._use_supabase_client():
             client = await self._get_client()
             # Filter to only columns that exist in the payments table
@@ -2335,10 +2350,10 @@ class PostgresClient:
                     "transaction_id",
                     "payment_method",
                     "payment_method_id",
-                    "provider_data",
                     "created_at",
                 }
             }
+            insert_data["provider_data"] = merged_provider_data
             result = await client.table("payments").insert(insert_data).execute()
             return result.data[0] if result.data else data
         sql_pay = """INSERT INTO payments
@@ -2355,7 +2370,7 @@ class PostgresClient:
             data.get("status", "pending"),
             data.get("transaction_id"),
             data.get("payment_method"),
-            json.dumps(data.get("provider_data", {})),
+            json.dumps(merged_provider_data),
             data.get("created_at"),
         )
         if conn is not None:
