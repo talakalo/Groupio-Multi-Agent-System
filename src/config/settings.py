@@ -129,12 +129,20 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     SMTP_FROM_EMAIL: str = "noreply@groupio.co.il"
     SMTP_FROM_NAME: str = "Groupio"
-    # When True, login rejects unverified users with 403. Set for broader launch.
-    ENFORCE_EMAIL_VERIFICATION: bool = False
+    # When True, login rejects unverified users with 403. Enabled by default for production safety.
+    # Set ENFORCE_EMAIL_VERIFICATION=false in .env to disable during local development.
+    ENFORCE_EMAIL_VERIFICATION: bool = True
     # Base URL for verification links in emails (default for production)
     FRONTEND_URL: str = "https://groupio.co.il"
     # Admin inbox for system alerts (vetting escalations, expiry errors, etc.)
     ADMIN_EMAIL: str = ""
+
+    # Push Notifications (Firebase Cloud Messaging)
+    # Set FCM_SERVER_KEY to your Firebase project's server key to enable push notifications.
+    # When empty, push notifications are silently skipped (log at DEBUG level).
+    FCM_SERVER_KEY: str = ""
+    # FCM endpoint (override only for testing)
+    FCM_ENDPOINT: str = "https://fcm.googleapis.com/fcm/send"
 
     # Payment provider ("mock" for dev/demos, "stripe" or "payplus" for production)
     PAYMENT_PROVIDER: str = "mock"

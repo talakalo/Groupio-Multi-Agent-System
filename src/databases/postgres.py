@@ -2506,6 +2506,286 @@ class PostgresClient:
                 seq = 1
         return f"{seq:05d}"
 
+    # ------------------------------------------------------------------
+    # Credit Awards (Phase 4)
+    # ------------------------------------------------------------------
+
+    async def create_credit_award(self, data: dict[str, Any]) -> dict[str, Any]:
+        """Insert a credit award record for an influencer resident."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            result = await client.table("credit_awards").insert(data).execute()
+            return result.data[0] if result.data else data
+        await self._pg_execute(
+            """INSERT INTO credit_awards (id, resident_id, amount, reason, status, created_at)
+               VALUES ($1, $2, $3, $4, $5, $6)""",
+            data["id"],
+            data["resident_id"],
+            data.get("amount", 0),
+            data.get("reason", ""),
+            data.get("status", "pending_approval"),
+            data.get("created_at") or datetime.now(UTC),
+        )
+        return data
+
+    async def list_credit_awards(
+        self, resident_id: str | None = None, status: str | None = None
+    ) -> list[dict[str, Any]]:
+        """List credit award records, optionally filtered by resident or status."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            q = client.table("credit_awards").select("*")
+            if resident_id:
+                q = q.eq("resident_id", resident_id)
+            if status:
+                q = q.eq("status", status)
+            result = await q.order("created_at", desc=True).execute()
+            return result.data or []
+        conditions = []
+        args: list[Any] = []
+        if resident_id:
+            args.append(resident_id)
+            conditions.append("resident_id = $%d" % len(args))
+        if status:
+            args.append(status)
+            conditions.append("status = $%d" % len(args))
+        where = " AND ".join(conditions) if conditions else "1=1"
+        return await self._pg_fetch_all(
+            f"SELECT * FROM credit_awards WHERE {where} ORDER BY created_at DESC", *args
+        ) or []
+
+    async def update_credit_award(self, award_id: str, update_data: dict[str, Any]) -> dict[str, Any]:
+        """Update a credit award (e.g., approve or reject)."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            await client.table("credit_awards").update(update_data).eq("id", award_id).execute()
+            result = await client.table("credit_awards").select("*").eq("id", award_id).execute()
+            return result.data[0] if result.data else {"id": award_id, **update_data}
+        set_parts = []
+        args: list[Any] = []
+        for key, val in update_data.items():
+            args.append(val)
+            set_parts.append(f'"{key}" = ${len(args)}')
+        args.append(award_id)
+        await self._pg_execute(
+            "UPDATE credit_awards SET " + ", ".join(set_parts) + f" WHERE id = ${len(args)}",
+            *args,
+        )
+        return await self._pg_fetch_one("SELECT * FROM credit_awards WHERE id = $1", award_id) or {
+            "id": award_id, **update_data
+        }
+
+    # ------------------------------------------------------------------
+    # Regional / city aggregation helpers (Phase 4)
+    # ------------------------------------------------------------------
+
+    async def get_distinct_regions(self) -> list[str]:
+        """Return the distinct non-null region values stored in the buildings table."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            result = await client.table("buildings").select("region").execute()
+            seen: set[str] = set()
+            regions: list[str] = []
+            for row in result.data or []:
+                r = row.get("region")
+                if r and r not in seen:
+                    seen.add(r)
+                    regions.append(r)
+            return regions
+        rows = await self._pg_fetch_all(
+            "SELECT DISTINCT region FROM buildings WHERE region IS NOT NULL AND region <> '' ORDER BY region"
+        )
+        return [r["region"] for r in (rows or [])]
+
+    async def get_distinct_cities(self) -> list[str]:
+        """Return the distinct non-null city values stored in the buildings table."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            result = await client.table("buildings").select("city").execute()
+            seen: set[str] = set()
+            cities: list[str] = []
+            for row in result.data or []:
+                c = row.get("city")
+                if c and c not in seen:
+                    seen.add(c)
+                    cities.append(c)
+            return cities
+        rows = await self._pg_fetch_all(
+            "SELECT DISTINCT city FROM buildings WHERE city IS NOT NULL AND city <> '' ORDER BY city"
+        )
+        return [r["city"] for r in (rows or [])]
+
+    # ------------------------------------------------------------------
+    # Agent Metrics Persistence (Phase 4)
+    # ------------------------------------------------------------------
+
+    async def record_agent_metrics(self, agent_name: str, metrics: dict[str, Any]) -> None:
+        """Persist in-memory agent metrics snapshot to the agent_metrics table."""
+        rows_to_insert = [
+            {
+                "id": str(uuid4()),
+                "agent_name": agent_name,
+                "metric_type": metric_type,
+                "value": float(value),
+                "metadata": {},
+                "recorded_at": datetime.now(UTC),
+            }
+            for metric_type, value in metrics.items()
+            if isinstance(value, (int, float))
+        ]
+        if not rows_to_insert:
+            return
+        if self._use_supabase_client():
+            client = await self._get_client()
+            await client.table("agent_metrics").insert(rows_to_insert).execute()
+            return
+        for row in rows_to_insert:
+            await self._pg_execute(
+                """INSERT INTO agent_metrics (id, agent_name, metric_type, value, metadata, recorded_at)
+                   VALUES ($1, $2, $3, $4, $5::jsonb, $6)""",
+                row["id"],
+                row["agent_name"],
+                row["metric_type"],
+                row["value"],
+                "{}",
+                row["recorded_at"],
+            )
+
+    async def get_agent_metrics_history(
+        self, agent_name: str, limit: int = 100
+    ) -> list[dict[str, Any]]:
+        """Return historical metrics rows for a given agent, newest first."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            result = (
+                await client.table("agent_metrics")
+                .select("*")
+                .eq("agent_name", agent_name)
+                .order("recorded_at", desc=True)
+                .limit(limit)
+                .execute()
+            )
+            return result.data or []
+        return (
+            await self._pg_fetch_all(
+                "SELECT * FROM agent_metrics WHERE agent_name = $1 ORDER BY recorded_at DESC LIMIT $2",
+                agent_name,
+                limit,
+            )
+            or []
+        )
+
+    # ------------------------------------------------------------------
+    # Pending Agent Decisions (Phase 3 — autonomy mode approval workflow)
+    # ------------------------------------------------------------------
+
+    async def create_pending_decision(self, data: dict[str, Any]) -> dict[str, Any]:
+        """Queue an agent decision for admin review."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            result = await client.table("pending_agent_decisions").insert(data).execute()
+            return result.data[0] if result.data else data
+        await self._pg_execute(
+            """INSERT INTO pending_agent_decisions
+               (id, agent_name, conversation_id, user_id, action_type, payload,
+                escalation_reason, status, created_at)
+               VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9)""",
+            data["id"],
+            data["agent_name"],
+            data.get("conversation_id"),
+            data.get("user_id"),
+            data["action_type"],
+            json.dumps(data.get("payload", {})),
+            data.get("escalation_reason", ""),
+            data.get("status", "pending"),
+            data.get("created_at") or datetime.now(UTC),
+        )
+        return data
+
+    async def list_pending_decisions(
+        self, status: str = "pending", agent_name: str | None = None, limit: int = 50, offset: int = 0
+    ) -> tuple[list[dict[str, Any]], int]:
+        """Return paginated pending agent decisions."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            q = client.table("pending_agent_decisions").select("*", count="exact").eq("status", status)
+            if agent_name:
+                q = q.eq("agent_name", agent_name)
+            result = await q.order("created_at", desc=True).range(offset, offset + limit - 1).execute()
+            return result.data or [], result.count or 0
+        args: list[Any] = [status]
+        extra = ""
+        if agent_name:
+            args.append(agent_name)
+            extra = " AND agent_name = $%d" % len(args)
+        count_row = await self._pg_fetch_one(
+            f"SELECT COUNT(*) AS c FROM pending_agent_decisions WHERE status = $1{extra}", *args
+        )
+        total = count_row["c"] if count_row else 0
+        args.extend([limit, offset])
+        n1, n2 = len(args) - 1, len(args)
+        rows = await self._pg_fetch_all(
+            f"SELECT * FROM pending_agent_decisions WHERE status = $1{extra} "
+            f"ORDER BY created_at DESC LIMIT ${n1} OFFSET ${n2}",
+            *args,
+        )
+        return rows or [], total
+
+    async def update_pending_decision(self, decision_id: str, update_data: dict[str, Any]) -> dict[str, Any]:
+        """Approve or reject a pending decision (status → 'approved' | 'rejected')."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            await client.table("pending_agent_decisions").update(update_data).eq("id", decision_id).execute()
+            result = await client.table("pending_agent_decisions").select("*").eq("id", decision_id).execute()
+            return result.data[0] if result.data else {"id": decision_id, **update_data}
+        set_parts = []
+        args: list[Any] = []
+        for key, val in update_data.items():
+            if key == "payload":
+                args.append(json.dumps(val))
+                set_parts.append(f'"{key}" = ${len(args)}::jsonb')
+            else:
+                args.append(val)
+                set_parts.append(f'"{key}" = ${len(args)}')
+        args.append(decision_id)
+        await self._pg_execute(
+            "UPDATE pending_agent_decisions SET " + ", ".join(set_parts) + f" WHERE id = ${len(args)}",
+            *args,
+        )
+        return await self._pg_fetch_one("SELECT * FROM pending_agent_decisions WHERE id = $1", decision_id) or {
+            "id": decision_id, **update_data
+        }
+
+    async def get_pending_decision(self, decision_id: str) -> dict[str, Any] | None:
+        """Fetch a single pending decision by ID."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            result = await client.table("pending_agent_decisions").select("*").eq("id", decision_id).execute()
+            return result.data[0] if result.data else None
+        return await self._pg_fetch_one(
+            "SELECT * FROM pending_agent_decisions WHERE id = $1", decision_id
+        )
+
+    async def get_agent_system_prompt(self, agent_name: str) -> str | None:
+        """Load an agent's system prompt override from system_settings (key: agent_prompt_{name})."""
+        key = f"agent_prompt_{agent_name}"
+        if self._use_supabase_client():
+            client = await self._get_client()
+            result = await client.table("system_settings").select("value").eq("key", key).limit(1).execute()
+            if result.data:
+                val = result.data[0].get("value")
+                return val if isinstance(val, str) else None
+            return None
+        row = await self._pg_fetch_one("SELECT value FROM system_settings WHERE key = $1", key)
+        if row:
+            val = row["value"]
+            if isinstance(val, str):
+                return val
+            # JSONB may deserialise to dict/list — unwrap string scalars
+            if isinstance(val, dict) and "v" in val:
+                return str(val["v"])
+        return None
+
     async def health_check(self) -> bool:
         """Check if PostgreSQL is accessible."""
         try:

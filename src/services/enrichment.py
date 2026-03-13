@@ -179,25 +179,46 @@ class EnrichmentService:
                 raw_response={"error": "license_number required"},
             )
 
-        # Stub: no external API configured
-        api_url = self._settings.GOV_CONTRACTOR_API_URL or ""
-        if not api_url:
-            return ContractorVerificationResult(
-                verified=False,
-                confidence=0.0,
-                source="stub",
-                verified_at=datetime.now(UTC),
-                raw_response={"license_number": license_number, "business_name": business_name},
-            )
+        # Phase 3: use data.gov.il company registry to cross-reference business name.
+        # NOTE: data.gov.il does not provide official contractor *license* verification.
+        # This performs a best-effort business name + company-ID lookup only.
+        if self._datagov:
+            try:
+                matches: list[dict] = []
+                # Try searching by company ID (license number may be company registration number)
+                if license_number.isdigit():
+                    matches = self._datagov.search_registered_entity(
+                        name=business_name or "",
+                        company_id=license_number,
+                        limit=3,
+                    )
+                # Fall back to name search
+                if not matches and business_name:
+                    matches = self._datagov.search_registered_entity(
+                        name=business_name,
+                        limit=3,
+                    )
+                if matches:
+                    best = matches[0]
+                    is_active = best.get("status", "") == "פעילה"
+                    confidence = 0.75 if is_active else 0.4
+                    return ContractorVerificationResult(
+                        verified=is_active,
+                        confidence=confidence,
+                        source="data.gov.il (company registry)",
+                        verified_at=datetime.now(UTC),
+                        raw_response=best,
+                    )
+            except Exception as e:
+                logger.warning("data.gov.il contractor verification failed: %s", e)
 
-        # Placeholder for future: call external API
-        logger.debug("Contractor API URL configured but not implemented: %s", api_url[:50])
+        # No external verification available — return not-verified result
         return ContractorVerificationResult(
             verified=False,
             confidence=0.0,
             source="stub",
             verified_at=datetime.now(UTC),
-            raw_response={"license_number": license_number},
+            raw_response={"license_number": license_number, "business_name": business_name},
         )
 
 

@@ -194,12 +194,23 @@ class PricingAgent(BaseAgent):
         # Task 3.1 — Autonomy mode: in recommend mode, flag for human confirmation
         settings = get_settings()
         if settings.PRICING_AGENT_MODE in ("recommend", "gated"):
+            reason = f"Pricing results require admin confirmation (mode={settings.PRICING_AGENT_MODE})"
             state["needs_human"] = True
-            state["escalation_reason"] = (
-                f"Pricing results require admin confirmation (mode={settings.PRICING_AGENT_MODE})"
-            )
+            state["escalation_reason"] = reason
             if state["actions_taken"]:
                 state["actions_taken"][-1]["requires_human_confirmation"] = True
+            last_action = state["actions_taken"][-1] if state["actions_taken"] else {}
+            await self._enqueue_pending_decision(
+                state=state,
+                action_type="pricing_recommendation",
+                payload={
+                    "offer_id": last_action.get("offer_id", ""),
+                    "recommended_price": last_action.get("recommended_price"),
+                    "price_range": last_action.get("price_range"),
+                    "mode": settings.PRICING_AGENT_MODE,
+                },
+                escalation_reason=reason,
+            )
 
         self._metrics["calls"] += 1
         return state

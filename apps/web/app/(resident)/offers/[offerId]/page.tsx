@@ -26,6 +26,7 @@ import { useTranslations } from 'next-intl';
 
 import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
+import { useNotificationStore } from '@/lib/stores/notificationStore';
 import { cn } from '@/lib/utils/cn';
 
 // ---------------------------------------------------------------------------
@@ -223,6 +224,7 @@ export default function OfferDetailPage() {
   const tCat = useTranslations('categories');
   const tContractors = useTranslations('contractors');
   const user = useAuthStore((s) => s.user);
+  const addSuccess = useNotificationStore((s) => s.success);
 
   const offerId = params.offerId;
   const [showJoinModal, setShowJoinModal] = useState(false);
@@ -261,7 +263,7 @@ export default function OfferDetailPage() {
         await navigator.share(shareData);
       } else {
         await navigator.clipboard.writeText(window.location.href);
-        // TODO: show a brief "Link copied!" toast once a toast component is added
+        addSuccess('הקישור הועתק!', 'הקישור הועתק ללוח — שתפו עם שכנים');
       }
     } catch {
       // User cancelled share dialog — ignore

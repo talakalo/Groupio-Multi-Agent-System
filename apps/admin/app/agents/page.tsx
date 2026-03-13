@@ -11,6 +11,7 @@ import {
   Filter,
 } from "lucide-react";
 import { AgentCard } from "@/components/features/agents/AgentCard";
+import { AgentOrchestrationGraph } from "@/components/features/agents/AgentOrchestrationGraph";
 import type { AgentStatus } from "@/components/features/agents/AgentCard";
 import { AgentMetricsChart } from "@/components/features/metrics/AgentMetricsChart";
 import type { AgentChartSeries } from "@/components/features/metrics/AgentMetricsChart";
@@ -345,42 +346,7 @@ export default function AgentsPage() {
         <p className="text-xs text-surface-400 mb-4">
           Visual representation of the agent orchestration pipeline
         </p>
-        <div className="relative border-2 border-dashed border-surface-200 rounded-xl p-8 flex flex-col items-center justify-center min-h-[200px] bg-surface-50/50">
-          {/* Simplified flow visualization */}
-          <div className="flex items-center gap-3 flex-wrap justify-center">
-            <div className="flex flex-col items-center gap-1">
-              <div className="w-16 h-16 rounded-xl bg-primary-100 text-primary-700 flex items-center justify-center font-semibold text-xs">
-                Router
-              </div>
-            </div>
-            <div className="text-surface-300 text-lg">&rarr;</div>
-            <div className="flex flex-col gap-2">
-              {["Matching", "Pricing", "Vetting", "Support", "Outreach", "Architecture", "Payment", "Notification"].map(
-                (name) => (
-                  <div
-                    key={name}
-                    className="w-20 h-8 rounded-lg bg-surface-100 text-surface-600 flex items-center justify-center text-[11px] font-medium"
-                  >
-                    {name}
-                  </div>
-                )
-              )}
-            </div>
-            <div className="text-surface-300 text-lg">&rarr;</div>
-            <div className="flex flex-col items-center gap-2">
-              <div className="w-16 h-16 rounded-xl bg-success-50 text-success-700 flex items-center justify-center font-semibold text-xs">
-                Analytics
-              </div>
-              <div className="w-16 h-12 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center font-semibold text-[10px]">
-                Human
-              </div>
-            </div>
-          </div>
-          <p className="text-xs text-surface-400 mt-4">
-            <Layers className="w-3.5 h-3.5 inline mr-1" />
-            10 agents in orchestration pipeline &mdash; interactive graph coming soon
-          </p>
-        </div>
+        <AgentOrchestrationGraph selectedAgent={selectedAgent} />
       </div>
 
       {/* ================================================================== */}
