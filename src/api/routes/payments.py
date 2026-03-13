@@ -604,7 +604,7 @@ async def request_refund(
         raise HTTPException(status_code=409, detail=f"Cannot refund payment with status: {current_status}")
 
     provider = get_payment_provider()
-    transaction_id = payment.get("transaction_id") or payment.get("id")
+    transaction_id = str(payment.get("transaction_id") or payment.get("id") or "")
     refund_amount = body.amount or payment.get("amount")
 
     try:

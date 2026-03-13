@@ -26,7 +26,7 @@ function OfferAnalyticsPanel({ offer }: { offer: Offer }) {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [loadingParts, setLoadingParts] = useState(false);
 
-  const revenue = (offer.base_price ?? 0) * (offer.current_participants ?? 0);
+  const revenue = (offer.basePrice ?? 0) * (offer.participants ?? 0);
 
   const fetchParticipants = useCallback(async () => {
     if (participants.length > 0) return; // already loaded
@@ -52,8 +52,7 @@ function OfferAnalyticsPanel({ offer }: { offer: Offer }) {
       <div className="flex flex-wrap items-center gap-6 px-5 py-3 text-sm text-gray-600">
         <span className="flex items-center gap-1.5">
           <Users className="w-4 h-4 text-sky-500" aria-hidden="true" />
-          <strong>{offer.current_participants ?? 0}</strong>
-          {offer.max_participants ? ` / ${offer.max_participants}` : ''} משתתפים
+          <strong>{offer.participants ?? 0}</strong> משתתפים
         </span>
         <span className="flex items-center gap-1.5">
           <DollarSign className="w-4 h-4 text-emerald-500" aria-hidden="true" />
@@ -61,7 +60,7 @@ function OfferAnalyticsPanel({ offer }: { offer: Offer }) {
         </span>
         <span className="flex items-center gap-1.5">
           <BarChart2 className="w-4 h-4 text-amber-500" aria-hidden="true" />
-          מחיר בסיס: <strong>₪{(offer.base_price ?? 0).toLocaleString('he-IL')}</strong>
+          מחיר בסיס: <strong>₪{(offer.basePrice ?? 0).toLocaleString('he-IL')}</strong>
         </span>
         <button
           type="button"

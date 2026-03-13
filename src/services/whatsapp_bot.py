@@ -206,7 +206,7 @@ class WhatsAppBotService:
             )
 
         # Normalize Hebrew text if applicable
-        user_message = message.text
+        user_message = message.text or ""
         if is_hebrew(user_message):
             user_message = normalize_hebrew(user_message)
 
