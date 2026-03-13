@@ -4,7 +4,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # src/models/contractors.py  (compatibility shim)
 # ---------------------------------------------------------------------------

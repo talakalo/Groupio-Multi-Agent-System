@@ -1,8 +1,8 @@
 """Additional coverage tests for base agent, payment service, and orchestration."""
 
 from unittest.mock import AsyncMock, MagicMock, patch
-import pytest
 
+import pytest
 
 # ---------------------------------------------------------------------------
 # src/agents/base.py — CircuitBreaker, LLMResponseCache, BaseAgent methods
@@ -359,7 +359,7 @@ class TestGetPaymentProvider:
         pay_mod._payment_provider = None
 
     def test_returns_mock_provider_when_configured(self):
-        from src.services.payment import get_payment_provider, MockPaymentProvider
+        from src.services.payment import MockPaymentProvider, get_payment_provider
         with patch("src.config.settings.get_settings") as mock_settings:
             settings = MagicMock()
             settings.PAYMENT_PROVIDER = "mock"
@@ -378,7 +378,7 @@ class TestGetPaymentProvider:
                 get_payment_provider()
 
     def test_returns_stripe_provider(self):
-        from src.services.payment import get_payment_provider, StripePaymentProvider
+        from src.services.payment import StripePaymentProvider, get_payment_provider
         mock_stripe = MagicMock()
         mock_stripe.StripeError = Exception
         with patch("src.config.settings.get_settings") as mock_settings, \
@@ -401,7 +401,7 @@ class TestGetPaymentProvider:
                 get_payment_provider()
 
     def test_mock_logs_warning_in_production(self):
-        from src.services.payment import get_payment_provider, MockPaymentProvider
+        from src.services.payment import MockPaymentProvider, get_payment_provider
         with patch("src.config.settings.get_settings") as mock_settings:
             settings = MagicMock()
             settings.PAYMENT_PROVIDER = "mock"
