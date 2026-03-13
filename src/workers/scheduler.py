@@ -213,7 +213,7 @@ async def refresh_building_similarity():
     graph = get_graph_store()
 
     try:
-        regions = await db.get_distinct_regions() if hasattr(db, "get_distinct_regions") else []
+        regions = await db.get_distinct_regions()
     except Exception as exc:
         logger.warning("Could not fetch distinct regions: %s", exc)
         regions = []
@@ -244,7 +244,7 @@ async def refresh_influencer_scores():
     graph = get_graph_store()
 
     try:
-        cities = await db.get_distinct_cities() if hasattr(db, "get_distinct_cities") else []
+        cities = await db.get_distinct_cities()
     except Exception as exc:
         logger.warning("Could not fetch distinct cities: %s", exc)
         cities = []

@@ -32,9 +32,9 @@ class TestVATRateConstant:
 
     def test_vat_rate_is_18_percent(self):
         """VAT_RATE constant equals 0.18 (Israeli מע"מ since 2025)."""
-        from src.api.routes.payments import VAT_RATE as route_vat_rate
+        from src.api.routes.payments import VAT_RATE
 
-        assert route_vat_rate == pytest.approx(0.18)
+        assert VAT_RATE == pytest.approx(0.18)
 
 
 # ---------------------------------------------------------------------------
@@ -95,10 +95,10 @@ class TestInvoiceServiceVAT:
     @pytest.mark.asyncio
     async def test_invoice_number_format(self, svc, mock_db):
         """Invoice number follows INV-{year}-{seq} format."""
-        import datetime
+        from datetime import UTC, datetime as dt
 
         result = await svc.generate_invoice_number()
-        year = datetime.datetime.now(datetime.timezone.utc).year
+        year = dt.now(UTC).year
         assert result == f"INV-{year}-00001"
 
     @pytest.mark.asyncio

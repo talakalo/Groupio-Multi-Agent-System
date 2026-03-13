@@ -3,6 +3,7 @@
 import hashlib
 import hmac
 import logging
+import time as _time
 from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
@@ -85,8 +86,6 @@ _DEFAULT_HIGH_VALUE_CATEGORIES = {"renovations", "kitchen", "electrical", "plumb
 MIN_PAYMENT_AMOUNT = 1  # Minimum valid payment in ILS
 
 # In-process cache so we don't hit the DB on every request (TTL: 5 minutes)
-import time as _time
-
 _escrow_thresholds_cache: dict[str, Any] = {}
 _escrow_thresholds_fetched_at: float = 0.0
 _ESCROW_THRESHOLDS_TTL = 300  # seconds
@@ -763,12 +762,15 @@ async def download_invoice_pdf(
   .invoice-info p {{ margin: 3px 0; color: #555; font-size: 13px; }}
   .divider {{ border: none; border-top: 2px solid #eee; margin: 0 0 24px; }}
   table {{ width: 100%; border-collapse: collapse; margin: 0 0 8px; }}
-  th {{ background: #f5f7fa; padding: 10px 12px; text-align: right; border-bottom: 2px solid #ddd; font-size: 13px; color: #555; }}
+  th {{ background: #f5f7fa; padding: 10px 12px; text-align: right;
+    border-bottom: 2px solid #ddd; font-size: 13px; color: #555; }}
   td {{ padding: 10px 12px; border-bottom: 1px solid #f0f0f0; font-size: 13px; }}
   .subtotal-section td {{ border-bottom: none; font-size: 13px; color: #555; padding: 6px 12px; }}
   .vat-row td {{ color: #555; font-size: 13px; padding: 6px 12px; border-bottom: none; }}
-  .total-row td {{ font-weight: bold; font-size: 16px; border-top: 2px solid #222; padding: 12px; background: #f9fafb; }}
-  .status {{ display: inline-block; padding: 3px 10px; border-radius: 10px; font-size: 12px; font-weight: bold; }}
+  .total-row td {{ font-weight: bold; font-size: 16px;
+    border-top: 2px solid #222; padding: 12px; background: #f9fafb; }}
+  .status {{ display: inline-block; padding: 3px 10px;
+    border-radius: 10px; font-size: 12px; font-weight: bold; }}
   .status-paid {{ background: #e8f5e9; color: #2e7d32; }}
   .status-pending {{ background: #fff3e0; color: #e65100; }}
   .legal-note {{ margin-top: 32px; padding: 12px 16px; background: #f9fafb; border-radius: 8px;

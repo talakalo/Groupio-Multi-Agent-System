@@ -183,9 +183,7 @@ class InfluencerAgent(BaseAgent):
                 "status": "pending_approval",
             }
             try:
-                # create_credit_award is added to postgres client in Phase 4 migration
-                if hasattr(self._db, "create_credit_award"):
-                    await self._db.create_credit_award(record)
+                await self._db.create_credit_award(record)
                 written.append(record)
             except Exception as exc:
                 logger.warning("Failed to write credit award for resident %s: %s", resident_id, exc)

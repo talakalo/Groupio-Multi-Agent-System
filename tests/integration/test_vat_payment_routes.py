@@ -143,9 +143,6 @@ class TestInitiatePaymentVAT:
         )
 
         mock_provider.create_charge.assert_awaited_once()
-        charged_amount = mock_provider.create_charge.call_args.kwargs.get(
-            "amount", mock_provider.create_charge.call_args[0][0]
-        )
         # Accept both positional (amount=X) and keyword calling conventions
         call_kwargs = mock_provider.create_charge.call_args[1]
         call_args = mock_provider.create_charge.call_args[0]
@@ -234,7 +231,6 @@ class TestInitiatePaymentVAT:
         )
 
         assert resp.status_code == 200
-        data = resp.json()
         # Provider should charge the existing invoice total (944), not recalculate
         amount_charged = mock_provider.create_charge.call_args[1].get(
             "amount"
