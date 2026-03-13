@@ -652,7 +652,7 @@ export default function ResidentProfilePage() {
                 {t('logout')}
               </button>
               </div>
-            )}
+            )
           </div>
         </div>
       )}

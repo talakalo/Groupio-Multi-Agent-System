@@ -74,7 +74,7 @@ function fmt(amount: number, currency = "ILS") {
 }
 
 /**
- * Order summary showing subtotal, מע&quot;מ (18%), and total.
+ * Order summary showing subtotal, מע"מ (18%), and total.
  * Displayed before the Stripe card form.
  */
 function OrderSummary({
@@ -99,15 +99,15 @@ function OrderSummary({
       </div>
       <dl className="px-4 py-3 space-y-2 text-sm">
         <div className="flex justify-between text-gray-600">
-          <dt>מחיר לפני מע&quot;מ</dt>
+          <dt>מחיר לפני מע"מ</dt>
           <dd dir="ltr">{fmt(subtotal, currency)}</dd>
         </div>
         <div className="flex justify-between text-gray-600">
-          <dt>מע&quot;מ {vatPct}%</dt>
+          <dt>מע"מ {vatPct}%</dt>
           <dd dir="ltr">{fmt(taxAmount, currency)}</dd>
         </div>
         <div className="flex justify-between font-bold text-gray-900 border-t border-gray-200 pt-2 text-base">
-          <dt>סה&quot;כ לתשלום</dt>
+          <dt>סה"כ לתשלום</dt>
           <dd dir="ltr">{fmt(total, currency)}</dd>
         </div>
       </dl>
@@ -197,11 +197,11 @@ function SuccessState({
       {/* VAT receipt */}
       <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm space-y-1.5">
         <div className="flex justify-between text-gray-600">
-          <span>מחיר לפני מע&quot;מ</span>
+          <span>מחיר לפני מע"מ</span>
           <span dir="ltr">{fmt(sub, currency)}</span>
         </div>
         <div className="flex justify-between text-gray-600">
-          <span>מע&quot;מ {vatPct}%</span>
+          <span>מע"מ {vatPct}%</span>
           <span dir="ltr">{fmt(tax, currency)}</span>
         </div>
         <div className="flex justify-between font-bold text-gray-900 border-t border-emerald-200 pt-1.5">
@@ -258,7 +258,13 @@ function CheckoutContent() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const initiatePayment = useCallback(async () => {
-    if (!offerId) return;
+    if (!offerId) {
+      setErrorMessage("מזהה הצעה חסר. חזרו לדף ההצעה ונסו שוב.");
+      setPhase("error");
+      return;
+    }
+    setPhase("loading");
+    setErrorMessage(null);
     try {
       const result = await apiClient.initiatePayment(offerId) as unknown as PaymentResult;
       setPayment(result);
@@ -291,9 +297,8 @@ function CheckoutContent() {
   }, [offerId, router]);
 
   useEffect(() => {
-    if (!offerId) return;
-    void initiatePayment(); // eslint-disable-line react-hooks/set-state-in-effect
-  }, [initiatePayment, offerId]);
+    initiatePayment();
+  }, [initiatePayment]);
 
   if (!offerId) {
     return (
