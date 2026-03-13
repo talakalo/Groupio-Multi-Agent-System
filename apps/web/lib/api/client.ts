@@ -276,6 +276,22 @@ class ApiClient {
     });
   }
 
+  /** Request a password reset email (unauthenticated). */
+  async requestPasswordReset(email: string) {
+    return this.request<{ status: string }>("/api/v1/auth/password/reset", {
+      method: "POST",
+      body: { email },
+    });
+  }
+
+  /** Confirm a password reset using the token from the email link. */
+  async confirmPasswordReset(token: string, new_password: string) {
+    return this.request<{ status: string }>("/api/v1/auth/password/reset/confirm", {
+      method: "POST",
+      body: { token, new_password },
+    });
+  }
+
   // ---- Payment endpoints ----
 
   async getMyPayments() {

@@ -198,7 +198,7 @@ export default function LoginPage() {
         {/* Form */}
         <form onSubmit={handleSubmit(onSubmit)} className="card space-y-5">
           {error && (
-            <div className="bg-red-50 text-red-700 rounded-xl px-4 py-3 text-sm space-y-2">
+            <div role="alert" className="bg-red-50 text-red-700 rounded-xl px-4 py-3 text-sm space-y-2">
               <p>{error}</p>
               {showResendVerification && resendEmail && (
                 <div className="pt-2 border-t border-red-200">
@@ -241,16 +241,19 @@ export default function LoginPage() {
             <input
               id="identifier"
               type={loginMethod === "email" ? "email" : "tel"}
+              autoComplete={loginMethod === "email" ? "email" : "tel"}
               placeholder={
                 loginMethod === "email"
                   ? "your@email.com"
                   : "050-1234567"
               }
               className="input-field"
+              aria-describedby={errors.identifier ? "identifier-error" : undefined}
+              aria-invalid={!!errors.identifier}
               {...register("identifier")}
             />
             {errors.identifier && (
-              <p className="text-red-500 text-sm mt-1">
+              <p id="identifier-error" role="alert" className="text-red-500 text-sm mt-1">
                 {errors.identifier.message}
               </p>
             )}
@@ -266,12 +269,15 @@ export default function LoginPage() {
             <input
               id="password"
               type="password"
+              autoComplete="current-password"
               placeholder="הזינו סיסמה"
               className="input-field"
+              aria-describedby={errors.password ? "password-error" : undefined}
+              aria-invalid={!!errors.password}
               {...register("password")}
             />
             {errors.password && (
-              <p className="text-red-500 text-sm mt-1">
+              <p id="password-error" role="alert" className="text-red-500 text-sm mt-1">
                 {errors.password.message}
               </p>
             )}
