@@ -111,18 +111,22 @@ async function setupCommonMocks(page: Page) {
       body: JSON.stringify(MOCK_SYSTEM_HEALTH),
     })
   );
+  await page.route("**/api/v1/auth/me", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ id: "admin_001", email: TEST_ADMIN.email, role: "admin" }),
+    })
+  );
 }
 
 async function setupAdminAuth(page: Page) {
-  await page.addInitScript(() => {
-    localStorage.setItem(
-      "auth",
-      JSON.stringify({
-        user: { id: "admin_001", email: "admin@groupio.co.il", role: "admin" },
-        token: "admin_jwt_token",
-      })
-    );
-  });
+  // Admin uses cookie-based auth: refresh_token + admin_role_verified (no sessionStorage)
+  const baseUrl = process.env.PLAYWRIGHT_BASE_URL || "http://localhost:3001";
+  await page.context().addCookies([
+    { name: "refresh_token", value: "e2e-admin-refresh", url: baseUrl },
+    { name: "admin_role_verified", value: "1", url: baseUrl },
+  ]);
 }
 
 test.describe("Admin Login Flow", () => {
@@ -131,93 +135,68 @@ test.describe("Admin Login Flow", () => {
   });
 
   test("should display admin login page", async ({ page }) => {
-    await page.goto("/admin/login");
+    await page.goto("/login");
 
-    await expect(page.locator("text=כניסת מנהל")).toBeVisible();
+    await expect(page.locator("text=Groupio Admin, text=כניסת מנהל").first()).toBeVisible();
     await expect(page.locator('input[name="email"]')).toBeVisible();
     await expect(page.locator('input[name="password"]')).toBeVisible();
   });
 
   test("should login successfully and redirect to dashboard", async ({ page }) => {
-    await page.route("**/api/v1/auth/admin/login", (route) =>
+    await page.route("**/api/v1/auth/login/json", (route) =>
       route.fulfill({
         status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          "Set-Cookie": "refresh_token=e2e-admin-refresh; Path=/; SameSite=Lax",
+        },
         body: JSON.stringify({
-          user: { id: "admin_001", email: TEST_ADMIN.email, role: "admin" },
-          token: "admin_jwt_token",
+          access_token: "admin_jwt_token",
         }),
       })
     );
+    await page.route("**/api/v1/auth/me", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ id: "admin_001", email: TEST_ADMIN.email, role: "admin" }),
+      })
+    );
 
-    await page.goto("/admin/login");
+    await page.goto("/login");
 
     await page.fill('input[name="email"]', TEST_ADMIN.email);
     await page.fill('input[name="password"]', TEST_ADMIN.password);
     await page.click('button[type="submit"]');
 
-    await expect(page).toHaveURL(/admin\/dashboard/);
+    await expect(page).toHaveURL(/dashboard/);
   });
 
   test("should reject non-admin users", async ({ page }) => {
-    await page.route("**/api/v1/auth/admin/login", (route) =>
+    await page.route("**/api/v1/auth/login/json", (route) =>
       route.fulfill({
-        status: 403,
-        body: JSON.stringify({ error: "Admin access required" }),
+        status: 200,
+        headers: { "Set-Cookie": "refresh_token=e2e-refresh; Path=/; SameSite=Lax" },
+        body: JSON.stringify({ access_token: "user_token" }),
+      })
+    );
+    await page.route("**/api/v1/auth/me", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ id: "user_001", email: "user@example.com", role: "resident" }),
       })
     );
 
-    await page.goto("/admin/login");
+    await page.goto("/login");
 
     await page.fill('input[name="email"]', "user@example.com");
     await page.fill('input[name="password"]', "password123");
     await page.click('button[type="submit"]');
 
-    await expect(page.locator("text=אין הרשאות מנהל")).toBeVisible();
+    await expect(page.locator("text=Access denied, text=אין הרשאות").first()).toBeVisible();
   });
 
-  test("should require 2FA for admin login", async ({ page }) => {
-    await page.route("**/api/v1/auth/admin/login", (route) =>
-      route.fulfill({
-        status: 200,
-        body: JSON.stringify({ requires2FA: true, tempToken: "temp_token" }),
-      })
-    );
-
-    await page.goto("/admin/login");
-
-    await page.fill('input[name="email"]', TEST_ADMIN.email);
-    await page.fill('input[name="password"]', TEST_ADMIN.password);
-    await page.click('button[type="submit"]');
-
-    await expect(page.locator("text=הזן קוד אימות")).toBeVisible();
-    await expect(page.locator('input[name="otp"]')).toBeVisible();
-  });
-
-  test("should verify 2FA code", async ({ page }) => {
-    await page.route("**/api/v1/auth/admin/verify-2fa", (route) =>
-      route.fulfill({
-        status: 200,
-        body: JSON.stringify({
-          user: { id: "admin_001", role: "admin" },
-          token: "admin_jwt_token",
-        }),
-      })
-    );
-
-    await page.goto("/admin/login");
-
-    // Simulate 2FA screen
-    await page.addInitScript(() => {
-      sessionStorage.setItem("tempToken", "temp_token");
-    });
-
-    await page.goto("/admin/verify-2fa");
-
-    await page.fill('input[name="otp"]', "123456");
-    await page.click('button[type="submit"]');
-
-    await expect(page).toHaveURL(/admin\/dashboard/);
-  });
 });
 
 test.describe("Admin Dashboard", () => {
@@ -225,7 +204,7 @@ test.describe("Admin Dashboard", () => {
     await setupCommonMocks(page);
     await setupAdminAuth(page);
 
-    await page.route("**/api/v1/admin/dashboard", (route) =>
+    await page.route("**/api/v1/dashboard", (route) =>
       route.fulfill({
         status: 200,
         body: JSON.stringify(MOCK_DASHBOARD_STATS),
@@ -234,7 +213,7 @@ test.describe("Admin Dashboard", () => {
   });
 
   test("should display dashboard with key metrics", async ({ page }) => {
-    await page.goto("/admin/dashboard");
+    await page.goto("/dashboard");
 
     await expect(page.locator("text=לוח בקרה")).toBeVisible();
     await expect(page.locator("text=5,000")).toBeVisible(); // Total users
@@ -242,7 +221,7 @@ test.describe("Admin Dashboard", () => {
   });
 
   test("should show system health status", async ({ page }) => {
-    await page.goto("/admin/dashboard");
+    await page.goto("/dashboard");
 
     await expect(page.locator("text=מצב המערכת")).toBeVisible();
     await expect(page.locator("text=99.95%")).toBeVisible(); // Uptime
@@ -250,7 +229,7 @@ test.describe("Admin Dashboard", () => {
   });
 
   test("should display agent performance metrics", async ({ page }) => {
-    await page.goto("/admin/dashboard");
+    await page.goto("/dashboard");
 
     await expect(page.locator("text=ביצועי סוכנים")).toBeVisible();
     await expect(page.locator("text=Router")).toBeVisible();
@@ -265,25 +244,25 @@ test.describe("Admin Dashboard", () => {
       })
     );
 
-    await page.goto("/admin/dashboard");
+    await page.goto("/dashboard");
 
     await expect(page.locator('[data-testid="escalation-alert"]')).toBeVisible();
     await expect(page.locator("text=8 פניות ממתינות")).toBeVisible();
   });
 
   test("should navigate to different sections", async ({ page }) => {
-    await page.goto("/admin/dashboard");
+    await page.goto("/dashboard");
 
     await page.click('a:has-text("קבלנים")');
     await expect(page).toHaveURL(/admin\/contractors/);
 
-    await page.goto("/admin/dashboard");
+    await page.goto("/dashboard");
     await page.click('a:has-text("אסקלציות")');
     await expect(page).toHaveURL(/admin\/escalations/);
   });
 
   test("should show revenue chart", async ({ page }) => {
-    await page.goto("/admin/dashboard");
+    await page.goto("/dashboard");
 
     await expect(page.locator('[data-testid="revenue-chart"]')).toBeVisible();
     await expect(page.locator("text=₪2,500,000")).toBeVisible();
@@ -300,7 +279,7 @@ test.describe("Admin Dashboard", () => {
       })
     );
 
-    await page.goto("/admin/dashboard");
+    await page.goto("/dashboard");
 
     await expect(page.locator('[data-testid="activity-feed"]')).toBeVisible();
     await expect(page.locator("text=הצעה חדשה נוצרה")).toBeVisible();
@@ -343,7 +322,7 @@ test.describe("Admin Contractor Management", () => {
   });
 
   test("should display contractors list", async ({ page }) => {
-    await page.goto("/admin/contractors");
+    await page.goto("/contractors");
 
     await expect(page.locator("text=ניהול קבלנים")).toBeVisible();
     await expect(page.locator("text=New AC Company")).toBeVisible();
@@ -351,7 +330,7 @@ test.describe("Admin Contractor Management", () => {
   });
 
   test("should filter contractors by status", async ({ page }) => {
-    await page.goto("/admin/contractors");
+    await page.goto("/contractors");
 
     await page.click('button:has-text("ממתינים לאישור")');
 
@@ -375,7 +354,7 @@ test.describe("Admin Contractor Management", () => {
       })
     );
 
-    await page.goto("/admin/contractors/con_pending_001");
+    await page.goto("/contractors/con_pending_001");
 
     await expect(page.locator("text=New AC Company")).toBeVisible();
     await expect(page.locator("text=87654321")).toBeVisible(); // License number
@@ -390,7 +369,7 @@ test.describe("Admin Contractor Management", () => {
       })
     );
 
-    await page.goto("/admin/contractors/con_pending_001");
+    await page.goto("/contractors/con_pending_001");
     await page.click('button:has-text("אשר קבלן")');
 
     await expect(page.locator("text=אישור קבלן")).toBeVisible();
@@ -407,7 +386,7 @@ test.describe("Admin Contractor Management", () => {
       })
     );
 
-    await page.goto("/admin/contractors/con_pending_001");
+    await page.goto("/contractors/con_pending_001");
     await page.click('button:has-text("דחה")');
 
     await expect(page.locator("text=סיבת דחייה")).toBeVisible();
@@ -425,7 +404,7 @@ test.describe("Admin Contractor Management", () => {
       })
     );
 
-    await page.goto("/admin/contractors/con_pending_001");
+    await page.goto("/contractors/con_pending_001");
     await page.click('button:has-text("בקש מסמכים")');
 
     await page.click('label:has-text("אישור ביטוח מורחב")');
@@ -443,7 +422,7 @@ test.describe("Admin Contractor Management", () => {
       })
     );
 
-    await page.goto("/admin/contractors/con_001");
+    await page.goto("/contractors/con_001");
     await page.click('button:has-text("השעה")');
 
     await page.fill('textarea[name="reason"]', "תלונות רבות על איכות עבודה");
@@ -466,7 +445,7 @@ test.describe("Admin Contractor Management", () => {
       })
     );
 
-    await page.goto("/admin/contractors/con_001/analytics");
+    await page.goto("/contractors/con_001/analytics");
 
     await expect(page.locator("text=₪180,000")).toBeVisible();
     await expect(page.locator("text=45 הצעות")).toBeVisible();
@@ -488,7 +467,7 @@ test.describe("Admin Escalation Management", () => {
   });
 
   test("should display escalations list", async ({ page }) => {
-    await page.goto("/admin/escalations");
+    await page.goto("/escalations");
 
     await expect(page.locator("text=אסקלציות")).toBeVisible();
     await expect(page.locator("text=יעל כהן")).toBeVisible();
@@ -496,14 +475,14 @@ test.describe("Admin Escalation Management", () => {
   });
 
   test("should show priority badges", async ({ page }) => {
-    await page.goto("/admin/escalations");
+    await page.goto("/escalations");
 
     await expect(page.locator('[data-testid="priority-high"]')).toBeVisible();
     await expect(page.locator('[data-testid="priority-medium"]')).toBeVisible();
   });
 
   test("should filter by priority", async ({ page }) => {
-    await page.goto("/admin/escalations");
+    await page.goto("/escalations");
 
     await page.click('button:has-text("גבוהה")');
 
@@ -519,7 +498,7 @@ test.describe("Admin Escalation Management", () => {
       })
     );
 
-    await page.goto("/admin/escalations/esc_001");
+    await page.goto("/escalations/esc_001");
 
     await expect(page.locator("text=יעל כהן")).toBeVisible();
     await expect(page.locator("text=השירות היה גרוע")).toBeVisible();
@@ -534,7 +513,7 @@ test.describe("Admin Escalation Management", () => {
       })
     );
 
-    await page.goto("/admin/escalations/esc_001");
+    await page.goto("/escalations/esc_001");
     await page.click('button:has-text("קח שליטה")');
 
     await expect(page.locator('[data-testid="admin-chat-input"]')).toBeVisible();
@@ -548,7 +527,7 @@ test.describe("Admin Escalation Management", () => {
       })
     );
 
-    await page.goto("/admin/escalations/esc_001");
+    await page.goto("/escalations/esc_001");
     await page.click('button:has-text("קח שליטה")');
 
     await page.fill('[data-testid="admin-chat-input"]', "שלום, אני נציג שירות. כיצד אוכל לעזור?");
@@ -565,7 +544,7 @@ test.describe("Admin Escalation Management", () => {
       })
     );
 
-    await page.goto("/admin/escalations/esc_001");
+    await page.goto("/escalations/esc_001");
     await page.click('button:has-text("סמן כנפתר")');
 
     await page.selectOption('select[name="resolution"]', "customer_satisfied");
@@ -583,7 +562,7 @@ test.describe("Admin Escalation Management", () => {
       })
     );
 
-    await page.goto("/admin/escalations/esc_001");
+    await page.goto("/escalations/esc_001");
     await page.click('button:has-text("העבר לגורם בכיר")');
 
     await page.fill('textarea[name="reason"]', "דורש התייחסות משפטית");
@@ -600,7 +579,7 @@ test.describe("Admin Escalation Management", () => {
       })
     );
 
-    await page.goto("/admin/escalations/esc_001");
+    await page.goto("/escalations/esc_001");
     await page.click('button:has-text("הוסף הערה")');
 
     await page.fill('textarea[name="note"]', "בוצעה שיחה עם הלקוח ב-10:00");
@@ -615,7 +594,7 @@ test.describe("Admin Analytics & Reports", () => {
     await setupCommonMocks(page);
     await setupAdminAuth(page);
 
-    await page.route("**/api/v1/admin/analytics*", (route) =>
+    await page.route("**/api/v1/analytics*", (route) =>
       route.fulfill({
         status: 200,
         body: JSON.stringify({
@@ -654,7 +633,7 @@ test.describe("Admin Analytics & Reports", () => {
   });
 
   test("should display analytics dashboard", async ({ page }) => {
-    await page.goto("/admin/analytics");
+    await page.goto("/analytics");
 
     await expect(page.locator("text=ניתוח נתונים")).toBeVisible();
     await expect(page.locator("text=5,000 משתמשים")).toBeVisible();
@@ -662,19 +641,19 @@ test.describe("Admin Analytics & Reports", () => {
   });
 
   test("should show user growth chart", async ({ page }) => {
-    await page.goto("/admin/analytics");
+    await page.goto("/analytics");
 
     await expect(page.locator('[data-testid="user-growth-chart"]')).toBeVisible();
   });
 
   test("should show revenue trends", async ({ page }) => {
-    await page.goto("/admin/analytics");
+    await page.goto("/analytics");
 
     await expect(page.locator('[data-testid="revenue-chart"]')).toBeVisible();
   });
 
   test("should filter by date range", async ({ page }) => {
-    await page.goto("/admin/analytics");
+    await page.goto("/analytics");
 
     await page.click('button:has-text("טווח תאריכים")');
     await page.click("text=חודש אחרון");
@@ -684,7 +663,7 @@ test.describe("Admin Analytics & Reports", () => {
   });
 
   test("should show agent performance metrics", async ({ page }) => {
-    await page.goto("/admin/analytics");
+    await page.goto("/analytics");
 
     await page.click('button:has-text("ביצועי סוכנים")');
 
@@ -694,14 +673,14 @@ test.describe("Admin Analytics & Reports", () => {
   });
 
   test("should show category breakdown", async ({ page }) => {
-    await page.goto("/admin/analytics");
+    await page.goto("/analytics");
 
     await expect(page.locator("text=התקנת מזגנים")).toBeVisible();
     await expect(page.locator("text=150 הצעות")).toBeVisible();
   });
 
   test("should export analytics report", async ({ page }) => {
-    await page.route("**/api/v1/admin/analytics/export", (route) =>
+    await page.route("**/api/v1/analytics/export", (route) =>
       route.fulfill({
         status: 200,
         headers: { "Content-Type": "application/pdf" },
@@ -709,7 +688,7 @@ test.describe("Admin Analytics & Reports", () => {
       })
     );
 
-    await page.goto("/admin/analytics");
+    await page.goto("/analytics");
 
     const [download] = await Promise.all([
       page.waitForEvent("download"),
@@ -720,7 +699,7 @@ test.describe("Admin Analytics & Reports", () => {
   });
 
   test("should view agent-specific metrics", async ({ page }) => {
-    await page.route("**/api/v1/admin/analytics/agents/router", (route) =>
+    await page.route("**/api/v1/analytics/agents/router", (route) =>
       route.fulfill({
         status: 200,
         body: JSON.stringify({
@@ -738,7 +717,7 @@ test.describe("Admin Analytics & Reports", () => {
       })
     );
 
-    await page.goto("/admin/analytics/agents/router");
+    await page.goto("/analytics/agents/router");
 
     await expect(page.locator("text=Router Agent")).toBeVisible();
     await expect(page.locator("text=15,000 קריאות")).toBeVisible();
@@ -751,7 +730,7 @@ test.describe("Admin User Management", () => {
     await setupCommonMocks(page);
     await setupAdminAuth(page);
 
-    await page.route("**/api/v1/admin/users*", (route) =>
+    await page.route("**/api/v1/users*", (route) =>
       route.fulfill({
         status: 200,
         body: JSON.stringify({
@@ -767,14 +746,14 @@ test.describe("Admin User Management", () => {
   });
 
   test("should display users list", async ({ page }) => {
-    await page.goto("/admin/users");
+    await page.goto("/users");
 
     await expect(page.locator("text=ניהול משתמשים")).toBeVisible();
     await expect(page.locator("text=יעל כהן")).toBeVisible();
   });
 
   test("should search users", async ({ page }) => {
-    await page.goto("/admin/users");
+    await page.goto("/users");
 
     await page.fill('input[placeholder*="חיפוש"]', "יעל");
 
@@ -783,7 +762,7 @@ test.describe("Admin User Management", () => {
   });
 
   test("should view user details", async ({ page }) => {
-    await page.route("**/api/v1/admin/users/user_001", (route) =>
+    await page.route("**/api/v1/users/user_001", (route) =>
       route.fulfill({
         status: 200,
         body: JSON.stringify({
@@ -799,7 +778,7 @@ test.describe("Admin User Management", () => {
       })
     );
 
-    await page.goto("/admin/users/user_001");
+    await page.goto("/users/user_001");
 
     await expect(page.locator("text=יעל כהן")).toBeVisible();
     await expect(page.locator("text=רוטשילד 15")).toBeVisible();
@@ -807,14 +786,14 @@ test.describe("Admin User Management", () => {
   });
 
   test("should suspend user", async ({ page }) => {
-    await page.route("**/api/v1/admin/users/user_001/suspend", (route) =>
+    await page.route("**/api/v1/users/user_001/suspend", (route) =>
       route.fulfill({
         status: 200,
         body: JSON.stringify({ status: "suspended" }),
       })
     );
 
-    await page.goto("/admin/users/user_001");
+    await page.goto("/users/user_001");
     await page.click('button:has-text("השעה משתמש")');
 
     await page.fill('textarea[name="reason"]', "הפרת תנאי שימוש");
@@ -824,14 +803,14 @@ test.describe("Admin User Management", () => {
   });
 
   test("should add new admin user", async ({ page }) => {
-    await page.route("**/api/v1/admin/users/create-admin", (route) =>
+    await page.route("**/api/v1/users/create-admin", (route) =>
       route.fulfill({
         status: 201,
         body: JSON.stringify({ id: "admin_new", email: "newadmin@groupio.co.il" }),
       })
     );
 
-    await page.goto("/admin/users");
+    await page.goto("/users");
     await page.click('button:has-text("הוסף מנהל")');
 
     await page.fill('input[name="email"]', "newadmin@groupio.co.il");
@@ -847,7 +826,7 @@ test.describe("Admin System Settings", () => {
     await setupCommonMocks(page);
     await setupAdminAuth(page);
 
-    await page.route("**/api/v1/admin/settings", (route) =>
+    await page.route("**/api/v1/settings", (route) =>
       route.fulfill({
         status: 200,
         body: JSON.stringify({
@@ -877,21 +856,21 @@ test.describe("Admin System Settings", () => {
   });
 
   test("should display settings page", async ({ page }) => {
-    await page.goto("/admin/settings");
+    await page.goto("/settings");
 
     await expect(page.locator("text=הגדרות מערכת")).toBeVisible();
     await expect(page.locator("text=הגדרות כלליות")).toBeVisible();
   });
 
   test("should update notification settings", async ({ page }) => {
-    await page.route("**/api/v1/admin/settings/notifications", (route) =>
+    await page.route("**/api/v1/settings/notifications", (route) =>
       route.fulfill({
         status: 200,
         body: JSON.stringify({ success: true }),
       })
     );
 
-    await page.goto("/admin/settings");
+    await page.goto("/settings");
     await page.click('button:has-text("התראות")');
 
     await page.click('[data-testid="toggle-push"]');
@@ -901,14 +880,14 @@ test.describe("Admin System Settings", () => {
   });
 
   test("should update agent escalation settings", async ({ page }) => {
-    await page.route("**/api/v1/admin/settings/agents", (route) =>
+    await page.route("**/api/v1/settings/agents", (route) =>
       route.fulfill({
         status: 200,
         body: JSON.stringify({ success: true }),
       })
     );
 
-    await page.goto("/admin/settings");
+    await page.goto("/settings");
     await page.click('button:has-text("סוכנים")');
 
     await page.fill('input[name="escalationThreshold"]', "5");
@@ -918,14 +897,14 @@ test.describe("Admin System Settings", () => {
   });
 
   test("should update security settings", async ({ page }) => {
-    await page.route("**/api/v1/admin/settings/security", (route) =>
+    await page.route("**/api/v1/settings/security", (route) =>
       route.fulfill({
         status: 200,
         body: JSON.stringify({ success: true }),
       })
     );
 
-    await page.goto("/admin/settings");
+    await page.goto("/settings");
     await page.click('button:has-text("אבטחה")');
 
     await page.fill('input[name="sessionTimeout"]', "60");
@@ -948,7 +927,7 @@ test.describe("Admin System Settings", () => {
       })
     );
 
-    await page.goto("/admin/settings/audit-logs");
+    await page.goto("/settings/audit-logs");
 
     await expect(page.locator("text=יומן פעילות")).toBeVisible();
     await expect(page.locator("text=settings_updated")).toBeVisible();
@@ -961,7 +940,7 @@ test.describe("Admin Offer Management", () => {
     await setupCommonMocks(page);
     await setupAdminAuth(page);
 
-    await page.route("**/api/v1/admin/offers*", (route) =>
+    await page.route("**/api/v1/offers*", (route) =>
       route.fulfill({
         status: 200,
         body: JSON.stringify({
@@ -991,7 +970,7 @@ test.describe("Admin Offer Management", () => {
   });
 
   test("should display offers list", async ({ page }) => {
-    await page.goto("/admin/offers");
+    await page.goto("/offers");
 
     await expect(page.locator("text=ניהול הצעות")).toBeVisible();
     await expect(page.locator("text=התקנת מזגנים")).toBeVisible();
@@ -999,7 +978,7 @@ test.describe("Admin Offer Management", () => {
   });
 
   test("should show flagged offers", async ({ page }) => {
-    await page.goto("/admin/offers");
+    await page.goto("/offers");
 
     await page.click('button:has-text("מסומנות")');
 
@@ -1008,7 +987,7 @@ test.describe("Admin Offer Management", () => {
   });
 
   test("should review flagged offer", async ({ page }) => {
-    await page.route("**/api/v1/admin/offers/offer_002", (route) =>
+    await page.route("**/api/v1/offers/offer_002", (route) =>
       route.fulfill({
         status: 200,
         body: JSON.stringify({
@@ -1023,34 +1002,34 @@ test.describe("Admin Offer Management", () => {
       })
     );
 
-    await page.goto("/admin/offers/offer_002");
+    await page.goto("/offers/offer_002");
 
     await expect(page.locator("text=המחיר נמוך מהממוצע")).toBeVisible();
   });
 
   test("should approve flagged offer", async ({ page }) => {
-    await page.route("**/api/v1/admin/offers/offer_002/approve", (route) =>
+    await page.route("**/api/v1/offers/offer_002/approve", (route) =>
       route.fulfill({
         status: 200,
         body: JSON.stringify({ status: "active" }),
       })
     );
 
-    await page.goto("/admin/offers/offer_002");
+    await page.goto("/offers/offer_002");
     await page.click('button:has-text("אשר")');
 
     await expect(page.locator("text=ההצעה אושרה")).toBeVisible();
   });
 
   test("should cancel fraudulent offer", async ({ page }) => {
-    await page.route("**/api/v1/admin/offers/offer_002/cancel", (route) =>
+    await page.route("**/api/v1/offers/offer_002/cancel", (route) =>
       route.fulfill({
         status: 200,
         body: JSON.stringify({ status: "cancelled" }),
       })
     );
 
-    await page.goto("/admin/offers/offer_002");
+    await page.goto("/offers/offer_002");
     await page.click('button:has-text("בטל הצעה")');
 
     await page.fill('textarea[name="reason"]', "מחיר חשוד - לא תואם שוק");
@@ -1077,7 +1056,7 @@ test.describe("Admin Notifications & Alerts", () => {
       })
     );
 
-    await page.goto("/admin/dashboard");
+    await page.goto("/dashboard");
 
     await expect(page.locator('[data-testid="system-alerts"]')).toBeVisible();
     await expect(page.locator("text=Vector DB latency high")).toBeVisible();
@@ -1091,14 +1070,14 @@ test.describe("Admin Notifications & Alerts", () => {
       })
     );
 
-    await page.goto("/admin/dashboard");
+    await page.goto("/dashboard");
     await page.click('[data-testid="dismiss-alert_001"]');
 
     await expect(page.locator("text=Vector DB latency high")).not.toBeVisible();
   });
 
   test("should receive real-time notifications", async ({ page }) => {
-    await page.goto("/admin/dashboard");
+    await page.goto("/dashboard");
 
     // Simulate WebSocket notification
     await page.evaluate(() => {

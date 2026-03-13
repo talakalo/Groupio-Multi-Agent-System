@@ -55,7 +55,11 @@ export default function BuildingsManagerLayout({ children }: { children: React.R
   }
 
   const handleLogout = async () => {
-    await logout();
+    try {
+      await logout();
+    } catch {
+      // Ignore logout errors — always redirect to login
+    }
     router.push('/login');
   };
 

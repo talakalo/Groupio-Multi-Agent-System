@@ -248,6 +248,26 @@ async def join_offer(
 
     await db.join_offer(current_user.id, offer_id, request.unit_count)
 
+    # Record viral invite conversion in the graph (fire-and-forget)
+    if request.invite_token:
+        from src.databases.graph_store import get_graph_store
+        from src.databases.redis_client import get_redis_client
+
+        async def _mark_converted() -> None:
+            try:
+                redis = get_redis_client()
+                inviter_id = await redis.get(f"invite_token:{request.invite_token}")
+                if inviter_id:
+                    graph = get_graph_store()
+                    await graph.mark_invite_converted(
+                        invitee_id=current_user.id,
+                        offer_id=offer_id,
+                    )
+            except Exception as exc:
+                logger.warning("Failed to mark invite converted: %s", exc)
+
+        background_tasks.add_task(_mark_converted)
+
     # Dispatch join confirmation email (fire-and-forget)
     new_count = current_count + 1
     min_participants = offer.get("min_participants", 5)

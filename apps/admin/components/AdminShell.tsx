@@ -4,7 +4,7 @@
 // Keeping this separate allows app/layout.tsx to remain a Server Component
 // (Next.js requirement: root layouts must be RSC for metadata/SEO to work).
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { clsx } from "clsx";
@@ -50,6 +50,17 @@ function makeQueryClient() {
 }
 
 let browserQueryClient: QueryClient | undefined;
+
+/** When redirected from web app login with token in hash: cookies are already set by API.
+ * Just set admin_role_verified and strip the hash. */
+function consumeTokenFromHash() {
+  if (typeof window === "undefined") return;
+  const hash = window.location.hash;
+  if (hash && hash.includes("token=")) {
+    document.cookie = "admin_role_verified=1; path=/; SameSite=Strict; max-age=86400";
+    window.history.replaceState(null, "", window.location.pathname + window.location.search);
+  }
+}
 
 function getQueryClient() {
   if (typeof window === "undefined") return makeQueryClient();
@@ -140,20 +151,15 @@ function Header({ sidebarCollapsed }: { sidebarCollapsed: boolean }) {
   const email = user?.email ?? "—";
 
   async function handleLogout() {
-    const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
     const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "") || "http://localhost:8000";
     const url = baseUrl.endsWith("/api/v1")
       ? `${baseUrl.replace(/\/api\/v1$/, "")}/api/v1/auth/logout`
       : `${baseUrl}/api/v1/auth/logout`;
     try {
-      await fetch(url, {
-        method: "POST",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        credentials: "include",
-      });
+      await fetch(url, { method: "POST", credentials: "include" });
     } finally {
       if (typeof window !== "undefined") {
-        localStorage.removeItem("auth_token");
+        document.cookie = "admin_role_verified=; path=/; max-age=0";
         router.push("/login");
       }
     }
@@ -218,6 +224,10 @@ function Header({ sidebarCollapsed }: { sidebarCollapsed: boolean }) {
 export function AdminShell({ children }: { children: ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const queryClient = getQueryClient();
+
+  useEffect(() => {
+    consumeTokenFromHash();
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>

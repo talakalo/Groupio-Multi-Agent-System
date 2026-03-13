@@ -26,6 +26,7 @@ import { useTranslations } from 'next-intl';
 
 import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
+import { useNotificationStore } from '@/lib/stores/notificationStore';
 import { cn } from '@/lib/utils/cn';
 
 // ---------------------------------------------------------------------------
@@ -223,6 +224,7 @@ export default function OfferDetailPage() {
   const tCat = useTranslations('categories');
   const tContractors = useTranslations('contractors');
   const user = useAuthStore((s) => s.user);
+  const addSuccess = useNotificationStore((s) => s.success);
 
   const offerId = params.offerId;
   const [showJoinModal, setShowJoinModal] = useState(false);
@@ -261,7 +263,7 @@ export default function OfferDetailPage() {
         await navigator.share(shareData);
       } else {
         await navigator.clipboard.writeText(window.location.href);
-        // TODO: show a brief "Link copied!" toast once a toast component is added
+        addSuccess('הקישור הועתק!', 'הקישור הועתק ללוח — שתפו עם שכנים');
       }
     } catch {
       // User cancelled share dialog — ignore
@@ -429,6 +431,7 @@ export default function OfferDetailPage() {
           onClick={() => setShowJoinModal(true)}
           disabled={joinMutation.isPending || joinMutation.isSuccess || offer.status !== 'active' || !user?.id}
           className="btn-primary w-full flex items-center justify-center gap-2 text-lg py-3"
+          data-testid="join-offer-button"
         >
           {joinMutation.isPending ? (
             <>
@@ -447,6 +450,25 @@ export default function OfferDetailPage() {
 
         {joinMutation.isError && (
           <p className="text-red-500 text-sm mt-2 text-center">{t('joinError')}</p>
+        )}
+
+        {/* After joining: prompt resident to proceed to payment */}
+        {joinMutation.isSuccess && (
+          <div className="mt-3 bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-emerald-800">הצטרפתם בהצלחה!</p>
+              <p className="text-xs text-emerald-700 mt-0.5">
+                כדי להבטיח את מקומכם, יש להשלים את התשלום.
+              </p>
+            </div>
+            <Link
+              href={`/checkout?offerId=${offerId}`}
+              className="btn-primary text-sm whitespace-nowrap flex-shrink-0"
+              data-testid="proceed-to-payment-button"
+            >
+              לתשלום →
+            </Link>
+          </div>
         )}
 
         {/* Cancellation policy summary — always visible */}

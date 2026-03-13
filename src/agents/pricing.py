@@ -7,6 +7,7 @@ from typing import Any
 from src.agents.base import AgentConfig, BaseAgent
 from src.config.prompts.pricing import PRICING_SYSTEM_PROMPT
 from src.config.settings import get_settings
+from src.databases.graph_store import get_graph_store
 from src.databases.postgres import get_postgres_client
 from src.models.agent_state import AgentState
 from src.models.offer import SEASONALITY_FACTORS
@@ -90,6 +91,21 @@ class PricingAgent(BaseAgent):
         self._current_market_data = market_data
         self._current_category = category
 
+        # Step 4b: Fetch building similarity clusters for social proof
+        building_id = building_context.get("id") or state.get("building_id")
+        similarity_clusters: list[dict[str, Any]] = []
+        if building_id:
+            try:
+                graph = get_graph_store()
+                similarity_clusters = await graph.get_building_similarity_clusters(
+                    building_id=building_id,
+                    category=category,
+                    limit=10,
+                )
+                state["building_similarity_clusters"] = similarity_clusters
+            except Exception:
+                logger.warning("Failed to fetch building similarity clusters")
+
         # Step 5: Generate pricing analysis via LLM
         response = await self._generate_pricing_response(
             state=state,
@@ -98,6 +114,7 @@ class PricingAgent(BaseAgent):
             market_data=market_data,
             tiers=tiers,
             pricing_context=pricing_context,
+            similarity_clusters=similarity_clusters,
         )
 
         offer_id = entities.get("offer_id") or context_next.get("offer_id")
@@ -177,12 +194,23 @@ class PricingAgent(BaseAgent):
         # Task 3.1 — Autonomy mode: in recommend mode, flag for human confirmation
         settings = get_settings()
         if settings.PRICING_AGENT_MODE in ("recommend", "gated"):
+            reason = f"Pricing results require admin confirmation (mode={settings.PRICING_AGENT_MODE})"
             state["needs_human"] = True
-            state["escalation_reason"] = (
-                f"Pricing results require admin confirmation (mode={settings.PRICING_AGENT_MODE})"
-            )
+            state["escalation_reason"] = reason
             if state["actions_taken"]:
                 state["actions_taken"][-1]["requires_human_confirmation"] = True
+            last_action = state["actions_taken"][-1] if state["actions_taken"] else {}
+            await self._enqueue_pending_decision(
+                state=state,
+                action_type="pricing_recommendation",
+                payload={
+                    "offer_id": last_action.get("offer_id", ""),
+                    "recommended_price": last_action.get("recommended_price"),
+                    "price_range": last_action.get("price_range"),
+                    "mode": settings.PRICING_AGENT_MODE,
+                },
+                escalation_reason=reason,
+            )
 
         self._metrics["calls"] += 1
         return state
@@ -288,9 +316,20 @@ class PricingAgent(BaseAgent):
         market_data: dict[str, Any],
         tiers: list[dict[str, Any]],
         pricing_context: list[dict[str, Any]],
+        similarity_clusters: list[dict[str, Any]] | None = None,
     ) -> str:
         """Generate pricing analysis response via LLM."""
         context_text = "\n".join(doc.get("text", "")[:300] for doc in pricing_context[:3])
+
+        # Build social proof text from similarity clusters
+        social_proof_text = ""
+        if similarity_clusters:
+            total_buildings = len(similarity_clusters)
+            total_residents = sum(c.get("residents_joined", 0) for c in similarity_clusters)
+            social_proof_text = (
+                f"\nSocial Proof: {total_buildings} similar buildings in the area have joined "
+                f"{category} deals with {total_residents} total residents participating."
+            )
 
         tiers_text = "\n".join(
             f"- {t['min_participants']}-{t.get('max_participants') or '+'} units: "
@@ -314,6 +353,7 @@ class PricingAgent(BaseAgent):
                         f"- Sample size: {market_data.get('sample_size', 'N/A')}\n\n"
                         f"Tiered Pricing:\n{tiers_text}\n\n"
                         f"Pricing Context:\n{context_text}\n\n"
+                        f"{social_proof_text}\n\n"
                         f"Provide a clear pricing analysis for the user."
                     ),
                 }

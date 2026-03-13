@@ -103,6 +103,43 @@ export interface ContractorsListResponse {
   has_more: boolean;
 }
 
+// ---- Pending Agent Decisions ----
+
+export interface PendingDecision {
+  id: string;
+  agent_name: string;
+  conversation_id?: string;
+  user_id?: string;
+  action_type: string;
+  payload: Record<string, unknown>;
+  escalation_reason?: string;
+  status: "pending" | "approved" | "rejected";
+  decided_by?: string;
+  decision_note?: string;
+  decided_at?: string;
+  created_at: string;
+}
+
+export interface PendingDecisionsResponse {
+  items: PendingDecision[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+// ---- Credit Awards ----
+
+export interface CreditAward {
+  id: string;
+  resident_id: string;
+  amount: number;
+  reason: string;
+  status: "pending_approval" | "approved" | "rejected" | "applied";
+  approved_by?: string;
+  approved_at?: string;
+  created_at: string;
+}
+
 // ---- Client Configuration ----
 
 export interface ApiClientConfig {
@@ -251,6 +288,78 @@ export class GroupioApiClient {
     );
   }
 
+  // ---- Refund Methods ----
+
+  async requestRefund(
+    paymentId: string,
+    reason?: string,
+    amount?: number,
+  ): Promise<{ payment_id: string; refund_id: string; status: string; amount: number; reason: string }> {
+    return this.post(`/payments/${encodeURIComponent(paymentId)}/refund`, { reason, amount });
+  }
+
+  // ---- Push Token ----
+
+  async registerPushToken(token: string): Promise<{ status: string }> {
+    return this.post<{ status: string }>("/auth/push-token", { token });
+  }
+
+  async unregisterPushToken(): Promise<{ status: string }> {
+    const response = await fetch(`${this.baseUrl}/auth/push-token`, {
+      method: "DELETE",
+      headers: this.buildHeaders(),
+      credentials: "include",
+    });
+    if (!response.ok) await this.handleErrorResponse(response, "/auth/push-token");
+    return response.json() as Promise<{ status: string }>;
+  }
+
+  // ---- Pending Agent Decisions (Admin) ----
+
+  async listPendingDecisions(params?: {
+    status?: string;
+    agent_name?: string;
+    page?: number;
+    page_size?: number;
+  }): Promise<PendingDecisionsResponse> {
+    const search = new URLSearchParams();
+    if (params?.status) search.set("status", params.status);
+    if (params?.agent_name) search.set("agent_name", params.agent_name);
+    if (params?.page != null) search.set("page", String(params.page));
+    if (params?.page_size != null) search.set("page_size", String(params.page_size));
+    const qs = search.toString();
+    return this.get<PendingDecisionsResponse>(`/admin/agents/pending-decisions${qs ? `?${qs}` : ""}`);
+  }
+
+  async approvePendingDecision(decisionId: string, note?: string): Promise<PendingDecision> {
+    return this.post<PendingDecision>(
+      `/admin/agents/pending-decisions/${encodeURIComponent(decisionId)}/approve`,
+      undefined,
+      note ? `?note=${encodeURIComponent(note)}` : "",
+    );
+  }
+
+  async rejectPendingDecision(decisionId: string, note?: string): Promise<PendingDecision> {
+    return this.post<PendingDecision>(
+      `/admin/agents/pending-decisions/${encodeURIComponent(decisionId)}/reject`,
+      undefined,
+      note ? `?note=${encodeURIComponent(note)}` : "",
+    );
+  }
+
+  // ---- Credit Awards (Admin) ----
+
+  async listCreditAwards(params?: {
+    resident_id?: string;
+    status?: string;
+  }): Promise<CreditAward[]> {
+    const search = new URLSearchParams();
+    if (params?.resident_id) search.set("resident_id", params.resident_id);
+    if (params?.status) search.set("status", params.status);
+    const qs = search.toString();
+    return this.get<CreditAward[]>(`/admin/credit-awards${qs ? `?${qs}` : ""}`);
+  }
+
   // ---- Internal HTTP Helpers ----
 
   private buildHeaders(): Record<string, string> {
@@ -279,6 +388,7 @@ export class GroupioApiClient {
         headers: this.buildHeaders(),
         body: body != null ? JSON.stringify(body) : undefined,
         signal: controller.signal,
+        credentials: "include", // Send HTTP-only cookies (e.g. access_token)
       });
     } catch (error: unknown) {
       if (error instanceof DOMException && error.name === "AbortError") {
@@ -348,7 +458,7 @@ export class GroupioApiClient {
     return this.request<T>("GET", path);
   }
 
-  private async post<T>(path: string, body?: unknown): Promise<T> {
-    return this.request<T>("POST", path, body);
+  private async post<T>(path: string, body?: unknown, qs?: string): Promise<T> {
+    return this.request<T>("POST", qs ? `${path}${qs}` : path, body);
   }
 }

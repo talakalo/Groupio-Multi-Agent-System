@@ -108,7 +108,11 @@ export default function ResidentProfilePage() {
   const logoutAction = useAuthStore((s) => s.logout);
 
   const handleLogout = async () => {
-    await logoutAction();
+    try {
+      await logoutAction();
+    } catch {
+      // Ignore logout errors — always redirect to login
+    }
     router.push('/login');
   };
 
@@ -191,10 +195,16 @@ export default function ResidentProfilePage() {
     }
   };
 
-  const handleDeleteAccount = async () => {
-    const confirmed = window.confirm(t('deleteAccountConfirm'));
-    if (!confirmed) return;
+  const [deletePhase, setDeletePhase] = useState<'idle' | 'confirm'>('idle');
+  const [deleteInput, setDeleteInput] = useState('');
+  const [deleteError, setDeleteError] = useState('');
 
+  const handleDeleteAccount = async () => {
+    if (deleteInput !== 'DELETE') {
+      setDeleteError('יש להקליד DELETE לאישור');
+      return;
+    }
+    setDeleteError('');
     try {
       const headers: Record<string, string> = {};
       if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
@@ -208,6 +218,7 @@ export default function ResidentProfilePage() {
       router.push('/login');
     } catch (error) {
       console.error('Failed to delete account:', error);
+      setDeleteError('שגיאה במחיקת החשבון. נסו שוב.');
     }
   };
 
@@ -272,8 +283,18 @@ export default function ResidentProfilePage() {
       if (!res.ok) throw new Error('Failed to save profile');
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: async (data: { preferred_language?: string }) => {
       queryClient.invalidateQueries({ queryKey: ['resident', 'profile'] });
+      const lang = data?.preferred_language;
+      if (lang) {
+        await fetch('/api/locale', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ locale: lang }),
+          credentials: 'same-origin',
+        }).catch(() => {});
+        router.refresh();
+      }
     },
   });
 
@@ -408,7 +429,7 @@ export default function ResidentProfilePage() {
               <Globe className="absolute top-3.5 end-3 h-4 w-4 text-gray-400" />
               <select
                 id="language"
-                value={profile.language ?? 'he'}
+                value={profile.language ?? profile.preferredLanguage ?? 'he'}
                 onChange={(e) => updateField('language' as keyof ResidentProfile, e.target.value)}
                 className="input-field pe-10"
               >
@@ -579,20 +600,59 @@ export default function ResidentProfilePage() {
           <div className="card">
             <h3 className="text-sm font-bold text-red-600 mb-2">{t('dangerZone')}</h3>
             <p className="text-xs text-gray-500 mb-4">{t('deleteAccountWarning')}</p>
-            <div className="flex gap-3">
+            {deletePhase === 'idle' ? (
+              <div className="flex gap-3">
               <button
                 type="button"
-                onClick={handleDeleteAccount}
+                onClick={() => setDeletePhase('confirm')}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 transition-colors text-sm font-medium"
               >
                 <Trash2 className="h-4 w-4" />
                 {t('deleteAccount')}
               </button>
+              </div>
+            ) : (
+              <div className="space-y-3 p-4 rounded-xl border border-red-200 bg-red-50">
+                <p className="text-sm font-semibold text-red-700">⚠️ פעולה זו אינה הפיכה</p>
+                <p className="text-xs text-red-600">הקלידו <strong>DELETE</strong> כדי לאשר מחיקת החשבון:</p>
+                <input
+                  type="text"
+                  value={deleteInput}
+                  onChange={e => { setDeleteInput(e.target.value); setDeleteError(''); }}
+                  placeholder="DELETE"
+                  className="input-field text-sm"
+                  aria-label="אישור מחיקת חשבון"
+                  autoComplete="off"
+                />
+                {deleteError && <p className="text-xs text-red-600" role="alert">{deleteError}</p>}
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleDeleteAccount}
+                    disabled={deleteInput !== 'DELETE'}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    מחק את החשבון שלי
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setDeletePhase('idle'); setDeleteInput(''); setDeleteError(''); }}
+                    className="px-4 py-2 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors text-sm font-medium"
+                  >
+                    ביטול
+                  </button>
+                </div>
+              </div>
+            )}
+            {deletePhase === 'idle' && (
+              <div className="flex gap-3 mt-3">
               <button type="button" onClick={handleLogout} className="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors text-sm font-medium">
                 <LogOut className="h-4 w-4" />
                 {t('logout')}
               </button>
-            </div>
+              </div>
+            )}
           </div>
         </div>
       )}

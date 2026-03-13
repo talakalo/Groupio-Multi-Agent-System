@@ -204,6 +204,62 @@ async def generate_daily_analytics():
         logger.error("Failed to generate daily analytics: %s", exc)
 
 
+@scheduler.register("refresh_building_similarity", interval_seconds=86400)  # Nightly
+async def refresh_building_similarity():
+    """Compute and materialise SIMILAR_TO edges between buildings per region."""
+    from src.databases.graph_store import get_graph_store
+
+    db = get_postgres_client()
+    graph = get_graph_store()
+
+    try:
+        regions = await db.get_distinct_regions()
+    except Exception as exc:
+        logger.warning("Could not fetch distinct regions: %s", exc)
+        regions = []
+
+    if not regions:
+        # Fall back to a single global pass when region list unavailable
+        count = await graph.compute_and_store_similarity_edges()
+        logger.info("Building similarity edges refreshed (global): %d edges", count)
+        return
+
+    total = 0
+    for region in regions:
+        try:
+            count = await graph.compute_and_store_similarity_edges(region=region)
+            total += count
+        except Exception as exc:
+            logger.error("Failed to refresh similarity edges for region %s: %s", region, exc)
+
+    logger.info("Building similarity edges refreshed for %d regions: %d total edges", len(regions), total)
+
+
+@scheduler.register("refresh_influencer_scores", interval_seconds=86400)  # Nightly
+async def refresh_influencer_scores():
+    """Recompute materialised INFLUENCED edges for all residents, grouped by city."""
+    from src.databases.graph_store import get_graph_store
+
+    db = get_postgres_client()
+    graph = get_graph_store()
+
+    try:
+        cities = await db.get_distinct_cities()
+    except Exception as exc:
+        logger.warning("Could not fetch distinct cities: %s", exc)
+        cities = []
+
+    total = 0
+    for city in cities:
+        try:
+            count = await graph.refresh_influence_scores_for_city(city=city)
+            total += count
+        except Exception as exc:
+            logger.error("Failed to refresh influence scores for city %s: %s", city, exc)
+
+    logger.info("Influencer scores refreshed for %d cities: %d total edges", len(cities), total)
+
+
 async def run_scheduler():
     """Entry point to start the scheduler."""
     await scheduler.start()

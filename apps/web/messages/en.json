@@ -32,6 +32,7 @@
     "contractors": "Contractors",
     "building": "Building",
     "profile": "Profile",
+    "payments": "Payments",
     "aiAssistant": "AI Assistant",
     "myAccount": "My Account"
   },
@@ -47,7 +48,10 @@
   },
   "dashboard": {
     "welcome": "Hello, {name}!",
+    "guestName": "there",
     "dashboardSubtitle": "Here's what's happening in your building",
+    "errorLoadingOffers": "Error loading offers. Please try again.",
+    "retry": "Retry",
     "activeOffers": "Active Offers",
     "neighborsJoined": "Neighbors Joined",
     "totalSavings": "Total Savings",
@@ -65,6 +69,7 @@
   },
   "offers": {
     "title": "Offers",
+    "groupOffer": "Group Offer",
     "active": "Active",
     "expired": "Expired",
     "completed": "Completed",
@@ -92,7 +97,9 @@
     "priceMin": "Min Price",
     "priceMax": "Max Price",
     "noLimit": "No Limit",
-    "noOffersDescription": "No offers match your search"
+    "noOffersDescription": "No offers match your search",
+    "errorLoadingOffers": "Error loading offers. Please try again.",
+    "retry": "Retry"
   },
   "contractors": {
     "title": "Contractors",
@@ -226,14 +233,244 @@
         "viewAll": "View All",
         "empty": "No active projects"
       }
+    },
+    "offers": {
+      "create": {
+        "title": "Create New Offer",
+        "subtitle": "Fill in the details for your group service offer",
+        "sections": {
+          "basicInfo": "Basic Info",
+          "pricing": "Pricing",
+          "services": "Services & Requirements"
+        },
+        "fields": {
+          "title": "Title",
+          "description": "Description",
+          "category": "Category",
+          "region": "Region",
+          "buildingId": "Building ID",
+          "basePrice": "Base Price",
+          "minParticipants": "Min Participants",
+          "maxParticipants": "Max Participants",
+          "includedServices": "Included Services",
+          "requirements": "Requirements",
+          "validUntil": "Valid Until"
+        },
+        "placeholders": {
+          "title": "Enter offer title",
+          "description": "Describe the service in detail",
+          "category": "Select category",
+          "region": "Select region",
+          "buildingId": "Enter building ID",
+          "requirements": "Additional requirements (optional)"
+        },
+        "hints": {
+          "basePrice": "Price per unit. More participants = lower price."
+        },
+        "services": {
+          "installation": "Installation",
+          "materials": "Materials",
+          "warranty": "Warranty",
+          "removal": "Removal",
+          "cleanup": "Cleanup",
+          "inspection": "Inspection",
+          "maintenance": "Maintenance"
+        },
+        "categories": {
+          "ac_installation": "AC Installation",
+          "kitchen": "Kitchen",
+          "electrical": "Electrical",
+          "plumbing": "Plumbing",
+          "painting": "Painting",
+          "flooring": "Flooring",
+          "windows": "Windows",
+          "security": "Security"
+        },
+        "regions": {
+          "center": "Center",
+          "tel_aviv": "Tel Aviv",
+          "jerusalem": "Jerusalem",
+          "north": "North",
+          "south": "South",
+          "sharon": "Sharon",
+          "shfela": "Shfela"
+        },
+        "buttons": {
+          "cancel": "Cancel",
+          "create": "Create Offer",
+          "creating": "Creating..."
+        },
+        "hidePricingPreview": "Hide pricing preview",
+        "showPricingPreview": "Show pricing preview",
+        "errors": {
+          "createFailed": "Failed to create offer. Please try again."
+        }
+      },
+      "active": {
+        "title": "Active Offers",
+        "subtitle": "Manage your offers",
+        "createOffer": "Create Offer",
+        "resultsCount": "{count} offers",
+        "filters": {
+          "status": "Status",
+          "category": "Category",
+          "sortBy": "Sort by",
+          "allStatuses": "All Statuses",
+          "pending": "Pending",
+          "accepted": "Accepted",
+          "inProgress": "In Progress",
+          "completed": "Completed",
+          "allCategories": "All Categories",
+          "sortByDate": "Date",
+          "sortByPrice": "Price",
+          "sortByParticipants": "Participants"
+        },
+        "categories": {
+          "ac_installation": "AC Installation",
+          "kitchen": "Kitchen",
+          "electrical": "Electrical",
+          "plumbing": "Plumbing",
+          "painting": "Painting",
+          "flooring": "Flooring",
+          "windows": "Windows",
+          "security": "Security"
+        },
+        "empty": {
+          "title": "No offers",
+          "description": "You don't have any offers yet. Create a new offer to get started.",
+          "cta": "Create Offer"
+        }
+      }
+    },
+    "profile": {
+      "title": "Business Profile",
+      "subtitle": "Manage your business details and documents",
+      "trustScore": {
+        "title": "Trust Score",
+        "description": "Your trust score affects your ranking in offers"
+      },
+      "sections": {
+        "business": "Business Details",
+        "services": "Services & Regions",
+        "documents": "Documents",
+        "settings": "Settings"
+      },
+      "fields": {
+        "businessName": "Business Name",
+        "contactName": "Contact Name",
+        "email": "Email",
+        "phone": "Phone",
+        "description": "Description",
+        "yearsExperience": "Years Experience",
+        "employeeCount": "Employee Count",
+        "website": "Website",
+        "categories": "Categories",
+        "regions": "Regions"
+      },
+      "documents": {
+        "requestBannerTitle": "Additional documents requested",
+        "license": "License",
+        "insurance": "Insurance",
+        "certifications": "Certifications",
+        "licenseNumber": "License Number",
+        "expiresAt": "Expires At",
+        "notUploaded": "Not uploaded",
+        "upload": "Upload",
+        "uploading": "Uploading...",
+        "uploadSuccess": "File uploaded successfully",
+        "uploadError": "Upload failed",
+        "uploaded": "uploaded"
+      },
+      "settings": {
+        "notifications": "Notifications",
+        "emailOffers": "Email offers",
+        "smsOffers": "SMS offers",
+        "whatsappOffers": "WhatsApp offers",
+        "availability": "Availability",
+        "acceptingOffers": "Accepting new offers",
+        "dangerZone": "Danger Zone",
+        "deactivate": "Deactivate account"
+      },
+      "save": "Save",
+      "saving": "Saving...",
+      "saveSuccess": "Profile saved successfully",
+      "saveError": "Save failed"
+    },
+    "projects": {
+      "title": "Projects",
+      "subtitle": "Overview of your projects",
+      "stats": {
+        "total": "Total",
+        "completed": "Completed",
+        "inProgress": "In Progress",
+        "revenue": "Revenue",
+        "avgRating": "Avg Rating"
+      },
+      "filters": {
+        "status": "Status",
+        "year": "Year",
+        "allStatuses": "All Statuses",
+        "inProgress": "In Progress",
+        "completed": "Completed",
+        "cancelled": "Cancelled"
+      },
+      "empty": "No projects",
+      "participants": "participants",
+      "startedAt": "Started",
+      "completedAt": "Completed",
+      "viewDetails": "View Details",
+      "requestReview": "Request Review",
+      "statuses": {
+        "draft": "Draft",
+        "pending": "Pending",
+        "matching": "Matching",
+        "matched": "Matched",
+        "in_progress": "In Progress",
+        "completed": "Completed",
+        "cancelled": "Cancelled",
+        "active": "Active"
+      }
     }
   },
   "onboarding": {
+    "title": "Complete Profile",
+    "subtitle": "Tell us a bit about yourself",
+    "selectRole": "Select Role",
+    "selectRoleDescription": "Are you a resident or contractor?",
+    "resident": "Resident",
+    "residentDescription": "I live in a building and look for group offers",
+    "contractor": "Contractor",
+    "contractorDescription": "I provide services to buildings",
     "buildingInfo": "Building Info",
     "buildingInfoDescription": "Tell us about your building",
     "buildingAddress": "Building Address",
     "buildingAddressPlaceholder": "Enter address",
-    "buildingType": "Building Type"
+    "suggestAddress": "Suggest address",
+    "suggestedAddress": "Suggested address",
+    "useSuggested": "Use suggested",
+    "keepOriginal": "Keep original",
+    "city": "City",
+    "cityPlaceholder": "Enter city",
+    "apartmentNumber": "Apt. number",
+    "apartmentNumberPlaceholder": "e.g. 3A",
+    "region": "Region",
+    "buildingType": "Building Type",
+    "businessInfo": "Business Info",
+    "businessInfoDescription": "Tell us about your business",
+    "businessName": "Business name",
+    "businessNamePlaceholder": "Enter business name",
+    "licenseNumber": "License number",
+    "licenseNumberPlaceholder": "Enter license number",
+    "yearsInBusiness": "Years in business",
+    "businessDescription": "Description",
+    "businessDescriptionPlaceholder": "Describe your services",
+    "serviceRegions": "Service regions",
+    "servicePreferences": "Service preferences",
+    "residentPreferencesDescription": "Select categories that interest you",
+    "contractorPreferencesDescription": "Select categories you offer",
+    "selectedCount": "{count} selected",
+    "finish": "Finish",
+    "submitError": "Submission failed. Please try again."
   },
   "chat": {
     "placeholder": "Type a message...",
@@ -285,18 +522,6 @@
     "newOffer": "New Offer",
     "myBusiness": "My Business",
     "logout": "Log out"
-  },
-  "contractor": {
-    "offers": {
-      "create": {
-        "fields": {
-          "buildingId": "Building ID"
-        },
-        "placeholders": {
-          "buildingId": "Enter building ID"
-        }
-      }
-    }
   },
   "residentNav": {
     "dashboard": "Dashboard",

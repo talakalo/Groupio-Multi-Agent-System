@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useMemo, useCallback, Fragment, useRef } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import React, { useState, useMemo, useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import {
   Search,
@@ -157,6 +157,84 @@ function TrustScoreBar({
 }
 
 // ---------------------------------------------------------------------------
+// Verification Metadata (Phase 2)
+// ---------------------------------------------------------------------------
+
+interface VerificationMetadataItem {
+  id: string;
+  contractor_id: string;
+  source: string;
+  verified: boolean;
+  confidence: number;
+  verified_at: string;
+  raw_response?: Record<string, unknown>;
+  created_at: string;
+}
+
+function VerificationMetadataSection({ contractorId }: { contractorId: string }) {
+  const rawApiUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "") || "http://localhost:8000";
+  const API_BASE = rawApiUrl.endsWith("/api/v1") ? rawApiUrl : `${rawApiUrl}/api/v1`;
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["admin", "contractors", contractorId, "verification-metadata"],
+    queryFn: async () => {
+      const res = await fetch(
+        `${API_BASE}/admin/contractors/${encodeURIComponent(contractorId)}/verification-metadata`,
+        { credentials: "include" }
+      );
+      if (!res.ok) throw new Error("Failed to fetch verification metadata");
+      return res.json() as Promise<{ items: VerificationMetadataItem[] }>;
+    },
+    enabled: !!contractorId,
+  });
+
+  const items = data?.items ?? [];
+
+  return (
+    <div className="space-y-2">
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-surface-500">
+        External Verification Records
+      </h3>
+      {isLoading && (
+        <p className="text-sm text-surface-400">Loading verification data...</p>
+      )}
+      {!isLoading && items.length === 0 && (
+        <p className="text-sm text-surface-500 italic">
+          No external verification records. Status above reflects internal/admin review only.
+        </p>
+      )}
+      {!isLoading && items.length > 0 && (
+        <div className="space-y-2">
+          {items.map((m) => (
+            <div
+              key={m.id}
+              className="p-3 rounded-lg border border-surface-200 bg-surface-50 text-sm"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span
+                  className={clsx(
+                    "font-medium",
+                    m.verified ? "text-success-700" : "text-surface-600"
+                  )}
+                >
+                  {m.verified ? "Verified" : "Not verified"} — {m.source}
+                </span>
+                <span className="text-xs text-surface-500">
+                  {(m.confidence * 100).toFixed(0)}% confidence
+                </span>
+              </div>
+              <p className="text-xs text-surface-500 mt-1">
+                Verified at: {new Date(m.verified_at).toLocaleString()}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Page component
 // ---------------------------------------------------------------------------
 
@@ -180,17 +258,15 @@ export default function ContractorsPage() {
   const rawApiUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "") || "http://localhost:8000";
   const API_BASE = rawApiUrl.endsWith("/api/v1") ? rawApiUrl : `${rawApiUrl}/api/v1`;
 
-  function getAuthHeaders(): Record<string, string> {
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
-    const token = typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
-    if (token) headers["Authorization"] = `Bearer ${token}`;
-    return headers;
-  }
+  const fetchOpts = (): RequestInit => ({
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+  });
 
   async function approveContractor(id: string) {
     const res = await fetch(`${API_BASE}/contractors/${encodeURIComponent(id)}/verify`, {
       method: "POST",
-      headers: getAuthHeaders(),
+      ...fetchOpts(),
       body: JSON.stringify({ decision: "approved" }),
     });
     if (!res.ok) throw new Error(`Failed to approve contractor ${id}: ${res.status}`);
@@ -200,7 +276,7 @@ export default function ContractorsPage() {
   async function suspendContractor(id: string) {
     const res = await fetch(`${API_BASE}/contractors/${encodeURIComponent(id)}`, {
       method: "PUT",
-      headers: getAuthHeaders(),
+      ...fetchOpts(),
       body: JSON.stringify({ verification_status: "suspended" }),
     });
     if (!res.ok) throw new Error(`Failed to suspend contractor ${id}: ${res.status}`);
@@ -208,16 +284,12 @@ export default function ContractorsPage() {
   }
 
   async function requestDocuments(id: string) {
-    const res = await fetch(`${API_BASE}/contractors/${encodeURIComponent(id)}/request-docs`, {
+    const res = await fetch(`${API_BASE}/admin/contractors/${encodeURIComponent(id)}/request-docs`, {
       method: "POST",
-      headers: getAuthHeaders(),
+      ...fetchOpts(),
+      body: JSON.stringify({ message: "Please upload additional documents to complete your verification." }),
     });
-    // Gracefully handle 404 (endpoint may not exist yet)
-    if (res.status === 404) {
-      console.warn(`request-docs endpoint not found for contractor ${id}`);
-      return null;
-    }
-    if (!res.ok) throw new Error(`Failed to request documents for contractor ${id}: ${res.status}`);
+    if (!res.ok) throw new Error(`Failed to request documents: ${res.status}`);
     return res.json();
   }
 
@@ -368,11 +440,21 @@ export default function ContractorsPage() {
     setActionLoading(true);
     try {
       const ids = Array.from(selectedIds);
-      await Promise.allSettled(ids.map((id) => requestDocuments(id)));
+      const results = await Promise.allSettled(
+        ids.map((id) =>
+          fetch(`${API_BASE}/admin/contractors/${encodeURIComponent(id)}/request-documents`, {
+            method: "POST",
+            ...fetchOpts(),
+            body: JSON.stringify({ message: "Please upload your license, insurance, and business registration documents to complete your verification." }),
+          })
+        )
+      );
+      const succeeded = results.filter((r) => r.status === "fulfilled").length;
       await queryClient.invalidateQueries({ queryKey: ["admin", "contractors"] });
       setSelectedIds(new Set());
+      alert(`Document requests sent to ${succeeded} of ${ids.length} contractors.`);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to request documents");
+      alert(err instanceof Error ? err.message : "Failed to send document requests");
     } finally {
       setActionLoading(false);
     }
@@ -545,6 +627,8 @@ export default function ContractorsPage() {
             <button
               className="btn-secondary btn-sm"
               onClick={handleBulkRequestDocs}
+              disabled={actionLoading}
+              title="Request documents from selected contractors"
             >
               <FileText className="w-3.5 h-3.5" />
               Request Docs
@@ -843,6 +927,9 @@ export default function ContractorsPage() {
                 </div>
               </div>
 
+              {/* Verification Metadata (Phase 2 - external/official verification) */}
+              <VerificationMetadataSection contractorId={detailContractor.id} />
+
               {/* Trust Score Breakdown */}
               <div className="space-y-3">
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-surface-500">
@@ -938,25 +1025,26 @@ export default function ContractorsPage() {
                   </button>
                 )}
                 <button
+                  type="button"
                   className="btn-secondary flex-1"
                   disabled={actionLoading}
                   onClick={async () => {
+                    if (!detailContractor) return;
                     setActionLoading(true);
                     try {
-                      const result = await requestDocuments(detailContractor.id);
-                      if (result === null) {
-                        alert("Document request endpoint is not available yet. Please try again later.");
-                      }
+                      await requestDocuments(detailContractor.id);
                       await queryClient.invalidateQueries({ queryKey: ["admin", "contractors"] });
+                      alert("Document request sent. The contractor will see it in their profile.");
                     } catch (err) {
-                      alert(err instanceof Error ? err.message : "Failed to request documents");
+                      alert(err instanceof Error ? err.message : "Failed to send request");
                     } finally {
                       setActionLoading(false);
                     }
                   }}
+                  title="Request the contractor to upload additional documents"
                 >
                   <FileText className="w-4 h-4" />
-                  {actionLoading ? "Requesting..." : "Request Documents"}
+                  {actionLoading ? "Sending..." : "Request Documents"}
                 </button>
               </div>
             </div>

@@ -284,6 +284,63 @@ class TestDataSeeder:
         """Get a description for an offer based on category."""
         return f"הצעה קבוצתית משתלמת ל{self._get_offer_title(category).lower()}. מחיר מוזל לכל הדיירים המשתתפים!"
 
+    async def _write_to_db(self) -> None:
+        """Write all generated seed data to the database via PostgresClient."""
+        import sys
+        import os
+
+        # Allow running from repo root or scripts/ directory
+        repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        if repo_root not in sys.path:
+            sys.path.insert(0, repo_root)
+
+        try:
+            from src.databases.postgres import get_postgres_client  # noqa: PLC0415
+
+            db = get_postgres_client()
+
+            print("\n💾 Writing seed data to database...")
+
+            written = {"users": 0, "buildings": 0, "contractors": 0, "offers": 0}
+
+            for user in self.users:
+                try:
+                    existing = await db.get_user_by_email(user["email"])
+                    if not existing:
+                        await db.create_user(user)
+                        written["users"] += 1
+                except Exception as exc:
+                    print(f"  ⚠️  Skipped user {user.get('email')}: {exc}")
+
+            for building in self.buildings:
+                try:
+                    await db.create_building(building)
+                    written["buildings"] += 1
+                except Exception as exc:
+                    print(f"  ⚠️  Skipped building {building.get('address')}: {exc}")
+
+            for contractor in self.contractors:
+                try:
+                    await db.create_contractor(contractor)
+                    written["contractors"] += 1
+                except Exception as exc:
+                    print(f"  ⚠️  Skipped contractor {contractor.get('business_name')}: {exc}")
+
+            for offer in self.offers:
+                try:
+                    await db.create_offer(offer)
+                    written["offers"] += 1
+                except Exception as exc:
+                    print(f"  ⚠️  Skipped offer {offer.get('id')}: {exc}")
+
+            print(
+                f"  ✅ Inserted — users:{written['users']} buildings:{written['buildings']} "
+                f"contractors:{written['contractors']} offers:{written['offers']}"
+            )
+        except ImportError as exc:
+            print(f"  ⚠️  Could not import PostgresClient — database write skipped ({exc})")
+            print("     Run from the repository root with the Python virtualenv activated.")
+
     async def seed_all(self):
         """Run all seeding operations."""
         print("\n🌱 Starting test data seeding...\n")
@@ -301,14 +358,10 @@ class TestDataSeeder:
         print(f"  - Offers: {len(self.offers)}")
         print(f"  - Escalations: {len(self.escalations)}")
 
-        # TODO: Insert into actual database
-        # async with get_db_session() as session:
-        #     for user in self.users:
-        #         session.add(User(**user))
-        #     await session.commit()
+        # Persist to database via PostgresClient
+        await self._write_to_db()
 
         print("\n✅ Test data seeding completed!")
-        print("\n⚠️  Note: This is a dry run. Uncomment database operations to persist data.")
 
         return {
             "users": self.users,

@@ -26,7 +26,7 @@
   },
   "pnpm": {
     "overrides": {
-      "tar": ">=7.5.8",
+      "tar": ">=7.5.11",
       "fast-xml-parser": ">=5.3.6",
       "rollup": ">=4.59.0",
       "eslint-plugin-jsx-a11y>minimatch": "3.1.5",

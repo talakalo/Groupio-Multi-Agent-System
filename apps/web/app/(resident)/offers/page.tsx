@@ -86,7 +86,7 @@ function OfferCard({ offer }: { offer: Offer }) {
   );
 
   return (
-    <Link href={`/offers/${offer.id}`} className="card group hover:border-primary-200 block">
+    <Link href={`/offers/${offer.id}`} className="card group hover:border-primary-200 block" data-testid="offer-card">
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-2">
           <span className="badge-primary text-xs">{tCat(offer.category)}</span>

@@ -35,6 +35,10 @@ export default function LoginPage() {
   const [loginMethod, setLoginMethod] = useState<LoginMethod>("email");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showResendVerification, setShowResendVerification] = useState(false);
+  const [resendEmail, setResendEmail] = useState<string>("");
+  const [resendSent, setResendSent] = useState(false);
+  const [resending, setResending] = useState(false);
 
   const {
     register,
@@ -47,6 +51,8 @@ export default function LoginPage() {
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
     setError(null);
+    setShowResendVerification(false);
+    setResendSent(false);
 
     try {
       const isEmail = data.identifier.includes("@");
@@ -70,32 +76,51 @@ export default function LoginPage() {
         if (meRes.ok) {
           const meData = await meRes.json();
           user = { role: meData.role };
+          const prefLang = (meData.preferred_language ?? meData.preferredLanguage ?? "he") as "he" | "en";
           useAuthStore.getState().setUser({
             id: meData.id,
             email: meData.email,
             fullName: meData.full_name ?? meData.fullName ?? "",
             phone: meData.phone ?? "",
             role: meData.role,
-            preferredLanguage: (meData.preferred_language ?? meData.preferredLanguage ?? "he") as "he" | "en",
+            preferredLanguage: prefLang,
             avatarUrl: meData.avatar_url ?? meData.avatarUrl,
             buildingId: meData.building_id ?? meData.buildingId,
             contractorId: meData.contractor_id ?? meData.contractorId,
             isVerified: meData.is_verified ?? meData.isVerified ?? false,
           });
+          await fetch("/api/locale", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ locale: prefLang }),
+            credentials: "same-origin",
+          }).catch(() => {});
         }
       } catch {
         // /me failed; still set cookie with token so middleware allows access
       }
       setAuthCookie(response.token, user);
+      const role = user?.role ?? "";
+      if (["admin", "super_admin", "buildings_manager"].includes(role)) {
+        const adminUrl = process.env.NEXT_PUBLIC_ADMIN_URL || "http://localhost:3001";
+        window.location.href = `${adminUrl}/dashboard#token=${encodeURIComponent(response.token)}`;
+        return;
+      }
+      if (role === "contractor") {
+        router.push("/contractor/dashboard");
+        return;
+      }
       router.push("/dashboard");
     } catch (err) {
       const rawMessage = err instanceof Error ? err.message : String(err);
       const status = err instanceof ApiError ? err.status : null;
       const is401 = status === 401;
+      const is403 = status === 403;
       const is503 = status === 503;
       const is500 = status === 500;
       const isConnectionError =
         !is401 &&
+        !is403 &&
         !is503 &&
         !is500 &&
         (rawMessage.includes("Connection refused") ||
@@ -103,15 +128,21 @@ export default function LoginPage() {
           rawMessage.includes("NetworkError") ||
           rawMessage.includes("ERR_") ||
           rawMessage.includes("Cannot assign"));
-      setError(
-        is401
-          ? "אימייל או סיסמה שגויים. נסו שוב."
-          : is503
-            ? "מסד הנתונים לא זמין. נסו שוב מאוחר יותר."
-            : is500 || isConnectionError
-              ? "לא ניתן להתחבר לשרת. וודא שהשירות (פורט 8000) ומסד הנתונים פועלים."
-              : rawMessage || "אירעה שגיאה בהתחברות. נסו שוב."
-      );
+      if (is403 && loginMethod === "email" && data.identifier.includes("@")) {
+        setShowResendVerification(true);
+        setResendEmail(data.identifier.trim());
+        setError("האימייל לא אומת. נא לבדוק את תיבת הדואר ולחצו על קישור האימות, או לשלוח קישור מחדש.");
+      } else {
+        setError(
+          is401
+            ? "אימייל או סיסמה שגויים. נסו שוב."
+            : is503
+              ? "מסד הנתונים לא זמין. נסו שוב מאוחר יותר."
+              : is500 || isConnectionError
+                ? "לא ניתן להתחבר לשרת. וודא שהשירות (פורט 8000) ומסד הנתונים פועלים."
+                : rawMessage || "אירעה שגיאה בהתחברות. נסו שוב."
+        );
+      }
     } finally {
       setIsLoading(false);
     }
@@ -167,8 +198,36 @@ export default function LoginPage() {
         {/* Form */}
         <form onSubmit={handleSubmit(onSubmit)} className="card space-y-5">
           {error && (
-            <div className="bg-red-50 text-red-700 rounded-xl px-4 py-3 text-sm">
-              {error}
+            <div role="alert" className="bg-red-50 text-red-700 rounded-xl px-4 py-3 text-sm space-y-2">
+              <p>{error}</p>
+              {showResendVerification && resendEmail && (
+                <div className="pt-2 border-t border-red-200">
+                  {resendSent ? (
+                    <p className="text-emerald-700 text-xs">
+                      נשלח אליכם קישור אימות. בדקו את תיבת הדואר.
+                    </p>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={resending}
+                      onClick={async () => {
+                        setResending(true);
+                        try {
+                          await apiClient.resendVerificationByEmail(resendEmail);
+                          setResendSent(true);
+                        } catch {
+                          setError("שליחת קישור נכשלה. נסו שוב מאוחר יותר.");
+                        } finally {
+                          setResending(false);
+                        }
+                      }}
+                      className="text-primary-600 hover:text-primary-700 font-medium text-xs underline underline-offset-1"
+                    >
+                      {resending ? "שולח..." : "לשלוח קישור אימות מחדש"}
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -182,16 +241,19 @@ export default function LoginPage() {
             <input
               id="identifier"
               type={loginMethod === "email" ? "email" : "tel"}
+              autoComplete={loginMethod === "email" ? "email" : "tel"}
               placeholder={
                 loginMethod === "email"
                   ? "your@email.com"
                   : "050-1234567"
               }
               className="input-field"
+              aria-describedby={errors.identifier ? "identifier-error" : undefined}
+              aria-invalid={!!errors.identifier}
               {...register("identifier")}
             />
             {errors.identifier && (
-              <p className="text-red-500 text-sm mt-1">
+              <p id="identifier-error" role="alert" className="text-red-500 text-sm mt-1">
                 {errors.identifier.message}
               </p>
             )}
@@ -207,12 +269,15 @@ export default function LoginPage() {
             <input
               id="password"
               type="password"
+              autoComplete="current-password"
               placeholder="הזינו סיסמה"
               className="input-field"
+              aria-describedby={errors.password ? "password-error" : undefined}
+              aria-invalid={!!errors.password}
               {...register("password")}
             />
             {errors.password && (
-              <p className="text-red-500 text-sm mt-1">
+              <p id="password-error" role="alert" className="text-red-500 text-sm mt-1">
                 {errors.password.message}
               </p>
             )}
@@ -226,12 +291,12 @@ export default function LoginPage() {
               />
               <span className="text-gray-600">זכור אותי</span>
             </label>
-            <a
-              href="#"
+            <Link
+              href="/forgot-password"
               className="text-primary-600 hover:text-primary-700 font-medium"
             >
               שכחתי סיסמה
-            </a>
+            </Link>
           </div>
 
           <button

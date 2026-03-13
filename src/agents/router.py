@@ -21,6 +21,10 @@ INTENT_AGENT_MAP = {
     "technical_support": "support",
     "architecture_analysis": "architecture",
     "payment_query": "payment",
+    # Graph-powered GMV features
+    "viral_invite_query": "outreach",
+    "building_social_proof": "pricing",
+    "influencer_campaign": "influencer",
 }
 
 VALID_AGENTS = frozenset(INTENT_AGENT_MAP.values())

@@ -19,19 +19,10 @@ import {
 
 let apiClient: GroupioApiClient | undefined;
 
-function getAuthToken(): string | null {
-  if (typeof window === "undefined") return null;
-  // Admin login stores token in sessionStorage (not localStorage) for security.
-  return sessionStorage.getItem("auth_token");
-}
-
-function getApiClient(authToken?: string | null): GroupioApiClient {
-  const token = authToken !== undefined ? authToken : getAuthToken();
+/** Admin uses HTTP-only cookies for auth. No token in JS (reduces XSS exposure). */
+function getApiClient(): GroupioApiClient {
   const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "") || "http://localhost:8000";
   const baseUrlWithPrefix = baseUrl.endsWith("/api/v1") ? baseUrl : `${baseUrl}/api/v1`;
-  if (token != null) {
-    return new GroupioApiClient({ baseUrl: baseUrlWithPrefix, authToken: token });
-  }
   if (!apiClient) {
     apiClient = new GroupioApiClient({ baseUrl: baseUrlWithPrefix });
   }
@@ -78,16 +69,13 @@ export function useDashboardMetrics() {
   return useQuery<DashboardMetrics>({
     queryKey: [...queryKeys.metrics, "dashboard"],
     queryFn: async (): Promise<DashboardMetrics> => {
-      const token = getAuthToken();
       const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/?$/, "") || "http://localhost:8000";
       const analyticsUrl = baseUrl.endsWith("/api/v1")
         ? `${baseUrl.replace(/\/api\/v1$/, "")}/api/v1/admin/analytics`
         : `${baseUrl}/api/v1/admin/analytics`;
 
       try {
-        const headers: Record<string, string> = {};
-        if (token) headers["Authorization"] = `Bearer ${token}`;
-        const res = await fetch(analyticsUrl, { headers });
+        const res = await fetch(analyticsUrl, { credentials: "include" });
         if (res.ok) {
           const data = await res.json();
           return {
@@ -165,14 +153,12 @@ export function useResolveEscalation() {
     }) => {
       const rawBase = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "") || "http://localhost:8000";
       const base = rawBase.endsWith("/api/v1") ? rawBase : `${rawBase}/api/v1`;
-      const token = getAuthToken();
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (token) headers["Authorization"] = `Bearer ${token}`;
       const response = await fetch(
         `${base}/escalations/${escalationId}/resolve`,
         {
           method: "POST",
-          headers,
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
           body: resolution_notes ? JSON.stringify({ resolution_notes }) : undefined,
         }
       );
@@ -280,12 +266,11 @@ export function useReloadAgent() {
 
   return useMutation({
     mutationFn: async (agentName: string) => {
-      const token = getAuthToken();
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (token) headers["Authorization"] = `Bearer ${token}`;
+      const base = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/+$/, "");
+      const url = base.endsWith("/api/v1") ? base : `${base}/api/v1`;
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL ?? "/api/v1"}/admin/agents/${encodeURIComponent(agentName)}/reload`,
-        { method: "POST", headers }
+        `${url}/admin/agents/${encodeURIComponent(agentName)}/reload`,
+        { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include" }
       );
       if (!response.ok) throw new Error(`Failed to reload agent ${agentName}`);
       return response.json();
@@ -363,17 +348,14 @@ export function useAdminAnalyticsDashboard() {
   return useQuery<AdminAnalyticsDashboard>({
     queryKey: ["admin", "analytics-dashboard"],
     queryFn: async () => {
-      const token = getAuthToken();
       const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "") || "http://localhost:8000";
       const backendUrl = baseUrl.endsWith("/api/v1") ? `${baseUrl.replace(/\/api\/v1$/, "")}/api/v1/admin/analytics` : `${baseUrl}/api/v1/admin/analytics`;
-      const headers: Record<string, string> = {};
-      if (token) headers["Authorization"] = `Bearer ${token}`;
 
       // Try the backend first, fall back to the Next.js proxy route
-      const res = await fetch(backendUrl, { headers }).catch(() => null);
+      const res = await fetch(backendUrl, { credentials: "include" }).catch(() => null);
       if (res?.ok) return res.json() as Promise<AdminAnalyticsDashboard>;
 
-      const proxyRes = await fetch("/api/admin/analytics", { headers });
+      const proxyRes = await fetch("/api/admin/analytics", { credentials: "include" });
       if (!proxyRes.ok) throw new Error("Failed to fetch analytics");
       return proxyRes.json();
     },
@@ -408,16 +390,12 @@ export function useActivityLog() {
   return useQuery<ActivityLogEntry[]>({
     queryKey: ["admin", "activity-log"],
     queryFn: async (): Promise<ActivityLogEntry[]> => {
-      const token = getAuthToken();
       const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "") || "http://localhost:8000";
       const url = baseUrl.endsWith("/api/v1")
         ? `${baseUrl.replace(/\/api\/v1$/, "")}/api/v1/admin/audit-logs?page_size=10`
         : `${baseUrl}/api/v1/admin/audit-logs?page_size=10`;
 
-      const headers: Record<string, string> = {};
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-
-      const res = await fetch(url, { headers });
+      const res = await fetch(url, { credentials: "include" });
       if (!res.ok) return [];
 
       const data = await res.json();
@@ -461,11 +439,9 @@ export function useAdminUser() {
   return useQuery<AdminUser | null>({
     queryKey: ["admin", "me"],
     queryFn: async (): Promise<AdminUser | null> => {
-      const token = getAuthToken();
-      if (!token) return null;
       const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "") || "http://localhost:8000";
       const url = baseUrl.endsWith("/api/v1") ? `${baseUrl.replace(/\/api\/v1$/, "")}/api/v1/auth/me` : `${baseUrl}/api/v1/auth/me`;
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(url, { credentials: "include" });
       if (!res.ok) return null;
       return res.json();
     },
@@ -490,14 +466,11 @@ export function useVettingStatus() {
   return useQuery<VettingStatus>({
     queryKey: ["admin", "vetting-status"],
     queryFn: async (): Promise<VettingStatus> => {
-      const token = getAuthToken();
       const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "") || "http://localhost:8000";
       const url = baseUrl.endsWith("/api/v1")
         ? `${baseUrl.replace(/\/api\/v1$/, "")}/api/v1/admin/vetting/status`
         : `${baseUrl}/api/v1/admin/vetting/status`;
-      const headers: Record<string, string> = {};
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-      const res = await fetch(url, { headers });
+      const res = await fetch(url, { credentials: "include" });
       if (!res.ok) return { pendingReview: 0, approved: 0, rejected: 0, pendingContractors: [] };
       return res.json();
     },

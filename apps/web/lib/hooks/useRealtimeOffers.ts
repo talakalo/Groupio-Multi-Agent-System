@@ -128,7 +128,11 @@ export function useRealtimeOffers({
         }
       };
 
-      ws.onerror = () => {
+      ws.onerror = (_event) => {
+        // The WebSocket onerror fires a plain DOM Event (not ErrorEvent).
+        // We intentionally discard the event object here — never throwing
+        // or rejecting with it — to prevent "[object Event]" unhandled
+        // rejections in the Next.js dev overlay.
         setStatus('error');
       };
 

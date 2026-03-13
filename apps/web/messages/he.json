@@ -32,6 +32,7 @@
     "contractors": "קבלנים",
     "building": "הבניין",
     "profile": "פרופיל",
+    "payments": "תשלומים",
     "aiAssistant": "עוזר AI",
     "myAccount": "החשבון שלי"
   },
@@ -47,7 +48,10 @@
   },
   "dashboard": {
     "welcome": "שלום, {name}!",
+    "guestName": "חבר",
     "dashboardSubtitle": "הנה מה שקורה בבניין שלך",
+    "errorLoadingOffers": "שגיאה בטעינת ההצעות. נסה שוב.",
+    "retry": "נסה שוב",
     "activeOffers": "הצעות פעילות",
     "neighborsJoined": "שכנים הצטרפו",
     "totalSavings": "סך חיסכון",
@@ -65,6 +69,7 @@
   },
   "offers": {
     "title": "הצעות",
+    "groupOffer": "הצעה קבוצתית",
     "active": "פעילות",
     "expired": "פגו תוקף",
     "completed": "הושלמו",
@@ -92,7 +97,9 @@
     "priceMin": "מחיר מינימלי",
     "priceMax": "מחיר מקסימלי",
     "noLimit": "ללא הגבלה",
-    "noOffersDescription": "לא נמצאו הצעות התואמות לחיפוש שלך"
+    "noOffersDescription": "לא נמצאו הצעות התואמות לחיפוש שלך",
+    "errorLoadingOffers": "שגיאה בטעינת ההצעות. נסה שוב.",
+    "retry": "נסה שוב"
   },
   "contractors": {
     "title": "קבלנים",
@@ -226,14 +233,244 @@
         "viewAll": "הצג הכל",
         "empty": "אין פרויקטים פעילים"
       }
+    },
+    "offers": {
+      "create": {
+        "title": "צור הצעה חדשה",
+        "subtitle": "מלא את הפרטים להצעת שירות קבוצתי",
+        "sections": {
+          "basicInfo": "פרטים בסיסיים",
+          "pricing": "תמחור",
+          "services": "שירותים ודרישות"
+        },
+        "fields": {
+          "title": "כותרת",
+          "description": "תיאור",
+          "category": "קטגוריה",
+          "region": "אזור",
+          "buildingId": "מזהה בניין",
+          "basePrice": "מחיר בסיס",
+          "minParticipants": "מינימום משתתפים",
+          "maxParticipants": "מקסימום משתתפים",
+          "includedServices": "שירותים כלולים",
+          "requirements": "דרישות",
+          "validUntil": "תוקף עד"
+        },
+        "placeholders": {
+          "title": "הכנס כותרת להצעה",
+          "description": "תאר את השירות בפירוט",
+          "category": "בחר קטגוריה",
+          "region": "בחר אזור",
+          "buildingId": "הזן מזהה בניין",
+          "requirements": "דרישות נוספות (אופציונלי)"
+        },
+        "hints": {
+          "basePrice": "מחיר ליחידה. ככל שיותר משתתפים, המחיר יורד."
+        },
+        "services": {
+          "installation": "התקנה",
+          "materials": "חומרים",
+          "warranty": "אחריות",
+          "removal": "הסרה",
+          "cleanup": "ניקוי",
+          "inspection": "בדיקה",
+          "maintenance": "תחזוקה"
+        },
+        "categories": {
+          "ac_installation": "התקנת מזגנים",
+          "kitchen": "מטבחים",
+          "electrical": "חשמל",
+          "plumbing": "אינסטלציה",
+          "painting": "צביעה",
+          "flooring": "ריצוף",
+          "windows": "חלונות",
+          "security": "אבטחה"
+        },
+        "regions": {
+          "center": "מרכז",
+          "tel_aviv": "תל אביב",
+          "jerusalem": "ירושלים",
+          "north": "צפון",
+          "south": "דרום",
+          "sharon": "שרון",
+          "shfela": "שפלה"
+        },
+        "buttons": {
+          "cancel": "ביטול",
+          "create": "צור הצעה",
+          "creating": "יוצר..."
+        },
+        "hidePricingPreview": "הסתר תצוגת מחירים",
+        "showPricingPreview": "הצג תצוגת מחירים",
+        "errors": {
+          "createFailed": "יצירת ההצעה נכשלה. נסה שוב."
+        }
+      },
+      "active": {
+        "title": "הצעות פעילות",
+        "subtitle": "נהל את ההצעות שלך",
+        "createOffer": "צור הצעה",
+        "resultsCount": "{count} הצעות",
+        "filters": {
+          "status": "סטטוס",
+          "category": "קטגוריה",
+          "sortBy": "מיין לפי",
+          "allStatuses": "כל הסטטוסים",
+          "pending": "ממתין",
+          "accepted": "אושר",
+          "inProgress": "בתהליך",
+          "completed": "הושלם",
+          "allCategories": "כל הקטגוריות",
+          "sortByDate": "תאריך",
+          "sortByPrice": "מחיר",
+          "sortByParticipants": "משתתפים"
+        },
+        "categories": {
+          "ac_installation": "התקנת מזגנים",
+          "kitchen": "מטבחים",
+          "electrical": "חשמל",
+          "plumbing": "אינסטלציה",
+          "painting": "צביעה",
+          "flooring": "ריצוף",
+          "windows": "חלונות",
+          "security": "אבטחה"
+        },
+        "empty": {
+          "title": "אין הצעות",
+          "description": "עדיין אין לך הצעות. צור הצעה חדשה כדי להתחיל.",
+          "cta": "צור הצעה"
+        }
+      }
+    },
+    "profile": {
+      "title": "פרופיל העסק",
+      "subtitle": "נהל את פרטי העסק והמסמכים",
+      "trustScore": {
+        "title": "ציון אמינות",
+        "description": "ציון האמינות שלך משפיע על הדירוג בהצעות"
+      },
+      "sections": {
+        "business": "פרטי העסק",
+        "services": "שירותים ואזורים",
+        "documents": "מסמכים",
+        "settings": "הגדרות"
+      },
+      "fields": {
+        "businessName": "שם העסק",
+        "contactName": "שם איש קשר",
+        "email": "אימייל",
+        "phone": "טלפון",
+        "description": "תיאור",
+        "yearsExperience": "שנות ניסיון",
+        "employeeCount": "מספר עובדים",
+        "website": "אתר",
+        "categories": "קטגוריות",
+        "regions": "אזורים"
+      },
+      "documents": {
+        "requestBannerTitle": "נדרשו מסמכים נוספים",
+        "license": "רישיון",
+        "insurance": "ביטוח",
+        "certifications": "תעודות",
+        "licenseNumber": "מספר רישיון",
+        "expiresAt": "תוקף עד",
+        "notUploaded": "לא הועלה",
+        "upload": "העלה",
+        "uploading": "מעלה...",
+        "uploadSuccess": "הקובץ הועלה בהצלחה",
+        "uploadError": "שגיאה בהעלאה",
+        "uploaded": "הועלו"
+      },
+      "settings": {
+        "notifications": "התראות",
+        "emailOffers": "הצעות במייל",
+        "smsOffers": "הצעות ב-SMS",
+        "whatsappOffers": "הצעות בוואטסאפ",
+        "availability": "זמינות",
+        "acceptingOffers": "מקבל הצעות חדשות",
+        "dangerZone": "אזור מסוכן",
+        "deactivate": "השבת חשבון"
+      },
+      "save": "שמור",
+      "saving": "שומר...",
+      "saveSuccess": "הפרופיל נשמר בהצלחה",
+      "saveError": "שגיאה בשמירה"
+    },
+    "projects": {
+      "title": "פרויקטים",
+      "subtitle": "סקירת הפרויקטים שלך",
+      "stats": {
+        "total": "סה\"כ",
+        "completed": "הושלמו",
+        "inProgress": "בתהליך",
+        "revenue": "הכנסות",
+        "avgRating": "דירוג ממוצע"
+      },
+      "filters": {
+        "status": "סטטוס",
+        "year": "שנה",
+        "allStatuses": "כל הסטטוסים",
+        "inProgress": "בתהליך",
+        "completed": "הושלם",
+        "cancelled": "בוטל"
+      },
+      "empty": "אין פרויקטים",
+      "participants": "משתתפים",
+      "startedAt": "התחיל",
+      "completedAt": "הושלם",
+      "viewDetails": "צפה בפרטים",
+      "requestReview": "בקש חוות דעת",
+      "statuses": {
+        "draft": "טיוטה",
+        "pending": "ממתין",
+        "matching": "בהתאמה",
+        "matched": "הותאם",
+        "in_progress": "בתהליך",
+        "completed": "הושלם",
+        "cancelled": "בוטל",
+        "active": "פעיל"
+      }
     }
   },
   "onboarding": {
+    "title": "השלמת פרופיל",
+    "subtitle": "ספר לנו קצת על עצמך",
+    "selectRole": "בחר תפקיד",
+    "selectRoleDescription": "האם אתה דייר או קבלן?",
+    "resident": "דייר",
+    "residentDescription": "אני גר בבניין ואחפש הצעות קבוצתיות",
+    "contractor": "קבלן",
+    "contractorDescription": "אני מספק שירותים לבניינים",
     "buildingInfo": "פרטי הבניין",
     "buildingInfoDescription": "ספר לנו על הבניין שלך",
     "buildingAddress": "כתובת הבניין",
     "buildingAddressPlaceholder": "הכנס כתובת",
-    "buildingType": "סוג הבניין"
+    "suggestAddress": "הצע כתובת",
+    "suggestedAddress": "כתובת מוצעת",
+    "useSuggested": "השתמש בהצעה",
+    "keepOriginal": "השאר מקורי",
+    "city": "עיר",
+    "cityPlaceholder": "הכנס עיר",
+    "apartmentNumber": "מס' דירה",
+    "apartmentNumberPlaceholder": "למשל 3א",
+    "region": "אזור",
+    "buildingType": "סוג הבניין",
+    "businessInfo": "פרטי העסק",
+    "businessInfoDescription": "ספר לנו על העסק שלך",
+    "businessName": "שם העסק",
+    "businessNamePlaceholder": "הכנס שם עסק",
+    "licenseNumber": "מס' רישיון",
+    "licenseNumberPlaceholder": "הכנס מס' רישיון",
+    "yearsInBusiness": "שנות ניסיון",
+    "businessDescription": "תיאור",
+    "businessDescriptionPlaceholder": "תאר את השירותים שלך",
+    "serviceRegions": "אזורי שירות",
+    "servicePreferences": "העדפות שירות",
+    "residentPreferencesDescription": "בחר קטגוריות שמעניינות אותך",
+    "contractorPreferencesDescription": "בחר קטגוריות שאתה מציע",
+    "selectedCount": "{count} נבחרו",
+    "finish": "סיום",
+    "submitError": "שגיאה בשליחה. נסה שוב."
   },
   "chat": {
     "placeholder": "הקלד הודעה...",
@@ -285,18 +522,6 @@
     "newOffer": "הצעה חדשה",
     "myBusiness": "העסק שלי",
     "logout": "התנתקות"
-  },
-  "contractor": {
-    "offers": {
-      "create": {
-        "fields": {
-          "buildingId": "מזהה בניין"
-        },
-        "placeholders": {
-          "buildingId": "הזן מזהה בניין"
-        }
-      }
-    }
   },
   "residentNav": {
     "dashboard": "לוח בקרה",

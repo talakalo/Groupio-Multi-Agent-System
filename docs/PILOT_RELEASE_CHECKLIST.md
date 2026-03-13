@@ -1,7 +1,8 @@
 # Groupio — Pilot Release Checklist & Go/No-Go Criteria
 
 > **Release target:** Controlled pilot — 20–50 real users across 1–3 buildings.
-> **Branch:** `claude/pilot-readiness-hardening-cNLYY` (merge to `dev` before deploy)
+> **Branch:** `fix/audit-findings-pilot-hardening` (merge to `dev` before deploy)
+> **Pilot hardening:** Contractor create redirect fixed; nav aligned; loading states added. See `PILOT_HARDENING_IMPLEMENTATION_REPORT.md`.
 
 ---
 
@@ -257,7 +258,27 @@ curl "http://localhost:8000/api/v1/conversations/OTHER_USER_ID/messages" \
 
 ---
 
-## 6. CI Smoke Command
+## 6. Release Gate Verification (Pre-Pilot)
+
+Run these commands before deploying to pilot:
+
+```bash
+# Build (must pass)
+pnpm --filter web run build
+
+# Web unit tests
+pnpm --filter web exec vitest run --reporter=basic
+
+# E2E: contractor create + pilot smoke (port 3000 must be free)
+CI=1 pnpm --filter web exec playwright test e2e/contractor-flow.spec.ts e2e/pilot-smoke.spec.ts --project=chromium
+
+# Backend (optional if backend unchanged)
+pytest tests/unit -x -q
+```
+
+See `PILOT_KNOWN_LIMITATIONS.md` for E2E preconditions and `FINAL_PILOT_RELEASE_GATE_REPORT.md` for the latest gate status.
+
+## 7. CI Smoke Command
 
 ```bash
 # Full CI verification sequence (run in order):
@@ -274,7 +295,7 @@ pnpm --filter web exec playwright test e2e/pilot-smoke.spec.ts \
 
 ---
 
-## 7. Release Notes — Pilot Hardening Pass
+## 8. Release Notes — Pilot Hardening Pass
 
 ### What was fixed
 
@@ -315,7 +336,7 @@ pnpm --filter web exec playwright test e2e/pilot-smoke.spec.ts \
 
 ---
 
-## 8. Go / No-Go Acceptance Criteria
+## 9. Go / No-Go Acceptance Criteria
 
 ### Hard blockers — must all be PASS for GO
 
@@ -342,7 +363,7 @@ pnpm --filter web exec playwright test e2e/pilot-smoke.spec.ts \
 
 ---
 
-## 9. Final Go/No-Go Recommendation
+## 10. Final Go/No-Go Recommendation
 
 **GO WITH CONDITIONS**
 

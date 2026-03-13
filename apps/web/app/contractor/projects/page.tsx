@@ -4,6 +4,7 @@ import type { Offer } from '@groupio/types';
 import { useTranslations } from 'next-intl';
 import { useState, useEffect } from 'react';
 
+import Link from 'next/link';
 import { useAuthStore } from '@/lib/stores/authStore';
 
 type ProjectStatus = 'all' | 'in_progress' | 'completed' | 'cancelled';
@@ -22,6 +23,8 @@ interface ProjectWithStats extends Offer {
 export default function ContractorProjectsPage() {
   const t = useTranslations('contractor.projects');
   const accessToken = useAuthStore((s) => s.accessToken);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const refreshAccessToken = useAuthStore((s) => s.refreshAccessToken);
   const [projects, setProjects] = useState<ProjectWithStats[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<ProjectStatus>('all');
@@ -29,11 +32,19 @@ export default function ContractorProjectsPage() {
 
   useEffect(() => {
     async function fetchProjects() {
+      let token = accessToken;
+      if (isAuthenticated && !token) {
+        const ok = await refreshAccessToken();
+        if (!ok) return;
+        token = useAuthStore.getState().accessToken;
+      }
+      if (!token) return;
+
       setIsLoading(true);
       const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      const token = accessToken;
-      const headers: Record<string, string> = {};
-      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const headers: Record<string, string> = {
+        Authorization: `Bearer ${token}`,
+      };
 
       try {
         const params = new URLSearchParams();
@@ -52,8 +63,8 @@ export default function ContractorProjectsPage() {
       }
     }
 
-    fetchProjects();
-  }, [statusFilter, year, accessToken]);
+    fetchProjects().catch(() => {});
+  }, [statusFilter, year, accessToken, isAuthenticated, refreshAccessToken]);
 
   const stats = {
     total: projects.length,
@@ -215,12 +226,12 @@ export default function ContractorProjectsPage() {
               )}
 
               <div className="mt-4 pt-4 border-t flex gap-2">
-                <a
+                <Link
                   href={`/contractor/projects/${project.id}`}
                   className="text-sky-600 hover:text-sky-700 text-sm font-medium"
                 >
                   {t('viewDetails')}
-                </a>
+                </Link>
                 {project.status === 'completed' && !project.review && (
                   <button className="text-gray-500 hover:text-gray-700 text-sm font-medium mr-4">
                     {t('requestReview')}

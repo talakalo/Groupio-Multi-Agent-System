@@ -13,6 +13,8 @@ import { useAuthStore } from '@/lib/stores/authStore';
 export default function ContractorDashboardPage() {
   const t = useTranslations('contractor.dashboard');
   const accessToken = useAuthStore((s) => s.accessToken);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const refreshAccessToken = useAuthStore((s) => s.refreshAccessToken);
   const [stats, setStats] = useState<ContractorStats | null>(null);
   const [activeOffers, setActiveOffers] = useState<Offer[]>([]);
   const [pendingOffers, setPendingOffers] = useState<Offer[]>([]);
@@ -20,14 +22,22 @@ export default function ContractorDashboardPage() {
 
   useEffect(() => {
     async function fetchDashboardData() {
+      let token = accessToken;
+      if (isAuthenticated && !token) {
+        const ok = await refreshAccessToken();
+        if (!ok) return;
+        token = useAuthStore.getState().accessToken;
+      }
+      if (!token) return;
+
       const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      const token = accessToken;
-      const headers: Record<string, string> = {};
-      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const headers: Record<string, string> = {
+        Authorization: `Bearer ${token}`,
+      };
 
       try {
         // Get current user to find contractor_id
-        const meRes = await fetch(`${apiBase}/api/v1/auth/me`, { headers });
+        const meRes = await fetch(`${apiBase}/api/v1/auth/me`, { headers, credentials: 'include' });
         if (!meRes.ok) throw new Error('Not authenticated');
         const me = await meRes.json();
         const contractorId = me.contractor_id;
@@ -53,8 +63,8 @@ export default function ContractorDashboardPage() {
       }
     }
 
-    fetchDashboardData();
-  }, [accessToken]);
+    fetchDashboardData().catch(() => {});
+  }, [accessToken, isAuthenticated, refreshAccessToken]);
 
   if (isLoading) {
     return (

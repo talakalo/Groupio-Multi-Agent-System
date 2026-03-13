@@ -477,11 +477,15 @@ function PayoutsTable({
 
 type TabKey = "escrow" | "payouts";
 
-const API_BASE = "/api/v1";
+function getApiBase(): string {
+  const raw = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "") || "http://localhost:8000";
+  return raw.endsWith("/api/v1") ? raw : `${raw}/api/v1`;
+}
 
 async function fetchApi<T>(path: string, options?: RequestInit): Promise<T | null> {
   try {
-    const res = await fetch(`${API_BASE}${path}`, {
+    const res = await fetch(`${getApiBase()}${path}`, {
+      credentials: "include",
       headers: { "Content-Type": "application/json" },
       ...options,
     });

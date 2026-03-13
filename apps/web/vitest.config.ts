@@ -9,6 +9,9 @@ export default defineConfig({
     globals: true,
     setupFiles: ["./__tests__/setup.ts"],
     exclude: ["e2e/**", "node_modules/**"],
+    typecheck: {
+      tsconfig: "./tsconfig.test.json",
+    },
   },
   resolve: {
     alias: {

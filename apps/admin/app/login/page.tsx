@@ -9,15 +9,9 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 /**
  * Admin login page — single-step email + password authentication.
  *
- * NOTE: The previous 2FA step has been removed because the backend endpoint
- * it called (`/api/v1/auth/verify-2fa`) does not exist, causing admin login
- * to always fail with a 404 in production. A working TOTP/2FA implementation
- * will be added in Phase 1 once the backend endpoint is implemented.
- *
- * Token storage: stored in sessionStorage (tab-scoped, cleared on close).
- * The HTTP-only refresh_token cookie set by the backend handles silent
- * refresh. The admin middleware.ts ensures all admin routes require the
- * refresh_token cookie to be present.
+ * Token storage: access_token and refresh_token are set as HTTP-only cookies
+ * by the backend. No token in JS/sessionStorage (reduces XSS exposure).
+ * See apps/admin/SECURITY.md.
  */
 export default function LoginPage() {
   const router = useRouter();
@@ -48,14 +42,8 @@ export default function LoginPage() {
           throw new Error(data.detail || data.message || "Invalid credentials");
         }
 
-        const token = data.token || data.access_token;
-        if (!token) {
-          throw new Error("No access token returned from server");
-        }
-
         // Verify the user has admin-level role before granting access
         const meRes = await fetch(`${API_URL}/api/v1/auth/me`, {
-          headers: { Authorization: `Bearer ${token}` },
           credentials: "include",
         });
 
@@ -67,10 +55,13 @@ export default function LoginPage() {
           }
         }
 
-        // Store in sessionStorage: tab-scoped, cleared when browser tab is closed.
-        // Short-lived access token (15 min) + HTTP-only refresh cookie provides
-        // a reasonable security posture for the admin panel.
-        sessionStorage.setItem("admin_token", token);
+        // access_token and refresh_token are HTTP-only cookies set by the API.
+        // Set admin-role cookie for middleware (middleware requires both refresh_token
+        // and admin_role_verified).
+        if (typeof document !== "undefined") {
+          document.cookie =
+            "admin_role_verified=1; path=/; SameSite=Strict; max-age=86400";
+        }
 
         router.push("/dashboard");
       } catch (err: unknown) {

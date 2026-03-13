@@ -45,6 +45,7 @@ export default function ContractorProfilePage() {
 
   const [contractorId, setContractorId] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState<string | null>(null);
+  const [docRequest, setDocRequest] = useState<{ message: string; requested_at: string } | null>(null);
 
   async function handleDocumentUpload(docType: 'license' | 'insurance' | 'certifications') {
     const input = document.createElement('input');
@@ -102,11 +103,20 @@ export default function ContractorProfilePage() {
         setContractorId(cid);
 
         if (cid) {
-          const res = await fetch(`${apiBase}/api/v1/contractors/${cid}`, { headers });
-          if (res.ok) {
-            const data = await res.json();
+          const [contractorRes, docReqRes] = await Promise.all([
+            fetch(`${apiBase}/api/v1/contractors/${cid}`, { headers, credentials: 'include' }),
+            fetch(`${apiBase}/api/v1/contractors/me/doc-requests`, { headers, credentials: 'include' }),
+          ]);
+          if (contractorRes.ok) {
+            const data = await contractorRes.json();
             setContractor(data);
             reset(data);
+          }
+          if (docReqRes.ok) {
+            const dr = await docReqRes.json();
+            if (dr.pending && dr.items?.[0]) {
+              setDocRequest({ message: dr.items[0].message ?? '', requested_at: dr.items[0].requested_at ?? '' });
+            }
           }
         }
       } catch (error) {
@@ -123,7 +133,8 @@ export default function ContractorProfilePage() {
     if (!contractorId) return;
     setIsSaving(true);
     const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+    // Access token lives only in Zustand memory — never in localStorage.
+    const token = useAuthStore.getState().accessToken;
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
@@ -185,6 +196,17 @@ export default function ContractorProfilePage() {
         <h1 className="text-3xl font-bold text-gray-900">{t('title')}</h1>
         <p className="text-gray-600 mt-2">{t('subtitle')}</p>
       </header>
+
+      {/* Document Request Banner */}
+      {docRequest && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6" role="alert">
+          <h3 className="font-semibold text-amber-900">{t('documents.requestBannerTitle')}</h3>
+          <p className="text-amber-800 text-sm mt-1">{docRequest.message}</p>
+          <p className="text-amber-600 text-xs mt-2">
+            {docRequest.requested_at ? new Date(docRequest.requested_at).toLocaleDateString() : ''}
+          </p>
+        </div>
+      )}
 
       {/* Trust Score Banner */}
       <div className="bg-gradient-to-l from-sky-500 to-sky-600 rounded-xl p-6 mb-8 text-white">

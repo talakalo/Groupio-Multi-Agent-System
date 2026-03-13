@@ -1,3 +1,10 @@
+const isDev = process.env.NODE_ENV !== "production";
+
+// In development, allow the local backend so fetch calls are not blocked by CSP.
+const devApiOrigins = isDev
+  ? " http://localhost:8000 ws://localhost:8000"
+  : "";
+
 const adminSecurityHeaders = [
   {
     key: "Content-Security-Policy",
@@ -7,7 +14,7 @@ const adminSecurityHeaders = [
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob:",
       "font-src 'self'",
-      "connect-src 'self' https://api.groupio.co.il wss://api.groupio.co.il",
+      `connect-src 'self' https://api.groupio.co.il wss://api.groupio.co.il${devApiOrigins}`,
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",

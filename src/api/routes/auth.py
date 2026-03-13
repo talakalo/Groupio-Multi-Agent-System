@@ -109,6 +109,23 @@ async def signup(request: SignupRequest, _: None = Depends(check_auth_rate_limit
 
     logger.info("User registered via signup: %s", user.email)
 
+    # Send verification email (if SMTP configured)
+    verify_token = str(uuid4())
+    redis = get_redis_client()
+    await redis.set(
+        f"email_verify:{verify_token}",
+        user.id,
+        ex=24 * 60 * 60,  # 24 hour expiry
+    )
+    email_service = get_email_service()
+    settings = get_settings()
+    await email_service.send_verification_email(
+        to_email=user.email,
+        user_name=user.full_name or user.email.split("@")[0],
+        verification_token=verify_token,
+        base_url=settings.FRONTEND_URL,
+    )
+
     # Auto-login: create token
     access_token = create_access_token(
         user_id=user.id,
@@ -117,7 +134,6 @@ async def signup(request: SignupRequest, _: None = Depends(check_auth_rate_limit
     )
     refresh_token = create_refresh_token(user_id=user.id)
 
-    settings = get_settings()
     redis = get_redis_client()
     await redis.set(
         f"refresh_token:{user.id}",
@@ -169,10 +185,12 @@ async def register(request: UserCreate) -> UserResponse:
     )
 
     email_service = get_email_service()
+    settings = get_settings()
     await email_service.send_verification_email(
         to_email=user.email,
         user_name=user.full_name or user.email.split("@")[0],
         verification_token=verify_token,
+        base_url=settings.FRONTEND_URL,
     )
 
     return user
@@ -208,6 +226,11 @@ async def login(
         raise HTTPException(status_code=423, detail="Account is locked")
 
     settings = get_settings()
+    if settings.ENFORCE_EMAIL_VERIFICATION and not user.is_verified:
+        raise HTTPException(
+            status_code=403,
+            detail="Email not verified. Please check your inbox for the verification link.",
+        )
 
     # Create tokens
     access_token = create_access_token(
@@ -228,14 +251,25 @@ async def login(
     # Update last login
     await db.update_user(user.id, {"last_login": datetime.now(UTC)})
 
-    # Set refresh token as HTTP-only cookie
+    # Set refresh token as HTTP-only cookie.
+    # secure=False in development so the cookie works over http://localhost.
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
         httponly=True,
-        secure=True,
+        secure=settings.ENVIRONMENT != "development",
         samesite="lax",
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+        path="/",
+    )
+    # Set access token as HTTP-only cookie (for admin app; reduces XSS exposure).
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=settings.ENVIRONMENT != "development",
+        samesite="lax",
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         path="/",
     )
 
@@ -280,6 +314,11 @@ async def login_json(
         raise HTTPException(status_code=423, detail="Account is locked")
 
     settings = get_settings()
+    if settings.ENFORCE_EMAIL_VERIFICATION and not user.is_verified:
+        raise HTTPException(
+            status_code=403,
+            detail="Email not verified. Please check your inbox for the verification link.",
+        )
 
     access_token = create_access_token(
         user_id=user.id,
@@ -301,9 +340,18 @@ async def login_json(
         key="refresh_token",
         value=refresh_token,
         httponly=True,
-        secure=True,
+        secure=settings.ENVIRONMENT != "development",
         samesite="lax",
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+        path="/",
+    )
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=settings.ENVIRONMENT != "development",
+        samesite="lax",
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         path="/",
     )
 
@@ -367,9 +415,18 @@ async def refresh_token(
         key="refresh_token",
         value=new_refresh_token,
         httponly=True,
-        secure=True,
+        secure=settings.ENVIRONMENT != "development",
         samesite="lax",
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+        path="/",
+    )
+    response.set_cookie(
+        key="access_token",
+        value=new_access_token,
+        httponly=True,
+        secure=settings.ENVIRONMENT != "development",
+        samesite="lax",
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         path="/",
     )
 
@@ -393,6 +450,7 @@ async def logout(
     await redis.delete(f"refresh_token:{current_user.id}")
 
     response.delete_cookie("refresh_token", path="/")
+    response.delete_cookie("access_token", path="/")
 
     logger.info("User logged out: %s", current_user.email)
 
@@ -538,6 +596,41 @@ async def verify_email(token: str) -> dict[str, str]:
     return {"status": "email_verified"}
 
 
+class ResendVerificationByEmailRequest(BaseModel):
+    """Request to resend verification email by email address (no auth required)."""
+
+    email: EmailStr
+
+
+@router.post("/resend-verification-by-email")
+async def resend_verification_by_email(
+    request: ResendVerificationByEmailRequest,
+    http_request: Request,
+    _: None = Depends(check_auth_rate_limit),
+) -> dict[str, str]:
+    """Resend verification email by email address. Always returns success to avoid info leak."""
+    db = get_postgres_client()
+    user = await db.get_user_by_email(request.email)
+    if user and not user.is_verified:
+        verify_token = str(uuid4())
+        redis = get_redis_client()
+        await redis.set(
+            f"email_verify:{verify_token}",
+            user.id,
+            ex=24 * 60 * 60,
+        )
+        email_service = get_email_service()
+        settings = get_settings()
+        await email_service.send_verification_email(
+            to_email=user.email,
+            user_name=user.full_name or user.email.split("@")[0],
+            verification_token=verify_token,
+            base_url=settings.FRONTEND_URL,
+        )
+        logger.info("Verification email resent to %s (unauthenticated request)", user.email)
+    return {"status": "verification_email_sent"}
+
+
 @router.post("/resend-verification")
 async def resend_verification(
     current_user: UserInDB = Depends(get_current_user),
@@ -558,10 +651,12 @@ async def resend_verification(
 
     # Send verification email
     email_service = get_email_service()
+    settings = get_settings()
     await email_service.send_verification_email(
         to_email=current_user.email,
         user_name=current_user.full_name or current_user.email.split("@")[0],
         verification_token=verify_token,
+        base_url=settings.FRONTEND_URL,
     )
 
     logger.info("Verification email resent to: %s", current_user.email)
@@ -605,3 +700,36 @@ async def delete_account(
     logger.info("Account deleted (GDPR erasure) for user: %s", current_user.id)
 
     return {"status": "account_deleted"}
+
+
+# ---------------------------------------------------------------------------
+# Push notification device token registration
+# ---------------------------------------------------------------------------
+
+
+class PushTokenRequest(BaseModel):
+    """Request body for registering a push notification device token."""
+
+    token: str = Field(..., min_length=10, description="FCM device registration token")
+
+
+@router.post("/push-token")
+async def register_push_token(
+    body: PushTokenRequest,
+    current_user: UserInDB = Depends(get_current_user),
+) -> dict[str, str]:
+    """Register or update the FCM push notification token for the current user's device."""
+    db = get_postgres_client()
+    await db.update_user(current_user.id, {"push_token": body.token})
+    logger.info("Push token registered for user: %s", current_user.id)
+    return {"status": "registered"}
+
+
+@router.delete("/push-token")
+async def unregister_push_token(
+    current_user: UserInDB = Depends(get_current_user),
+) -> dict[str, str]:
+    """Remove the FCM push notification token for the current user."""
+    db = get_postgres_client()
+    await db.update_user(current_user.id, {"push_token": None})
+    return {"status": "unregistered"}

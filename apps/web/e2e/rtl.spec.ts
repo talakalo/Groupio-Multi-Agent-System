@@ -30,11 +30,15 @@ test.describe("RTL / Hebrew layout", () => {
 
   test("Signup page has ToS checkbox", async ({ page }) => {
     await page.goto("/signup");
+    // "resident" is pre-selected by default — skip the role click to avoid
+    // an intermediate React re-render that can race with the next click.
+    // Click "המשך" directly to advance to step 2 where the ToS checkbox renders.
+    await page.getByRole("button", { name: /המשך/ }).click();
     const tosCheckbox = page.locator("#tos");
-    await expect(tosCheckbox).toBeVisible();
+    await expect(tosCheckbox).toBeVisible({ timeout: 10000 });
     await expect(tosCheckbox).toHaveAttribute("required");
-    await expect(page.getByRole("link", { name: "תנאי השימוש" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "מדיניות הפרטיות" })).toBeVisible();
+    await expect(page.locator("form").getByRole("link", { name: "תנאי השימוש" })).toBeVisible();
+    await expect(page.locator("form").getByRole("link", { name: "מדיניות הפרטיות" })).toBeVisible();
   });
 
   test("ChevronLeft icons have rtl-flip class for RTL mode", async ({ page }) => {

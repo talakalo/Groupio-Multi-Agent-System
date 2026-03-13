@@ -11,12 +11,15 @@ import {
   ChevronDown,
   PlusCircle,
   ClipboardList,
+  Mail,
+  Loader2,
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
+import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
 import { NotificationPanel } from '@/components/shared/NotificationPanel';
@@ -40,22 +43,50 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
   const router = useRouter();
   const t = useTranslations('contractorNav');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
   const token = useAuthStore((s) => s.accessToken);
+  const user = useAuthStore((s) => s.user);
+  const isVerified = user?.isVerified ?? true;
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const [resendSent, setResendSent] = useState(false);
+  const [resending, setResending] = useState(false);
+  const refreshAccessToken = useAuthStore((s) => s.refreshAccessToken);
   const logout = useAuthStore((s) => s.logout);
 
   useEffect(() => {
-    if (!token) {
+    if (!token && isAuthenticated) {
+      refreshAccessToken().then((success) => {
+        if (!success) router.replace('/login');
+      });
+    } else if (!token && !isAuthenticated) {
       router.replace('/login');
     }
-  }, [token, router]);
+  }, [token, isAuthenticated, router, refreshAccessToken]);
 
-  if (!token) {
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    }
+    if (userMenuOpen) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [userMenuOpen]);
+
+  if (!token && !isAuthenticated) {
     return null;
   }
 
 
   const handleLogout = async () => {
-    await logout();
+    try {
+      await logout();
+    } catch {
+      // Ignore logout errors — always redirect to login
+    }
     router.push('/login');
   };
 
@@ -160,6 +191,47 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
 
       {/* Main content area */}
       <div className="lg:ps-72">
+        {/* Unverified email banner */}
+        {!isVerified && (
+          <div
+            className="bg-amber-50 border-b border-amber-200 px-4 py-3 flex items-center justify-between gap-4 flex-wrap"
+            role="alert"
+            aria-live="polite"
+          >
+            <div className="flex items-center gap-2 text-amber-800 text-sm">
+              <Mail className="h-4 w-4 flex-shrink-0" aria-hidden />
+              <span>נא לאמת את כתובת האימייל שלכם. בדקו את תיבת הדואר ולחצו על קישור האימות.</span>
+            </div>
+            {resendSent ? (
+              <span className="text-emerald-700 text-sm font-medium">נשלח! בדקו את האימייל.</span>
+            ) : (
+              <button
+                type="button"
+                onClick={async () => {
+                  setResending(true);
+                  try {
+                    await apiClient.resendVerification();
+                    setResendSent(true);
+                  } finally {
+                    setResending(false);
+                  }
+                }}
+                disabled={resending}
+                className="text-amber-800 font-medium text-sm underline hover:no-underline flex items-center gap-1"
+              >
+                {resending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    שולח...
+                  </>
+                ) : (
+                  'שליחת קישור אימות מחדש'
+                )}
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Top bar */}
         <header className="sticky top-0 z-20 bg-white/80 backdrop-blur-md border-b border-gray-100">
           <div className="flex items-center justify-between px-4 sm:px-6 h-16">
@@ -177,15 +249,47 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
             <div className="flex items-center gap-3">
               <NotificationPanel />
 
-              <button
-                type="button"
-                className="flex items-center gap-2 ps-3 pe-2 py-1.5 rounded-xl hover:bg-gray-100 transition-colors"
-              >
-                <div className="w-8 h-8 rounded-full bg-accent-100 flex items-center justify-center">
-                  <UserCircle className="h-5 w-5 text-accent-600" />
-                </div>
-                <ChevronDown className="h-4 w-4 text-gray-400" />
-              </button>
+              <div className="relative" ref={userMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setUserMenuOpen((o) => !o)}
+                  className="flex items-center gap-2 ps-3 pe-2 py-1.5 rounded-xl hover:bg-gray-100 transition-colors"
+                  aria-expanded={userMenuOpen}
+                  aria-haspopup="true"
+                >
+                  <div className="w-8 h-8 rounded-full bg-accent-100 flex items-center justify-center">
+                    <UserCircle className="h-5 w-5 text-accent-600" />
+                  </div>
+                  <ChevronDown className={cn('h-4 w-4 text-gray-400 transition-transform', userMenuOpen && 'rotate-180')} />
+                </button>
+                {userMenuOpen && (
+                  <div className="absolute end-0 top-full mt-2 w-48 rounded-xl border border-gray-200 bg-white py-1 shadow-lg z-50">
+                    <div className="px-4 py-2 border-b border-gray-100">
+                      <p className="font-medium text-gray-900 truncate">{user?.fullName ?? t('myBusiness')}</p>
+                      <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                    </div>
+                    <Link
+                      href="/contractor/profile"
+                      onClick={() => setUserMenuOpen(false)}
+                      className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    >
+                      <UserCircle className="h-4 w-4" />
+                      {t('profile')}
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUserMenuOpen(false);
+                        handleLogout();
+                      }}
+                      className="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      {t('logout')}
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </header>

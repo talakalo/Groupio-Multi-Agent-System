@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  CreditCard,
   LayoutDashboard,
   Tag,
   Wrench,
@@ -12,15 +13,19 @@ import {
   MessageSquare,
   ChevronDown,
   FileImage,
+  Mail,
+  Loader2,
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
 
+import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
 import { NotificationPanel } from '@/components/shared/NotificationPanel';
+import { LanguageToggle } from '@/components/shared/LanguageToggle';
 
 interface NavItem {
   href: string;
@@ -35,6 +40,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/architecture', labelKey: 'architecture', icon: FileImage },
   { href: '/building', labelKey: 'building', icon: Building2 },
   { href: '/profile', labelKey: 'profile', icon: UserCircle },
+  { href: '/payments', labelKey: 'payments', icon: CreditCard },
 ];
 
 export default function ResidentLayout({ children }: { children: React.ReactNode }) {
@@ -43,20 +49,33 @@ export default function ResidentLayout({ children }: { children: React.ReactNode
   const t = useTranslations('residentNav');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const token = useAuthStore((s) => s.accessToken);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const isVerified = useAuthStore((s) => s.user?.isVerified ?? true);
+  const refreshAccessToken = useAuthStore((s) => s.refreshAccessToken);
   const logout = useAuthStore((s) => s.logout);
+  const [resendSent, setResendSent] = useState(false);
+  const [resending, setResending] = useState(false);
 
   useEffect(() => {
-    if (!token) {
+    if (!token && isAuthenticated) {
+      refreshAccessToken().then((success) => {
+        if (!success) router.replace('/login');
+      });
+    } else if (!token && !isAuthenticated) {
       router.replace('/login');
     }
-  }, [token, router]);
+  }, [token, isAuthenticated, router, refreshAccessToken]);
 
-  if (!token) {
+  if (!token && !isAuthenticated) {
     return null;
   }
 
   const handleLogout = async () => {
-    await logout();
+    try {
+      await logout();
+    } catch {
+      // Ignore logout errors — always redirect to login
+    }
     router.push('/login');
   };
 
@@ -159,6 +178,49 @@ export default function ResidentLayout({ children }: { children: React.ReactNode
 
       {/* Main content area */}
       <div className="lg:ps-72">
+        {/* Unverified email banner */}
+        {!isVerified && (
+          <div
+            className="bg-amber-50 border-b border-amber-200 px-4 py-3 flex items-center justify-between gap-4 flex-wrap"
+            role="alert"
+            aria-live="polite"
+          >
+            <div className="flex items-center gap-2 text-amber-800 text-sm">
+              <Mail className="h-4 w-4 flex-shrink-0" aria-hidden />
+              <span>
+                נא לאמת את כתובת האימייל שלכם. בדקו את תיבת הדואר ולחצו על קישור האימות.
+              </span>
+            </div>
+            {resendSent ? (
+              <span className="text-emerald-700 text-sm font-medium">נשלח! בדקו את האימייל.</span>
+            ) : (
+              <button
+                type="button"
+                onClick={async () => {
+                  setResending(true);
+                  try {
+                    await apiClient.resendVerification();
+                    setResendSent(true);
+                  } finally {
+                    setResending(false);
+                  }
+                }}
+                disabled={resending}
+                className="text-amber-800 font-medium text-sm underline hover:no-underline flex items-center gap-1"
+              >
+                {resending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    שולח...
+                  </>
+                ) : (
+                  'שליחת קישור אימות מחדש'
+                )}
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Top bar */}
         <header className="sticky top-0 z-20 bg-white/80 backdrop-blur-md border-b border-gray-100">
           <div className="flex items-center justify-between px-4 sm:px-6 h-16">
@@ -174,6 +236,7 @@ export default function ResidentLayout({ children }: { children: React.ReactNode
             <div className="flex-1" />
 
             <div className="flex items-center gap-3">
+              <LanguageToggle />
               <NotificationPanel />
 
               <button

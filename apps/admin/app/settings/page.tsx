@@ -109,18 +109,10 @@ const TABS: { id: TabId; label: string; icon: React.ComponentType<{ className?: 
 // API helpers
 // ---------------------------------------------------------------------------
 
-function getAuthHeaders(): Record<string, string> {
-  const token =
-    typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-  return headers;
-}
+const fetchOpts = (): RequestInit => ({ credentials: "include", headers: { "Content-Type": "application/json" } });
 
 async function fetchSettings(): Promise<SystemSettings> {
-  const res = await fetch(`${API_URL}/api/v1/admin/settings`, {
-    headers: getAuthHeaders(),
-  });
+  const res = await fetch(`${API_URL}/api/v1/admin/settings`, fetchOpts());
   if (!res.ok) throw new Error("Failed to fetch settings");
   return res.json();
 }
@@ -128,7 +120,7 @@ async function fetchSettings(): Promise<SystemSettings> {
 async function saveSettings(settings: SystemSettings): Promise<SystemSettings> {
   const res = await fetch(`${API_URL}/api/v1/admin/settings`, {
     method: "PUT",
-    headers: getAuthHeaders(),
+    ...fetchOpts(),
     body: JSON.stringify(settings),
   });
   if (!res.ok) throw new Error("Failed to save settings");

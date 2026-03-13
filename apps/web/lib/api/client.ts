@@ -241,12 +241,55 @@ class ApiClient {
     buildingId?: string;
   }) {
     return this.request<{ token: string; user: import("@groupio/types").Resident }>(
-      "/api/v1/auth/register",
+      "/api/v1/auth/signup",
       {
         method: "POST",
-        body: data,
+        body: {
+          name: data.name,
+          email: data.email,
+          phone: data.phone,
+          password: data.password,
+          role: data.role,
+          buildingId: data.buildingId,
+        },
       }
     );
+  }
+
+  async verifyEmail(token: string) {
+    return this.request<{ status: string }>(`/api/v1/auth/verify-email/${encodeURIComponent(token)}`, {
+      method: "POST",
+    });
+  }
+
+  async resendVerificationByEmail(email: string) {
+    return this.request<{ status: string }>("/api/v1/auth/resend-verification-by-email", {
+      method: "POST",
+      body: { email },
+    });
+  }
+
+  /** Resend verification (requires auth). */
+  async resendVerification() {
+    return this.request<{ status: string }>("/api/v1/auth/resend-verification", {
+      method: "POST",
+    });
+  }
+
+  /** Request a password reset email (unauthenticated). */
+  async requestPasswordReset(email: string) {
+    return this.request<{ status: string }>("/api/v1/auth/password/reset", {
+      method: "POST",
+      body: { email },
+    });
+  }
+
+  /** Confirm a password reset using the token from the email link. */
+  async confirmPasswordReset(token: string, new_password: string) {
+    return this.request<{ status: string }>("/api/v1/auth/password/reset/confirm", {
+      method: "POST",
+      body: { token, new_password },
+    });
   }
 
   // ---- Payment endpoints ----
@@ -276,6 +319,30 @@ class ApiClient {
 
   async getMyInvoices() {
     return this.request<import("@groupio/types").Invoice[]>("/api/v1/payments/invoices/my");
+  }
+
+  // ---- Review endpoints ----
+
+  async addContractorReview(
+    contractorId: string,
+    data: { offer_id: string; rating: number; comment?: string }
+  ) {
+    return this.request<{ id: string; contractor_id: string; rating: number; comment?: string; created_at: string }>(
+      `/api/v1/contractors/${encodeURIComponent(contractorId)}/reviews`,
+      { method: "POST", body: data }
+    );
+  }
+
+  // ---- Offer participants ----
+
+  async getOfferParticipants(offerId: string, params?: { page?: number; page_size?: number }) {
+    const search = new URLSearchParams();
+    if (params?.page != null) search.set("page", String(params.page));
+    if (params?.page_size != null) search.set("page_size", String(params.page_size));
+    const qs = search.toString();
+    return this.request<{ items: unknown[]; total: number; page: number; page_size: number }>(
+      `/api/v1/offers/${encodeURIComponent(offerId)}/participants${qs ? `?${qs}` : ""}`
+    );
   }
 }
 

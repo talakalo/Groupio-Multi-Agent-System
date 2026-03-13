@@ -2,8 +2,9 @@
 
 import csv
 import io
+import json
 import logging
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import Any
 from uuid import uuid4
 
@@ -13,6 +14,7 @@ from pydantic import BaseModel, EmailStr
 
 from src.api.middleware.auth import get_admin_user, hash_password
 from src.databases.postgres import get_postgres_client
+from src.databases.redis_client import get_redis_client
 from src.databases.vector_store import get_vector_store
 from src.models.user import UserInDB
 from src.orchestration.graph import get_orchestrator
@@ -934,6 +936,76 @@ async def get_agent_autonomy_modes(
     }
 
 
+# --------------- Pending agent decisions (Task 3.1 approval workflow) ---------------
+
+
+@router.get("/agents/pending-decisions")
+async def list_pending_decisions(
+    status: str = "pending",
+    agent_name: str | None = None,
+    page: int = 1,
+    page_size: int = 20,
+    admin: UserInDB = Depends(get_admin_user),
+) -> dict[str, Any]:
+    """List agent decisions queued for admin review (matching, pricing, vetting in gated/recommend mode)."""
+    db = get_postgres_client()
+    offset = (page - 1) * page_size
+    items, total = await db.list_pending_decisions(status=status, agent_name=agent_name, limit=page_size, offset=offset)
+    return {"items": items, "total": total, "page": page, "page_size": page_size}
+
+
+@router.post("/agents/pending-decisions/{decision_id}/approve")
+async def approve_pending_decision(
+    decision_id: str,
+    note: str = "",
+    admin: UserInDB = Depends(get_admin_user),
+) -> dict[str, Any]:
+    """Approve a pending agent decision."""
+    db = get_postgres_client()
+    entry = await db.get_pending_decision(decision_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Pending decision not found")
+    if entry.get("status") != "pending":
+        raise HTTPException(status_code=409, detail=f"Decision already resolved: {entry['status']}")
+    updated = await db.update_pending_decision(
+        decision_id,
+        {
+            "status": "approved",
+            "decided_by": admin.id,
+            "decision_note": note,
+            "decided_at": datetime.now(UTC),
+        },
+    )
+    logger.info("Admin %s approved decision %s (agent=%s)", admin.id, decision_id, entry.get("agent_name"))
+    return updated
+
+
+@router.post("/agents/pending-decisions/{decision_id}/reject")
+async def reject_pending_decision(
+    decision_id: str,
+    note: str = "",
+    admin: UserInDB = Depends(get_admin_user),
+) -> dict[str, Any]:
+    """Reject a pending agent decision."""
+    db = get_postgres_client()
+    entry = await db.get_pending_decision(decision_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Pending decision not found")
+    if entry.get("status") != "pending":
+        raise HTTPException(status_code=409, detail=f"Decision already resolved: {entry['status']}")
+    updated = await db.update_pending_decision(
+        decision_id,
+        {
+            "status": "rejected",
+            "decided_by": admin.id,
+            "decision_note": note,
+            "decided_at": datetime.now(UTC),
+        },
+    )
+    logger.info("Admin %s rejected decision %s (agent=%s)", admin.id, decision_id, entry.get("agent_name"))
+    return updated
+
+
 @router.get("/agents/audit/{audit_id}")
 async def get_agent_audit_entry(
     audit_id: str,
@@ -945,3 +1017,144 @@ async def get_agent_audit_entry(
     if not entry:
         raise HTTPException(status_code=404, detail="Audit entry not found")
     return dict(entry)
+
+
+# --------------- Contractor verification metadata (Phase 2) ---------------
+
+
+@router.get("/contractors/{contractor_id}/verification-metadata")
+async def get_contractor_verification_metadata(
+    contractor_id: str,
+    admin: UserInDB = Depends(get_admin_user),
+) -> dict[str, Any]:
+    """Get verification metadata for a contractor (external/official verification records).
+
+    Phase 3: Augments with data.gov.il company registry lookup when available.
+    Company registry is NOT contractor license verification — it is business name lookup only.
+    """
+    db = get_postgres_client()
+    contractor = await db.get_contractor(contractor_id)
+    if not contractor:
+        raise HTTPException(status_code=404, detail="Contractor not found")
+    items = await db.get_contractor_verification_metadata(contractor_id)
+
+    # Phase 3: augment with data.gov.il company registry lookup (not license verification)
+    from src.services.enrichment import get_enrichment_service
+
+    svc = get_enrichment_service()
+    business_name = (contractor.get("business_name") or "").strip()
+    if business_name and hasattr(svc, "search_registered_company"):
+        companies = svc.search_registered_company(business_name)
+        for c in companies:
+            items.append(
+                {
+                    "id": f"datagov-{c.get('company_id', '')}",
+                    "source": "data.gov.il (company registry)",
+                    "verified": c.get("status") == "פעילה",
+                    "confidence": 0.7 if c.get("status") == "פעילה" else 0.5,
+                    "verified_at": datetime.now(UTC).isoformat(),
+                    "raw_response": c,
+                }
+            )
+
+    return {"items": items, "contractor_id": contractor_id}
+
+
+# --------------- Request contractor documents ---------------
+
+
+class RequestDocsBody(BaseModel):
+    """Optional message when requesting documents from a contractor."""
+
+    message: str = "Please upload additional documents to complete your verification."
+
+
+@router.post("/contractors/{contractor_id}/request-docs")
+async def request_contractor_docs(
+    contractor_id: str,
+    request: Request,
+    body: RequestDocsBody | None = None,
+    admin: UserInDB = Depends(get_admin_user),
+) -> dict[str, str]:
+    """Request docs from contractor. Stored in Redis; contractor sees via GET /contractors/me/doc-requests."""
+    db = get_postgres_client()
+    contractor = await db.get_contractor(contractor_id)
+    if not contractor:
+        raise HTTPException(status_code=404, detail="Contractor not found")
+
+    redis = get_redis_client()
+    default_msg = "Please upload additional documents to complete your verification."
+    payload = {
+        "requested_at": datetime.now(UTC).isoformat(),
+        "requested_by": admin.id,
+        "requested_by_email": admin.email,
+        "message": (body.message if body else "") or default_msg,
+    }
+    await redis.set(
+        f"doc_request:{contractor_id}",
+        json.dumps(payload),
+        ex=30 * 24 * 60 * 60,  # 30 days
+    )
+
+    await db.create_audit_log(
+        {
+            "user_id": admin.id,
+            "action": "request_docs",
+            "resource_type": "contractor",
+            "resource_id": contractor_id,
+            "details": {"message": payload["message"]},
+            "ip_address": request.client.host if request.client else None,
+        }
+    )
+
+    logger.info("Admin %s requested docs from contractor %s", admin.email, contractor_id)
+
+    return {"status": "doc_request_sent", "contractor_id": contractor_id}
+
+
+# ---------------------------------------------------------------------------
+# Credit Awards admin endpoints
+# ---------------------------------------------------------------------------
+
+
+@router.get("/credit-awards")
+async def list_credit_awards(
+    resident_id: str | None = None,
+    status: str | None = None,
+    admin: UserInDB = Depends(get_admin_user),
+) -> dict[str, Any]:
+    """List credit awards, optionally filtered by resident or status."""
+    db = get_postgres_client()
+    items = await db.list_credit_awards(resident_id=resident_id, status=status)
+    return {"items": items, "total": len(items)}
+
+
+@router.post("/credit-awards/{award_id}/approve")
+async def approve_credit_award(
+    award_id: str,
+    admin: UserInDB = Depends(get_admin_user),
+) -> dict[str, Any]:
+    """Approve a pending credit award and mark it for application."""
+    db = get_postgres_client()
+    updated = await db.update_credit_award(
+        award_id,
+        {
+            "status": "approved",
+            "approved_by": admin.id,
+            "approved_at": datetime.now(UTC),
+        },
+    )
+    logger.info("Admin %s approved credit award %s", admin.id, award_id)
+    return updated
+
+
+@router.post("/credit-awards/{award_id}/reject")
+async def reject_credit_award(
+    award_id: str,
+    admin: UserInDB = Depends(get_admin_user),
+) -> dict[str, Any]:
+    """Reject a pending credit award."""
+    db = get_postgres_client()
+    updated = await db.update_credit_award(award_id, {"status": "rejected", "approved_by": admin.id})
+    logger.info("Admin %s rejected credit award %s", admin.id, award_id)
+    return updated

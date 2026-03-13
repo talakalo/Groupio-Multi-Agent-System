@@ -1,4 +1,5 @@
-# Groupio Multi-Agent System - Local Setup Guide
+curl http://localhost:8000/api/v1/health
+{"status":"degraded","services":{"vector_db":true,"graph_db":true,"redis":true,"postgres":false}}Mac# Groupio Multi-Agent System - Local Setup Guide
 
 This guide walks you through setting up and running the Groupio system locally for development.
 
@@ -240,7 +241,7 @@ python -m pytest tests/unit/ -v
 # With coverage
 python -m pytest tests/unit/ --cov=src --cov-report=html
 
-# Integration tests (requires running services)
+# Integration tests (mocks Redis when unavailable; some tests require PostgreSQL)
 python -m pytest tests/integration/ -v
 ```
 

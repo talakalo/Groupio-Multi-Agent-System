@@ -30,6 +30,22 @@ test.describe('Architecture Upload Flow', () => {
         })
       );
     });
+
+    // Set cookies the Next.js Edge middleware reads for auth decisions:
+    // refresh_token (presence = session valid) + groupio-auth (role hint for routing)
+    await page.context().addCookies([
+      { name: 'refresh_token', value: 'e2e-refresh-token', url: 'http://localhost:3000' },
+      { name: 'groupio-auth', value: encodeURIComponent(JSON.stringify({ state: { user: { role: 'resident' }, isAuthenticated: true } })), url: 'http://localhost:3000' },
+    ]);
+
+    // Mock token refresh so the layout can restore the session
+    await page.route('**/api/v1/auth/refresh', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ access_token: 'e2e-access-token' }),
+      })
+    );
   });
 
   test('should display upload page with dropzone', async ({ page }) => {
@@ -38,13 +54,13 @@ test.describe('Architecture Upload Flow', () => {
     // The page renders Hebrew text from i18n: "העלה את תוכנית הדירה שלך"
     // Also check for file input and the upload button
     await expect(
-      page.getByText(/תוכנית|העלה|floor plan|upload/i)
+      page.getByRole('heading', { level: 1 })
     ).toBeVisible({ timeout: 10000 });
   });
 
   test('should upload and analyze a floor plan', async ({ page }) => {
-    // Mock the upload endpoint
-    await page.route('**/api/v1/uploads/architecture', (route) =>
+    // Mock the upload endpoint (** suffix covers ?building_id=... query params)
+    await page.route('**/api/v1/uploads/architecture**', (route) =>
       route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -119,8 +135,8 @@ test.describe('Architecture Upload Flow', () => {
   });
 
   test('should handle upload errors gracefully', async ({ page }) => {
-    // Mock the upload endpoint to return 500
-    await page.route('**/api/v1/uploads/architecture', (route) =>
+    // Mock the upload endpoint to return 500 (** suffix covers ?building_id=... query params)
+    await page.route('**/api/v1/uploads/architecture**', (route) =>
       route.fulfill({
         status: 500,
         contentType: 'application/json',
@@ -140,13 +156,14 @@ test.describe('Architecture Upload Flow', () => {
 
     // Should show an error message (Hebrew: "ההעלאה נכשלה" or "נסה שוב")
     await expect(
-      page.getByText(/נכשל|error|failed|נסה שוב|try again/i)
+      page.getByText(/נכשל|error|failed|נסה שוב|try again/i).first()
     ).toBeVisible({ timeout: 10000 });
   });
 
   test('should show analyzing state during processing', async ({ page }) => {
-    // Mock upload to succeed
-    await page.route('**/api/v1/uploads/architecture', (route) =>
+    // Mock upload to succeed.  Use ** suffix to also catch ?building_id=... query params
+    // that get appended when the Zustand store has a populated buildingId.
+    await page.route('**/api/v1/uploads/architecture**', (route) =>
       route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -172,6 +189,8 @@ test.describe('Architecture Upload Flow', () => {
 
     await page.goto('/architecture');
 
+    // Wait for the upload zone to be rendered before interacting with the file input
+    await page.locator('input[type="file"]').waitFor({ state: 'attached' });
     const fileInput = page.locator('input[type="file"]');
     await fileInput.setInputFiles({
       name: 'plan.pdf',

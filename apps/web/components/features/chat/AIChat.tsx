@@ -90,34 +90,64 @@ export function AIChat({
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // ---- Chat history: load from backend on mount ----
-  // Only fetches when a userId is provided (skip for anonymous/guest sessions).
-  const { data: historyData } = useQuery<{ messages: { id: string; role: 'user' | 'assistant'; content: string; created_at: string }[] }>({
+  // ---- Chat history: load from backend on mount, with pagination ----
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
+
+  const { data: historyData } = useQuery<
+    { messages: { id: string; role: 'user' | 'assistant'; content: string; created_at: string }[]; next_cursor: string | null }
+  >({
     queryKey: ['chat-history', userId],
     queryFn: async () => {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
-      const res = await fetch(`${baseUrl}/api/v1/conversations/${userId}/messages`, { headers });
+      const res = await fetch(`${baseUrl}/api/v1/conversations/${userId}/messages?limit=50`, { headers });
       if (!res.ok) throw new Error('Failed to load chat history');
       return res.json();
     },
-    enabled: Boolean(userId) && userId !== 'anonymous',
-    staleTime: Infinity, // history only needs to load once per mount
+    enabled: Boolean(userId) && userId !== 'anonymous' && !historyLoaded,
+    staleTime: Infinity,
   });
 
   // Hydrate messages from backend history on first load
   useEffect(() => {
-    if (!historyData?.messages?.length) return;
-    const historical: ChatMessage[] = historyData.messages.map((m) => ({
+    if (historyData === undefined) return;
+    const historical: ChatMessage[] = (historyData.messages || []).map((m) => ({
       id: m.id,
       role: m.role,
       content: m.content,
       timestamp: new Date(m.created_at),
     }));
-    // Prepend history before the welcome message
     setMessages((prev) => [...historical, ...prev]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    setNextCursor(historyData?.next_cursor ?? null);
+    setHistoryLoaded(true);
   }, [historyData]);
+
+  const loadOlderMessages = useCallback(async () => {
+    if (!nextCursor || isLoadingHistory || !userId || userId === 'anonymous') return;
+    setIsLoadingHistory(true);
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+      const res = await fetch(
+        `${baseUrl}/api/v1/conversations/${userId}/messages?limit=50&before=${encodeURIComponent(nextCursor)}`,
+        { headers }
+      );
+      if (!res.ok) throw new Error('Failed to load older messages');
+      const data = await res.json();
+      const older: ChatMessage[] = (data.messages || []).map((m: { id: string; role: 'user' | 'assistant'; content: string; created_at: string }) => ({
+        id: m.id,
+        role: m.role,
+        content: m.content,
+        timestamp: new Date(m.created_at),
+      }));
+      setMessages((prev) => [...older, ...prev]);
+      setNextCursor(data.next_cursor ?? null);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  }, [nextCursor, isLoadingHistory, userId, accessToken, baseUrl]);
 
   // ---- Refs ----
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -183,7 +213,7 @@ export function AIChat({
       try {
         // Use AbortController to enforce a 30-second timeout
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30_000);
+        timeoutId = setTimeout(() => controller.abort(), 30_000);
 
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
         if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
@@ -238,11 +268,14 @@ export function AIChat({
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    sendMessage(input);
+    // sendMessage is async; attach a no-op catch so the returned Promise
+    // never becomes an unhandled rejection (shown as "[object Event]" in
+    // Next.js dev overlay when the rejection value is a DOM Event).
+    sendMessage(input).catch(() => {});
   };
 
   const handleSuggestionClick = (suggestion: string) => {
-    sendMessage(suggestion);
+    sendMessage(suggestion).catch(() => {});
   };
 
   // ---- Render ----
@@ -271,7 +304,20 @@ export function AIChat({
       </div>
 
       {/* ---- Messages ---- */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 flex flex-col">
+        {nextCursor && (
+          <div className="flex justify-center py-2">
+            <button
+              type="button"
+              onClick={loadOlderMessages}
+              disabled={isLoadingHistory}
+              className="text-sm text-primary-600 hover:text-primary-700 disabled:opacity-50"
+            >
+              {isLoadingHistory ? 'טוען...' : 'טוען הודעות ישנות יותר'}
+            </button>
+          </div>
+        )}
+        <div className="space-y-4 flex-1">
         {messages.map((msg) => (
           <div
             key={msg.id}
@@ -313,6 +359,7 @@ export function AIChat({
             </div>
           </div>
         ))}
+        </div>
         <div ref={messagesEndRef} />
       </div>
 

@@ -185,17 +185,28 @@ class WhatsAppBotService:
             contact: Optional contact info
         """
         if not message.text:
-            # Handle non-text messages
-            await self._send_text_message(
-                message.from_number,
-                "מצטערים, כרגע אנחנו תומכים רק בהודעות טקסט. אנא שלח הודעה כתובה."
-                if is_hebrew(message.from_number)
-                else "Sorry, we currently only support text messages. Please send a written message.",
+            # Build a synthetic text prompt for the orchestrator based on media type.
+            # This lets agents acknowledge media uploads (images, documents) and
+            # give the user context-appropriate instructions instead of a hard error.
+            if message.image_id:
+                synthetic_text = "[המשתמש שלח תמונה]" if is_hebrew(message.from_number) else "[User sent an image]"
+            elif message.document_id:
+                synthetic_text = "[המשתמש שלח מסמך]" if is_hebrew(message.from_number) else "[User sent a document]"
+            else:
+                synthetic_text = (
+                    "[המשתמש שלח קובץ מדיה]" if is_hebrew(message.from_number) else "[User sent a media file]"
+                )
+            message = message.__class__(
+                message_id=message.message_id,
+                from_number=message.from_number,
+                timestamp=message.timestamp,
+                text=synthetic_text,
+                image_id=message.image_id,
+                document_id=message.document_id,
             )
-            return
 
         # Normalize Hebrew text if applicable
-        user_message = message.text
+        user_message = message.text or ""
         if is_hebrew(user_message):
             user_message = normalize_hebrew(user_message)
 
@@ -213,8 +224,8 @@ class WhatsAppBotService:
         }
 
         try:
-            # Send typing indicator
-            await self._send_typing_indicator(message.from_number)
+            # Send typing indicator (mark message as read — shows blue ticks)
+            await self._send_typing_indicator(message.from_number, message_id=message.message_id)
 
             # Process through orchestrator
             result = await self.orchestrator.run(
@@ -283,10 +294,29 @@ class WhatsAppBotService:
         except httpx.HTTPError as e:
             logger.error("Failed to send WhatsApp message: %s", e)
 
-    async def _send_typing_indicator(self, to: str) -> None:
-        """Send typing indicator."""
-        # Note: WhatsApp Business API doesn't have native typing indicator
-        # This is a placeholder for future implementation; _payload for future use
+    async def _send_typing_indicator(self, to: str, message_id: str | None = None) -> None:
+        """Send a typing indicator by marking the last message as read.
+
+        The WhatsApp Business API does not expose a standalone "typing" event.
+        Marking the incoming message as read causes WhatsApp to display two
+        blue ticks on the sender's screen, which is the standard signal that
+        the bot is processing their message.
+        """
+        if not message_id:
+            return
+        try:
+            settings = get_settings()
+            status_url = f"https://graph.facebook.com/v18.0/{settings.WHATSAPP_PHONE_ID}/messages"
+            payload = {
+                "messaging_product": "whatsapp",
+                "status": "read",
+                "message_id": message_id,
+            }
+            response = await self.http_client.post(status_url, json=payload)
+            response.raise_for_status()
+        except Exception as exc:
+            # Non-critical: log and continue — delivery of the actual reply is unaffected
+            logger.debug("WhatsApp typing indicator (mark-read) failed: %s", exc)
 
     async def _send_quick_replies(
         self,

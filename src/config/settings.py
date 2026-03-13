@@ -115,6 +115,13 @@ class Settings(BaseSettings):
     # API Keys for service-to-service auth
     API_KEYS: list[str] = []
 
+    # Government / open-data enrichment (optional; stub used when empty)
+    GOV_ADDRESS_API_URL: str = ""
+    GOV_CONTRACTOR_API_URL: str = ""
+    GOV_MUNICIPALITY_API_URL: str = ""
+    # Phase 3: data.gov.il integration. Set to "1" or "true" to enable.
+    ENABLE_DATAGOV_IL: str = "1"
+
     # Email Settings (for verification emails)
     SMTP_HOST: str = ""
     SMTP_PORT: int = 587
@@ -122,8 +129,20 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     SMTP_FROM_EMAIL: str = "noreply@groupio.co.il"
     SMTP_FROM_NAME: str = "Groupio"
+    # When True, login rejects unverified users with 403. Enabled by default for production safety.
+    # Set ENFORCE_EMAIL_VERIFICATION=false in .env to disable during local development.
+    ENFORCE_EMAIL_VERIFICATION: bool = True
+    # Base URL for verification links in emails (default for production)
+    FRONTEND_URL: str = "https://groupio.co.il"
     # Admin inbox for system alerts (vetting escalations, expiry errors, etc.)
     ADMIN_EMAIL: str = ""
+
+    # Push Notifications (Firebase Cloud Messaging)
+    # Set FCM_SERVER_KEY to your Firebase project's server key to enable push notifications.
+    # When empty, push notifications are silently skipped (log at DEBUG level).
+    FCM_SERVER_KEY: str = ""
+    # FCM endpoint (override only for testing)
+    FCM_ENDPOINT: str = "https://fcm.googleapis.com/fcm/send"
 
     # Payment provider ("mock" for dev/demos, "stripe" or "payplus" for production)
     PAYMENT_PROVIDER: str = "mock"

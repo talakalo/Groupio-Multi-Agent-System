@@ -39,6 +39,12 @@ class ResidentBuilding(BaseModel):
     region: str = Field(..., min_length=1, max_length=50)
     apartment_number: str = Field(..., alias="apartmentNumber", min_length=1, max_length=20)
     building_type: str = Field("new_residential", alias="buildingType", max_length=50)
+    # Phase 2: optional enrichment from address normalization
+    municipality_code: str | None = Field(None, alias="municipalityCode")
+    municipality_name: str | None = Field(None, alias="municipalityName")
+    address_normalized: str | None = Field(None, alias="addressNormalized")
+    enrichment_confidence: float | None = Field(None, alias="enrichmentConfidence")
+    enrichment_source: str | None = Field(None, alias="enrichmentSource")
 
 
 class ContractorBusiness(BaseModel):
@@ -122,25 +128,36 @@ async def complete_onboarding(
         if not building:
             # Create a new building record. The current user becomes its admin.
             building_id = str(uuid4())
+            building_payload: dict[str, Any] = {
+                "id": building_id,
+                "name": f"{info.building_address}, {info.city}",
+                "address": info.building_address,
+                "city": info.city,
+                "region": info.region,
+                "total_units": 0,
+                "floors": 1,
+                "year_built": None,
+                "admin_user_id": user_id,
+                "resident_count": 0,
+                "active_offers": 0,
+                "completed_offers": 0,
+                "total_savings": 0.0,
+                "whatsapp_group_id": None,
+            }
+            if info.municipality_code:
+                building_payload["municipality_code"] = info.municipality_code
+            if info.municipality_name:
+                building_payload["municipality_name"] = info.municipality_name
+            if info.address_normalized:
+                building_payload["address_normalized"] = info.address_normalized
+            if info.enrichment_confidence is not None:
+                building_payload["enrichment_confidence"] = info.enrichment_confidence
+            if info.enrichment_source:
+                building_payload["enrichment_source"] = info.enrichment_source
+            if info.municipality_code or info.address_normalized:
+                building_payload["enriched_at"] = datetime.now(UTC)
             try:
-                building = await db.create_building(
-                    {
-                        "id": building_id,
-                        "name": f"{info.building_address}, {info.city}",
-                        "address": info.building_address,
-                        "city": info.city,
-                        "region": info.region,
-                        "total_units": 0,
-                        "floors": 1,
-                        "year_built": None,
-                        "admin_user_id": user_id,
-                        "resident_count": 0,
-                        "active_offers": 0,
-                        "completed_offers": 0,
-                        "total_savings": 0.0,
-                        "whatsapp_group_id": None,
-                    }
-                )
+                building = await db.create_building(building_payload)
                 logger.info("Created new building %s for onboarding user %s", building_id, user_id)
             except Exception as exc:
                 logger.error("Failed to create building for user %s: %s", user_id, exc)

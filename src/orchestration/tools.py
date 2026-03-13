@@ -6,6 +6,7 @@ from typing import Any
 from src.databases.graph_store import get_graph_store
 from src.databases.postgres import get_postgres_client
 from src.rag.pipeline import get_rag_pipeline
+from src.services.enrichment import get_enrichment_service
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,9 @@ class ToolRegistry:
             "analyze_sentiment": self._analyze_sentiment,
             "escalate_to_human": self._escalate_to_human,
             "create_support_ticket": self._create_support_ticket,
+            "normalize_address": self._normalize_address,
+            "verify_contractor_license": self._verify_contractor_license,
+            "get_municipality_info": self._get_municipality_info,
         }
 
     def get_tool(self, name: str) -> Any:
@@ -143,6 +147,49 @@ class ToolRegistry:
             "status": "open",
         }
         return await db.create_support_ticket(ticket_data)
+
+    async def _normalize_address(self, address: str, city: str) -> dict[str, Any]:
+        """Normalize address to canonical form. Returns address, city, street, municipality, confidence, source."""
+        svc = get_enrichment_service()
+        result = svc.normalize_address(address, city)
+        return {
+            "address": result.address,
+            "city": result.city,
+            "street": result.street,
+            "house_number": result.house_number,
+            "municipality": result.municipality,
+            "confidence": result.confidence,
+            "source": result.source,
+        }
+
+    async def _verify_contractor_license(
+        self,
+        license_number: str,
+        business_name: str | None = None,
+    ) -> dict[str, Any]:
+        """Verify contractor license against government registry. Returns verified, confidence, source, verified_at."""
+        svc = get_enrichment_service()
+        result = svc.verify_contractor_license(license_number, business_name)
+        return {
+            "verified": result.verified,
+            "confidence": result.confidence,
+            "source": result.source,
+            "verified_at": result.verified_at.isoformat(),
+            "raw_response": result.raw_response,
+        }
+
+    async def _get_municipality_info(self, city: str) -> dict[str, Any] | None:
+        """Get municipality metadata for a city. Returns None if not found."""
+        svc = get_enrichment_service()
+        result = svc.get_municipality_info(city)
+        if result is None:
+            return None
+        return {
+            "city": result.city,
+            "municipality_name": result.municipality_name,
+            "district": result.district,
+            "region": result.region,
+        }
 
 
 _tool_registry: ToolRegistry | None = None

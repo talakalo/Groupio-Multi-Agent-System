@@ -206,6 +206,7 @@ export default function SignupPage() {
                   key={option.value}
                   type="button"
                   onClick={() => setSelectedRole(option.value)}
+                  aria-pressed={isSelected}
                   className={cn(
                     "w-full text-right card transition-all",
                     isSelected
@@ -270,7 +271,7 @@ export default function SignupPage() {
             className="card space-y-5"
           >
             {error && (
-              <div className="bg-red-50 text-red-700 rounded-xl px-4 py-3 text-sm">
+              <div role="alert" className="bg-red-50 text-red-700 rounded-xl px-4 py-3 text-sm">
                 {error}
               </div>
             )}

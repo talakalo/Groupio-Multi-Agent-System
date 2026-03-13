@@ -2,8 +2,10 @@
 
 import React, { Component, type ErrorInfo, type ReactNode, useState, useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import * as Sentry from "@sentry/nextjs";
 import { apiClient } from "@/lib/api/client";
 import { useAuthStore } from "@/lib/stores/authStore";
+import { LocaleSyncProvider } from "@/lib/providers/LocaleSyncProvider";
 import { ToastContainer } from "@/components/shared/ToastContainer";
 
 // PostHog analytics — optional, requires NEXT_PUBLIC_POSTHOG_KEY
@@ -47,12 +49,11 @@ class AppErrorBoundary extends Component<
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error("[AppErrorBoundary]", error, info);
+    // Sentry.captureException is a no-op when no DSN is configured.
     try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { captureException } = require('@sentry/nextjs');
-      captureException(error);
+      Sentry.captureException(error);
     } catch {
-      // @sentry/nextjs not installed — silently skip
+      // Guard against any Sentry initialization errors
     }
   }
 
@@ -121,7 +122,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const { isAuthenticated, accessToken } = useAuthStore.getState();
     if (isAuthenticated && !accessToken) {
-      useAuthStore.getState().refreshAccessToken();
+      // Attach a no-op catch so the fire-and-forget Promise never becomes
+      // an unhandled rejection (which Next.js dev overlay shows as
+      // "[object Event]" when the rejection value is a DOM Event).
+      useAuthStore.getState().refreshAccessToken().catch(() => {});
     }
   }, []);
 
@@ -142,8 +146,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- React 19 ReactNode typing conflict */}
-        {children as any}
+        <LocaleSyncProvider>
+          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- React 19 ReactNode typing conflict */}
+          {children as any}
+        </LocaleSyncProvider>
       </QueryClientProvider>
     </ErrorBoundary>
   );

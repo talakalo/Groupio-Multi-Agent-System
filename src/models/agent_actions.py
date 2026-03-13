@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class AgentActionEnvelope(BaseModel):
@@ -20,6 +20,12 @@ class AgentActionEnvelope(BaseModel):
     summary_for_next_agent: str = ""
     suggested_next_intent: str = ""
     suggested_next_agent: str = ""
+
+    @field_validator("suggested_next_agent", "suggested_next_intent", "summary_for_next_agent", mode="before")
+    @classmethod
+    def coerce_none_to_empty(cls, v: str | None) -> str:
+        return v if v is not None else ""
+
     entities_to_pass: dict[str, Any] = Field(default_factory=dict)
 
 

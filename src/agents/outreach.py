@@ -48,6 +48,16 @@ CAMPAIGNS = {
             "האם תרצה לראות את ההזדמנויות?"
         ),
     },
+    "viral_invite_loop": {
+        "trigger": "resident_share_requested",
+        "target": "inviter_resident",
+        "template_he": (
+            "היי {name}!\n\n"
+            "השכן/ה {neighbor_name} שלך הצטרף/ה לעסקת {category}!\n"
+            "כבר {joined_count} שכנים בבניין. עוד {needed} = {next_discount}% הנחה.\n\n"
+            "שתף/י עם שכנים נוספים: {invite_link}"
+        ),
+    },
     "seasonal_campaign": {
         "trigger": "scheduled_seasonal",
         "campaigns": {
@@ -251,10 +261,16 @@ class OutreachAgent(BaseAgent):
 
     def _determine_campaign_type(self, state: AgentState) -> str:
         """Determine which campaign type to run based on context."""
-        state.get("intent", "")
+        intent = state.get("intent", "")
+
+        # Viral invite intent from router
+        if intent == "viral_invite_query":
+            return "viral_invite_loop"
 
         # Check if there's an explicit campaign request
         user_message = self._get_last_user_message(state)
+        if "שת" in user_message or "invite" in user_message.lower() or "זמן" in user_message:
+            return "viral_invite_loop"
         if "momentum" in user_message.lower() or "offer" in user_message.lower():
             return "offer_momentum"
 

@@ -127,7 +127,7 @@ class LLMResponseCache:
 _llm_cache = LLMResponseCache(default_ttl=1800)  # 30 min default
 
 # Agents whose decisions require human review in recommend mode
-_REVIEW_AGENTS: frozenset[str] = frozenset({"matching", "pricing", "vetting"})
+_REVIEW_AGENTS: frozenset[str] = frozenset({"matching", "pricing", "vetting", "influencer"})
 
 _THINKING_RE = re.compile(r"<thinking>(.*?)</thinking>", re.DOTALL)
 
@@ -285,6 +285,7 @@ class BaseAgent(ABC):
                 logger.warning("agent_audit_log write failed: %s", exc)
 
         asyncio.create_task(_write())
+        asyncio.create_task(self._persist_metrics())
 
     @retry(
         stop=stop_after_attempt(3),
@@ -354,12 +355,73 @@ class BaseAgent(ABC):
             return self.config.system_prompt.format_map(SafeDict(safe))
 
     async def reload_config(self) -> None:
-        """Reload agent configuration (for hot-reloading prompts)."""
+        """Reload agent configuration — hot-reloads system prompt from system_settings if overridden."""
         logger.info("Reloading config for agent: %s", self.config.name)
+        try:
+            from src.databases.postgres import get_postgres_client
+
+            db = get_postgres_client()
+            override = await db.get_agent_system_prompt(self.config.name)
+            if override:
+                self.config.system_prompt = override
+                logger.info("Agent %s: system prompt reloaded from system_settings", self.config.name)
+            else:
+                logger.info("Agent %s: no system prompt override in system_settings, keeping current", self.config.name)
+        except Exception as exc:
+            logger.warning("Agent %s: reload_config failed: %s", self.config.name, exc)
 
     async def get_metrics(self) -> dict[str, Any]:
-        """Get agent execution metrics."""
-        return {
-            "name": self.config.name,
-            **self._metrics,
-        }
+        """Get agent execution metrics, including persisted historical totals from DB."""
+        snapshot = {"name": self.config.name, **self._metrics}
+        try:
+            from src.databases.postgres import get_postgres_client
+
+            db = get_postgres_client()
+            history = await db.get_agent_metrics_history(self.config.name, limit=1000)
+            if history:
+                aggregated: dict[str, float] = {}
+                for row in history:
+                    mt = row.get("metric_type", "")
+                    val = float(row.get("value", 0))
+                    aggregated[mt] = aggregated.get(mt, 0.0) + val
+                snapshot["historical"] = aggregated
+        except Exception as exc:
+            logger.debug("Agent %s: could not load historical metrics: %s", self.config.name, exc)
+        return snapshot
+
+    async def _enqueue_pending_decision(
+        self,
+        state: "AgentState",
+        action_type: str,
+        payload: dict[str, Any],
+        escalation_reason: str,
+    ) -> None:
+        """Persist a pending decision to the DB for admin review/approval."""
+        try:
+            from src.databases.postgres import get_postgres_client
+
+            db = get_postgres_client()
+            record = {
+                "id": str(uuid4()),
+                "agent_name": self.config.name,
+                "conversation_id": state.get("conversation_id"),
+                "user_id": state.get("user_id"),
+                "action_type": action_type,
+                "payload": payload,
+                "escalation_reason": escalation_reason,
+                "status": "pending",
+                "created_at": datetime.now(UTC),
+            }
+            await db.create_pending_decision(record)
+        except Exception as exc:
+            logger.warning("Agent %s: failed to enqueue pending decision: %s", self.config.name, exc)
+
+    async def _persist_metrics(self) -> None:
+        """Snapshot current in-memory metrics to the agent_metrics DB table."""
+        try:
+            from src.databases.postgres import get_postgres_client
+
+            db = get_postgres_client()
+            await db.record_agent_metrics(self.config.name, self._metrics)
+        except Exception as exc:
+            logger.debug("Agent %s: metrics persistence failed: %s", self.config.name, exc)
