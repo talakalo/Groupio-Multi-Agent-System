@@ -10,6 +10,7 @@ import {
   Menu,
   X,
   ChevronLeft,
+  Package,
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -44,6 +45,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { label: 'לוח בקרה', href: '/dashboard', icon: LayoutDashboard },
   { label: 'הצעות', href: '/offers', icon: Tag },
+  { label: 'ההזמנות שלי', href: '/orders', icon: Package },
   { label: 'קבלנים', href: '/contractors', icon: HardHat },
   { label: 'הבניין שלי', href: '/building', icon: Building2 },
   { label: 'פרופיל', href: '/profile', icon: UserCircle },

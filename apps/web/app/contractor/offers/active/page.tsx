@@ -1,11 +1,132 @@
 'use client';
 
 import type { Offer, ServiceCategory } from '@groupio/types';
+import { Users, BarChart2, DollarSign, ChevronDown, ChevronUp, Loader2, Mail, Phone } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 import { OfferCard } from '@/components/features/offers/OfferCard';
+import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
+
+// ---- Offer analytics + participants panel ----
+
+interface Participant {
+  id: string;
+  full_name?: string;
+  email?: string;
+  phone?: string;
+  apartment_number?: string;
+  units?: number;
+  status?: string;
+}
+
+function OfferAnalyticsPanel({ offer }: { offer: Offer }) {
+  const [expanded, setExpanded] = useState(false);
+  const [participants, setParticipants] = useState<Participant[]>([]);
+  const [loadingParts, setLoadingParts] = useState(false);
+
+  const revenue = (offer.base_price ?? 0) * (offer.current_participants ?? 0);
+
+  const fetchParticipants = useCallback(async () => {
+    if (participants.length > 0) return; // already loaded
+    setLoadingParts(true);
+    try {
+      const res = await apiClient.getOfferParticipants(offer.id);
+      setParticipants((res.items as Participant[]) ?? []);
+    } catch {
+      // non-critical
+    } finally {
+      setLoadingParts(false);
+    }
+  }, [offer.id, participants.length]);
+
+  const handleToggle = () => {
+    if (!expanded) fetchParticipants();
+    setExpanded((v) => !v);
+  };
+
+  return (
+    <div className="border-t border-gray-100 bg-gray-50 rounded-b-xl">
+      {/* Stats row */}
+      <div className="flex flex-wrap items-center gap-6 px-5 py-3 text-sm text-gray-600">
+        <span className="flex items-center gap-1.5">
+          <Users className="w-4 h-4 text-sky-500" aria-hidden="true" />
+          <strong>{offer.current_participants ?? 0}</strong>
+          {offer.max_participants ? ` / ${offer.max_participants}` : ''} משתתפים
+        </span>
+        <span className="flex items-center gap-1.5">
+          <DollarSign className="w-4 h-4 text-emerald-500" aria-hidden="true" />
+          הכנסה משוערת: <strong>₪{revenue.toLocaleString('he-IL')}</strong>
+        </span>
+        <span className="flex items-center gap-1.5">
+          <BarChart2 className="w-4 h-4 text-amber-500" aria-hidden="true" />
+          מחיר בסיס: <strong>₪{(offer.base_price ?? 0).toLocaleString('he-IL')}</strong>
+        </span>
+        <button
+          type="button"
+          onClick={handleToggle}
+          className="ms-auto flex items-center gap-1 text-sky-600 hover:text-sky-700 font-medium text-sm"
+          aria-expanded={expanded}
+        >
+          {expanded ? (
+            <><ChevronUp className="w-4 h-4" aria-hidden="true" />הסתר משתתפים</>
+          ) : (
+            <><ChevronDown className="w-4 h-4" aria-hidden="true" />הצג משתתפים</>
+          )}
+        </button>
+      </div>
+
+      {/* Participant list */}
+      {expanded && (
+        <div className="px-5 pb-4">
+          {loadingParts ? (
+            <div className="flex items-center gap-2 text-sm text-gray-500 py-2">
+              <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />טוען משתתפים...
+            </div>
+          ) : participants.length === 0 ? (
+            <p className="text-sm text-gray-400 py-2">אין משתתפים עדיין.</p>
+          ) : (
+            <ul className="divide-y divide-gray-100">
+              {participants.map((p, i) => (
+                <li key={p.id ?? i} className="flex items-center justify-between py-2.5 text-sm">
+                  <div>
+                    <p className="font-medium text-gray-900">{p.full_name ?? 'דייר'}</p>
+                    {p.apartment_number && (
+                      <p className="text-xs text-gray-500">דירה {p.apartment_number}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {p.email && (
+                      <a
+                        href={`mailto:${p.email}`}
+                        className="flex items-center gap-1 text-sky-600 hover:underline text-xs"
+                        aria-label={`שלח מייל ל-${p.full_name ?? 'דייר'}`}
+                      >
+                        <Mail className="w-3.5 h-3.5" aria-hidden="true" />
+                        {p.email}
+                      </a>
+                    )}
+                    {p.phone && (
+                      <a
+                        href={`tel:${p.phone}`}
+                        className="flex items-center gap-1 text-emerald-600 hover:underline text-xs"
+                        aria-label={`התקשר ל-${p.full_name ?? 'דייר'}`}
+                      >
+                        <Phone className="w-3.5 h-3.5" aria-hidden="true" />
+                        {p.phone}
+                      </a>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 
 type OfferStatus = 'all' | 'pending' | 'accepted' | 'in_progress' | 'completed';
@@ -176,13 +297,15 @@ export default function ContractorActiveOffersPage() {
       ) : (
         <div className="space-y-4">
           {offers.map((offer: Offer) => (
-            <OfferCard
-              key={offer.id}
-              offer={offer}
-              variant="contractor"
-              showActions
-              showParticipants
-            />
+            <div key={offer.id} className="rounded-xl overflow-hidden border border-gray-200 shadow-sm">
+              <OfferCard
+                offer={offer}
+                variant="contractor"
+                showActions
+                showParticipants
+              />
+              <OfferAnalyticsPanel offer={offer} />
+            </div>
           ))}
         </div>
       )}
