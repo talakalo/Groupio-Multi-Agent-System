@@ -408,11 +408,17 @@ async def get_payment(
     if payment.get("user_id") != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized to view this payment")
 
+    raw_amount = payment.get("amount", 0)
+    pay_subtotal = payment.get("subtotal", round(raw_amount / (1 + VAT_RATE), 2))
+    pay_tax_amount = payment.get("tax_amount", round(pay_subtotal * VAT_RATE, 2))
     return PaymentResponse(
         id=payment["id"],
         user_id=payment["user_id"],
         offer_id=payment.get("offer_id", ""),
-        amount=payment.get("amount", 0),
+        subtotal=pay_subtotal,
+        tax_rate=payment.get("tax_rate", VAT_RATE),
+        tax_amount=pay_tax_amount,
+        amount=raw_amount,
         currency=payment.get("currency", "ILS"),
         status=payment.get("status", "unknown"),
         transaction_id=payment.get("transaction_id"),
