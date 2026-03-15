@@ -302,8 +302,10 @@ class TestOffersAPI:
         mock_db.join_offer = AsyncMock()
         override_auth({"id": "user-123", "role": "resident"})
 
-        with patch("src.api.routes.offers.get_email_service", return_value=AsyncMock()), \
-             patch("src.api.routes.offers.get_whatsapp_bot", return_value=AsyncMock()):
+        with (
+            patch("src.api.routes.offers.get_email_service", return_value=AsyncMock()),
+            patch("src.api.routes.offers.get_whatsapp_bot", return_value=AsyncMock()),
+        ):
             response = client.post(
                 "/api/v1/offers/offer-123/join",
                 json={"user_id": "user-123", "unit_count": 1},

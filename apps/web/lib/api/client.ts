@@ -159,6 +159,12 @@ class ApiClient {
     );
   }
 
+  async getOfferParticipants(offerId: string) {
+    return this.request<{ items: unknown[]; total: number }>(
+      `/api/v1/offers/${offerId}/participants`,
+    );
+  }
+
   // ---- Contractor endpoints ----
 
   async getContractors(params?: { category?: string; region?: string }) {
@@ -174,6 +180,16 @@ class ApiClient {
   async getContractor(contractorId: string) {
     return this.request<import("@groupio/types").Contractor>(
       `/api/v1/contractors/${contractorId}`
+    );
+  }
+
+  async addContractorReview(
+    contractorId: string,
+    body: { offer_id: string; rating: number; comment?: string },
+  ) {
+    return this.request<{ status: string }>(
+      `/api/v1/contractors/${contractorId}/reviews`,
+      { method: "POST", body },
     );
   }
 
@@ -300,6 +316,13 @@ class ApiClient {
   }
 
   // ---- Payment endpoints ----
+
+  async approveWork(paymentId: string) {
+    return this.request<{ status: string }>(
+      `/api/v1/payments/${paymentId}/approve-work`,
+      { method: "POST" },
+    );
+  }
 
   async getMyPayments() {
     return this.request<import("@groupio/types").Payment[]>("/api/v1/payments/my");

@@ -79,7 +79,6 @@ function formatDate(dateStr: string) {
 
 export default function OrderDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const token = useAuthStore((s) => s.accessToken);
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -107,9 +106,7 @@ export default function OrderDetailPage() {
     if (!order) return;
     setApproving(true);
     try {
-      await apiClient.request(`/api/v1/payments/${order.id}/approve-work`, {
-        method: "POST",
-      });
+      await apiClient.approveWork(order.id);
       setApproved(true);
       await fetchOrder();
     } catch {
