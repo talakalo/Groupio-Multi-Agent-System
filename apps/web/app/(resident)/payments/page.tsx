@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import {
   CreditCard,
   FileText,
@@ -14,6 +15,7 @@ import {
   Shield,
   TrendingUp,
   Loader2,
+  Info,
 } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 
@@ -120,6 +122,22 @@ function PaymentRow({ payment }: { payment: Payment }) {
         <span className="font-semibold text-gray-900 min-w-[80px] text-left" dir="ltr">
           {formatCurrency(payment.amount, payment.currency)}
         </span>
+        {payment.status === 'pending' && (
+          <Link
+            href={`/checkout?offer=${payment.offerId}`}
+            className="text-xs font-medium text-indigo-600 hover:text-indigo-700 underline"
+          >
+            שלמו עכשיו
+          </Link>
+        )}
+        {payment.status === 'succeeded' && (
+          <Link
+            href={`/orders/${payment.id}`}
+            className="text-xs font-medium text-indigo-600 hover:text-indigo-700 underline"
+          >
+            פרטי הזמנה
+          </Link>
+        )}
       </div>
     </div>
   );
@@ -224,6 +242,24 @@ export default function PaymentsPage() {
 
       {/* Escrow Explainer */}
       <EscrowExplainer />
+
+      {/* How to add payment method */}
+      <div className="bg-amber-50 border border-amber-200 rounded-xl p-5">
+        <div className="flex items-start gap-3">
+          <Info className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <h3 className="font-medium text-amber-900 mb-1">היכן מזינים פרטי תשלום?</h3>
+            <p className="text-sm text-amber-800 leading-relaxed">
+              פרטי כרטיס האשראי או אמצעי התשלום יוזנו בעת הצטרפות להצעה ובשלב אישור התשלום.
+              גלשו ל{' '}
+              <Link href="/offers" className="font-medium text-amber-900 underline hover:no-underline">
+                ההצעות הפעילות
+              </Link>
+              , הצטרפו להצעה, ותתבקשו להזין את פרטי התשלום לפני השלמת התשלום.
+            </p>
+          </div>
+        </div>
+      </div>
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

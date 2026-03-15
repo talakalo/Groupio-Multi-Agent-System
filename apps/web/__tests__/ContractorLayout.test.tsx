@@ -26,8 +26,9 @@ const mockLogout = vi.fn(() => Promise.resolve());
 
 vi.mock('@/lib/stores/authStore', () => ({
   useAuthStore: vi.fn((selector: (s: Record<string, unknown>) => unknown) =>
-    selector({ accessToken: mockAccessToken, logout: mockLogout })
+    selector({ accessToken: mockAccessToken, logout: mockLogout, user: { role: 'contractor' } })
   ),
+  useAuthHasHydrated: vi.fn(() => true),
 }));
 
 import ContractorLayout from '../app/contractor/layout';

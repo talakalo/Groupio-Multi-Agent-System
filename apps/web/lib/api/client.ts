@@ -276,7 +276,8 @@ class ApiClient {
     });
   }
 
-  /** Request a password reset email (unauthenticated). */
+  // ---- Password Reset endpoints ----
+
   async requestPasswordReset(email: string) {
     return this.request<{ status: string }>("/api/v1/auth/password/reset", {
       method: "POST",
@@ -284,11 +285,17 @@ class ApiClient {
     });
   }
 
-  /** Confirm a password reset using the token from the email link. */
-  async confirmPasswordReset(token: string, new_password: string) {
+  async confirmPasswordReset(token: string, newPassword: string) {
     return this.request<{ status: string }>("/api/v1/auth/password/reset/confirm", {
       method: "POST",
-      body: { token, new_password },
+      body: { token, new_password: newPassword },
+    });
+  }
+
+  async changePassword(currentPassword: string, newPassword: string) {
+    return this.request<{ status: string }>("/api/v1/auth/password/change", {
+      method: "POST",
+      body: { current_password: currentPassword, new_password: newPassword },
     });
   }
 
@@ -319,30 +326,6 @@ class ApiClient {
 
   async getMyInvoices() {
     return this.request<import("@groupio/types").Invoice[]>("/api/v1/payments/invoices/my");
-  }
-
-  // ---- Review endpoints ----
-
-  async addContractorReview(
-    contractorId: string,
-    data: { offer_id: string; rating: number; comment?: string }
-  ) {
-    return this.request<{ id: string; contractor_id: string; rating: number; comment?: string; created_at: string }>(
-      `/api/v1/contractors/${encodeURIComponent(contractorId)}/reviews`,
-      { method: "POST", body: data }
-    );
-  }
-
-  // ---- Offer participants ----
-
-  async getOfferParticipants(offerId: string, params?: { page?: number; page_size?: number }) {
-    const search = new URLSearchParams();
-    if (params?.page != null) search.set("page", String(params.page));
-    if (params?.page_size != null) search.set("page_size", String(params.page_size));
-    const qs = search.toString();
-    return this.request<{ items: unknown[]; total: number; page: number; page_size: number }>(
-      `/api/v1/offers/${encodeURIComponent(offerId)}/participants${qs ? `?${qs}` : ""}`
-    );
   }
 }
 

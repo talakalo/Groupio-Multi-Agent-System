@@ -27,8 +27,9 @@ const mockLogout = vi.fn(() => Promise.resolve());
 
 vi.mock('@/lib/stores/authStore', () => ({
   useAuthStore: vi.fn((selector: (s: Record<string, unknown>) => unknown) =>
-    selector({ accessToken: mockAccessToken, logout: mockLogout })
+    selector({ accessToken: mockAccessToken, logout: mockLogout, isAuthenticated: !!mockAccessToken, user: { role: 'resident', isVerified: true } })
   ),
+  useAuthHasHydrated: vi.fn(() => true),
 }));
 
 import ResidentLayout from '../app/(resident)/layout';
