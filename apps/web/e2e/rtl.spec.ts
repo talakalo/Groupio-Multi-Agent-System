@@ -32,9 +32,14 @@ test.describe("RTL / Hebrew layout", () => {
     await page.goto("/signup");
     // "resident" is pre-selected by default — skip the role click to avoid
     // an intermediate React re-render that can race with the next click.
-    // Click "המשך" directly to advance to step 2 where the ToS checkbox renders.
-    await page.getByRole("button", { name: /המשך/ }).click();
-    const tosCheckbox = page.locator("#tos");
+    // Wait for hydration; then click "המשך" to advance to step 2 where the ToS checkbox renders.
+    const continueBtn = page.getByRole("button", { name: /^המשך$/ });
+    await expect(continueBtn).toBeVisible({ timeout: 15000 });
+    await continueBtn.click();
+    // Wait for step 2 form to render after React state update
+    const form = page.locator("form");
+    await expect(form).toBeVisible({ timeout: 10000 });
+    const tosCheckbox = form.locator("#tos");
     await expect(tosCheckbox).toBeVisible({ timeout: 10000 });
     await expect(tosCheckbox).toHaveAttribute("required");
     await expect(page.locator("form").getByRole("link", { name: "תנאי השימוש" })).toBeVisible();
@@ -55,7 +60,7 @@ test.describe("RTL / Hebrew layout", () => {
         }
       });
     });
-    // Not a hard failure — log result for CI review
     console.log("rtl-flip CSS found:", hasRtlFlip);
+    expect(hasRtlFlip).toBe(true);
   });
 });

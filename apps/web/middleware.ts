@@ -5,19 +5,22 @@ import type { NextRequest } from 'next/server';
 const protectedRoutes = [
   '/dashboard',
   '/offers',
+  '/orders',
   '/contractors',
   '/building',
   '/profile',
   '/chat',
   '/architecture',
   '/payments',
+  '/checkout',
+  '/change-password',
   '/contractor',
   '/admin',
   '/buildings-manager',
 ];
 
 // Routes only for unauthenticated users
-const authRoutes = ['/login', '/signup'];
+const authRoutes = ['/login', '/signup', '/forgot-password', '/reset-password'];
 
 // Routes that require specific roles (authentication already enforced above)
 const contractorRoutes = ['/contractor'];
