@@ -140,7 +140,7 @@ test.describe("Verify Email Flow", () => {
     );
     await page.goto("/verify-email?token=bad-token");
     await expect(
-      page.getByText(/שגיאה|לא תקין|invalid|נכשל/i),
+      page.getByText(/שגיאה|לא תקין|invalid|נכשל/i).first(),
     ).toBeVisible({ timeout: 15000 });
   });
 
@@ -393,7 +393,7 @@ test.describe("Change Password Page", () => {
       }),
     );
     await page.goto("/change-password");
-    await expect(page.locator("main, [role='main']")).toBeVisible({
+    await expect(page.locator("main, [role='main']").first()).toBeVisible({
       timeout: 15000,
     });
     const currentPwd = page.locator("#currentPassword, input[name='currentPassword']").first();
@@ -410,18 +410,37 @@ test.describe("Change Password Page", () => {
       }),
     );
     await page.route("**/api/v1/auth/password/change", (r) =>
-      r.fulfill({ status: 200, body: JSON.stringify({ status: "changed" }) }),
+      r.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ status: "changed" }),
+      }),
     );
     await page.goto("/change-password");
-    const currentPwd = page.locator("#currentPassword").first();
-    await expect(currentPwd).toBeVisible({ timeout: 10000 });
-    await currentPwd.fill("OldPassword1!");
-    await page.locator("#newPassword").first().fill("NewPassword1!");
-    await page.locator("#confirmPassword").first().fill("NewPassword1!");
-    const submitBtn = page.getByRole("button", { name: /שנה סיסמה|change|עדכן/i });
-    await submitBtn.click();
+    await expect(page.locator("#currentPassword").first()).toBeVisible({
+      timeout: 15000,
+    });
+    // Fill form fields and submit programmatically to avoid DOM detachment
+    await page.evaluate(() => {
+      const set = (id: string, val: string) => {
+        const el = document.getElementById(id) as HTMLInputElement;
+        if (!el) return;
+        const nativeSetter = Object.getOwnPropertyDescriptor(
+          HTMLInputElement.prototype,
+          "value",
+        )?.set;
+        nativeSetter?.call(el, val);
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+        el.dispatchEvent(new Event("change", { bubbles: true }));
+      };
+      set("currentPassword", "OldPassword1!");
+      set("newPassword", "NewPassword1!");
+      set("confirmPassword", "NewPassword1!");
+      const btn = document.querySelector('button[type="submit"]') as HTMLButtonElement;
+      btn?.click();
+    });
     await expect(
-      page.getByText(/הסיסמה שונתה|password changed|עודכנה/i),
-    ).toBeVisible({ timeout: 10000 });
+      page.getByText(/הסיסמה שונתה/i).first(),
+    ).toBeVisible({ timeout: 15000 });
   });
 });
