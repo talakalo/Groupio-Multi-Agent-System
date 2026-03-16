@@ -132,9 +132,10 @@ Groupio-Multi-Agent-System/           # Root monorepo
 ### Loading/Error/Empty States
 - **Email verification banner**: Shown for unverified users with resend button — GOOD
 - **Auth guard**: Resident layout redirects to `/login` when no token — GOOD
-- **Missing**: No generic error boundary component visible across routes
-- **Missing**: No loading skeletons for data-fetching pages (standard Next.js `loading.tsx` files not found)
-- **Missing**: No `error.tsx` files for route-level error boundaries
+- **Missing in web app**: No generic error boundary component visible across resident/contractor routes
+- **Admin app**: Has `error.tsx` and `not-found.tsx` — GOOD
+- **Missing in web app**: No loading skeletons for data-fetching pages (standard Next.js `loading.tsx` files not found)
+- **Missing in web app**: No `error.tsx` files for route-level error boundaries
 
 ### Accessibility/RTL/i18n Findings
 - `aria-label` on sidebar toggle buttons — GOOD
@@ -415,7 +416,9 @@ The backend has **16 well-organized route modules** under `/api/v1/`:
 
 6. **Refresh token stored in Redis without per-device tracking**: Only one refresh token per user — logging in on a new device invalidates the old session. Not ideal for multi-device users.
 
-7. **CORS origin reflection in error handler** (`src/api/main.py:96`):
+7. **Admin app uses `admin_role_verified` cookie for middleware gate**: The admin app sets a non-HTTP-only `admin_role_verified=1` cookie after verifying the user's role via `/auth/me`. This cookie is SameSite=Strict which mitigates CSRF, but it can be forged client-side to bypass the middleware check. Backend enforcement is authoritative, but the frontend gate is bypassable.
+
+8. **CORS origin reflection in error handler** (`src/api/main.py:96`):
    ```python
    origin = request.headers.get("origin")
    if origin:
