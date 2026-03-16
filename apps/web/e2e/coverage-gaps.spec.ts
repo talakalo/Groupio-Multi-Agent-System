@@ -90,6 +90,13 @@ async function setupBaseMocks(page: Page) {
       body: JSON.stringify({ status: "healthy", services: {} }),
     }),
   );
+  await page.route("**/api/v1/auth/refresh", (r) =>
+    r.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ access_token: "cov-test-token" }),
+    }),
+  );
   await page.route("**/api/v1/auth/me", (r) =>
     r.fulfill({ status: 200, body: JSON.stringify(MOCK_USER) }),
   );
@@ -350,9 +357,11 @@ test.describe("Order Detail Page", () => {
     await setAuthToken(page);
     await setupBaseMocks(page);
     await page.route("**/api/v1/payments/*", (r) => {
-      if (r.request().url().includes("/my")) return r.fallback();
+      const url = r.request().url();
+      if (url.includes("/my") || url.includes("/initiate")) return r.fallback();
       return r.fulfill({
         status: 200,
+        contentType: "application/json",
         body: JSON.stringify({
           id: "pay-1",
           offerId: "offer-1",
@@ -375,6 +384,8 @@ test.describe("Order Detail Page", () => {
     await expect(page.locator("main, [role='main']")).toBeVisible({
       timeout: 15000,
     });
+    // Order detail should show key info (title or amount)
+    await expect(page.getByText(/התקנת מזגנים|4,500|₪/)).toBeVisible({ timeout: 5000 });
   });
 });
 
