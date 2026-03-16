@@ -20,6 +20,7 @@ Groupio is a **well-architected multi-agent marketplace platform** for Israeli r
 - **Database schema**: 21 Alembic migrations covering RLS policies, FK indexes, triggers, and security hardening
 - **CI/CD pipeline**: Comprehensive GitHub Actions with backend lint/type-check, security scanning (Trivy + GitLeaks), frontend tests, E2E Playwright, Docker build
 - **Security posture**: Security headers middleware, PII redaction in logs, production config validators, input sanitization
+- **Resilience patterns**: Circuit breaker on external calls, LLM fallback (Anthropic→OpenAI), Redis-backed response cache, atomic rate limiting via Lua scripts, Neo4j retry with backoff
 
 ### What is Weakest
 - **Payment system**: Defaults to `PAYMENT_PROVIDER=mock` — no real Stripe integration has been tested end-to-end in a live environment
@@ -308,7 +309,16 @@ The backend has **16 well-organized route modules** under `/api/v1/`:
 - `get_current_user`: JWT token validation with DB user lookup on every request — GOOD but N+1 potential
 - `get_admin_user`: Checks `role in (ADMIN, SUPER_ADMIN, BUILDINGS_MANAGER)` — **RISK: buildings_manager gets full admin access**
 - `require_roles()`: Factory function for fine-grained role checks — available but underused
-- Rate limiting: IP-based (20/min) on auth endpoints + user-based (60/min) on general endpoints — GOOD
+- Rate limiting: IP-based (20/min) on auth endpoints + user-based (60/min) on general endpoints, **atomic Lua scripts** prevent race conditions — GOOD
+
+### Resilience Patterns
+- **Circuit breaker**: `CircuitBreaker` class in `agents/base.py` protects external service calls — GOOD
+- **LLM fallback**: Primary model (claude-sonnet-4-20250514) with automatic fallback to gpt-4o on timeout — GOOD
+- **LLM response cache**: Redis-backed `LLMResponseCache` for deduplication — GOOD
+- **DB transactions**: `PostgresClient.transaction()` context manager exists for asyncpg backend (Supabase fallback is non-transactional) — PARTIAL
+- **Graph store retries**: Neo4j driver with 3 attempts + exponential backoff, max 50 connections — GOOD
+- **Fraud detection**: `graph_store.detect_suspicious_patterns()` analyzes offer/review patterns — GOOD but effectiveness unverified
+- **Background workers**: Redis-based task queue (`groupio:agent:tasks`) for async agent processing — GOOD
 
 ### Business Logic Concerns
 1. **Offer join uses non-atomic counter**: `current_participants` is read from the offer dict, incremented client-side, but the DB update is separate — race condition risk for concurrent joins
@@ -570,7 +580,7 @@ The backend has **16 well-organized route modules** under `/api/v1/`:
 | G19 | **Register then login makes 2 API calls** | FRONTEND GAP | `authStore.ts:177-202` calls register then login | Unnecessary latency; `/signup` endpoint returns token directly | Nice to have |
 | G20 | **No skip-to-content link** | UX GAP | All layouts missing accessibility landmark | Screen reader users can't skip navigation | Public launch |
 | G21 | **Account lockout has no auto-unlock** | BACKEND GAP | `auth.py:220-222` sets `is_active=False` permanently | Locked-out users stuck without admin intervention | Broader beta |
-| G22 | **No DB transactions for multi-step operations** | DATABASE GAP | Payment creation + invoice creation are separate calls | Partial writes on failure | Broader beta |
+| G22 | **DB transactions underused for multi-step operations** | DATABASE GAP | `PostgresClient.transaction()` exists but payment+invoice creation doesn't use it; Supabase backend has no transaction support | Partial writes on failure | Broader beta |
 
 ### LOW
 
@@ -601,7 +611,7 @@ The backend has **16 well-organized route modules** under `/api/v1/`:
 10. **[G14] Wire orders pages**: Either connect to backend and add to sidebar, or remove the orphaned pages.
 11. **[G16] Fix offer join race condition**: Remove the client-side participant count update; rely solely on the DB trigger.
 12. **[G21] Add auto-unlock mechanism**: Reset login failure counter after a configurable cooldown period (e.g., 15 minutes).
-13. **[G22] Add DB transactions**: Wrap multi-step operations (payment + invoice creation) in database transactions.
+13. **[G22] Use existing DB transactions**: `PostgresClient.transaction()` context manager exists — wrap payment+invoice creation and other multi-step ops in it. For Supabase backend, implement transaction support or document the limitation.
 
 ### Must Fix Before Public Launch
 
