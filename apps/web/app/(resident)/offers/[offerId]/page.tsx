@@ -646,7 +646,7 @@ export default function OfferDetailPage() {
                   ...(contractor.verified ? ['verified' as const] : []),
                   'escrow' as const,
                   ...(contractor.licenseNumber ? ['licensed' as const] : []),
-                  ...(contractor.insured ? ['insured' as const] : []),
+                  ...((contractor as { insured?: boolean }).insured ? ['insured' as const] : []),
                 ]}
                 size="sm"
                 className="mb-4"

@@ -150,7 +150,7 @@ export default function AgentsPage() {
           type: typeMap[agentHint.toLowerCase()] ?? "matching",
           summary: esc.reason,
           reasoning: esc.context?.actionsTaken?.map((a: { action: string }) => a.action).join(". ") ?? "",
-          createdAt: esc.created_at ?? new Date().toISOString(),
+          createdAt: esc.createdAt ?? new Date().toISOString(),
         };
       });
   }, [escalationsData]);

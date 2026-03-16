@@ -106,7 +106,7 @@ export default function SignupPage() {
         email: data.email,
         phone: data.phone,
         password: data.password,
-        role: selectedRole,
+        role: selectedRole === "buildings_manager" ? "resident" : selectedRole,
         buildingId: data.buildingId || undefined,
       });
 

@@ -103,7 +103,7 @@ export default function SignupScreen() {
         router.push({
           pathname: "/(auth)/verify-email",
           params: { email: email.trim().toLowerCase() },
-        });
+        } as never);
       } else {
         router.replace("/(auth)/login");
       }

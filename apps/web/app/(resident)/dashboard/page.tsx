@@ -183,7 +183,7 @@ const ORDER_STATUS: Record<string, { label: string; variant: 'warning' | 'info' 
   succeeded: { label: 'בנאמנות', variant: 'primary', icon: Shield },
   released: { label: 'הושלם', variant: 'success', icon: CheckCircle2 },
   failed: { label: 'נכשל', variant: 'error', icon: XCircle },
-  refunded: { label: 'הוחזר', variant: 'accent', icon: RefreshCw },
+  refunded: { label: 'הוחזר', variant: 'info', icon: RefreshCw },
 };
 
 // ---------------------------------------------------------------------------

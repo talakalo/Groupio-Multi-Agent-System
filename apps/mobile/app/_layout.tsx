@@ -215,7 +215,12 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (!isAuthenticated) return;
-    return setupNotificationNavigation(router);
+    return setupNotificationNavigation({
+      push: (href: string) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        router.push(href as any);
+      },
+    });
   }, [isAuthenticated, router]);
 
   useEffect(() => {

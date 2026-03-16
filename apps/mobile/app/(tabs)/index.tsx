@@ -249,7 +249,7 @@ export default function HomeScreen() {
   const activeOffers = offersData?.data ?? [];
   const contractorOffersList = contractorOffersData?.data ?? [];
   const contractorProjectsList = contractorProjectsData?.data ?? [];
-  const userName = profile?.name?.split(" ")[0] ?? i18n.t("profile.user");
+  const userName = profile?.name?.split(" ")[0] ?? i18n.t("profile.user") ?? "";
   const totalParticipants = activeOffers.reduce(
     (sum, o) => sum + o.participants,
     0,

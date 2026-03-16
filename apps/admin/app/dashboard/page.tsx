@@ -217,7 +217,7 @@ export default function DashboardPage() {
   }, [unverifiedContractors, recentEscalations]);
 
   // Health bar metrics
-  const healthServices = health?.services ?? {};
+  const healthServices = (health?.services ?? {}) as Record<string, boolean | undefined>;
   const allServicesUp = Object.values(healthServices).every(Boolean);
   const uptimeLabel = health ? (allServicesUp ? "100%" : "Degraded") : "—";
 

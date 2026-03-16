@@ -293,7 +293,7 @@ export default function ProfileScreen() {
     );
   }
 
-  const userName = profile?.name ?? i18n.t("profile.user");
+  const userName = profile?.name ?? i18n.t("profile.user") ?? "";
   const userInitials = userName
     .split(" ")
     .map((n) => n[0])

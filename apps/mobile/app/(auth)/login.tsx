@@ -174,7 +174,7 @@ export default function LoginScreen() {
               <Button
                 mode="text"
                 compact
-                onPress={() => router.push("/(auth)/signup")}
+                onPress={() => router.push("/(auth)/signup" as never)}
               >
                 {i18n.t("auth.signup")}
               </Button>

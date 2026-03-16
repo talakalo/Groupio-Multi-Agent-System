@@ -35,7 +35,7 @@ export default function OrdersScreen() {
 
   const handlePress = useCallback(
     (order: Order) => {
-      router.push({ pathname: "/order-detail", params: { id: order.id } });
+      router.push({ pathname: "/order-detail", params: { id: order.id } } as never);
     },
     [router],
   );
