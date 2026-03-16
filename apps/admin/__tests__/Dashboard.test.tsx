@@ -43,6 +43,7 @@ vi.mock('@/lib/hooks', () => ({
   }),
   useActivityLog: () => ({ data: [] }),
   useVettingStatus: () => ({ data: { pendingReview: 3, approved: 42, rejected: 5, contractors: [] } }),
+  useContractors: () => ({ data: [] }),
 }));
 
 // Mock Next.js router
@@ -89,7 +90,8 @@ describe('Admin Dashboard Page', () => {
     render(<DashboardPage />, { wrapper: createTestWrapper() });
 
     await waitFor(() => {
-      expect(screen.getByText(/uptime/i)).toBeInTheDocument();
+      const uptimeElements = screen.getAllByText(/uptime/i);
+      expect(uptimeElements.length).toBeGreaterThanOrEqual(1);
     });
   });
 

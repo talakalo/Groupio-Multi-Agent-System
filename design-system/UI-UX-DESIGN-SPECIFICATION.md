@@ -347,20 +347,31 @@ type UXStrategy = {
 
 ## 5. Audit Summary (ImplementationStatus by Area)
 
-| AuditTarget | Web | Admin | Mobile |
-|-------------|-----|-------|--------|
-| ExistingRoutes | Implemented | Implemented | Partial |
-| ExistingLayouts | Implemented | Implemented | Implemented |
-| ExistingNavigation | Partial (no bottom nav) | Implemented | Implemented |
-| ExistingRoleFlows | Implemented | Implemented | Partial |
-| ExistingDashboards | Implemented | Implemented | Implemented |
-| ExistingOfferPages | Implemented | Implemented | Partial |
-| ExistingCheckoutPages | Implemented | N/A | Implemented |
-| ExistingAdminPages | Implemented | Implemented | Missing |
-| ExistingContractorFlows | Implemented | N/A | Partial |
-| ExistingOnboardingFlows | Implemented | N/A | Missing |
-| ExistingChatAndAIFlows | Implemented | Agent UI | Implemented |
-| ExistingErrorsAndLoadingStates | Inconsistent | Partial | Inconsistent |
+### ImplementationStatus by AuditTarget
+
+| AuditTarget | Status | Notes |
+|-------------|--------|-------|
+| ExistingRoutes | Implemented | Web: 45 pages; Admin: 10 pages; Resident/Contractor/BM/Auth flows present |
+| ExistingLayouts | Implemented | Resident, Contractor, BuildingsManager, Admin, Auth layouts |
+| ExistingNavigation | Implemented | Resident: sidebar + bottom nav + More sheet; Contractor: sidebar + bottom nav + FAB; BM: sidebar; Admin: grouped sections |
+| ExistingRoleFlows | Implemented | Resident→Contractor→BM role routing; Admin separate app |
+| ExistingDashboards | Implemented | Resident, Contractor, BM, Admin dashboards with metrics |
+| ExistingOfferPages | Implemented | List, detail, create, active; filters, empty states |
+| ExistingCheckoutPages | Implemented | Stripe/mock modes; PriceBreakdown, EscrowBadge, TrustBadgeCluster |
+| ExistingAdminPages | Implemented | Dashboard, Agents, Escalations, Payments, Offers, Users, Contractors, Analytics, Settings, Audit Logs |
+| ExistingContractorFlows | Implemented | Create offer wizard, active offers, projects, profile |
+| ExistingOnboardingFlows | Implemented | Post-signup onboarding with StepIndicator bar variant |
+| ExistingChatAndAIFlows | Implemented | Resident /chat; Admin Agent UI with metrics |
+| ExistingErrorsAndLoadingStates | Implemented | 16 error.tsx (root, resident, checkout, orders, building, auth, admin, contractor, BM); 32 loading.tsx across routes |
+
+### Orphaned / Inconsistent
+
+| Item | Status | Recommendation |
+|------|--------|----------------|
+| `/architecture` (resident) | Orphaned | Low relevance; remove from nav or relocate |
+| Admin `/buildings` | Missing | Nav link removed; use BM for buildings |
+| packages/ui vs web | Inconsistent | Tokens in packages/ui; some globals duplicated |
+| LanguageToggle | Partial | Resident only; Contractor/BM lack it |
 
 ---
 
