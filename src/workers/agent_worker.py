@@ -84,12 +84,15 @@ class AgentWorker:
             if self.router_agent is None:
                 raise RuntimeError("Router agent not initialized")
 
-            result = await self.router_agent.run(
-                message=message,
-                user_id=user_id,
-                session_id=session_id,
-                context=context,
-            )
+            state = {
+                "messages": [{"role": "user", "content": message}] if message else [],
+                "user_id": user_id,
+                "conversation_id": session_id,
+                "context": context,
+                "intent": None,
+                "actions_taken": [],
+            }
+            result = await self.router_agent.run(state)
 
             return {
                 "task_id": task_id,
