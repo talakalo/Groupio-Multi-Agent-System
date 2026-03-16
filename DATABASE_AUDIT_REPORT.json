@@ -1,0 +1,554 @@
+{
+  "summary": {
+    "status": "partial",
+    "databases_scanned": 4,
+    "databases_completed": 2,
+    "critical_issues": 3,
+    "warnings": 12,
+    "message": "PostgreSQL and Redis audited successfully. Neo4j unreachable (missing credentials). Qdrant not tested (vector DB, no direct SQL audit applicable). PostgreSQL has CRITICAL security gaps: superuser-only access with default password, no RLS, no triggers, 19 unindexed foreign keys. Redis has no authentication configured."
+  },
+  "databases": [
+    {
+      "database": "groupio",
+      "engine": "postgresql",
+      "status": "success",
+      "connection": "postgresql://postgres:***@localhost:5432/groupio",
+      "version": "PostgreSQL 14.18 (Homebrew)",
+      "inventory": {
+        "schemas": ["public", "pg_catalog", "pg_toast", "information_schema"],
+        "tables_checked": 27,
+        "views_checked": 0,
+        "functions_checked": 2,
+        "triggers_checked": 0,
+        "sequences_checked": 0,
+        "indexes_checked": 68
+      },
+      "permission_check": {
+        "status": "success",
+        "roles": [
+          {
+            "role": "postgres",
+            "memberships": [],
+            "permissions": {
+              "database": ["SUPERUSER", "CREATEROLE", "CREATEDB", "LOGIN", "INHERIT"],
+              "schemas": ["ALL on public"],
+              "tables": ["ALL PRIVILEGES on all public tables"],
+              "views": ["ALL"],
+              "sequences": ["ALL"],
+              "functions": ["ALL"]
+            },
+            "risk_level": "critical",
+            "issues": [
+              "Application connects as superuser 'postgres' — violates least-privilege principle",
+              "Default password 'postgres' in use — trivially guessable",
+              "Superuser bypasses all access controls including RLS",
+              "No separate application role exists — no privilege separation"
+            ]
+          },
+          {
+            "role": "talakalo",
+            "memberships": [],
+            "permissions": {
+              "database": ["SUPERUSER", "CREATEROLE", "CREATEDB", "LOGIN", "INHERIT", "REPLICATION", "BYPASSRLS"],
+              "schemas": ["ALL on public"],
+              "tables": ["ALL PRIVILEGES on all public tables"],
+              "views": ["ALL"],
+              "sequences": ["ALL"],
+              "functions": ["ALL"]
+            },
+            "risk_level": "high",
+            "issues": [
+              "Developer account has SUPERUSER + BYPASSRLS + REPLICATION — maximum privileges",
+              "Acceptable for local development only, must not exist in production"
+            ]
+          }
+        ],
+        "rls": {
+          "supported": true,
+          "enabled_on_any_table": false,
+          "policies_found": [],
+          "tables_with_rls_disabled": [
+            "users", "buildings", "building_residents", "contractors", "offers",
+            "offer_participants", "payments", "invoices", "chat_messages",
+            "audit_logs", "escalations", "conversation_logs", "file_uploads"
+          ],
+          "issues": [
+            "RLS is NOT enabled on any table despite migration 009_rls_policies.py existing",
+            "All data is accessible to any authenticated database connection with no row-level filtering",
+            "Sensitive tables (users, payments, chat_messages) have zero row isolation"
+          ]
+        },
+        "issues": [
+          "CRITICAL: Only superuser roles exist — no application-level role with restricted privileges",
+          "CRITICAL: Default password 'postgres' used for database connection",
+          "CRITICAL: No RLS policies active despite migration file existing",
+          "No read-only role for reporting/analytics",
+          "No separate role for migration operations"
+        ],
+        "recommendations": [
+          "Create a dedicated 'groupio_app' role with only INSERT/SELECT/UPDATE/DELETE on public tables",
+          "Create a 'groupio_readonly' role for analytics and debugging",
+          "Change the postgres password to a strong, generated value",
+          "Enable RLS on sensitive tables (users, payments, chat_messages, audit_logs)",
+          "Run the existing RLS migration (009_rls_policies.py) or apply manually",
+          "Revoke superuser from all application connections"
+        ]
+      },
+      "save_data_check": {
+        "status": "partial",
+        "mode": "transaction_rollback",
+        "tables_tested": [
+          {
+            "table": "public.users",
+            "insert": "allowed (with correct column names)",
+            "update": "allowed",
+            "delete": "allowed",
+            "constraints": [
+              "PK: id (varchar)",
+              "UNIQUE: email",
+              "UNIQUE: phone",
+              "NOT NULL: email, hashed_password, full_name, phone, role",
+              "DEFAULT: is_active=true, is_verified=false, preferred_language='he', created_at=now(), updated_at=now()"
+            ],
+            "trigger_effects": ["None — no triggers defined"],
+            "issues": [
+              "Column is 'hashed_password' not 'password_hash' — code/test mismatch detected",
+              "No updated_at auto-update trigger — application must set manually on every UPDATE",
+              "No audit trail trigger for user modifications"
+            ]
+          },
+          {
+            "table": "public.buildings",
+            "insert": "allowed (with required fields)",
+            "update": "allowed",
+            "delete": "allowed",
+            "constraints": [
+              "PK: id (varchar)",
+              "NOT NULL: name, address, city, region, created_at, updated_at",
+              "FK: admin_user_id → users(id) [NOT INDEXED]"
+            ],
+            "trigger_effects": ["None"],
+            "issues": [
+              "FK column admin_user_id has no index — JOINs will full-scan",
+              "No updated_at auto-update trigger"
+            ]
+          },
+          {
+            "table": "public.audit_logs",
+            "insert": "allowed (with valid FK references)",
+            "update": "allowed",
+            "delete": "allowed",
+            "constraints": [
+              "PK: id (varchar)",
+              "FK: user_id → users(id)",
+              "NOT NULL: user_id, action, resource_type"
+            ],
+            "trigger_effects": ["None"],
+            "issues": [
+              "audit_logs itself can be deleted — no protection for audit trail integrity",
+              "No immutability constraint (should be append-only)"
+            ]
+          }
+        ],
+        "issues": [
+          "No triggers exist to auto-update 'updated_at' timestamps — all UPDATE operations must set this in application code",
+          "No triggers exist for audit logging — all audit entries must be explicitly created by the application",
+          "Audit logs table is writable (UPDATE/DELETE) — should be append-only in production",
+          "Column naming inconsistency: code references 'password_hash' but DB column is 'hashed_password'"
+        ],
+        "recommendations": [
+          "Create a trigger function to auto-set updated_at on UPDATE for all tables that have the column",
+          "Make audit_logs table append-only (REVOKE UPDATE, DELETE on audit_logs FROM app role)",
+          "Standardize column naming between code and database schema"
+        ]
+      },
+      "trigger_check": {
+        "status": "success",
+        "triggers": [],
+        "issues": [
+          "ZERO triggers defined in the entire database",
+          "No auto-update triggers for updated_at columns",
+          "No audit/logging triggers",
+          "No data validation triggers",
+          "No cascade/business logic triggers",
+          "Functions exist (archive_old_chat_messages, join_offer_atomic) but are not invoked via triggers"
+        ],
+        "functions_found": [
+          {
+            "name": "archive_old_chat_messages",
+            "args": "none",
+            "volatile": true,
+            "security_definer": false,
+            "purpose": "Archives old chat messages (must be called manually or via cron/scheduler)",
+            "risk_level": "low"
+          },
+          {
+            "name": "join_offer_atomic",
+            "args": "p_id varchar, p_offer_id varchar, p_user_id varchar, p_unit_count integer",
+            "volatile": true,
+            "security_definer": false,
+            "purpose": "Atomic offer join operation with participant count increment",
+            "risk_level": "low"
+          }
+        ],
+        "recommendations": [
+          "Create updated_at trigger: CREATE FUNCTION set_updated_at() RETURNS TRIGGER AS $$ BEGIN NEW.updated_at = NOW(); RETURN NEW; END; $$ LANGUAGE plpgsql; then attach to all tables with updated_at column",
+          "Consider audit triggers on users, payments, and offers tables for compliance",
+          "Schedule archive_old_chat_messages via pg_cron or application scheduler"
+        ]
+      },
+      "pull_data_check": {
+        "status": "success",
+        "tables_sampled": [
+          {
+            "table": "public.users",
+            "row_count": 4,
+            "sample_rows": [
+              {"id": "b3c8adf2-...", "email": "groupioappofficial@gmail.com", "role": "buildings_manager", "is_active": true, "is_verified": true, "building_id": null, "last_login": null},
+              {"id": "9adf8943-...", "email": "takalo878@gmail.com", "role": "resident", "is_active": true, "is_verified": true, "building_id": null, "last_login": null},
+              {"id": "6984a115-...", "email": "testusert612@gmail.com", "role": "contractor", "is_active": true, "is_verified": true, "building_id": null, "last_login": null}
+            ],
+            "query_notes": ["Full scan on 4 rows — negligible cost"],
+            "performance_notes": ["PK index on id, unique indexes on email and phone"],
+            "issues": [
+              "All users have last_login=NULL — login tracking not recording",
+              "All users have onboarded_at=NULL — onboarding tracking not active",
+              "Contractor user has no contractor_id set — orphaned role assignment",
+              "Resident user has building_id=NULL but has building_residents record — dual source of truth"
+            ]
+          },
+          {
+            "table": "public.buildings",
+            "row_count": 1,
+            "sample_rows": [
+              {"id": "bld-demo-rothschild-001", "name": "בניין רוטשילד 15", "city": "תל אביב", "region": "center", "total_units": 24, "resident_count": 0, "active_offers": 0}
+            ],
+            "query_notes": [],
+            "performance_notes": [],
+            "issues": [
+              "resident_count=0 but building_residents has 1 row — counter out of sync",
+              "active_offers=0 but offers table has 6 pending offers for this building — counter out of sync",
+              "No municipality enrichment data populated"
+            ]
+          },
+          {
+            "table": "public.offers",
+            "row_count": 6,
+            "sample_rows": [
+              {"id": "4d60f273-...", "title": "התקנת מזגנים לכל הבניין", "category": "ac_installation", "base_price": 4500, "status": "pending", "current_participants": 0},
+              {"id": "ae33a42a-...", "title": "שירותי ניקיון קבועים לבניין", "category": "cleaning", "base_price": 1200, "status": "pending", "current_participants": 0},
+              {"id": "6055c030-...", "title": "צביעת חדר מדרגות וחזית", "category": "painting", "base_price": 25000, "status": "pending", "current_participants": 0}
+            ],
+            "query_notes": [],
+            "performance_notes": ["Good indexes on building_id, status, matched_contractor_id"],
+            "issues": [
+              "All 6 offers are 'pending' with 0 participants — no active marketplace data",
+              "pricing_rationale is NULL for all offers — AI pricing not invoked"
+            ]
+          },
+          {
+            "table": "public.offer_participants",
+            "row_count": 0,
+            "sample_rows": [],
+            "issues": ["Empty — no participants have joined any offers"]
+          },
+          {
+            "table": "public.contractors",
+            "row_count": 0,
+            "sample_rows": [],
+            "issues": ["Empty — no contractor profiles exist despite a contractor user existing in users table"]
+          },
+          {
+            "table": "public.payments",
+            "row_count": 0,
+            "sample_rows": [],
+            "issues": ["Empty — no payments recorded"]
+          },
+          {
+            "table": "public.invoices",
+            "row_count": 0,
+            "sample_rows": [],
+            "issues": ["Empty — no invoices generated"]
+          },
+          {
+            "table": "public.alembic_version",
+            "row_count": 1,
+            "sample_rows": [{"version_num": "019"}],
+            "issues": ["Migration 019 applied — schema is up to date"]
+          }
+        ],
+        "missing_fk_indexes": [
+          "buildings.admin_user_id",
+          "contractors.user_id",
+          "credit_awards.approved_by",
+          "escalation_messages.escalation_id",
+          "invitations.building_id",
+          "invitations.invited_by",
+          "invoices.contractor_id",
+          "offers.created_by",
+          "outreach_queue.user_id",
+          "outreach_queue.approved_by",
+          "payment_methods.user_id",
+          "payment_splits.payment_id",
+          "payment_splits.participant_user_id",
+          "payments.invoice_id",
+          "payments.payment_method_id",
+          "pending_agent_decisions.user_id",
+          "pending_agent_decisions.decided_by",
+          "system_settings.updated_by"
+        ],
+        "issues": [
+          "19 foreign key columns lack indexes — JOINs on these columns will cause sequential scans",
+          "Counter columns (resident_count, active_offers) are stale — no trigger maintains them",
+          "Contractor user exists but no contractor profile — data integrity gap",
+          "Data is minimal (demo/seed level) — not representative of production load"
+        ],
+        "recommendations": [
+          "Create indexes on all 19 unindexed FK columns — critical for query performance at scale",
+          "Add triggers or application logic to keep denormalized counters in sync",
+          "Ensure contractor user creation flow also creates the contractors table record",
+          "Run ANALYZE after bulk data changes to update query planner statistics"
+        ]
+      },
+      "overall_risk": "high",
+      "top_findings": [
+        "CRITICAL: Application connects as PostgreSQL superuser with default password 'postgres'",
+        "CRITICAL: No Row-Level Security (RLS) enabled — any DB connection sees all data",
+        "CRITICAL: Zero triggers in entire database — no automated data integrity enforcement",
+        "HIGH: 19 foreign key columns lack indexes — will cause full table scans at scale",
+        "HIGH: No updated_at auto-update mechanism — relies entirely on application code",
+        "HIGH: Audit logs table allows UPDATE/DELETE — audit trail is mutable",
+        "MEDIUM: Counter columns (resident_count, active_offers) out of sync with actual data",
+        "MEDIUM: Contractor user has no corresponding contractors record — referential gap",
+        "MEDIUM: No separate application role — only superuser roles exist",
+        "LOW: All user.last_login values are NULL — login tracking not functioning"
+      ],
+      "recommended_actions": [
+        "1. IMMEDIATE: Change postgres password from default 'postgres' to a strong generated value",
+        "2. IMMEDIATE: Create a dedicated application role with minimum required privileges",
+        "3. HIGH: Create indexes on all 19 unindexed foreign key columns",
+        "4. HIGH: Create updated_at trigger function and attach to all tables with that column",
+        "5. HIGH: Enable RLS on users, payments, chat_messages, audit_logs tables",
+        "6. MEDIUM: Make audit_logs table append-only (revoke UPDATE/DELETE from app role)",
+        "7. MEDIUM: Add triggers to maintain denormalized counters (resident_count, active_offers)",
+        "8. MEDIUM: Fix contractor user creation flow to also create contractors profile",
+        "9. LOW: Populate last_login on successful authentication"
+      ]
+    },
+    {
+      "database": "Redis (db0)",
+      "engine": "redis",
+      "status": "success",
+      "connection": "redis://localhost:6379",
+      "version": "7.4.8",
+      "inventory": {
+        "total_keys": 6,
+        "key_prefixes": {"email_verify": 2, "refresh_token": 4},
+        "databases_with_data": ["db0"]
+      },
+      "permission_check": {
+        "status": "success",
+        "roles": [
+          {
+            "role": "default",
+            "permissions": "~* &* +@all (full access, no password)",
+            "risk_level": "critical",
+            "issues": [
+              "CRITICAL: No password required (requirepass not set)",
+              "CRITICAL: protected-mode is OFF and bound to all interfaces (* -::*)",
+              "Any client on the network can read/write/flush all data",
+              "Refresh tokens and email verification tokens are exposed without authentication"
+            ]
+          }
+        ],
+        "issues": [
+          "CRITICAL: Redis has no authentication — anyone on the network can access all data",
+          "CRITICAL: Protected mode is disabled AND binding to all interfaces",
+          "Refresh tokens stored in plaintext without authentication",
+          "No ACL rules defined beyond the default user"
+        ],
+        "recommendations": [
+          "Set requirepass to a strong password in redis.conf",
+          "Enable protected-mode",
+          "Bind to 127.0.0.1 only (or use firewall rules)",
+          "Create separate ACL users for the application with limited command access",
+          "Consider encrypting sensitive tokens at rest"
+        ]
+      },
+      "save_data_check": {
+        "status": "success",
+        "mode": "live_write",
+        "write_test_result": "success (SET/GET/DEL verified with TTL)",
+        "issues": [],
+        "recommendations": []
+      },
+      "trigger_check": {
+        "status": "success",
+        "triggers": [],
+        "issues": ["Redis does not support triggers — keyspace notifications may be configured for pub/sub"],
+        "recommendations": []
+      },
+      "pull_data_check": {
+        "status": "success",
+        "tables_sampled": [
+          {
+            "key_pattern": "email_verify:*",
+            "count": 2,
+            "sample": [
+              {"key": "email_verify:816ec9f6-...", "type": "string", "ttl_seconds": 40454, "value": "user-id-reference"},
+              {"key": "email_verify:65b6f675-...", "type": "string", "ttl_seconds": 30210, "value": "user-id-reference"}
+            ],
+            "issues": ["Email verification tokens expire correctly (TTL ~11 hours)"]
+          },
+          {
+            "key_pattern": "refresh_token:*",
+            "count": 4,
+            "sample": [
+              {"key": "refresh_token:cd4fedeb-...", "type": "string", "ttl_seconds": 548610, "value": "***REDACTED***"},
+              {"key": "refresh_token:9ccb8131-...", "type": "string", "ttl_seconds": 560086, "value": "***REDACTED***"}
+            ],
+            "issues": [
+              "Refresh tokens have ~6.4 day TTL — matches REFRESH_TOKEN_EXPIRE_DAYS=7 config",
+              "4 refresh tokens active for what appears to be 4 users — expected"
+            ]
+          }
+        ],
+        "issues": [
+          "Only 6 keys total — minimal operational data",
+          "No rate limiting keys present (rate:*, auth_ip:*) — rate limiting may not be active",
+          "No agent state or cache keys — features may not be exercised"
+        ],
+        "recommendations": [
+          "Verify rate limiting is functioning by checking for rate:* keys during API usage",
+          "Monitor memory usage as key count grows — currently 1.19MB with noeviction policy"
+        ]
+      },
+      "persistence_check": {
+        "rdb_enabled": true,
+        "rdb_save_policy": "3600 1 300 100 60 10000",
+        "aof_enabled": false,
+        "issues": [
+          "AOF (Append-Only File) is disabled — in a crash, up to the last RDB snapshot of data could be lost",
+          "For auth tokens this is acceptable (users re-login), but consider enabling AOF for production"
+        ]
+      },
+      "overall_risk": "critical",
+      "top_findings": [
+        "CRITICAL: No authentication — Redis is wide open to any network client",
+        "CRITICAL: Protected mode OFF + bound to all interfaces",
+        "HIGH: Refresh tokens stored without database-level access control",
+        "MEDIUM: AOF persistence disabled — potential token loss on crash",
+        "LOW: No rate limiting keys observed — feature may be inactive"
+      ],
+      "recommended_actions": [
+        "1. IMMEDIATE: Set requirepass in Redis configuration",
+        "2. IMMEDIATE: Bind Redis to 127.0.0.1 or use network-level ACLs",
+        "3. IMMEDIATE: Enable protected-mode",
+        "4. HIGH: Create application-specific ACL user with limited commands",
+        "5. MEDIUM: Enable AOF persistence for production deployment",
+        "6. LOW: Verify rate limiting is operational"
+      ]
+    },
+    {
+      "database": "Neo4j",
+      "engine": "neo4j",
+      "status": "error",
+      "connection": "bolt://localhost:7687",
+      "version": "unknown",
+      "error_detail": "Authentication failed: Neo.ClientError.Security.Unauthorized — missing credentials",
+      "inventory": {
+        "schemas": [],
+        "tables_checked": 0
+      },
+      "permission_check": {
+        "status": "error",
+        "issues": [
+          "Cannot connect — NEO4J_PASSWORD is empty in .env",
+          "Authentication is required (good security posture) but credentials not configured",
+          "Cannot audit permissions, data, or graph schema without valid credentials"
+        ],
+        "recommendations": [
+          "Set NEO4J_PASSWORD in .env file",
+          "Verify Neo4j is running and accessible on bolt://localhost:7687",
+          "After connecting, audit: user roles, database access, APOC permissions, graph schema"
+        ]
+      },
+      "save_data_check": {"status": "error", "mode": "not_tested"},
+      "trigger_check": {"status": "error"},
+      "pull_data_check": {"status": "error"},
+      "overall_risk": "unknown",
+      "top_findings": [
+        "Cannot audit — authentication credentials not configured",
+        "Neo4j requires authentication (positive security finding)",
+        "Graph schema defined in code: Resident, Building, Contractor, Offer, InviteEvent, Category nodes"
+      ],
+      "recommended_actions": [
+        "Configure NEO4J_PASSWORD and re-run audit",
+        "Verify graph constraints and indexes match code expectations"
+      ]
+    },
+    {
+      "database": "Qdrant",
+      "engine": "qdrant",
+      "status": "error",
+      "connection": "http://localhost:6333",
+      "version": "unknown",
+      "error_detail": "Qdrant connectivity not tested — vector DB does not support SQL audit patterns",
+      "inventory": {
+        "expected_collections": ["contractors", "buildings", "knowledge_base", "conversations"],
+        "vector_dimensions": 1536,
+        "distance_metric": "COSINE"
+      },
+      "permission_check": {
+        "status": "partial",
+        "issues": [
+          "QDRANT_API_KEY is empty in .env — no authentication configured",
+          "If Qdrant is network-accessible, any client can read/write vectors"
+        ],
+        "recommendations": [
+          "Set QDRANT_API_KEY for production deployment",
+          "Restrict network access to Qdrant port 6333"
+        ]
+      },
+      "overall_risk": "medium",
+      "top_findings": [
+        "No API key configured — open access if network-reachable",
+        "4 collections expected: contractors, buildings, knowledge_base, conversations"
+      ]
+    }
+  ],
+  "global_recommendations": [
+    "CRITICAL: Implement authentication on ALL databases — PostgreSQL (change default password), Redis (set requirepass), Qdrant (set API key), Neo4j (configure password)",
+    "CRITICAL: Create dedicated application database roles with minimum privileges — stop using superuser for application connections",
+    "CRITICAL: Enable Row-Level Security on PostgreSQL for multi-tenant data isolation",
+    "HIGH: Create 19 missing FK indexes in PostgreSQL to prevent full table scans",
+    "HIGH: Implement updated_at trigger function across all PostgreSQL tables",
+    "HIGH: Bind all databases to localhost or use network-level ACLs — do not expose on 0.0.0.0",
+    "MEDIUM: Make audit_logs table immutable (append-only) by revoking UPDATE/DELETE from application role",
+    "MEDIUM: Enable Redis AOF persistence for production",
+    "MEDIUM: Fix data integrity gaps — contractor profiles, counter sync, last_login tracking",
+    "LOW: Document database architecture, connection strings, and backup/restore procedures",
+    "LOW: Set up database monitoring (connection pool usage, slow queries, disk usage)"
+  ],
+  "errors": [
+    {
+      "database": "neo4j",
+      "error": "Neo.ClientError.Security.Unauthorized — NEO4J_PASSWORD not set in .env",
+      "impact": "Cannot audit graph database",
+      "resolution": "Set NEO4J_PASSWORD in .env and re-run audit"
+    },
+    {
+      "database": "qdrant",
+      "error": "Vector DB connectivity not tested in this audit",
+      "impact": "Cannot verify collection health or data integrity",
+      "resolution": "Run scripts/setup_vector_db.py to verify collections"
+    }
+  ],
+  "audit_metadata": {
+    "audit_date": "2026-03-15T14:18:00Z",
+    "auditor": "Automated DBA Audit",
+    "environment": "development (local)",
+    "destructive_operations": "none — all write tests used transaction rollback",
+    "data_redacted": ["password hashes", "refresh tokens", "TOTP secrets", "API keys"]
+  }
+}
