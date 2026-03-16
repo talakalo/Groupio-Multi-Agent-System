@@ -25,6 +25,7 @@ export default function BuildingsManagerBuildingsPage() {
   const t = useTranslations('buildingsManager.buildings');
   const accessToken = useAuthStore((s) => s.accessToken);
   const [search, setSearch] = useState('');
+  const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(null);
   const [regionFilter, setRegionFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'name' | 'units' | 'escalations'>('name');
   const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -52,7 +53,9 @@ export default function BuildingsManagerBuildingsPage() {
 
   const filtered = useMemo(() => {
     let result = buildings;
-    if (search) {
+    if (selectedBuildingId) {
+      result = result.filter((b) => b.id === selectedBuildingId);
+    } else if (search) {
       const q = search.toLowerCase();
       result = result.filter(
         (b) =>
@@ -75,7 +78,7 @@ export default function BuildingsManagerBuildingsPage() {
         sorted.sort((a, b) => (a.name ?? a.address).localeCompare(b.name ?? b.address));
     }
     return sorted;
-  }, [buildings, search, regionFilter, sortBy]);
+  }, [buildings, search, selectedBuildingId, regionFilter, sortBy]);
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -87,6 +90,40 @@ export default function BuildingsManagerBuildingsPage() {
           </p>
         </div>
       </div>
+
+      {/* Sub-nav: building quick-switch when multiple buildings */}
+      {buildings.length > 1 && (
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
+          <button
+            type="button"
+            onClick={() => { setSelectedBuildingId(null); setSearch(''); }}
+            className={cn(
+              'flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-colors',
+              !selectedBuildingId ? 'bg-emerald-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            )}
+          >
+            {t('allBuildings') || 'הכל'}
+          </button>
+          {buildings.slice(0, 8).map((b) => {
+            const label = b.name ?? b.address;
+            const isActive = selectedBuildingId === b.id;
+            return (
+              <button
+                key={b.id}
+                type="button"
+                onClick={() => setSelectedBuildingId(b.id)}
+                className={cn(
+                  'flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-colors truncate max-w-[160px]',
+                  isActive ? 'bg-emerald-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                )}
+                title={label}
+              >
+                {label.length > 20 ? `${label.slice(0, 18)}…` : label}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Search & Filters */}
       <div className="flex flex-col sm:flex-row gap-3">

@@ -41,29 +41,28 @@ interface NavSection {
 
 const NAV_SECTIONS: NavSection[] = [
   {
-    title: "Operations",
+    title: "Core",
     items: [
       { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-      { label: "Offers", href: "/offers", icon: Tag },
-      { label: "Payments", href: "/payments", icon: CreditCard },
+      { label: "Agents", href: "/agents", icon: Bot },
       { label: "Escalations", href: "/escalations", icon: AlertTriangle },
+      { label: "Payments", href: "/payments", icon: CreditCard },
     ],
   },
   {
-    title: "Management",
+    title: "Data",
     items: [
+      { label: "Offers", href: "/offers", icon: Tag },
       { label: "Users", href: "/users", icon: Users },
       { label: "Contractors", href: "/contractors", icon: HardHat },
-      { label: "Buildings", href: "/buildings", icon: Building2 },
+      { label: "Analytics", href: "/analytics", icon: BarChart3 },
     ],
   },
   {
-    title: "System",
+    title: "Config",
     items: [
-      { label: "AI Agents", href: "/agents", icon: Bot },
-      { label: "Analytics", href: "/analytics", icon: BarChart3 },
       { label: "Settings", href: "/settings", icon: Settings },
-      { label: "Audit Log", href: "/audit-log", icon: FileText },
+      { label: "Audit Logs", href: "/settings/audit-logs", icon: FileText },
     ],
   },
 ];

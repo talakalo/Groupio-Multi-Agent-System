@@ -21,6 +21,7 @@ import { useTranslations } from 'next-intl';
 import { useState, useMemo } from 'react';
 
 import { CategoryChips } from '@/components/shared/CategoryChips';
+import { EmptyState } from '@/components/shared/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
@@ -514,18 +515,30 @@ export default function OffersListPage() {
           ))}
         </div>
       ) : (
-        <div className="card text-center py-16">
-          <div className="mx-auto mb-6 w-24 h-24 rounded-full bg-gray-100 flex items-center justify-center">
-            <Tag className="h-12 w-12 text-gray-300" />
-          </div>
-          <p className="text-gray-700 text-lg font-bold mb-2">{t('noOffers')}</p>
-          <p className="text-gray-400 text-sm mb-2">{t('noOffersDescription')}</p>
-          <p className="text-gray-500 text-sm mb-6">נסו לחפש בקטגוריה אחרת</p>
+        <div className="card">
+          <EmptyState
+            icon={Tag}
+            title={t('noOffers')}
+            description={
+              activeFilterCount > 0
+                ? t('noOffersDescription') + ' נסו לנקות את הסינון.'
+                : t('noOffersDescription')
+            }
+            action={
+              activeFilterCount > 0 ? undefined : { label: 'גלו הצעות', href: '/offers' }
+            }
+          />
           {activeFilterCount > 0 && (
-            <button type="button" onClick={clearFilters} className="btn-secondary inline-flex items-center gap-2">
-              <X className="h-4 w-4" />
-              <span>{t('clearFilters')}</span>
-            </button>
+            <div className="flex justify-center -mt-4 pb-4">
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="btn-secondary inline-flex items-center gap-2"
+              >
+                <X className="h-4 w-4" />
+                <span>{t('clearFilters')}</span>
+              </button>
+            </div>
           )}
         </div>
       )}

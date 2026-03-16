@@ -49,6 +49,22 @@
     "newOffer": "New Offer",
     "myBusiness": "My Business"
   },
+  "buildingsManager": {
+    "buildings": {
+      "title": "Buildings",
+      "total": "{count} buildings total",
+      "allBuildings": "All",
+      "searchPlaceholder": "Search buildings...",
+      "allRegions": "All regions",
+      "sortByName": "By name",
+      "sortByUnits": "By units",
+      "sortByEscalations": "By escalations",
+      "noResults": "No results found",
+      "empty": "No buildings",
+      "units": "{count} units",
+      "activeOffers": "{count} active offers"
+    }
+  },
   "dashboard": {
     "welcome": "Hello, {name}!",
     "guestName": "there",

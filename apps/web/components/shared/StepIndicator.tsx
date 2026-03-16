@@ -9,10 +9,28 @@ interface Step {
 interface StepIndicatorProps {
   steps: Step[];
   currentStep: number;
+  variant?: "circles" | "bar";
   className?: string;
 }
 
-export function StepIndicator({ steps, currentStep, className }: StepIndicatorProps) {
+export function StepIndicator({ steps, currentStep, variant = "circles", className }: StepIndicatorProps) {
+  if (variant === "bar") {
+    const pct = steps.length > 0 ? ((currentStep + 1) / steps.length) * 100 : 0;
+    return (
+      <nav aria-label="Progress" className={className}>
+        <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-primary-500 rounded-full transition-all duration-300"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        <p className="text-xs text-gray-500 mt-2 text-center">
+          שלב {currentStep + 1} מתוך {steps.length}
+        </p>
+      </nav>
+    );
+  }
+
   return (
     <nav aria-label="Progress" className={className}>
       {/* Horizontal layout for desktop */}

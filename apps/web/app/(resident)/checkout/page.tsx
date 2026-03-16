@@ -33,6 +33,7 @@ import {
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { Suspense, useCallback, useEffect, useState } from "react";
 
 import { EscrowBadge } from "@/components/features/payments/EscrowBadge";
@@ -122,7 +123,23 @@ function CreditCardBadge() {
   );
 }
 
-function TrustSidebar({ collapsed = false }: { collapsed?: boolean }) {
+type PriceItem = { label: string; amount: number; type?: "regular" | "discount" | "subtotal" | "tax" | "total" };
+
+interface TrustSidebarProps {
+  collapsed?: boolean;
+  priceItems?: PriceItem[];
+  currency?: string;
+  contractorName?: string;
+  contractorVerified?: boolean;
+}
+
+function TrustSidebar({
+  collapsed = false,
+  priceItems,
+  currency = "ILS",
+  contractorName,
+  contractorVerified,
+}: TrustSidebarProps) {
   const [open, setOpen] = useState(!collapsed);
 
   return (
@@ -149,6 +166,26 @@ function TrustSidebar({ collapsed = false }: { collapsed?: boolean }) {
       <div className={collapsed && !open ? "hidden lg:block" : ""}>
         <div className="space-y-4">
           <EscrowBadge variant="block" />
+
+          {priceItems && priceItems.length > 0 && (
+            <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+              <p className="text-xs font-semibold text-gray-600 mb-2">סיכום מחיר</p>
+              <PriceBreakdown items={priceItems} currency={currency} />
+            </div>
+          )}
+
+          {contractorName && (
+            <div className="rounded-xl border border-gray-200 bg-white p-3">
+              <p className="text-xs font-semibold text-gray-600 mb-1">הקבלן</p>
+              <p className="text-sm font-medium text-gray-900">{contractorName}</p>
+              {contractorVerified && (
+                <span className="inline-flex items-center gap-1 text-xs text-emerald-600 mt-1">
+                  <ShieldCheck className="h-3 w-3" aria-hidden="true" />
+                  קבלן מאומת
+                </span>
+              )}
+            </div>
+          )}
 
           <TrustBadgeCluster
             badges={["verified", "escrow", "licensed"]}
@@ -349,6 +386,72 @@ function ErrorState({
   );
 }
 
+// ---- Checkout stripe layout (fetches offer for trust sidebar) ----
+
+function CheckoutStripeLayout({
+  payment,
+  priceItems,
+  offerId,
+  onStripeSuccess,
+  onStripeError,
+}: {
+  payment: PaymentResult;
+  priceItems: PriceItem[];
+  offerId: string;
+  onStripeSuccess: () => void;
+  onStripeError: (msg: string) => void;
+}) {
+  const offerQuery = useQuery({
+    queryKey: ["offer", offerId],
+    queryFn: () => apiClient.getOffer(offerId),
+    enabled: !!offerId,
+  });
+  const contractor = offerQuery.data?.contractor;
+
+  const sidebarProps = {
+    priceItems,
+    currency: payment.currency || "ILS",
+    contractorName: contractor?.businessName,
+    contractorVerified: contractor?.verified,
+  };
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-6">
+      {/* Mobile: trust sidebar (collapsed accordion) */}
+      <div className="lg:hidden">
+        <TrustSidebar collapsed {...sidebarProps} />
+      </div>
+
+      {/* Left column: order review + payment */}
+      <div className="space-y-4">
+        <div className="text-center pb-2 lg:text-right">
+          <h2 className="text-lg font-semibold text-gray-900">השלמת תשלום</h2>
+        </div>
+
+        {/* Price breakdown */}
+        <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+          <PriceBreakdown items={priceItems} currency={payment.currency || "ILS"} />
+        </div>
+
+        <CreditCardBadge />
+
+        <StripeCheckoutForm
+          clientSecret={payment.client_secret!}
+          onSuccess={onStripeSuccess}
+          onError={onStripeError}
+        />
+      </div>
+
+      {/* Right column: trust sidebar (desktop) */}
+      <aside className="hidden lg:block">
+        <div className="sticky top-8 space-y-4">
+          <TrustSidebar {...sidebarProps} />
+        </div>
+      </aside>
+    </div>
+  );
+}
+
 // ---- Main checkout content (uses searchParams → must be wrapped in Suspense) ----
 
 function CheckoutContent() {
@@ -465,41 +568,14 @@ function CheckoutContent() {
 
   if (phase === "stripe" && payment?.client_secret) {
     const priceItems = buildPriceItems(payment);
-
     return (
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-6">
-        {/* Mobile: trust sidebar (collapsed accordion) */}
-        <div className="lg:hidden">
-          <TrustSidebar collapsed />
-        </div>
-
-        {/* Left column: order review + payment */}
-        <div className="space-y-4">
-          <div className="text-center pb-2 lg:text-right">
-            <h2 className="text-lg font-semibold text-gray-900">השלמת תשלום</h2>
-          </div>
-
-          {/* Price breakdown */}
-          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-            <PriceBreakdown items={priceItems} currency={payment.currency || "ILS"} />
-          </div>
-
-          <CreditCardBadge />
-
-          <StripeCheckoutForm
-            clientSecret={payment.client_secret}
-            onSuccess={handleStripeSuccess}
-            onError={handleStripeError}
-          />
-        </div>
-
-        {/* Right column: trust sidebar (desktop) */}
-        <aside className="hidden lg:block">
-          <div className="sticky top-8 space-y-4">
-            <TrustSidebar />
-          </div>
-        </aside>
-      </div>
+      <CheckoutStripeLayout
+        payment={payment}
+        priceItems={priceItems}
+        offerId={offerId}
+        onStripeSuccess={handleStripeSuccess}
+        onStripeError={handleStripeError}
+      />
     );
   }
 

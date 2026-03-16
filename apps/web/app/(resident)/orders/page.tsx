@@ -25,6 +25,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import { EscrowBadge } from "@/components/features/payments/EscrowBadge";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { Badge } from "@/components/ui/Badge";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { apiClient, ApiError } from "@/lib/api/client";
@@ -448,23 +449,19 @@ export default function OrdersPage() {
           </button>
         </div>
       ) : displayed.length === 0 ? (
-        <div className="flex flex-col items-center py-16 text-center bg-white rounded-xl border border-gray-200">
-          <div className="w-16 h-16 rounded-full bg-gray-50 flex items-center justify-center mb-4">
-            <Package className="w-8 h-8 text-gray-300" aria-hidden="true" />
-          </div>
-          <p className="text-gray-700 font-semibold text-lg">
-            {tab === "active" ? "אין הזמנות פעילות" : tab === "completed" ? "אין הזמנות שהושלמו" : "אין הזמנות עדיין"}
-          </p>
-          <p className="text-sm text-gray-400 mt-2 max-w-xs">
-            הזמנות יופיעו כאן לאחר שתצטרפו להצעה ותבצעו תשלום
-          </p>
-          <Link
-            href="/offers"
-            className="mt-5 inline-flex items-center gap-2 px-5 py-2.5 bg-primary-500 text-white text-sm font-medium rounded-lg hover:bg-primary-600 transition-colors"
-          >
-            גלו הצעות
-            <ChevronRight className="w-4 h-4 rtl:rotate-180" aria-hidden="true" />
-          </Link>
+        <div className="bg-white rounded-xl border border-gray-200">
+          <EmptyState
+            icon={Package}
+            title={
+              tab === "active"
+                ? "אין הזמנות פעילות"
+                : tab === "completed"
+                  ? "אין הזמנות שהושלמו"
+                  : "אין הזמנות עדיין"
+            }
+            description="הזמנות יופיעו כאן לאחר שתצטרפו להצעה ותבצעו תשלום"
+            action={{ label: "גלו הצעות", href: "/offers" }}
+          />
         </div>
       ) : (
         <div className="space-y-3" role="list">

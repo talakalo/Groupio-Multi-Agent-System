@@ -49,6 +49,22 @@
     "newOffer": "הצעה חדשה",
     "myBusiness": "העסק שלי"
   },
+  "buildingsManager": {
+    "buildings": {
+      "title": "בניינים",
+      "total": "סה\"כ {count} בניינים",
+      "allBuildings": "הכל",
+      "searchPlaceholder": "חיפוש בניינים...",
+      "allRegions": "כל האזורים",
+      "sortByName": "לפי שם",
+      "sortByUnits": "לפי יחידות",
+      "sortByEscalations": "לפי הסלמות",
+      "noResults": "לא נמצאו תוצאות",
+      "empty": "אין בניינים",
+      "units": "{count} יחידות",
+      "activeOffers": "{count} הצעות פעילות"
+    }
+  },
   "dashboard": {
     "welcome": "שלום, {name}!",
     "guestName": "חבר",

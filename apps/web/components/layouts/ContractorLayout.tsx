@@ -44,7 +44,6 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { label: 'לוח בקרה', href: '/contractor/dashboard', icon: LayoutDashboard },
   { label: 'הצעות פעילות', href: '/contractor/offers/active', icon: Tag },
-  { label: 'צור הצעה', href: '/contractor/offers/create', icon: PlusCircle },
   { label: 'פרויקטים', href: '/contractor/projects', icon: FolderKanban },
   { label: 'פרופיל', href: '/contractor/profile', icon: UserCircle },
 ];
@@ -118,6 +117,18 @@ export function ContractorLayout({
             </span>
             <span className="text-xs text-gray-500">חשבון קבלן</span>
           </div>
+        </div>
+
+        {/* Create Offer — prominent CTA */}
+        <div className="px-3 pt-4">
+          <Link
+            href="/contractor/offers/create"
+            onClick={() => setSidebarOpen(false)}
+            className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-primary-500 text-white font-semibold text-sm hover:bg-primary-600 transition-colors shadow-sm"
+          >
+            <PlusCircle className="h-5 w-5" />
+            <span>צרו הצעה חדשה</span>
+          </Link>
         </div>
 
         {/* Nav links */}

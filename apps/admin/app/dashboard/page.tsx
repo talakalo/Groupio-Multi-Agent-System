@@ -316,9 +316,9 @@ export default function DashboardPage() {
       </div>
 
       {/* ================================================================== */}
-      {/* Key Metrics Cards (clickable)                                       */}
+      {/* Key Metrics Cards (clickable) — compact density                     */}
       {/* ================================================================== */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
         <MetricCard
           label="Revenue Today"
           value={`\u20AA${(metrics?.gmvToday ?? 0).toLocaleString()}`}
@@ -369,7 +369,7 @@ export default function DashboardPage() {
       {/* ================================================================== */}
       {/* Pending Actions Queue + System Health Overview                      */}
       {/* ================================================================== */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Pending actions */}
         <div className="lg:col-span-2">
           <h2 className="text-sm font-semibold text-surface-900 mb-3">
@@ -451,12 +451,12 @@ export default function DashboardPage() {
       {/* ================================================================== */}
       {/* Agent Performance Summary + Recent Escalations                     */}
       {/* ================================================================== */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2">
           <h2 className="text-sm font-semibold text-surface-900 mb-3">
             Agent Performance
           </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2.5">
             {agentSummary.map((agent) => {
               const errorRate =
                 agent.calls > 0

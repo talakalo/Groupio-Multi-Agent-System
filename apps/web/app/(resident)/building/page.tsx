@@ -22,6 +22,7 @@ import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 
+import { EmptyState } from '@/components/shared/EmptyState';
 import { Badge } from '@/components/ui/Badge';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useAuthStore } from '@/lib/stores/authStore';
@@ -126,14 +127,14 @@ export default function BuildingPage() {
   const accessToken = useAuthStore((s) => s.accessToken);
   const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-  const buildingQuery = useQuery<BuildingProfile>({
+  const buildingQuery = useQuery<BuildingProfile | null>({
     queryKey: ['building', 'profile'],
     queryFn: async () => {
       const res = await fetch(`${apiBase}/api/v1/buildings/me`, {
         headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
       });
       if (!res.ok) {
-        if (res.status === 404) throw new Error('No building associated with your account');
+        if (res.status === 404) return null;
         throw new Error('Failed to fetch building');
       }
       const data = await res.json();
@@ -176,6 +177,19 @@ export default function BuildingPage() {
       setTimeout(() => setCopiedCode(false), 2000);
     }
   };
+
+  if (!buildingQuery.isLoading && buildingQuery.data === null) {
+    return (
+      <div className="max-w-4xl mx-auto">
+        <EmptyState
+          icon={Building2}
+          title={t('noBuilding') ?? 'אין בניין משויך'}
+          description="הצטרפו לבניין שלכם כדי לראות שכנים והצעות קבוצתיות."
+          action={{ label: 'הצטרפו לבניין', href: '/building/join' }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -381,10 +395,12 @@ export default function BuildingPage() {
               ))}
             </div>
           ) : (
-            <div className="text-center py-8">
-              <Tag className="h-12 w-12 text-gray-200 mx-auto mb-3" />
-              <p className="text-gray-500">{t('noGroupOffers')}</p>
-            </div>
+            <EmptyState
+              icon={Tag}
+              title={t('noGroupOffers')}
+              description="הצעות קבוצתיות בבניין יופיעו כאן. שתפו את קוד ההזמנה עם שכנים."
+              action={{ label: t('viewAll'), href: '/offers' }}
+            />
           )}
         </div>
       )}

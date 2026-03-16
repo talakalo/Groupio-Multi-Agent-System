@@ -693,7 +693,7 @@ export default function OnboardingPage() {
           <p className="text-gray-600">{t('subtitle')}</p>
         </div>
 
-        {/* Step indicator */}
+        {/* Step indicator — progress bar at top */}
         {!isComplete && (
           <StepIndicator
             steps={[
@@ -702,6 +702,7 @@ export default function OnboardingPage() {
               { label: t('servicePreferences') },
             ]}
             currentStep={stepIndex}
+            variant="bar"
             className="mb-8"
           />
         )}

@@ -403,6 +403,22 @@ export default function OfferDetailPage() {
           </button>
         </div>
 
+        {/* Pricing tiers — prominent */}
+        <div className="mb-6">
+          <h2 className="text-sm font-semibold text-gray-500 mb-3">{t('pricingTiers')}</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {offer.tiers.map((tier, idx) => (
+              <TierCard
+                key={idx}
+                tier={tier}
+                index={idx}
+                isCurrentTier={idx === offer.currentTier}
+                participants={offer.participants}
+              />
+            ))}
+          </div>
+        </div>
+
         {/* Pricing highlight */}
         <div className="bg-gradient-to-l from-primary-50 to-white rounded-xl p-6 mb-6">
           <div className="flex items-end gap-4">
@@ -481,8 +497,36 @@ export default function OfferDetailPage() {
           </div>
         </div>
 
-        {/* Escrow protection badge */}
-        <EscrowBadge variant="block" className="mb-5" />
+        {/* Contractor trust block + Escrow — prominent adjacent to CTA */}
+        {contractor && (
+          <div className="mb-5 flex flex-col gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-primary-100 flex items-center justify-center text-sm font-bold text-primary-600">
+                {contractor.businessName?.charAt(0) ?? '?'}
+              </div>
+              <div className="flex-1">
+                <p className="font-semibold text-gray-900">{contractor.businessName}</p>
+                {contractor.verified && (
+                  <span className="flex items-center gap-1 text-xs text-emerald-600">
+                    <Shield className="h-3 w-3" />
+                    {tContractors('verified')}
+                  </span>
+                )}
+              </div>
+            </div>
+            <TrustBadgeCluster
+              badges={[
+                ...(contractor.verified ? ['verified' as const] : []),
+                'escrow' as const,
+                ...(contractor.licenseNumber ? ['licensed' as const] : []),
+                ...((contractor as { insured?: boolean }).insured ? ['insured' as const] : []),
+              ]}
+              size="sm"
+            />
+            <EscrowBadge variant="block" className="border-0 bg-white/80" />
+          </div>
+        )}
+        {!contractor && <EscrowBadge variant="block" className="mb-5" />}
 
         {/* Join button — opens confirmation modal with policy disclosure */}
         <button
@@ -568,21 +612,8 @@ export default function OfferDetailPage() {
 
       {/* Two-column layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Pricing tiers - takes 2 cols */}
+        {/* Detail column - takes 2 cols */}
         <div className="lg:col-span-2">
-          <h2 className="text-lg font-bold text-gray-900 mb-4">{t('pricingTiers')}</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {offer.tiers.map((tier, idx) => (
-              <TierCard
-                key={idx}
-                tier={tier}
-                index={idx}
-                isCurrentTier={idx === offer.currentTier}
-                participants={offer.participants}
-              />
-            ))}
-          </div>
-
           {/* Pricing rationale (Task 3.4) */}
           <details className="mt-4 text-sm text-gray-500">
             <summary className="cursor-pointer font-medium text-primary-600 hover:text-primary-700">
