@@ -29,12 +29,15 @@
   "residentNav": {
     "dashboard": "לוח בקרה",
     "offers": "הצעות",
+    "orders": "הזמנות",
     "contractors": "קבלנים",
     "building": "הבניין",
     "profile": "פרופיל",
     "payments": "תשלומים",
+    "aiChat": "צ'אט AI",
     "aiAssistant": "עוזר AI",
-    "myAccount": "החשבון שלי"
+    "myAccount": "החשבון שלי",
+    "more": "עוד"
   },
   "contractorNav": {
     "dashboard": "לוח בקרה",
@@ -346,9 +349,45 @@
       "title": "פרופיל העסק",
       "subtitle": "נהל את פרטי העסק והמסמכים",
       "trustScore": {
+        "breakdown": "פירוט ציון",
         "title": "ציון אמינות",
-        "description": "ציון האמינות שלך משפיע על הדירוג בהצעות"
+        "description": "ציון האמינות שלך משפיע על הדירוג בהצעות",
+        "yourTrustScore": "ציון האמינות שלך",
+        "scoreBreakdown": "פירוט ציון",
+        "improvementTips": "טיפים לשיפור הציון",
+        "scoreLabels": {
+          "excellent": "מצוין",
+          "good": "טוב",
+          "needsImprovement": "דרוש שיפור"
+        },
+        "categories": {
+          "documents": "מסמכים",
+          "insurance": "ביטוח",
+          "rating": "דירוג",
+          "responseTime": "זמן תגובה"
+        },
+        "tips": {
+          "insurance": "העלו תעודות ביטוח להגדלת הציון",
+          "profile": "השלימו את פרטי הפרופיל",
+          "response": "הגיבו מהר יותר להצעות לשיפור הדירוג",
+          "reviews": "צברו ביקורות חיוביות מלקוחות"
+        }
       },
+      "vetting": {
+        "documentSubmission": "הגשת מסמכים",
+        "documentSubmissionDesc": "העלאת מסמכי עסק ותעודות",
+        "licenseCheck": "בדיקת רישיון",
+        "licenseCheckDesc": "אימות רישיון עסק תקף",
+        "insuranceCheck": "בדיקת ביטוח",
+        "insuranceCheckDesc": "אימות ביטוח אחריות מקצועית",
+        "finalVerification": "אימות סופי",
+        "finalVerificationDesc": "סקירה סופית ואישור פרופיל",
+        "statusComplete": "הושלם",
+        "statusFailed": "נכשל",
+        "statusInProgress": "בתהליך"
+      },
+      "update": "עדכון",
+      "comingSoon": "בקרוב",
       "sections": {
         "business": "פרטי העסק",
         "services": "שירותים ואזורים",
@@ -375,11 +414,16 @@
         "licenseNumber": "מספר רישיון",
         "expiresAt": "תוקף עד",
         "notUploaded": "לא הועלה",
+        "statusUploaded": "הועלה",
+        "approved": "מאושר",
+        "pendingReview": "ממתין לבדיקה",
+        "rejected": "נדחה",
         "upload": "העלה",
         "uploading": "מעלה...",
         "uploadSuccess": "הקובץ הועלה בהצלחה",
         "uploadError": "שגיאה בהעלאה",
-        "uploaded": "הועלו"
+        "uploaded": "הועלו",
+        "vettingTimeline": "ציר זמן אימות"
       },
       "settings": {
         "notifications": "התראות",
@@ -476,10 +520,33 @@
     "placeholder": "הקלד הודעה...",
     "send": "שלח",
     "thinking": "חושב...",
+    "readyToHelp": "מוכן לעזור",
+    "assistantTitle": "עוזר AI של גרופיו",
+    "talkToAgent": "דבר עם נציג",
+    "loading": "טוען...",
+    "loadingHistory": "טוען הודעות ישנות יותר",
+    "errorGeneric": "מצטער, משהו השתבש. נסה שוב.",
+    "escalateMessage": "אני רוצה לדבר עם נציג",
+    "aiDisclaimer": "תוצאות מחיפוש זה מופקות על ידי בינה מלאכותית ועשויות לדרוש בדיקה אנושית.",
+    "transferringToAgent": "מעביר אותך לנציג אנושי... אנא המתן",
+    "slowResponse": "זה לוקח יותר זמן מהמצופה...",
+    "thinkingMessages": {
+      "searchingContractors": "מחפש קבלנים...",
+      "checkingPrices": "בודק מחירים...",
+      "analyzingHistory": "מנתח היסטוריה...",
+      "preparingRecommendations": "מכין המלצות...",
+      "searchingOffers": "מחפש הצעות מתאימות...",
+      "checkingStatus": "בודק סטטוס..."
+    },
+    "defaultSuggestions": {
+      "findOffers": "מצא לי הצעות",
+      "orderStatus": "מה סטטוס ההזמנה שלי",
+      "talkToAgent": "דבר עם נציג"
+    },
     "suggestions": {
       "findAC": "מצא קבלן מזגנים",
       "pricing": "כמה עולה התקנת מזגנים?",
-      "orderStatus": "מה הסטטוס של ההזמנה שלי?",
+      "orderStatusPage": "מה הסטטוס של ההזמנה שלי?",
       "help": "עזרה"
     },
     "welcome": "היי! 👋 אני העוזר הדיגיטלי של גרופיו. איך אוכל לעזור?"
@@ -512,6 +579,43 @@
     "payNow": "שלם עכשיו",
     "total": "סה\"כ"
   },
+  "payments": {
+    "title": "התשלומים שלי",
+    "subtitle": "ניהול תשלומים, חשבוניות וסטטוס נאמנות",
+    "offerLabel": "הצעה #{id}",
+    "payNow": "שלמו עכשיו",
+    "orderDetails": "פרטי הזמנה",
+    "yourPaymentProtected": "התשלום שלך מוגן",
+    "escrowDescription": "כל התשלומים נשמרים בנאמנות (Escrow) על ידי Groupio. הכסף משוחרר לקבלן רק לאחר השלמת העבודה ואישור שלך. אם יש בעיה - אנחנו כאן לעזור עם תהליך החזר.",
+    "youPay": "אתה משלם",
+    "groupioHolds": "Groupio שומר בנאמנות",
+    "contractorReceives": "קבלן מקבל אחרי השלמה",
+    "loadError": "לא ניתן לטעון את התשלומים. נסה שוב.",
+    "refresh": "רענון",
+    "paymentInfoTitle": "היכן מזינים פרטי תשלום?",
+    "paymentInfoDescription": "פרטי כרטיס האשראי או אמצעי התשלום יוזנו בעת הצטרפות להצעה ובשלב אישור התשלום. גלשו ל",
+    "activeOffers": "ההצעות הפעילות",
+    "joinAndPay": ", הצטרפו להצעה, ותתבקשו להזין את פרטי התשלום לפני השלמת התשלום.",
+    "totalPaid": "סה״כ שולם",
+    "pendingPayments": "תשלומים ממתינים",
+    "activeOffersCount": "הצעות פעילות",
+    "filterAll": "הכל",
+    "filterPending": "ממתינים",
+    "filterSucceeded": "שולמו",
+    "filterRefunded": "הוחזרו",
+    "retry": "נסה שוב",
+    "noPayments": "עדיין אין תשלומים",
+    "noPaymentsInCategory": "אין תשלומים בקטגוריה זו",
+    "noPaymentsHint": "תשלומים יופיעו כאן כאשר תצטרפו להצעה ותבצעו תשלום",
+    "discoverOffers": "גלו הצעות",
+    "status": {
+      "pending": "ממתין לתשלום",
+      "processing": "בעיבוד",
+      "succeeded": "שולם",
+      "failed": "נכשל",
+      "refunded": "הוחזר"
+    }
+  },
   "contractorNav": {
     "dashboard": "לוח בקרה",
     "activeOffers": "הצעות פעילות",
@@ -526,12 +630,15 @@
   "residentNav": {
     "dashboard": "לוח בקרה",
     "offers": "הצעות",
+    "orders": "הזמנות",
     "contractors": "קבלנים",
-    "architecture": "תוכנית הדירה",
-    "building": "בניין",
+    "building": "הבניין",
     "profile": "פרופיל",
+    "payments": "תשלומים",
+    "aiChat": "צ'אט AI",
     "aiAssistant": "עוזר AI",
-    "myAccount": "החשבון שלי"
+    "myAccount": "החשבון שלי",
+    "more": "עוד"
   },
   "architecture": {
     "title": "תוכנית הדירה שלי",

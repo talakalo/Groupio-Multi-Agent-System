@@ -1,7 +1,16 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Building2, Mail, Phone, Loader2, ArrowLeft } from "lucide-react";
+import {
+  Building2,
+  Mail,
+  Phone,
+  Loader2,
+  ArrowLeft,
+  Users,
+  TrendingDown,
+  AlertTriangle,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -149,19 +158,76 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-primary-50 to-white flex items-center justify-center px-4">
+    <div className="min-h-screen flex flex-col lg:flex-row">
+      {/* Branding Panel – desktop only */}
+      <div className="hidden lg:flex lg:w-[480px] xl:w-[540px] bg-gradient-to-br from-primary-600 via-primary-700 to-primary-800 relative overflow-hidden">
+        <div className="relative z-10 flex flex-col justify-center px-12 xl:px-16">
+          <div className="flex items-center gap-3 mb-10">
+            <Building2 className="h-12 w-12 text-white" />
+            <span className="text-4xl font-bold text-white">Groupio</span>
+          </div>
+          <h2 className="text-3xl font-bold text-white mb-4 leading-snug">
+            חסכו יחד,
+            <br />
+            הרוויחו יחד
+          </h2>
+          <p className="text-primary-100 text-lg mb-12 leading-relaxed">
+            הפלטפורמה שמחברת דיירים לקבלנים מובילים ומאפשרת רכישה קבוצתית חכמה
+          </p>
+          <div className="space-y-5">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center">
+                <Building2 className="h-5 w-5 text-primary-200" />
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-white">500+</div>
+                <div className="text-primary-200 text-sm">בניינים פעילים</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center">
+                <Users className="h-5 w-5 text-primary-200" />
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-white">12,000+</div>
+                <div className="text-primary-200 text-sm">דיירים מרוצים</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center">
+                <TrendingDown className="h-5 w-5 text-primary-200" />
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-white">30%</div>
+                <div className="text-primary-200 text-sm">חיסכון ממוצע</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
+          <div className="absolute -top-20 -end-20 w-80 h-80 rounded-full border border-white/10" />
+          <div className="absolute -bottom-32 -start-16 w-96 h-96 rounded-full border border-white/10" />
+          <div className="absolute top-1/3 end-1/4 w-40 h-40 rounded-full bg-white/5" />
+        </div>
+      </div>
+
+      {/* Form Panel */}
+      <div className="flex-1 flex items-center justify-center px-4 py-8 bg-gradient-to-b from-primary-50 to-white lg:from-gray-50 lg:to-white">
       <div className="w-full max-w-md">
-        {/* Logo */}
-        <div className="text-center mb-8">
+        {/* Mobile logo */}
+        <div className="text-center mb-8 lg:hidden">
           <Link href="/" className="inline-flex items-center gap-2">
             <Building2 className="h-10 w-10 text-primary-500" />
-            <span className="text-3xl font-bold text-primary-600">
-              Groupio
-            </span>
+            <span className="text-3xl font-bold text-primary-600">Groupio</span>
           </Link>
           <h1 className="text-2xl font-bold text-gray-900 mt-6 mb-2">
             ברוכים הבאים חזרה
           </h1>
+          <p className="text-gray-600">התחברו כדי להמשיך לחסוך</p>
+        </div>
+        {/* Desktop heading */}
+        <div className="hidden lg:block text-center mb-8">
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">ברוכים הבאים חזרה</h1>
           <p className="text-gray-600">התחברו כדי להמשיך לחסוך</p>
         </div>
 
@@ -198,8 +264,11 @@ export default function LoginPage() {
         {/* Form */}
         <form onSubmit={handleSubmit(onSubmit)} className="card space-y-5">
           {error && (
-            <div role="alert" className="bg-red-50 text-red-700 rounded-xl px-4 py-3 text-sm space-y-2">
-              <p>{error}</p>
+            <div role="alert" className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm space-y-2">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0 text-red-500" />
+                <p className="flex-1">{error}</p>
+              </div>
               {showResendVerification && resendEmail && (
                 <div className="pt-2 border-t border-red-200">
                   {resendSent ? (
@@ -322,14 +391,15 @@ export default function LoginPage() {
 
         {/* Sign up link */}
         <p className="text-center text-gray-600 mt-6">
-          עדיין אין לכם חשבון?{" "}
+          אין לכם חשבון?{" "}
           <Link
             href="/signup"
             className="text-primary-600 hover:text-primary-700 font-medium"
           >
-            הרשמו חינם
+            הירשמו עכשיו
           </Link>
         </p>
+      </div>
       </div>
     </div>
   );

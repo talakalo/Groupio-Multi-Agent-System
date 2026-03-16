@@ -6,13 +6,26 @@ import {
   RefreshCw,
   GitBranch,
   Layers,
-  Clock,
   Activity,
-  Filter,
+  Settings,
+  Bot,
+  Search,
+  DollarSign,
+  ShieldCheck,
+  Headphones,
+  Megaphone,
+  BarChart3,
+  LayoutGrid,
+  Cpu,
+  CreditCard,
+  Bell,
 } from "lucide-react";
-import { AgentCard } from "@/components/features/agents/AgentCard";
+import { AgentStatusDot, type AgentHealthStatus } from "@/components/features/agents/AgentStatusDot";
+import { AgentModeLabel, type AgentMode } from "@/components/features/agents/AgentModeLabel";
+import { PendingDecisionCard, type PendingDecision, type DecisionType } from "@/components/features/agents/PendingDecisionCard";
+import { AgentConfigPanel, type AgentConfig } from "@/components/features/agents/AgentConfigPanel";
+import { AgentActivityLog, type AgentActivityEntry, type ActivityActionType } from "@/components/features/agents/AgentActivityLog";
 import { AgentOrchestrationGraph } from "@/components/features/agents/AgentOrchestrationGraph";
-import type { AgentStatus } from "@/components/features/agents/AgentCard";
 import { AgentMetricsChart } from "@/components/features/metrics/AgentMetricsChart";
 import type { AgentChartSeries } from "@/components/features/metrics/AgentMetricsChart";
 import {
@@ -28,92 +41,35 @@ import {
 // ---------------------------------------------------------------------------
 
 const AGENT_DEFS = [
-  {
-    key: "router",
-    name: "Router Agent",
-    description:
-      "Routes incoming user messages to the appropriate specialist agent based on intent classification.",
-  },
-  {
-    key: "matching",
-    name: "Matching Agent",
-    description:
-      "Matches residents with verified contractors using RAG + graph DB scoring.",
-  },
-  {
-    key: "pricing",
-    name: "Pricing Agent",
-    description:
-      "Calculates group-buy pricing tiers and market analysis for service categories.",
-  },
-  {
-    key: "vetting",
-    name: "Vetting Agent",
-    description:
-      "Verifies contractor credentials, licenses, and computes trust scores.",
-  },
-  {
-    key: "support",
-    name: "Support Agent",
-    description:
-      "Handles general customer support conversations and complaint resolution.",
-  },
-  {
-    key: "outreach",
-    name: "Outreach Agent",
-    description:
-      "Manages contractor communications, onboarding, and engagement campaigns.",
-  },
-  {
-    key: "analytics",
-    name: "Analytics Agent",
-    description:
-      "Generates insights, reports, and answers natural-language analytics queries.",
-  },
-  {
-    key: "architecture",
-    name: "Architecture Agent",
-    description:
-      "Analyzes uploaded floor plans via Vision AI and suggests renovation services.",
-  },
-  {
-    key: "payment",
-    name: "Payment Agent",
-    description:
-      "Handles payment queries, invoice generation, and refund processing.",
-  },
-  {
-    key: "notification",
-    name: "Notification Agent",
-    description:
-      "Central hub for multi-channel notifications (email, WhatsApp, push, in-app).",
-  },
+  { key: "router", name: "Router Agent", description: "Routes incoming user messages to the appropriate specialist agent based on intent classification." },
+  { key: "matching", name: "Matching Agent", description: "Matches residents with verified contractors using RAG + graph DB scoring." },
+  { key: "pricing", name: "Pricing Agent", description: "Calculates group-buy pricing tiers and market analysis for service categories." },
+  { key: "vetting", name: "Vetting Agent", description: "Verifies contractor credentials, licenses, and computes trust scores." },
+  { key: "support", name: "Support Agent", description: "Handles general customer support conversations and complaint resolution." },
+  { key: "outreach", name: "Outreach Agent", description: "Manages contractor communications, onboarding, and engagement campaigns." },
+  { key: "analytics", name: "Analytics Agent", description: "Generates insights, reports, and answers natural-language analytics queries." },
+  { key: "architecture", name: "Architecture Agent", description: "Analyzes uploaded floor plans via Vision AI and suggests renovation services." },
+  { key: "payment", name: "Payment Agent", description: "Handles payment queries, invoice generation, and refund processing." },
+  { key: "notification", name: "Notification Agent", description: "Central hub for multi-channel notifications (email, WhatsApp, push, in-app)." },
 ] as const;
 
+const AGENT_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  router: Bot,
+  matching: Search,
+  pricing: DollarSign,
+  vetting: ShieldCheck,
+  support: Headphones,
+  outreach: Megaphone,
+  analytics: BarChart3,
+  architecture: LayoutGrid,
+  payment: CreditCard,
+  notification: Bell,
+};
+
 const CHART_COLORS = [
-  "#4f46e5",
-  "#22c55e",
-  "#f59e0b",
-  "#ef4444",
-  "#8b5cf6",
-  "#06b6d4",
-  "#ec4899",
-  "#14b8a6",
-  "#f97316",
-  "#a855f7",
+  "#4f46e5", "#22c55e", "#f59e0b", "#ef4444", "#8b5cf6",
+  "#06b6d4", "#ec4899", "#14b8a6", "#f97316", "#a855f7",
 ];
-
-// ---------------------------------------------------------------------------
-// Agent activity type (sourced from audit logs)
-// ---------------------------------------------------------------------------
-
-interface AgentActivity {
-  id: string;
-  agentKey: string;
-  agentName: string;
-  action: string;
-  timestamp: string;
-}
 
 // ---------------------------------------------------------------------------
 // Page component
@@ -122,94 +78,122 @@ interface AgentActivity {
 export default function AgentsPage() {
   const { data: systemStatus } = useSystemStatus();
   const reloadMutation = useReloadAgent();
-
-  // Track which agent is selected for the detail chart
-  const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
-
-  // Agent enabled/disabled toggles (client state)
-  const [agentToggles, setAgentToggles] = useState<Record<string, boolean>>(
-    () =>
-      Object.fromEntries(AGENT_DEFS.map((a) => [a.key, true]))
-  );
-
-  // Fetch detailed metrics for the selected agent
-  const { data: agentDetail } = useAgentMetrics(selectedAgent ?? "router");
   const { data: escalationsData } = useEscalations();
   const { data: auditActivity = [] } = useActivityLog();
 
-  // Map audit log entries to agent activity format
-  const activity: AgentActivity[] = useMemo(() => {
-    return auditActivity.map((entry) => ({
-      id: entry.id,
-      agentKey: "system",
-      agentName: "System",
-      action: entry.message,
-      timestamp: entry.timestamp,
-    }));
-  }, [auditActivity]);
+  const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
+  const [configPanel, setConfigPanel] = useState<AgentConfig | null>(null);
 
-  // Map escalations to decision queue items
-  const pendingDecisions = useMemo(() => {
-    const escalations = escalationsData?.escalations ?? [];
-    return escalations
-      .filter((e) => e.status === "open")
-      .slice(0, 5)
-      .map((esc) => ({
-        id: esc.id,
-        agent: (esc.context?.actionsTaken?.[0]?.agent ?? "Support").replace(/^\w/, (c: string) => c.toUpperCase()),
-        action: esc.reason,
-        detail: esc.context?.actionsTaken?.map((a: { action: string }) => a.action).join(", ") ?? "",
-        priority: esc.priority as "high" | "medium" | "low",
-      }));
-  }, [escalationsData]);
+  // Agent modes & toggles — client state until backend supports persistence
+  const [agentModes, setAgentModes] = useState<Record<string, AgentMode>>(
+    () => Object.fromEntries(AGENT_DEFS.map((a) => [a.key, "auto" as AgentMode])),
+  );
+  const [agentToggles, setAgentToggles] = useState<Record<string, boolean>>(
+    () => Object.fromEntries(AGENT_DEFS.map((a) => [a.key, true])),
+  );
 
-  // Derive agent card data from system status
+  const { data: agentDetail } = useAgentMetrics(selectedAgent ?? "router");
+
+  // ---------------------------------------------------------------------------
+  // Derive agent card data
+  // ---------------------------------------------------------------------------
+
   const agentCards = useMemo(() => {
-    return AGENT_DEFS.map((def, idx) => {
+    return AGENT_DEFS.map((def) => {
       const sysAgent = systemStatus?.agents?.[def.key];
       const calls = sysAgent?.calls ?? 0;
       const errors = sysAgent?.errors ?? 0;
       const errorRate = calls > 0 ? (errors / calls) * 100 : 0;
-      const status: AgentStatus =
-        !agentToggles[def.key]
-          ? "offline"
-          : errorRate > 5
+      const enabled = agentToggles[def.key];
+
+      const healthStatus: AgentHealthStatus = !enabled
+        ? "disabled"
+        : errorRate > 5
+          ? "error"
+          : errorRate > 2
             ? "degraded"
-            : "active";
+            : "healthy";
 
       return {
         ...def,
         calls,
         errors,
         errorRate,
-        status,
-        avgResponseMs: 0,
+        healthStatus,
+        enabled,
+        mode: agentModes[def.key],
+        avgResponseMs: sysAgent?.avgDurationMs ?? 0,
         requestsPerMin: +(calls / 1440).toFixed(1) || 0,
-        trendData: [calls],
       };
     });
-  }, [systemStatus, agentToggles]);
+  }, [systemStatus, agentToggles, agentModes]);
 
-  // Build chart series for the selected or all agents
+  // ---------------------------------------------------------------------------
+  // Pending decisions from escalations
+  // ---------------------------------------------------------------------------
+
+  const pendingDecisions: PendingDecision[] = useMemo(() => {
+    const escalations = escalationsData?.escalations ?? [];
+    const typeMap: Record<string, DecisionType> = {
+      vetting: "vetting", outreach: "outreach", credit: "credit",
+      payment: "payment", matching: "matching",
+    };
+
+    return escalations
+      .filter((e) => e.status === "open")
+      .slice(0, 5)
+      .map((esc) => {
+        const agentHint = esc.context?.actionsTaken?.[0]?.agent ?? "support";
+        return {
+          id: esc.id,
+          agentName: agentHint.replace(/^\w/, (c: string) => c.toUpperCase()) + " Agent",
+          type: typeMap[agentHint.toLowerCase()] ?? "matching",
+          summary: esc.reason,
+          reasoning: esc.context?.actionsTaken?.map((a: { action: string }) => a.action).join(". ") ?? "",
+          createdAt: esc.created_at ?? new Date().toISOString(),
+        };
+      });
+  }, [escalationsData]);
+
+  // ---------------------------------------------------------------------------
+  // Activity log mapping
+  // ---------------------------------------------------------------------------
+
+  const activityEntries: AgentActivityEntry[] = useMemo(() => {
+    const typeMap: Record<string, ActivityActionType> = {
+      agent: "api_call",
+      escalation: "escalation",
+      system: "config_change",
+      contractor: "decision",
+    };
+    return auditActivity.map((entry) => ({
+      id: entry.id,
+      agentName: "System",
+      actionType: typeMap[entry.type] ?? "api_call",
+      timestamp: entry.timestamp,
+      status: "success" as const,
+      details: entry.message,
+    }));
+  }, [auditActivity]);
+
+  // ---------------------------------------------------------------------------
+  // Chart series
+  // ---------------------------------------------------------------------------
+
   const chartSeries: AgentChartSeries[] = useMemo(() => {
     if (selectedAgent && agentDetail) {
-      return [
-        {
-          agentKey: agentDetail.name,
-          label:
-            AGENT_DEFS.find((a) => a.key === agentDetail.name)?.name ??
-            agentDetail.name,
-          color: CHART_COLORS[0],
-          data: agentDetail.history.map((h) => ({
-            timestamp: h.timestamp,
-            calls: h.calls,
-            avgLatencyMs: h.avgLatencyMs,
-            errorRate: Math.max(0, +(Math.random() * 2).toFixed(2)),
-          })),
-        },
-      ];
+      return [{
+        agentKey: agentDetail.name,
+        label: AGENT_DEFS.find((a) => a.key === agentDetail.name)?.name ?? agentDetail.name,
+        color: CHART_COLORS[0],
+        data: agentDetail.history.map((h) => ({
+          timestamp: h.timestamp,
+          calls: h.calls,
+          avgLatencyMs: h.avgLatencyMs,
+          errorRate: 0,
+        })),
+      }];
     }
-    // All agents comparison (single data point per agent from current status)
     const now = new Date().toISOString();
     return AGENT_DEFS.map((def, idx) => {
       const sysAgent = systemStatus?.agents?.[def.key];
@@ -225,15 +209,44 @@ export default function AgentsPage() {
     });
   }, [selectedAgent, agentDetail, systemStatus]);
 
+  // ---------------------------------------------------------------------------
+  // Handlers
+  // ---------------------------------------------------------------------------
+
   const handleReload = useCallback(
-    (agentKey: string) => {
-      reloadMutation.mutate(agentKey);
-    },
-    [reloadMutation]
+    (agentKey: string) => reloadMutation.mutate(agentKey),
+    [reloadMutation],
   );
 
   const handleToggle = useCallback((agentKey: string) => {
     setAgentToggles((prev) => ({ ...prev, [agentKey]: !prev[agentKey] }));
+  }, []);
+
+  const openConfig = useCallback((agentKey: string) => {
+    const def = AGENT_DEFS.find((a) => a.key === agentKey);
+    if (!def) return;
+    setConfigPanel({
+      id: agentKey,
+      name: def.name,
+      mode: agentModes[agentKey],
+      enabled: agentToggles[agentKey],
+      temperature: 0.7,
+      customPrompt: "",
+    });
+  }, [agentModes, agentToggles]);
+
+  const handleSaveConfig = useCallback((config: AgentConfig) => {
+    setAgentModes((prev) => ({ ...prev, [config.id]: config.mode }));
+    setAgentToggles((prev) => ({ ...prev, [config.id]: config.enabled }));
+    setConfigPanel(null);
+  }, []);
+
+  const handleApproveDecision = useCallback((_id: string) => {
+    // TODO: wire to escalation resolve API
+  }, []);
+
+  const handleRejectDecision = useCallback((_id: string) => {
+    // TODO: wire to escalation reject API
   }, []);
 
   return (
@@ -241,17 +254,12 @@ export default function AgentsPage() {
       {/* ---- Page header ---- */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-surface-900">
-            Agent Management
-          </h1>
+          <h1 className="text-xl font-bold text-surface-900">Agent Management</h1>
           <p className="text-sm text-surface-500 mt-0.5">
-            Monitor, configure, and manage the 7 Groupio AI agents
+            Monitor, configure, and manage the {AGENT_DEFS.length} Groupio AI agents
           </p>
         </div>
-        <button
-          className="btn-secondary"
-          onClick={() => setSelectedAgent(null)}
-        >
+        <button className="btn-secondary" onClick={() => setSelectedAgent(null)}>
           <RefreshCw className="w-4 h-4" />
           View All Agents
         </button>
@@ -261,69 +269,91 @@ export default function AgentsPage() {
       {/* Agent Cards Grid                                                    */}
       {/* ================================================================== */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
-        {agentCards.map((agent) => (
-          <div
-            key={agent.key}
-            className={clsx(
-              "cursor-pointer rounded-xl transition-all duration-150",
-              selectedAgent === agent.key
-                ? "ring-2 ring-primary-500 ring-offset-2"
-                : "ring-0"
-            )}
-            onClick={() =>
-              setSelectedAgent((prev) =>
-                prev === agent.key ? null : agent.key
-              )
-            }
-          >
-            <AgentCard
-              agentKey={agent.key}
-              name={agent.name}
-              status={agent.status}
-              avgResponseMs={agent.avgResponseMs}
-              requestsPerMin={agent.requestsPerMin}
-              errorRate={agent.errorRate}
-              trendData={agent.trendData}
-              enabled={agentToggles[agent.key]}
-              onReload={handleReload}
-              onConfigure={() => handleToggle(agent.key)}
-            />
-          </div>
-        ))}
-      </div>
+        {agentCards.map((agent) => {
+          const Icon = AGENT_ICONS[agent.key] ?? Bot;
+          return (
+            <div
+              key={agent.key}
+              className={clsx(
+                "card card-hover p-5 cursor-pointer transition-all duration-150",
+                selectedAgent === agent.key ? "ring-2 ring-primary-500 ring-offset-2" : "ring-0",
+                !agent.enabled && "opacity-60",
+              )}
+              onClick={() => setSelectedAgent((prev) => (prev === agent.key ? null : agent.key))}
+            >
+              {/* Card header */}
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary-50 text-primary-600 ring-1 ring-primary-100">
+                    <Icon className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-semibold text-surface-900 flex items-center gap-2">
+                      {agent.name}
+                      <AgentStatusDot status={agent.healthStatus} />
+                    </h3>
+                    <AgentModeLabel mode={agent.mode} />
+                  </div>
+                </div>
+                <button
+                  onClick={(e) => { e.stopPropagation(); openConfig(agent.key); }}
+                  className="btn-ghost p-1.5 rounded-lg"
+                  title="Configure agent"
+                >
+                  <Settings className="w-4 h-4" />
+                </button>
+              </div>
 
-      {/* ================================================================== */}
-      {/* Agent Configuration Toggles                                         */}
-      {/* ================================================================== */}
-      <div className="card p-5">
-        <h2 className="text-sm font-semibold text-surface-900 mb-4 flex items-center gap-2">
-          <Filter className="w-4 h-4 text-surface-400" />
-          Agent Configuration
-        </h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-4">
-          {AGENT_DEFS.map((def) => (
-            <div key={def.key} className="flex items-center gap-3">
-              <button
-                onClick={() => handleToggle(def.key)}
-                className={clsx(
-                  "relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200",
-                  agentToggles[def.key] ? "bg-primary-600" : "bg-surface-300"
-                )}
-                role="switch"
-                aria-checked={agentToggles[def.key]}
-                aria-label={`Toggle ${def.name}`}
-              >
-                <span
+              {/* Description */}
+              <p className="text-xs text-surface-500 mb-3 line-clamp-2">
+                {agent.description}
+              </p>
+
+              {/* Quick stats */}
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div>
+                  <p className="text-[10px] font-medium text-surface-400 uppercase">Calls</p>
+                  <p className="text-sm font-semibold text-surface-800">{agent.calls}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-medium text-surface-400 uppercase">Latency</p>
+                  <p className="text-sm font-semibold text-surface-800">{agent.avgResponseMs}ms</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-medium text-surface-400 uppercase">Errors</p>
+                  <p className={clsx(
+                    "text-sm font-semibold",
+                    agent.errorRate > 5 ? "text-danger-600" : agent.errorRate > 2 ? "text-warning-600" : "text-surface-800",
+                  )}>
+                    {agent.errorRate.toFixed(1)}%
+                  </p>
+                </div>
+              </div>
+
+              {/* Card footer actions */}
+              <div className="flex items-center gap-2 mt-3 pt-3 border-t border-surface-100">
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleReload(agent.key); }}
+                  className="btn-ghost btn-sm flex items-center gap-1"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  Reload
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleToggle(agent.key); }}
                   className={clsx(
-                    "inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200",
-                    agentToggles[def.key] ? "translate-x-6" : "translate-x-1"
+                    "btn-sm ms-auto rounded-lg px-3 py-1 text-xs font-medium transition-colors",
+                    agent.enabled
+                      ? "bg-success-50 text-success-700 hover:bg-success-100"
+                      : "bg-surface-100 text-surface-500 hover:bg-surface-200",
                   )}
-                />
-              </button>
-              <span className="text-sm text-surface-700">{def.name.replace(" Agent", "")}</span>
+                >
+                  {agent.enabled ? "Enabled" : "Disabled"}
+                </button>
+              </div>
             </div>
-          ))}
-        </div>
+          );
+        })}
       </div>
 
       {/* ================================================================== */}
@@ -336,7 +366,8 @@ export default function AgentsPage() {
       />
 
       {/* ================================================================== */}
-      {/* LangGraph Orchestration Flow Placeholder                           */}
+      {/* LangGraph Orchestration Flow                                        */}
+      {/* TODO: Make this interactive (click nodes to configure) in a future iteration */}
       {/* ================================================================== */}
       <div className="card p-6">
         <h2 className="text-sm font-semibold text-surface-900 mb-2 flex items-center gap-2">
@@ -350,94 +381,60 @@ export default function AgentsPage() {
       </div>
 
       {/* ================================================================== */}
-      {/* Agent Decision Queue (actions needing admin review)                 */}
+      {/* Pending Decisions                                                    */}
       {/* ================================================================== */}
-      <div className="card p-6">
+      <div>
         <h2 className="text-sm font-semibold text-surface-900 mb-3 flex items-center gap-2">
           <Layers className="w-4 h-4 text-amber-500" />
           Pending Agent Decisions
+          {pendingDecisions.length > 0 && (
+            <span className="badge bg-amber-100 text-amber-700">{pendingDecisions.length}</span>
+          )}
         </h2>
         <p className="text-xs text-surface-400 mb-4">
           Agent actions that require admin review or override
         </p>
-        <div className="divide-y divide-surface-100">
-          {pendingDecisions.length === 0 && (
-            <div className="py-6 text-center text-sm text-surface-400">
-              No pending decisions
-            </div>
-          )}
-          {pendingDecisions.map((decision) => (
-            <div key={decision.id} className="flex items-center gap-3 py-3">
-              <span
-                className={clsx(
-                  "w-2 h-2 rounded-full flex-shrink-0",
-                  decision.priority === "high" && "bg-red-500",
-                  decision.priority === "medium" && "bg-amber-500",
-                  decision.priority === "low" && "bg-green-500"
-                )}
+        {pendingDecisions.length === 0 ? (
+          <div className="card py-8 text-center text-sm text-surface-400">
+            No pending decisions — all agents are operating autonomously
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {pendingDecisions.map((decision) => (
+              <PendingDecisionCard
+                key={decision.id}
+                decision={decision}
+                onApprove={handleApproveDecision}
+                onReject={handleRejectDecision}
               />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm text-surface-700">
-                  <span className="font-medium text-surface-900">{decision.agent}</span>
-                  {" \u2014 "}
-                  {decision.action}
-                </p>
-                <p className="text-xs text-surface-400 mt-0.5">{decision.detail}</p>
-              </div>
-              <div className="flex gap-2 flex-shrink-0">
-                <button className="px-3 py-1.5 text-xs font-medium rounded-lg bg-primary-50 text-primary-700 hover:bg-primary-100 transition-colors">
-                  Approve
-                </button>
-                <button className="px-3 py-1.5 text-xs font-medium rounded-lg bg-surface-100 text-surface-600 hover:bg-surface-200 transition-colors">
-                  Override
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-        <p className="text-xs text-surface-400 mt-3 text-center">
-          Decision queue updates in real-time via WebSocket
-        </p>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ================================================================== */}
-      {/* Recent Agent Activity Log                                           */}
+      {/* Agent Activity Log                                                   */}
       {/* ================================================================== */}
       <div>
         <h2 className="text-sm font-semibold text-surface-900 mb-3 flex items-center gap-2">
           <Activity className="w-4 h-4 text-surface-400" />
-          Recent Agent Activity
+          Agent Activity Log
         </h2>
-        <div className="card divide-y divide-surface-100">
-          {activity.map((entry) => (
-            <div
-              key={entry.id}
-              className="flex items-center gap-3 px-4 py-3 hover:bg-surface-50 transition-colors"
-            >
-              <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary-50 text-primary-600 flex-shrink-0">
-                <span className="text-[10px] font-bold uppercase">
-                  {entry.agentKey.slice(0, 3)}
-                </span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm text-surface-700">
-                  <span className="font-medium text-surface-900">
-                    {entry.agentName}
-                  </span>{" "}
-                  &mdash; {entry.action}
-                </p>
-              </div>
-              <span className="text-xs text-surface-400 whitespace-nowrap flex items-center gap-1">
-                <Clock className="w-3 h-3" />
-                {new Date(entry.timestamp).toLocaleTimeString("en-IL", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </span>
-            </div>
-          ))}
-        </div>
+        <AgentActivityLog
+          entries={activityEntries}
+          agentNames={AGENT_DEFS.map((a) => a.name)}
+        />
       </div>
+
+      {/* ================================================================== */}
+      {/* Config Panel (slide-out)                                             */}
+      {/* ================================================================== */}
+      <AgentConfigPanel
+        agent={configPanel}
+        open={configPanel !== null}
+        onClose={() => setConfigPanel(null)}
+        onSave={handleSaveConfig}
+      />
     </div>
   );
 }

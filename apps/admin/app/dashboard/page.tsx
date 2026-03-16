@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import Link from "next/link";
 import { clsx } from "clsx";
 import {
   DollarSign,
@@ -15,6 +16,12 @@ import {
   TrendingUp,
   Users,
   Zap,
+  ChevronRight,
+  CreditCard,
+  Eye,
+  CheckCircle2,
+  Database,
+  Wifi,
 } from "lucide-react";
 import { MetricCard } from "@/components/features/metrics/MetricCard";
 import { AgentMetricsChart } from "@/components/features/metrics/AgentMetricsChart";
@@ -27,6 +34,7 @@ import {
   useAdminAnalyticsDashboard,
   useActivityLog,
   useVettingStatus,
+  useContractors,
 } from "@/lib/hooks";
 
 // ---------------------------------------------------------------------------
@@ -76,8 +84,8 @@ export default function DashboardPage() {
   const { data: analyticsData } = useAdminAnalyticsDashboard();
   const { data: activityLog = [] } = useActivityLog();
   const { data: vettingStatus } = useVettingStatus();
+  const { data: unverifiedContractors = [] } = useContractors({ verified: false });
 
-  // Show a top-level error banner if core data queries fail
   const hasCriticalError = metricsError || systemError;
 
   // Derive agent summary data from system status
@@ -133,15 +141,99 @@ export default function DashboardPage() {
       .slice(0, 5);
   }, [escalationsData]);
 
+  // Attention bar counts
+  const pendingVetting = vettingStatus?.pendingReview ?? 0;
+  const openEscalations = recentEscalations.filter((e) => e.status === "open").length;
+  const pendingPayments = 0; // placeholder until payments hook is available
+
+  const attentionItems = useMemo(() => {
+    const items: Array<{
+      label: string;
+      count: number;
+      severity: "warning" | "danger";
+      href: string;
+    }> = [];
+    if (pendingVetting > 0) {
+      items.push({
+        label: "Pending verifications",
+        count: pendingVetting,
+        severity: pendingVetting > 5 ? "danger" : "warning",
+        href: "/contractors?status=pending",
+      });
+    }
+    if (openEscalations > 0) {
+      items.push({
+        label: "Open escalations",
+        count: openEscalations,
+        severity: openEscalations > 3 ? "danger" : "warning",
+        href: "/escalations?status=open",
+      });
+    }
+    if (pendingPayments > 0) {
+      items.push({
+        label: "Pending payments",
+        count: pendingPayments,
+        severity: "warning",
+        href: "/payments?status=pending",
+      });
+    }
+    return items;
+  }, [pendingVetting, openEscalations, pendingPayments]);
+
+  // Pending actions queue (top 5 items needing admin action)
+  const pendingActions = useMemo(() => {
+    const actions: Array<{
+      id: string;
+      type: "contractor" | "escalation" | "payment";
+      title: string;
+      subtitle: string;
+      href: string;
+      actionLabel: string;
+    }> = [];
+
+    // Unverified contractors
+    for (const c of unverifiedContractors.slice(0, 3)) {
+      actions.push({
+        id: `contractor-${c.id}`,
+        type: "contractor",
+        title: c.businessName || "Unnamed contractor",
+        subtitle: `Trust score: ${c.trustScore ?? "N/A"}`,
+        href: `/contractors/${c.id}`,
+        actionLabel: "Review",
+      });
+    }
+
+    // Open escalations
+    for (const esc of recentEscalations.filter((e) => e.status === "open").slice(0, 2)) {
+      actions.push({
+        id: `escalation-${esc.id}`,
+        type: "escalation",
+        title: esc.reason,
+        subtitle: `Priority: ${esc.priority}`,
+        href: `/escalations/${esc.id}`,
+        actionLabel: "Handle",
+      });
+    }
+
+    return actions.slice(0, 5);
+  }, [unverifiedContractors, recentEscalations]);
+
   // Health bar metrics
   const healthServices = health?.services ?? {};
   const allServicesUp = Object.values(healthServices).every(Boolean);
-  // Uptime is reported by the backend health endpoint, not hardcoded.
   const uptimeLabel = health ? (allServicesUp ? "100%" : "Degraded") : "—";
 
-  // Sparkline data (omitted until historical data endpoint is available)
   const gmvSparkline: { value: number }[] = [];
   const offersSparkline: { value: number }[] = [];
+
+  const ACTION_TYPE_ICON: Record<
+    "contractor" | "escalation" | "payment",
+    { icon: React.ComponentType<{ className?: string }>; color: string }
+  > = {
+    contractor: { icon: ShieldCheck, color: "bg-primary-50 text-primary-600" },
+    escalation: { icon: AlertTriangle, color: "bg-warning-50 text-warning-600" },
+    payment: { icon: CreditCard, color: "bg-success-50 text-success-600" },
+  };
 
   return (
     <div className="space-y-6">
@@ -152,6 +244,32 @@ export default function DashboardPage() {
           System overview and real-time monitoring
         </p>
       </div>
+
+      {/* ================================================================== */}
+      {/* Attention Bar                                                       */}
+      {/* ================================================================== */}
+      {attentionItems.length > 0 && (
+        <div className="flex flex-wrap gap-3">
+          {attentionItems.map((item) => (
+            <Link
+              key={item.label}
+              href={item.href}
+              className={clsx(
+                "flex items-center gap-2.5 px-4 py-2.5 rounded-lg text-sm font-medium transition-all",
+                item.severity === "danger"
+                  ? "bg-danger-50 text-danger-700 border border-danger-200 hover:bg-danger-100"
+                  : "bg-warning-50 text-warning-700 border border-warning-200 hover:bg-warning-100"
+              )}
+            >
+              <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+              <span>
+                <span className="font-bold">{item.count}</span> {item.label}
+              </span>
+              <ChevronRight className="w-3.5 h-3.5 ms-1 opacity-50" />
+            </Link>
+          ))}
+        </div>
+      )}
 
       {/* ================================================================== */}
       {/* System Health Bar                                                   */}
@@ -180,10 +298,7 @@ export default function DashboardPage() {
                 </span>
               </span>
             </div>
-            {/* API Latency: shown only when real data is available from /metrics */}
-            {/* Error Rate: derived from live agent metrics, not hardcoded */}
           </div>
-          {/* Service status dots */}
           <div className="flex items-center gap-3">
             {Object.entries(healthServices).map(([svc, up]) => (
               <div key={svc} className="flex items-center gap-1.5 text-xs">
@@ -203,7 +318,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ================================================================== */}
-      {/* Key Metrics Cards                                                   */}
+      {/* Key Metrics Cards (clickable)                                       */}
       {/* ================================================================== */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
@@ -214,6 +329,7 @@ export default function DashboardPage() {
           variant="success"
           icon={<DollarSign className="w-4.5 h-4.5" />}
           sparklineData={gmvSparkline}
+          href="/payments"
         />
         <MetricCard
           label="Active Offers"
@@ -223,12 +339,14 @@ export default function DashboardPage() {
           variant="primary"
           icon={<FileText className="w-4.5 h-4.5" />}
           sparklineData={offersSparkline}
+          href="/offers"
         />
         <MetricCard
           label="Active Contractors"
           value={String(analyticsData?.totalContractors ?? metrics?.pendingVerifications ?? 0)}
           variant="default"
           icon={<ShieldCheck className="w-4.5 h-4.5" />}
+          href="/contractors"
         />
         <MetricCard
           label="Open Tickets"
@@ -237,6 +355,7 @@ export default function DashboardPage() {
           changePeriodLabel="vs last week"
           variant="warning"
           icon={<Ticket className="w-4.5 h-4.5" />}
+          href="/escalations"
         />
         <MetricCard
           label="Pending Vetting"
@@ -245,14 +364,96 @@ export default function DashboardPage() {
             (vettingStatus?.pendingReview ?? 0) > 0 ? "warning" : "default"
           }
           icon={<ShieldAlert className="w-4.5 h-4.5" />}
+          href="/contractors?status=pending"
         />
+      </div>
+
+      {/* ================================================================== */}
+      {/* Pending Actions Queue + System Health Overview                      */}
+      {/* ================================================================== */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Pending actions */}
+        <div className="lg:col-span-2">
+          <h2 className="text-sm font-semibold text-surface-900 mb-3">
+            Pending Actions
+          </h2>
+          <div className="card divide-y divide-surface-100">
+            {pendingActions.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-8 text-surface-400 gap-2">
+                <CheckCircle2 className="w-8 h-8 text-success-400" />
+                <span className="text-sm">All caught up — no pending actions</span>
+              </div>
+            )}
+            {pendingActions.map((action) => {
+              const cfg = ACTION_TYPE_ICON[action.type];
+              const Icon = cfg.icon;
+              return (
+                <div
+                  key={action.id}
+                  className="flex items-center gap-3 px-4 py-3"
+                >
+                  <div
+                    className={clsx(
+                      "flex items-center justify-center w-9 h-9 rounded-lg flex-shrink-0",
+                      cfg.color
+                    )}
+                  >
+                    <Icon className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-surface-800 truncate">
+                      {action.title}
+                    </p>
+                    <p className="text-xs text-surface-400">{action.subtitle}</p>
+                  </div>
+                  <Link
+                    href={action.href}
+                    className="btn-primary btn-sm flex-shrink-0"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    {action.actionLabel}
+                  </Link>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* System health overview */}
+        <div>
+          <h2 className="text-sm font-semibold text-surface-900 mb-3">
+            System Health
+          </h2>
+          <div className="card p-4 space-y-4">
+            <ServiceHealthRow
+              label="API Server"
+              icon={<Server className="w-4 h-4" />}
+              status={healthServices.api !== undefined ? (healthServices.api ? "healthy" : "down") : "unknown"}
+            />
+            <ServiceHealthRow
+              label="Redis"
+              icon={<Wifi className="w-4 h-4" />}
+              status={healthServices.redis !== undefined ? (healthServices.redis ? "healthy" : "down") : "unknown"}
+            />
+            <ServiceHealthRow
+              label="PostgreSQL"
+              icon={<Database className="w-4 h-4" />}
+              status={healthServices.postgres !== undefined ? (healthServices.postgres ? "healthy" : "down") : "unknown"}
+            />
+            <div className="pt-2 border-t border-surface-100">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-surface-500">Overall uptime</span>
+                <span className="font-semibold text-surface-700">{uptimeLabel}</span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* ================================================================== */}
       {/* Agent Performance Summary + Recent Escalations                     */}
       {/* ================================================================== */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Agent cards grid */}
         <div className="lg:col-span-2">
           <h2 className="text-sm font-semibold text-surface-900 mb-3">
             Agent Performance
@@ -293,7 +494,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Recent escalations feed */}
         <div>
           <h2 className="text-sm font-semibold text-surface-900 mb-3">
             Recent Escalations
@@ -387,6 +587,49 @@ export default function DashboardPage() {
             );
           })}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ServiceHealthRow (used in system health overview)
+// ---------------------------------------------------------------------------
+
+function ServiceHealthRow({
+  label,
+  icon,
+  status,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  status: "healthy" | "down" | "unknown";
+}) {
+  return (
+    <div className="flex items-center justify-between">
+      <div className="flex items-center gap-2.5">
+        <div className="text-surface-500">{icon}</div>
+        <span className="text-sm font-medium text-surface-700">{label}</span>
+      </div>
+      <div className="flex items-center gap-1.5">
+        <span
+          className={clsx(
+            "status-dot",
+            status === "healthy" && "status-dot-healthy",
+            status === "down" && "status-dot-unhealthy",
+            status === "unknown" && "bg-surface-300"
+          )}
+        />
+        <span
+          className={clsx(
+            "text-xs font-medium",
+            status === "healthy" && "text-success-600",
+            status === "down" && "text-danger-600",
+            status === "unknown" && "text-surface-400"
+          )}
+        >
+          {status === "healthy" ? "Operational" : status === "down" ? "Down" : "Unknown"}
+        </span>
       </div>
     </div>
   );

@@ -286,27 +286,59 @@ export function useReloadAgent() {
 
 // ---- Contractors ----
 
+/** API returns snake_case; we normalize for UI. */
+interface ContractorApiShape extends Contractor {
+  trust_score?: number;
+  average_rating?: number;
+  business_name?: string;
+  verification_status?: string;
+  trust_score_breakdown?: {
+    license_score?: number;
+    insurance_score?: number;
+    experience_score?: number;
+    reputation_score?: number;
+    completion_score?: number;
+    response_score?: number;
+    total?: number;
+  };
+}
+
 export interface ContractorListItem {
   id: string;
   businessName: string;
   verified: boolean;
+  /** Raw verification_status from API (pending | verified | approved | rejected | suspended). */
+  verificationStatus: string;
   rating: number;
   categories: string[];
   regions: string[];
   phone?: string;
   email?: string;
+  /** 0–100 from API; null when not yet calculated. */
+  trustScore: number | null;
+  trustScoreBreakdown?: ContractorApiShape["trust_score_breakdown"];
 }
 
-function mapContractorToListItem(c: Contractor): ContractorListItem {
+function mapContractorToListItem(c: ContractorApiShape): ContractorListItem {
+  const raw = c.trustScore ?? c.trust_score;
+  const trustScore =
+    typeof raw === "number" && !Number.isNaN(raw) ? raw : null;
+  const rating = c.rating ?? c.average_rating ?? 0;
+  const verified =
+    c.verified ??
+    (c.verification_status === "verified" || c.verification_status === "approved");
   return {
     id: c.id,
-    businessName: c.businessName ?? "",
-    verified: c.verified ?? false,
-    rating: c.rating ?? 0,
+    businessName: c.businessName ?? c.business_name ?? "",
+    verified: Boolean(verified),
+    verificationStatus: c.verification_status ?? (verified ? "verified" : "pending"),
+    rating,
     categories: Array.isArray(c.categories) ? c.categories : [],
     regions: Array.isArray(c.regions) ? c.regions : [],
     phone: c.phone,
     email: c.email,
+    trustScore,
+    trustScoreBreakdown: c.trust_score_breakdown,
   };
 }
 

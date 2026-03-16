@@ -2,6 +2,7 @@ import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import { storage } from './storage';
+import { getAuthToken } from './api';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -76,6 +77,21 @@ export async function registerForPushNotifications(): Promise<PushTokenResult> {
         description: 'Chat message notifications',
         importance: Notifications.AndroidImportance.DEFAULT,
       });
+
+      await Notifications.setNotificationChannelAsync('orders', {
+        name: 'Orders',
+        description: 'Order status updates',
+        importance: Notifications.AndroidImportance.HIGH,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#1a9a76',
+      });
+
+      await Notifications.setNotificationChannelAsync('payments', {
+        name: 'Payments',
+        description: 'Payment confirmations',
+        importance: Notifications.AndroidImportance.HIGH,
+        lightColor: '#1a9a76',
+      });
     }
 
     return { token: tokenData.data };
@@ -98,12 +114,17 @@ export async function sendPushTokenToServer(token: string): Promise<boolean> {
       return false;
     }
 
+    const authToken = getAuthToken();
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (authToken) {
+      headers['Authorization'] = `Bearer ${authToken}`;
+    }
+
     const response = await fetch(`${API_URL}/api/v1/users/push-token`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        // Add auth header here
-      },
+      headers,
       body: JSON.stringify({
         user_id: user.id,
         token,
@@ -157,9 +178,14 @@ export async function scheduleLocalNotification(
 ): Promise<string> {
   const settings = await storage.getSettings();
   if (!settings.notifications) {
-    console.log('Notifications disabled by user');
     return '';
   }
+
+  const notifType = (data?.type as NotificationType) ?? undefined;
+  const channelId =
+    Platform.OS === 'android' && notifType
+      ? getChannelForType(notifType)
+      : undefined;
 
   return await Notifications.scheduleNotificationAsync({
     content: {
@@ -167,8 +193,9 @@ export async function scheduleLocalNotification(
       body,
       data,
       sound: true,
+      ...(channelId ? { channelId } : {}),
     },
-    trigger: trigger || null, // null means immediate
+    trigger: trigger || null,
   });
 }
 
@@ -213,43 +240,178 @@ export async function clearBadge(): Promise<void> {
 export type NotificationType =
   | 'new_offer'
   | 'offer_update'
+  | 'order_status'
+  | 'payment_confirmed'
   | 'contractor_matched'
   | 'chat_message'
+  | 'escalation'
   | 'escalation_resolved'
-  | 'building_invite';
+  | 'building_invite'
+  | 'project_update';
 
 /**
- * Handle deep link from notification
+ * Expected shape of notification data payload.
+ * The backend should include `type` plus relevant IDs.
+ */
+export interface NotificationData {
+  type: NotificationType;
+  offerId?: string;
+  orderId?: string;
+  escalationId?: string;
+  buildingId?: string;
+  projectId?: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Resolve a deep-link route string from notification data.
  */
 export function getDeepLinkFromNotification(
-  notification: Notifications.Notification
+  notification: Notifications.Notification,
 ): string | null {
-  const data = notification.request.content.data;
+  const data = notification.request.content.data as NotificationData | undefined;
+  return data ? resolveRoute(data) : null;
+}
 
-  if (!data || !data.type) {
-    return null;
-  }
+/**
+ * Resolve a deep-link from a notification response (user tapped).
+ */
+export function getDeepLinkFromResponse(
+  response: Notifications.NotificationResponse,
+): string | null {
+  const data = response.notification.request.content.data as
+    | NotificationData
+    | undefined;
+  return data ? resolveRoute(data) : null;
+}
 
-  const type = data.type as NotificationType;
+/**
+ * Core routing logic: maps notification type + IDs → Expo Router path.
+ */
+function resolveRoute(data: NotificationData): string | null {
+  if (!data.type) return null;
 
-  switch (type) {
+  switch (data.type) {
     case 'new_offer':
     case 'offer_update':
-      return data.offerId ? `/offers/${data.offerId}` : '/offers';
+      return data.offerId
+        ? `/offer-detail?id=${data.offerId}`
+        : '/offers';
+
+    case 'order_status':
+      return data.orderId
+        ? `/order-detail?id=${data.orderId}`
+        : '/orders';
+
+    case 'payment_confirmed':
+      return '/payments';
 
     case 'contractor_matched':
-      return data.offerId ? `/offers/${data.offerId}` : '/offers';
+      return data.offerId
+        ? `/offer-detail?id=${data.offerId}`
+        : '/offers';
+
+    case 'escalation':
+    case 'escalation_resolved':
+      return '/chat';
 
     case 'chat_message':
       return '/chat';
 
-    case 'escalation_resolved':
-      return data.escalationId ? `/escalations/${data.escalationId}` : '/';
-
     case 'building_invite':
-      return data.buildingId ? `/buildings/${data.buildingId}/join` : '/';
+      return data.buildingId
+        ? `/buildings/${data.buildingId}/join`
+        : '/';
+
+    case 'project_update':
+      return data.offerId
+        ? `/offer-detail?id=${data.offerId}`
+        : '/contractor-projects';
 
     default:
       return null;
   }
+}
+
+/**
+ * Handle a notification response by navigating to the appropriate screen.
+ *
+ * Usage in root layout:
+ * ```
+ * import { router } from 'expo-router';
+ * import { handleNotificationNavigation } from '../lib/notifications';
+ *
+ * addNotificationListeners(undefined, (response) => {
+ *   handleNotificationNavigation(response, router);
+ * });
+ * ```
+ */
+export function handleNotificationNavigation(
+  response: Notifications.NotificationResponse,
+  navigate: { push: (href: string) => void },
+): void {
+  const route = getDeepLinkFromResponse(response);
+  if (route) {
+    navigate.push(route);
+  }
+}
+
+/**
+ * Map notification types → Android notification channels.
+ * Ensures notifications are routed to the correct channel for user control.
+ */
+const NOTIFICATION_CHANNEL_MAP: Record<NotificationType, string> = {
+  new_offer: 'offers',
+  offer_update: 'offers',
+  order_status: 'orders',
+  payment_confirmed: 'payments',
+  contractor_matched: 'offers',
+  chat_message: 'chat',
+  escalation: 'default',
+  escalation_resolved: 'default',
+  building_invite: 'default',
+  project_update: 'orders',
+};
+
+/**
+ * Get the Android notification channel for a notification type.
+ */
+export function getChannelForType(type: NotificationType): string {
+  return NOTIFICATION_CHANNEL_MAP[type] ?? 'default';
+}
+
+/**
+ * Set up notification listeners with automatic deep-link navigation.
+ * Also manages badge count: increments on receive, clears on tap.
+ * Returns a cleanup function to remove all listeners.
+ */
+export function setupNotificationNavigation(
+  navigate: { push: (href: string) => void },
+  onReceived?: (notification: Notifications.Notification) => void,
+): () => void {
+  const receivedSub = Notifications.addNotificationReceivedListener(
+    async (notification) => {
+      const current = await getBadgeCount();
+      await setBadgeCount(current + 1);
+      onReceived?.(notification);
+    },
+  );
+
+  const responseSub =
+    Notifications.addNotificationResponseReceivedListener(async (response) => {
+      await clearBadge();
+      handleNotificationNavigation(response, navigate);
+    });
+
+  Notifications.getLastNotificationResponseAsync().then(async (response) => {
+    if (response) {
+      await clearBadge();
+      handleNotificationNavigation(response, navigate);
+    }
+  });
+
+  return () => {
+    receivedSub.remove();
+    responseSub.remove();
+  };
 }

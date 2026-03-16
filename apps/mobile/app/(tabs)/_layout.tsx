@@ -3,6 +3,7 @@ import { Platform, StyleSheet } from "react-native";
 import { Tabs } from "expo-router";
 import { useTheme } from "react-native-paper";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
+import i18n from "../../lib/i18n";
 
 interface TabIconProps {
   name: string;
@@ -54,7 +55,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "\u05D1\u05D9\u05EA",
+          title: i18n.t("tabs.home"),
           headerTitle: "Groupio",
           tabBarIcon: ({ color, size }) => (
             <TabIcon name="home" color={color} size={size} />
@@ -64,18 +65,28 @@ export default function TabLayout() {
       <Tabs.Screen
         name="offers"
         options={{
-          title: "\u05D4\u05E6\u05E2\u05D5\u05EA",
-          headerTitle: "\u05D4\u05E6\u05E2\u05D5\u05EA \u05E7\u05D1\u05D5\u05E6\u05EA\u05D9\u05D5\u05EA",
+          title: i18n.t("tabs.offers"),
+          headerTitle: i18n.t("offers.title"),
           tabBarIcon: ({ color, size }) => (
             <TabIcon name="tag-multiple" color={color} size={size} />
           ),
         }}
       />
       <Tabs.Screen
+        name="orders"
+        options={{
+          title: i18n.t("tabs.orders"),
+          headerTitle: i18n.t("tabs.orders"),
+          tabBarIcon: ({ color, size }) => (
+            <TabIcon name="package-variant" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="chat"
         options={{
-          title: "\u05E6'\u05D0\u05D8",
-          headerTitle: "\u05E2\u05D5\u05D6\u05E8 AI",
+          title: i18n.t("tabs.chat"),
+          headerTitle: i18n.t("chat.title"),
           tabBarIcon: ({ color, size }) => (
             <TabIcon name="chat-processing" color={color} size={size} />
           ),
@@ -84,8 +95,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: "\u05E4\u05E8\u05D5\u05E4\u05D9\u05DC",
-          headerTitle: "\u05D4\u05E4\u05E8\u05D5\u05E4\u05D9\u05DC \u05E9\u05DC\u05D9",
+          title: i18n.t("tabs.profile"),
+          headerTitle: i18n.t("profile.title"),
           tabBarIcon: ({ color, size }) => (
             <TabIcon name="account-circle" color={color} size={size} />
           ),

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { AdminActionModal, type ModalField } from "@/components/shared/AdminActionModal";
 import {
   DollarSign,
   ArrowDownToLine,
@@ -26,6 +27,7 @@ import {
 } from "lucide-react";
 
 // ---- Types ----
+// TODO: PaymentSummary, ContractorPayout, EscrowAccount, EscrowStatus, PayoutStatus duplicate @groupio/types.
 
 type EscrowStatus =
   | "collecting"
@@ -313,6 +315,7 @@ function EscrowTable({
                     />
                   </div>
                 </td>
+                {/* TODO(5.10): Move platform fee % to admin settings page */}
                 <td className="py-3 px-4 text-right text-surface-600">
                   {formatCurrency(escrow.platformFee)}
                   <span className="text-xs text-surface-400 block">
@@ -382,6 +385,7 @@ function PayoutsTable({
             <th className="text-right py-3 px-4 font-medium text-surface-500">
               Gross
             </th>
+            {/* TODO(5.10): Platform fee % should come from admin settings */}
             <th className="text-right py-3 px-4 font-medium text-surface-500">
               Fee (5%)
             </th>
@@ -496,6 +500,35 @@ async function fetchApi<T>(path: string, options?: RequestInit): Promise<T | nul
   }
 }
 
+type ModalAction =
+  | { type: "release"; offerId: string }
+  | { type: "approve"; payoutId: string }
+  | { type: "override"; payoutId: string };
+
+const OVERRIDE_STATUS_OPTIONS: { value: string; label: string }[] = [
+  { value: "pending", label: "Pending" },
+  { value: "completed", label: "Completed" },
+  { value: "failed", label: "Failed" },
+  { value: "refunded", label: "Refunded" },
+  { value: "on_hold", label: "On Hold" },
+];
+
+const OVERRIDE_FIELDS: ModalField[] = [
+  {
+    key: "status",
+    type: "select",
+    label: "New Status",
+    required: true,
+    options: OVERRIDE_STATUS_OPTIONS,
+  },
+  {
+    key: "reason",
+    type: "textarea",
+    label: "Reason for Override",
+    placeholder: "Explain why this status is being changed...",
+  },
+];
+
 export default function AdminPaymentsPage() {
   const [activeTab, setActiveTab] = useState<TabKey>("escrow");
   const [summary, setSummary] = useState<PaymentSummary>(EMPTY_SUMMARY);
@@ -505,6 +538,7 @@ export default function AdminPaymentsPage() {
   const [escrowFilter, setEscrowFilter] = useState<"all" | EscrowStatus>(
     "all"
   );
+  const [activeModal, setActiveModal] = useState<ModalAction | null>(null);
 
   // Fetch real data from API, falling back to mock data
   const loadData = useCallback(async () => {
@@ -527,84 +561,77 @@ export default function AdminPaymentsPage() {
     loadData();
   }, [loadData]);
 
-  const handleRelease = useCallback(async (offerId: string) => {
-    if (
-      !window.confirm(
-        "Release escrow funds to contractor? This action cannot be undone."
-      )
-    ) {
-      return;
-    }
-    const result = await fetchApi<{ status: string }>(
-      `/admin/payments/escrow/${offerId}/release`,
-      { method: "POST" }
-    );
-    // Update local state optimistically
-    setEscrows((prev) =>
-      prev.map((e) =>
-        e.offerId === offerId ? { ...e, escrowStatus: "released" as EscrowStatus } : e
-      )
-    );
-    if (!result) {
-      // Revert on failure
-      loadData();
-    }
-  }, [loadData]);
+  const handleReleaseClick = useCallback((offerId: string) => {
+    setActiveModal({ type: "release", offerId });
+  }, []);
 
-  const handleApprovePayout = useCallback(async (payoutId: string) => {
-    if (
-      !window.confirm("Approve this payout to the contractor?")
-    ) {
-      return;
-    }
-    const result = await fetchApi<{ status: string }>(
-      `/admin/payments/payouts/${payoutId}/approve`,
-      { method: "POST" }
-    );
-    setPayouts((prev) =>
-      prev.map((p) =>
-        p.id === payoutId
-          ? {
-              ...p,
-              status: "approved" as PayoutStatus,
-              approvedAt: new Date().toISOString(),
-            }
-          : p
-      )
-    );
-    if (!result) {
-      loadData();
-    }
-  }, [loadData]);
+  const handleApproveClick = useCallback((payoutId: string) => {
+    setActiveModal({ type: "approve", payoutId });
+  }, []);
 
-  const ALLOWED_PAYMENT_STATUSES = ["pending", "completed", "failed", "refunded", "on_hold"];
+  const handleOverrideClick = useCallback((payoutId: string) => {
+    setActiveModal({ type: "override", payoutId });
+  }, []);
 
-  const handleOverrideStatus = useCallback(async (payoutId: string) => {
-    const newStatus = window.prompt(
-      `Enter new status:\n(${ALLOWED_PAYMENT_STATUSES.join(", ")})`
-    );
-    if (!newStatus) return;
-    const trimmed = newStatus.trim();
-    if (!ALLOWED_PAYMENT_STATUSES.includes(trimmed)) {
-      window.alert(`Invalid status. Must be one of: ${ALLOWED_PAYMENT_STATUSES.join(", ")}`);
-      return;
-    }
-    const reason = window.prompt("Reason for override (optional):") ?? "";
-    const result = await fetchApi<{ status: string }>(
-      `/admin/payments/${payoutId}/status`,
-      {
-        method: "PATCH",
-        body: JSON.stringify({ status: trimmed, reason }),
+  const handleModalConfirm = useCallback(
+    async (values: Record<string, string>) => {
+      if (!activeModal) return;
+
+      if (activeModal.type === "release") {
+        const result = await fetchApi<{ status: string }>(
+          `/admin/payments/escrow/${activeModal.offerId}/release`,
+          { method: "POST" }
+        );
+        setEscrows((prev) =>
+          prev.map((e) =>
+            e.offerId === activeModal.offerId
+              ? { ...e, escrowStatus: "released" as EscrowStatus }
+              : e
+          )
+        );
+        if (!result) loadData();
       }
-    );
-    if (result) {
-      setPayouts((prev) =>
-        prev.map((p) => (p.id === payoutId ? { ...p, status: trimmed as PayoutStatus } : p))
-      );
-    } else {
-      loadData();
-    }
-  }, [loadData]);
+
+      if (activeModal.type === "approve") {
+        const result = await fetchApi<{ status: string }>(
+          `/admin/payments/payouts/${activeModal.payoutId}/approve`,
+          { method: "POST" }
+        );
+        setPayouts((prev) =>
+          prev.map((p) =>
+            p.id === activeModal.payoutId
+              ? { ...p, status: "approved" as PayoutStatus, approvedAt: new Date().toISOString() }
+              : p
+          )
+        );
+        if (!result) loadData();
+      }
+
+      if (activeModal.type === "override") {
+        const result = await fetchApi<{ status: string }>(
+          `/admin/payments/${activeModal.payoutId}/status`,
+          {
+            method: "PATCH",
+            body: JSON.stringify({ status: values.status, reason: values.reason ?? "" }),
+          }
+        );
+        if (result) {
+          setPayouts((prev) =>
+            prev.map((p) =>
+              p.id === activeModal.payoutId
+                ? { ...p, status: values.status as PayoutStatus }
+                : p
+            )
+          );
+        } else {
+          loadData();
+        }
+      }
+
+      setActiveModal(null);
+    },
+    [activeModal, loadData]
+  );
 
   const filteredEscrows =
     escrowFilter === "all"
@@ -753,7 +780,7 @@ export default function AdminPaymentsPage() {
                 <p className="text-surface-500">No escrow accounts found</p>
               </div>
             ) : (
-              <EscrowTable escrows={filteredEscrows} onRelease={handleRelease} />
+              <EscrowTable escrows={filteredEscrows} onRelease={handleReleaseClick} />
             )}
           </div>
         </div>
@@ -767,10 +794,43 @@ export default function AdminPaymentsPage() {
               <p className="text-surface-500">No contractor payouts yet</p>
             </div>
           ) : (
-            <PayoutsTable payouts={payouts} onApprove={handleApprovePayout} onOverride={handleOverrideStatus} />
+            <PayoutsTable payouts={payouts} onApprove={handleApproveClick} onOverride={handleOverrideClick} />
           )}
         </div>
       )}
+
+      {/* Release Escrow Modal */}
+      <AdminActionModal
+        open={activeModal?.type === "release"}
+        onClose={() => setActiveModal(null)}
+        onConfirm={handleModalConfirm}
+        title="Release Escrow Funds"
+        description="Release escrow funds to the contractor. This action cannot be undone."
+        confirmLabel="Release Funds"
+        destructive
+      />
+
+      {/* Approve Payout Modal */}
+      <AdminActionModal
+        open={activeModal?.type === "approve"}
+        onClose={() => setActiveModal(null)}
+        onConfirm={handleModalConfirm}
+        title="Approve Payout"
+        description="Approve this payout to the contractor? Funds will be scheduled for transfer."
+        confirmLabel="Approve Payout"
+      />
+
+      {/* Override Status Modal */}
+      <AdminActionModal
+        open={activeModal?.type === "override"}
+        onClose={() => setActiveModal(null)}
+        onConfirm={handleModalConfirm}
+        title="Override Payment Status"
+        description="Manually change the payment status. This will be recorded in the audit log."
+        fields={OVERRIDE_FIELDS}
+        confirmLabel="Apply Override"
+        destructive
+      />
     </div>
   );
 }

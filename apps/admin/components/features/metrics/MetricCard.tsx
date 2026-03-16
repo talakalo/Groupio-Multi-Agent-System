@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { clsx } from "clsx";
-import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, ArrowUpRight } from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -28,6 +29,10 @@ export interface MetricCardProps {
   icon?: React.ReactNode;
   /** Additional CSS classes */
   className?: string;
+  /** Makes the card a clickable link */
+  href?: string;
+  /** Click handler (alternative to href) */
+  onClick?: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -122,6 +127,8 @@ export function MetricCard({
   variant = "default",
   icon,
   className,
+  href,
+  onClick,
 }: MetricCardProps) {
   const styles = VARIANT_STYLES[variant];
 
@@ -129,8 +136,10 @@ export function MetricCard({
   const isNegative = changePercent !== undefined && changePercent < 0;
   const isNeutral = changePercent !== undefined && changePercent === 0;
 
-  return (
-    <div className={clsx("card card-hover p-5", className)}>
+  const isClickable = Boolean(href || onClick);
+
+  const content = (
+    <>
       {/* Header row: icon + label */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2.5">
@@ -148,9 +157,14 @@ export function MetricCard({
           )}
           <span className="text-sm font-medium text-surface-500">{label}</span>
         </div>
-        {sparklineData && sparklineData.length > 1 && (
-          <Sparkline data={sparklineData} />
-        )}
+        <div className="flex items-center gap-2">
+          {sparklineData && sparklineData.length > 1 && (
+            <Sparkline data={sparklineData} />
+          )}
+          {isClickable && (
+            <ArrowUpRight className="w-4 h-4 text-surface-300 group-hover:text-primary-500 transition-colors" />
+          )}
+        </div>
       </div>
 
       {/* Value */}
@@ -182,6 +196,30 @@ export function MetricCard({
           <span className="text-xs text-surface-400">{changePeriodLabel}</span>
         </div>
       )}
-    </div>
+    </>
   );
+
+  const cardClasses = clsx(
+    "card card-hover p-5 group",
+    isClickable && "cursor-pointer",
+    className
+  );
+
+  if (href) {
+    return (
+      <Link href={href} className={clsx(cardClasses, "block no-underline")}>
+        {content}
+      </Link>
+    );
+  }
+
+  if (onClick) {
+    return (
+      <button onClick={onClick} className={clsx(cardClasses, "text-start w-full")}>
+        {content}
+      </button>
+    );
+  }
+
+  return <div className={cardClasses}>{content}</div>;
 }

@@ -1,11 +1,9 @@
 "use client";
 
 import {
-  ArrowRight,
   CheckCircle2,
   Clock,
   AlertCircle,
-  Shield,
   Loader2,
   FileText,
   Phone,
@@ -16,8 +14,12 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
+import { Badge } from "@/components/ui/Badge";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { Breadcrumb } from "@/components/shared/Breadcrumb";
+import { EscrowBadge } from "@/components/features/payments/EscrowBadge";
+import { OrderTimeline } from "@/components/features/orders/OrderTimeline";
 import { apiClient } from "@/lib/api/client";
-import { useAuthStore } from "@/lib/stores/authStore";
 
 interface OrderDetail {
   id: string;
@@ -41,15 +43,17 @@ interface OrderDetail {
   invoiceId?: string;
 }
 
+type BadgeVariant = "warning" | "info" | "success" | "error" | "accent" | "primary";
+
 const STATUS_MAP: Record<
   string,
-  { label: string; color: string; icon: React.ElementType }
+  { label: string; variant: BadgeVariant; icon: React.ElementType }
 > = {
-  pending: { label: "ממתין לתשלום", color: "bg-amber-100 text-amber-800", icon: Clock },
-  processing: { label: "בעיבוד", color: "bg-blue-100 text-blue-800", icon: Loader2 },
-  succeeded: { label: "שולם", color: "bg-green-100 text-green-800", icon: CheckCircle2 },
-  failed: { label: "נכשל", color: "bg-red-100 text-red-800", icon: XCircle },
-  refunded: { label: "הוחזר", color: "bg-purple-100 text-purple-800", icon: ArrowRight },
+  pending: { label: "ממתין לתשלום", variant: "warning", icon: Clock },
+  processing: { label: "בעיבוד", variant: "info", icon: Loader2 },
+  succeeded: { label: "שולם", variant: "success", icon: CheckCircle2 },
+  failed: { label: "נכשל", variant: "error", icon: XCircle },
+  refunded: { label: "הוחזר", variant: "accent", icon: Clock },
 };
 
 const ESCROW_MAP: Record<string, { label: string; color: string }> = {
@@ -118,9 +122,13 @@ export default function OrderDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]" dir="rtl">
-        <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
-      </div>
+      <main className="max-w-2xl mx-auto space-y-6 p-4 md:p-6" dir="rtl">
+        <Skeleton variant="text" className="h-4 w-40" />
+        <Skeleton variant="card" className="h-20" />
+        <Skeleton variant="card" className="h-48" />
+        <Skeleton variant="card" className="h-32" />
+        <Skeleton variant="card" className="h-40" />
+      </main>
     );
   }
 
@@ -150,24 +158,36 @@ export default function OrderDetailPage() {
     order.escrowStatus === "held" &&
     !approved;
 
+  const orderTitle = order.offer?.title || "הזמנה";
+
   return (
     <main className="max-w-2xl mx-auto space-y-6 p-4 md:p-6" dir="rtl">
       {/* Breadcrumb */}
-      <nav className="flex items-center gap-2 text-sm text-gray-500">
-        <Link href="/payments" className="hover:text-primary-600">
-          תשלומים
-        </Link>
-        <ArrowRight className="w-4 h-4 rtl-flip" />
-        <span className="text-gray-900">פרטי הזמנה</span>
-      </nav>
+      <Breadcrumb
+        items={[
+          { label: "ראשי", href: "/dashboard" },
+          { label: "הזמנות", href: "/orders" },
+          { label: orderTitle },
+        ]}
+      />
 
       {/* Status Banner */}
-      <div className={`rounded-xl p-4 flex items-center gap-3 ${statusConfig.color}`}>
-        <StatusIcon className="w-6 h-6" />
-        <div>
-          <p className="font-semibold">{statusConfig.label}</p>
-          <p className="text-sm opacity-80">{formatDate(order.createdAt)}</p>
+      <div className="bg-white rounded-xl border border-gray-200 p-5 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <StatusIcon className="w-6 h-6 text-gray-500" />
+          <div>
+            <Badge variant={statusConfig.variant} size="md">
+              {statusConfig.label}
+            </Badge>
+            <p className="text-xs text-gray-500 mt-1">{formatDate(order.createdAt)}</p>
+          </div>
         </div>
+      </div>
+
+      {/* Order Timeline */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <h2 className="font-semibold text-gray-900 mb-4">מצב ההזמנה</h2>
+        <OrderTimeline status={order.status} />
       </div>
 
       {/* Order Info Card */}
@@ -195,15 +215,10 @@ export default function OrderDetailPage() {
 
       {/* Escrow Status */}
       {escrowConfig && (
-        <div className={`rounded-xl p-4 ${escrowConfig.color}`}>
-          <div className="flex items-center gap-2">
-            <Shield className="w-5 h-5" />
-            <span className="font-medium">{escrowConfig.label}</span>
-          </div>
-          {order.escrowStatus === "held" && (
-            <p className="text-sm mt-2 opacity-80">
-              הכסף מוחזק בנאמנות עד שתאשרו שהעבודה הושלמה לשביעות רצונכם.
-            </p>
+        <div className="space-y-2">
+          <EscrowBadge variant={order.escrowStatus === "held" ? "block" : "inline"} />
+          {order.escrowStatus !== "held" && (
+            <p className="text-sm text-gray-500 px-1">{escrowConfig.label}</p>
           )}
         </div>
       )}
@@ -292,8 +307,8 @@ export default function OrderDetailPage() {
 
       {/* Back */}
       <div className="text-center pt-4">
-        <Link href="/payments" className="text-gray-500 hover:text-gray-700 text-sm">
-          ← חזרה לתשלומים
+        <Link href="/orders" className="text-gray-500 hover:text-gray-700 text-sm">
+          ← חזרה להזמנות
         </Link>
       </div>
     </main>

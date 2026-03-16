@@ -7,16 +7,26 @@ import {
   I18nManager,
   Pressable,
 } from "react-native";
-import { Text, Card, useTheme, Avatar, Divider } from "react-native-paper";
+import { Text, Card, useTheme, Avatar, Divider, Chip } from "react-native-paper";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
-import type { Offer } from "@groupio/types";
+import type { Offer, OfferStatus, ServiceCategory } from "@groupio/types";
 
 import { StatCard } from "../../components/StatCard";
 import { MobileOfferCard } from "../../components/MobileOfferCard";
-import { useProfile, useOffers, useActivityFeed, useBuildingNews } from "../../lib/hooks";
+import {
+  useProfile,
+  useOffers,
+  useActivityFeed,
+  useBuildingNews,
+  useContractorStats,
+  useContractorOffers,
+  useContractorProjects,
+} from "../../lib/hooks";
 import type { ActivityItem, NewsItem } from "../../lib/api";
+import { storage } from "../../lib/storage";
+import i18n from "../../lib/i18n";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -26,21 +36,21 @@ const QUICK_ACTIONS = [
   {
     key: "new_offer" as const,
     icon: "plus-circle",
-    label: "\u05D4\u05E6\u05E2\u05D4 \u05D7\u05D3\u05E9\u05D4",
-    color: "#1976D2",
-    bg: "#E3F2FD",
+    labelKey: "home.newOffer" as const,
+    color: "#1a9a76",
+    bg: "#d1f0e6",
   },
   {
     key: "find_contractor" as const,
     icon: "account-search",
-    label: "\u05DE\u05E6\u05D0 \u05E7\u05D1\u05DC\u05DF",
-    color: "#FF6F00",
-    bg: "#FFF3E0",
+    labelKey: "home.findContractor" as const,
+    color: "#f59e0b",
+    bg: "#fef3c7",
   },
   {
     key: "chat" as const,
     icon: "chat-processing",
-    label: "\u05E6'\u05D0\u05D8 AI",
+    labelKey: "home.aiChat" as const,
     color: "#2E7D32",
     bg: "#E8F5E9",
   },
@@ -61,6 +71,61 @@ const NEWS_CATEGORY_ICONS: Record<NewsItem["category"], string> = {
   community: "account-group",
 };
 
+const CONTRACTOR_QUICK_ACTIONS = [
+  {
+    key: "create_offer" as const,
+    icon: "plus-circle",
+    labelKey: "contractor.createOffer" as const,
+    color: "#1a9a76",
+    bg: "#d1f0e6",
+  },
+  {
+    key: "my_offers" as const,
+    icon: "tag-multiple",
+    labelKey: "contractor.myOffers" as const,
+    color: "#1565C0",
+    bg: "#E3F2FD",
+  },
+  {
+    key: "my_projects" as const,
+    icon: "clipboard-list",
+    labelKey: "contractor.projects" as const,
+    color: "#f59e0b",
+    bg: "#fef3c7",
+  },
+  {
+    key: "messages" as const,
+    icon: "chat-processing",
+    labelKey: "contractor.messages" as const,
+    color: "#2E7D32",
+    bg: "#E8F5E9",
+  },
+] as const;
+
+const OFFER_STATUS_KEYS: Record<string, string> = {
+  active: "status.active",
+  in_progress: "status.in_progress",
+  completed: "status.completed",
+  pending: "status.pending",
+  draft: "status.draft",
+  cancelled: "status.cancelled",
+  expired: "status.expired",
+};
+
+const CATEGORY_KEYS: Record<string, string> = {
+  ac_installation: "categories.ac_installation",
+  ac_maintenance: "categories.ac_maintenance",
+  kitchen: "categories.kitchen",
+  electrical: "categories.electrical",
+  plumbing: "categories.plumbing",
+  heating: "categories.heating",
+  renovations: "categories.renovations",
+  painting: "categories.painting",
+  flooring: "categories.flooring",
+  windows: "categories.windows",
+  security: "categories.security",
+};
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -68,6 +133,16 @@ const NEWS_CATEGORY_ICONS: Record<NewsItem["category"], string> = {
 export default function HomeScreen() {
   const theme = useTheme();
   const router = useRouter();
+
+  // Determine user role
+  const [userRole, setUserRole] = React.useState<string>("resident");
+  React.useEffect(() => {
+    storage.getUser().then((u) => {
+      if (u?.role) setUserRole(u.role);
+    });
+  }, []);
+
+  const isContractor = userRole === "contractor";
 
   // Data fetching
   const { data: profile } = useProfile();
@@ -79,7 +154,7 @@ export default function HomeScreen() {
     refetch: refetchOffers,
   } = useOffers(
     { status: "active", buildingId, limit: 5 },
-    { enabled: !!buildingId },
+    { enabled: !!buildingId && !isContractor },
   );
 
   const {
@@ -92,13 +167,38 @@ export default function HomeScreen() {
     refetch: refetchNews,
   } = useBuildingNews(buildingId);
 
+  // Contractor data
+  const { data: contractorStats, refetch: refetchContractorStats } =
+    useContractorStats({ enabled: isContractor });
+  const { data: contractorOffersData, refetch: refetchContractorOffers } =
+    useContractorOffers({ status: "active", limit: 5 }, { enabled: isContractor });
+  const { data: contractorProjectsData, refetch: refetchContractorProjects } =
+    useContractorProjects({ status: "in_progress", limit: 5 }, { enabled: isContractor });
+
   const [refreshing, setRefreshing] = React.useState(false);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await Promise.all([refetchOffers(), refetchActivity(), refetchNews()]);
+    if (isContractor) {
+      await Promise.all([
+        refetchContractorStats(),
+        refetchContractorOffers(),
+        refetchContractorProjects(),
+        refetchActivity(),
+      ]);
+    } else {
+      await Promise.all([refetchOffers(), refetchActivity(), refetchNews()]);
+    }
     setRefreshing(false);
-  }, [refetchOffers, refetchActivity, refetchNews]);
+  }, [
+    isContractor,
+    refetchOffers,
+    refetchActivity,
+    refetchNews,
+    refetchContractorStats,
+    refetchContractorOffers,
+    refetchContractorProjects,
+  ]);
 
   // Navigation
   const handleQuickAction = useCallback(
@@ -125,9 +225,31 @@ export default function HomeScreen() {
     [router],
   );
 
+  const handleContractorQuickAction = useCallback(
+    (key: (typeof CONTRACTOR_QUICK_ACTIONS)[number]["key"]) => {
+      switch (key) {
+        case "create_offer":
+          router.push("/create-offer" as never);
+          break;
+        case "my_offers":
+          router.push("/contractor-offers" as never);
+          break;
+        case "my_projects":
+          router.push("/contractor-projects" as never);
+          break;
+        case "messages":
+          router.push("/chat" as never);
+          break;
+      }
+    },
+    [router],
+  );
+
   // Computed
   const activeOffers = offersData?.data ?? [];
-  const userName = profile?.name?.split(" ")[0] ?? "\u05EA\u05D5\u05E9\u05D1";
+  const contractorOffersList = contractorOffersData?.data ?? [];
+  const contractorProjectsList = contractorProjectsData?.data ?? [];
+  const userName = profile?.name?.split(" ")[0] ?? i18n.t("profile.user");
   const totalParticipants = activeOffers.reduce(
     (sum, o) => sum + o.participants,
     0,
@@ -158,7 +280,7 @@ export default function HomeScreen() {
                 variant="headlineSmall"
                 style={[styles.welcomeTitle, { color: theme.colors.onSurface }]}
               >
-                {"\u05E9\u05DC\u05D5\u05DD"}, {userName}!
+                {i18n.t("home.greeting", { name: userName })}
               </Text>
               <Text
                 variant="bodyMedium"
@@ -169,7 +291,7 @@ export default function HomeScreen() {
               >
                 {profile?.building?.address
                   ? `${profile.building.address}, ${profile.building.city}`
-                  : "\u05D1\u05E8\u05D5\u05DA \u05D4\u05D1\u05D0 \u05DC-Groupio"}
+                  : i18n.t("home.welcomeTo")}
               </Text>
             </View>
             <Avatar.Text
@@ -182,41 +304,73 @@ export default function HomeScreen() {
         </View>
 
         {/* ---- Stats Row ---- */}
-        <View style={styles.statsRow}>
-          <StatCard
-            title={"\u05D4\u05E6\u05E2\u05D5\u05EA \u05E4\u05E2\u05D9\u05DC\u05D5\u05EA"}
-            value={activeOffers.length}
-            icon="tag-multiple"
-            iconColor={theme.colors.primary}
-            backgroundColor={theme.colors.primaryContainer}
-          />
-          <View style={styles.statSpacer} />
-          <StatCard
-            title={"\u05DE\u05E9\u05EA\u05EA\u05E4\u05D9\u05DD"}
-            value={totalParticipants}
-            icon="account-group"
-            iconColor={theme.colors.secondary}
-            backgroundColor={theme.colors.secondaryContainer}
-          />
-          <View style={styles.statSpacer} />
-          <StatCard
-            title={"\u05D7\u05E1\u05DB\u05D5\u05DF \u05DB\u05D5\u05DC\u05DC"}
-            value={
-              activeOffers.length > 0
-                ? `${Math.round(
-                    activeOffers.reduce(
-                      (s, o) =>
-                        s + (o.tiers[o.currentTier]?.discount ?? 0),
-                      0,
-                    ) / activeOffers.length,
-                  )}%`
-                : "0%"
-            }
-            icon="percent"
-            iconColor={theme.colors.tertiary}
-            backgroundColor={theme.colors.tertiaryContainer}
-          />
-        </View>
+        {isContractor ? (
+          <View style={styles.statsRow}>
+            <StatCard
+              title={i18n.t("contractor.activeOffers")}
+              value={contractorStats?.activeOffers ?? 0}
+              icon="tag-multiple"
+              iconColor={theme.colors.primary}
+              backgroundColor={theme.colors.primaryContainer}
+            />
+            <View style={styles.statSpacer} />
+            <StatCard
+              title={i18n.t("contractor.projects")}
+              value={contractorStats?.completedProjects ?? 0}
+              icon="clipboard-check"
+              iconColor={theme.colors.secondary}
+              backgroundColor={theme.colors.secondaryContainer}
+            />
+            <View style={styles.statSpacer} />
+            <StatCard
+              title={i18n.t("contractor.revenue")}
+              value={
+                contractorStats?.totalRevenue
+                  ? `₪${Math.round(contractorStats.totalRevenue).toLocaleString()}`
+                  : "₪0"
+              }
+              icon="currency-ils"
+              iconColor={theme.colors.tertiary}
+              backgroundColor={theme.colors.tertiaryContainer}
+            />
+          </View>
+        ) : (
+          <View style={styles.statsRow}>
+            <StatCard
+              title={i18n.t("home.activeOffers")}
+              value={activeOffers.length}
+              icon="tag-multiple"
+              iconColor={theme.colors.primary}
+              backgroundColor={theme.colors.primaryContainer}
+            />
+            <View style={styles.statSpacer} />
+            <StatCard
+              title={i18n.t("home.participants")}
+              value={totalParticipants}
+              icon="account-group"
+              iconColor={theme.colors.secondary}
+              backgroundColor={theme.colors.secondaryContainer}
+            />
+            <View style={styles.statSpacer} />
+            <StatCard
+              title={i18n.t("home.totalSavings")}
+              value={
+                activeOffers.length > 0
+                  ? `${Math.round(
+                      activeOffers.reduce(
+                        (s, o) =>
+                          s + (o.tiers[o.currentTier]?.discount ?? 0),
+                        0,
+                      ) / activeOffers.length,
+                    )}%`
+                  : "0%"
+              }
+              icon="percent"
+              iconColor={theme.colors.tertiary}
+              backgroundColor={theme.colors.tertiaryContainer}
+            />
+          </View>
+        )}
 
         {/* ---- Quick Actions ---- */}
         <View style={styles.sectionHeader}>
@@ -224,55 +378,201 @@ export default function HomeScreen() {
             variant="titleMedium"
             style={[styles.sectionTitle, { color: theme.colors.onSurface }]}
           >
-            {"\u05E4\u05E2\u05D5\u05DC\u05D5\u05EA \u05DE\u05D4\u05D9\u05E8\u05D5\u05EA"}
+            {isContractor ? i18n.t("contractor.quickActions") : i18n.t("home.quickActions")}
           </Text>
         </View>
 
-        <View style={styles.quickActionsRow}>
-          {QUICK_ACTIONS.map((action) => (
-            <Pressable
-              key={action.key}
-              style={({ pressed }) => [
-                styles.quickAction,
-                { backgroundColor: action.bg, opacity: pressed ? 0.7 : 1 },
-              ]}
-              onPress={() => handleQuickAction(action.key)}
-            >
-              <View
-                style={[
-                  styles.quickActionIconWrap,
-                  { backgroundColor: action.color },
+        {isContractor ? (
+          <View style={styles.quickActionsRow}>
+            {CONTRACTOR_QUICK_ACTIONS.map((action) => (
+              <Pressable
+                key={action.key}
+                style={({ pressed }) => [
+                  styles.quickAction,
+                  { backgroundColor: action.bg, opacity: pressed ? 0.7 : 1 },
                 ]}
+                onPress={() => handleContractorQuickAction(action.key)}
               >
-                <Icon name={action.icon} size={24} color="#FFFFFF" />
-              </View>
-              <Text
-                variant="labelMedium"
-                style={[styles.quickActionLabel, { color: action.color }]}
-                numberOfLines={1}
+                <View
+                  style={[
+                    styles.quickActionIconWrap,
+                    { backgroundColor: action.color },
+                  ]}
+                >
+                  <Icon name={action.icon} size={24} color="#FFFFFF" />
+                </View>
+                <Text
+                  variant="labelMedium"
+                  style={[styles.quickActionLabel, { color: action.color }]}
+                  numberOfLines={1}
+                >
+                  {i18n.t(action.labelKey)}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : (
+          <View style={styles.quickActionsRow}>
+            {QUICK_ACTIONS.map((action) => (
+              <Pressable
+                key={action.key}
+                style={({ pressed }) => [
+                  styles.quickAction,
+                  { backgroundColor: action.bg, opacity: pressed ? 0.7 : 1 },
+                ]}
+                onPress={() => handleQuickAction(action.key)}
               >
-                {action.label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
+                <View
+                  style={[
+                    styles.quickActionIconWrap,
+                    { backgroundColor: action.color },
+                  ]}
+                >
+                  <Icon name={action.icon} size={24} color="#FFFFFF" />
+                </View>
+                <Text
+                  variant="labelMedium"
+                  style={[styles.quickActionLabel, { color: action.color }]}
+                  numberOfLines={1}
+                >
+                  {i18n.t(action.labelKey)}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
 
-        {/* ---- Active Offers (horizontal scroll) ---- */}
-        {activeOffers.length > 0 && (
+        {/* ---- Contractor: Active Offers ---- */}
+        {isContractor && contractorOffersList.length > 0 && (
           <>
             <View style={styles.sectionHeader}>
               <Text
                 variant="titleMedium"
                 style={[styles.sectionTitle, { color: theme.colors.onSurface }]}
               >
-                {"\u05D4\u05E6\u05E2\u05D5\u05EA \u05E4\u05E2\u05D9\u05DC\u05D5\u05EA"}
+                {i18n.t("contractor.activeOffers")}
+              </Text>
+              <Pressable onPress={() => router.push("/contractor-offers" as never)}>
+                <Text
+                  variant="labelMedium"
+                  style={{ color: theme.colors.primary }}
+                >
+                  {i18n.t("home.viewAll")}
+                </Text>
+              </Pressable>
+            </View>
+            {contractorOffersList.slice(0, 3).map((offer) => (
+              <Card
+                key={offer.id}
+                style={[styles.contractorOfferRow, { backgroundColor: theme.colors.surface }]}
+                mode="elevated"
+                onPress={() => handleOfferPress(offer)}
+              >
+                <Card.Content style={styles.contractorOfferContent}>
+                  <View style={styles.contractorOfferLeft}>
+                    <Text
+                      variant="bodyMedium"
+                      style={[styles.contractorOfferTitle, { color: theme.colors.onSurface }]}
+                      numberOfLines={1}
+                    >
+                      {CATEGORY_KEYS[offer.category] ? i18n.t(CATEGORY_KEYS[offer.category]) : offer.category}
+                    </Text>
+                    <Text
+                      variant="bodySmall"
+                      style={{ color: theme.colors.onSurfaceVariant }}
+                    >
+                      {offer.participants} {i18n.t("contractor.participants")} · ₪{offer.basePrice.toLocaleString()}
+                    </Text>
+                  </View>
+                  <Chip
+                    compact
+                    style={{ backgroundColor: OFFER_STATUS_KEYS[offer.status] ? "#E8F5E9" : "#F5F5F5" }}
+                    textStyle={{ fontSize: 11, fontWeight: "600" }}
+                  >
+                    {OFFER_STATUS_KEYS[offer.status] ? i18n.t(OFFER_STATUS_KEYS[offer.status]) : offer.status}
+                  </Chip>
+                </Card.Content>
+              </Card>
+            ))}
+          </>
+        )}
+
+        {/* ---- Contractor: Recent Projects ---- */}
+        {isContractor && contractorProjectsList.length > 0 && (
+          <>
+            <View style={styles.sectionHeader}>
+              <Text
+                variant="titleMedium"
+                style={[styles.sectionTitle, { color: theme.colors.onSurface }]}
+              >
+                {i18n.t("contractor.recentProjects")}
+              </Text>
+              <Pressable onPress={() => router.push("/contractor-projects" as never)}>
+                <Text
+                  variant="labelMedium"
+                  style={{ color: theme.colors.primary }}
+                >
+                  {i18n.t("home.viewAll")}
+                </Text>
+              </Pressable>
+            </View>
+            {contractorProjectsList.slice(0, 3).map((project) => (
+              <Card
+                key={project.id}
+                style={[styles.contractorOfferRow, { backgroundColor: theme.colors.surface }]}
+                mode="elevated"
+                onPress={() =>
+                  router.push(`/offer-detail?id=${project.offerId}` as never)
+                }
+              >
+                <Card.Content style={styles.contractorOfferContent}>
+                  <View style={styles.contractorOfferLeft}>
+                    <Text
+                      variant="bodyMedium"
+                      style={[styles.contractorOfferTitle, { color: theme.colors.onSurface }]}
+                      numberOfLines={1}
+                    >
+                      {project.title ?? (CATEGORY_KEYS[project.category] ? i18n.t(CATEGORY_KEYS[project.category]) : project.category)}
+                    </Text>
+                    <Text
+                      variant="bodySmall"
+                      style={{ color: theme.colors.onSurfaceVariant }}
+                    >
+                      {project.buildingAddress ?? ""} · {project.participants} {i18n.t("contractor.participants")}
+                    </Text>
+                  </View>
+                  <Chip
+                    compact
+                    style={{
+                      backgroundColor:
+                        project.status === "in_progress" ? "#E3F2FD" : "#d1f0e6",
+                    }}
+                    textStyle={{ fontSize: 11, fontWeight: "600" }}
+                  >
+                    {OFFER_STATUS_KEYS[project.status] ? i18n.t(OFFER_STATUS_KEYS[project.status]) : project.status}
+                  </Chip>
+                </Card.Content>
+              </Card>
+            ))}
+          </>
+        )}
+
+        {/* ---- Resident: Active Offers (horizontal scroll) ---- */}
+        {!isContractor && activeOffers.length > 0 && (
+          <>
+            <View style={styles.sectionHeader}>
+              <Text
+                variant="titleMedium"
+                style={[styles.sectionTitle, { color: theme.colors.onSurface }]}
+              >
+                {i18n.t("home.activeOffers")}
               </Text>
               <Pressable onPress={() => router.push("/offers" as never)}>
                 <Text
                   variant="labelMedium"
                   style={{ color: theme.colors.primary }}
                 >
-                  {"\u05E6\u05E4\u05D4 \u05D1\u05D4\u05DB\u05DC"}
+                  {i18n.t("home.viewAll")}
                 </Text>
               </Pressable>
             </View>
@@ -301,7 +601,7 @@ export default function HomeScreen() {
             variant="titleMedium"
             style={[styles.sectionTitle, { color: theme.colors.onSurface }]}
           >
-            {"\u05E4\u05E2\u05D9\u05DC\u05D5\u05EA \u05D0\u05D7\u05E8\u05D5\u05E0\u05D5\u05EA"}
+            {i18n.t("home.recentActivity")}
           </Text>
         </View>
 
@@ -370,7 +670,7 @@ export default function HomeScreen() {
                   variant="bodyMedium"
                   style={{ color: theme.colors.onSurfaceVariant, marginTop: 8 }}
                 >
-                  {"\u05D0\u05D9\u05DF \u05E4\u05E2\u05D9\u05DC\u05D5\u05EA \u05D0\u05D7\u05E8\u05D5\u05E0\u05D5\u05EA \u05E2\u05D3\u05D9\u05D9\u05DF"}
+                  {i18n.t("home.noRecentActivity")}
                 </Text>
               </View>
             )}
@@ -383,7 +683,7 @@ export default function HomeScreen() {
             variant="titleMedium"
             style={[styles.sectionTitle, { color: theme.colors.onSurface }]}
           >
-            {"\u05D7\u05D3\u05E9\u05D5\u05EA \u05D4\u05D1\u05E0\u05D9\u05D9\u05DF"}
+            {i18n.t("home.buildingNews")}
           </Text>
         </View>
 
@@ -454,7 +754,7 @@ export default function HomeScreen() {
                   variant="bodyMedium"
                   style={{ color: theme.colors.onSurfaceVariant, marginTop: 8 }}
                 >
-                  {"\u05D0\u05D9\u05DF \u05D7\u05D3\u05E9\u05D5\u05EA \u05DB\u05E8\u05D2\u05E2"}
+                  {i18n.t("home.noNews")}
                 </Text>
               </View>
             </Card.Content>
@@ -480,11 +780,13 @@ function formatRelativeTime(isoDate: string): string {
   const diffHr = Math.floor(diffMs / 3_600_000);
   const diffDay = Math.floor(diffMs / 86_400_000);
 
-  if (diffMin < 1) return "\u05E2\u05DB\u05E9\u05D9\u05D5";
-  if (diffMin < 60) return `\u05DC\u05E4\u05E0\u05D9 ${diffMin} \u05D3\u05E7\u05D5\u05EA`;
-  if (diffHr < 24) return `\u05DC\u05E4\u05E0\u05D9 ${diffHr} \u05E9\u05E2\u05D5\u05EA`;
-  if (diffDay < 7) return `\u05DC\u05E4\u05E0\u05D9 ${diffDay} \u05D9\u05DE\u05D9\u05DD`;
-  return new Date(isoDate).toLocaleDateString("he-IL");
+  if (diffMin < 1) return i18n.t("time.now");
+  if (diffMin < 60) return i18n.t("time.minutesAgo", { count: diffMin });
+  if (diffHr < 24) return i18n.t("time.hoursAgo", { count: diffHr });
+  if (diffDay < 7) return i18n.t("time.daysAgo", { count: diffDay });
+  return new Date(isoDate).toLocaleDateString(
+    i18n.locale === "he" ? "he-IL" : "en-US",
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -651,6 +953,30 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 24,
+  },
+
+  // Contractor compact offer/project rows
+  contractorOfferRow: {
+    marginHorizontal: 16,
+    marginVertical: 3,
+    borderRadius: 12,
+    elevation: 1,
+  },
+  contractorOfferContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  contractorOfferLeft: {
+    flex: 1,
+    marginEnd: 10,
+    gap: 2,
+  },
+  contractorOfferTitle: {
+    fontWeight: "600",
+    fontSize: 14,
   },
 
   bottomSpacer: {

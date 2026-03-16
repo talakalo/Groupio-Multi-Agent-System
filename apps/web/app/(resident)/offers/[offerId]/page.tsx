@@ -21,13 +21,16 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 
 import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { useNotificationStore } from '@/lib/stores/notificationStore';
 import { cn } from '@/lib/utils/cn';
+import { Breadcrumb } from '@/components/shared/Breadcrumb';
+import { TrustBadgeCluster } from '@/components/shared/TrustBadgeCluster';
+import { EscrowBadge } from '@/components/features/payments/EscrowBadge';
 
 // ---------------------------------------------------------------------------
 // Join Confirmation Modal with cancellation policy disclosure
@@ -213,6 +216,58 @@ function TimelineStep({
 }
 
 // ---------------------------------------------------------------------------
+// Sticky CTA — visible when main join button scrolls out of view (desktop)
+// ---------------------------------------------------------------------------
+
+function StickyJoinCTA({
+  offerTitle,
+  price,
+  onJoin,
+  disabled,
+  targetRef,
+}: {
+  offerTitle: string;
+  price: string;
+  onJoin: () => void;
+  disabled: boolean;
+  targetRef: React.RefObject<HTMLButtonElement | null>;
+}) {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const target = targetRef.current;
+    if (!target) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setVisible(!entry.isIntersecting),
+      { threshold: 0 },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [targetRef]);
+
+  if (!visible) return null;
+
+  return (
+    <div className="fixed bottom-0 inset-x-0 z-40 hidden lg:block bg-white/95 backdrop-blur-sm border-t border-gray-200 shadow-lg">
+      <div className="max-w-4xl mx-auto flex items-center justify-between px-6 py-3">
+        <div>
+          <p className="font-bold text-gray-900 text-sm">{offerTitle}</p>
+          <p className="text-primary-600 font-semibold">{price}</p>
+        </div>
+        <button
+          type="button"
+          onClick={onJoin}
+          disabled={disabled}
+          className="btn-primary px-8 py-2.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          הצטרפו עכשיו
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main page
 // ---------------------------------------------------------------------------
 
@@ -228,6 +283,7 @@ export default function OfferDetailPage() {
 
   const offerId = params.offerId;
   const [showJoinModal, setShowJoinModal] = useState(false);
+  const joinButtonRef = useRef<HTMLButtonElement>(null);
 
   const offerQuery = useQuery<Offer>({
     queryKey: ['offer', offerId],
@@ -319,13 +375,13 @@ export default function OfferDetailPage() {
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Breadcrumb */}
-      <nav className="flex items-center gap-2 text-sm text-gray-400">
-        <Link href="/offers" className="hover:text-primary-600 transition-colors">
-          {t('title')}
-        </Link>
-        <ChevronLeft className="h-3.5 w-3.5 rtl-flip" />
-        <span className="text-gray-700">{tCat(offer.category)}</span>
-      </nav>
+      <Breadcrumb
+        items={[
+          { label: 'ראשי', href: '/' },
+          { label: t('title'), href: '/offers' },
+          { label: `${tCat(offer.category)} - ${t('groupOffer')}` },
+        ]}
+      />
 
       {/* Main info card */}
       <div className="card">
@@ -425,8 +481,12 @@ export default function OfferDetailPage() {
           </div>
         </div>
 
+        {/* Escrow protection badge */}
+        <EscrowBadge variant="block" className="mb-5" />
+
         {/* Join button — opens confirmation modal with policy disclosure */}
         <button
+          ref={joinButtonRef}
           type="button"
           onClick={() => setShowJoinModal(true)}
           disabled={joinMutation.isPending || joinMutation.isSuccess || offer.status !== 'active' || !user?.id}
@@ -483,6 +543,16 @@ export default function OfferDetailPage() {
             תנאי שימוש מלאים ←
           </Link>
         </div>
+
+        {/* Share with neighbors CTA */}
+        <button
+          type="button"
+          onClick={handleShare}
+          className="w-full flex items-center justify-center gap-2 mt-4 py-3 rounded-xl border-2 border-dashed border-primary-200 bg-primary-50/50 text-primary-700 font-semibold text-sm hover:bg-primary-50 transition-colors"
+        >
+          <Share2 className="h-4 w-4" />
+          שתפו עם השכנים — ככל שמצטרפים יותר, המחיר יורד!
+        </button>
       </div>
 
       {/* Join confirmation modal */}
@@ -571,6 +641,17 @@ export default function OfferDetailPage() {
                 </div>
               </div>
 
+              <TrustBadgeCluster
+                badges={[
+                  ...(contractor.verified ? ['verified' as const] : []),
+                  'escrow' as const,
+                  ...(contractor.licenseNumber ? ['licensed' as const] : []),
+                  ...(contractor.insured ? ['insured' as const] : []),
+                ]}
+                size="sm"
+                className="mb-4"
+              />
+
               <div className="space-y-3 mb-4">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-500">{tContractors('rating')}</span>
@@ -641,6 +722,15 @@ export default function OfferDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Sticky desktop CTA */}
+      <StickyJoinCTA
+        offerTitle={`${tCat(offer.category)} - ${t('groupOffer')}`}
+        price={formatPrice(currentTier?.price ?? offer.basePrice)}
+        onJoin={() => setShowJoinModal(true)}
+        disabled={joinMutation.isPending || joinMutation.isSuccess || offer.status !== 'active' || !user?.id}
+        targetRef={joinButtonRef}
+      />
     </div>
   );
 }

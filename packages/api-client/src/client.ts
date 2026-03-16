@@ -1,3 +1,9 @@
+/**
+ * Shared API client for Groupio backend.
+ * Used by admin app; web app uses its own apps/web/lib/api/client.ts (token refresh, different base).
+ * Types from @groupio/types. Consider unifying if API surface stabilizes.
+ */
+
 import type {
   MessageRequest,
   MessageResponse,

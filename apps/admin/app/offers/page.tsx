@@ -31,6 +31,8 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 // ---------------------------------------------------------------------------
 // Types
+// TODO: Offer shape here differs from @groupio/types Offer (admin API response);
+// consider aligning or documenting the divergence.
 // ---------------------------------------------------------------------------
 
 interface Offer {

@@ -9,7 +9,7 @@ import {
   LogOut,
   Building2,
   ChevronDown,
-  PlusCircle,
+  Plus,
   ClipboardList,
   Mail,
   Loader2,
@@ -33,7 +33,13 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { href: '/contractor/dashboard', labelKey: 'dashboard', icon: LayoutDashboard },
   { href: '/contractor/offers/active', labelKey: 'activeOffers', icon: ClipboardList },
-  { href: '/contractor/offers/create', labelKey: 'createOffer', icon: PlusCircle },
+  { href: '/contractor/projects', labelKey: 'projects', icon: FolderKanban },
+  { href: '/contractor/profile', labelKey: 'profile', icon: UserCircle },
+];
+
+const MOBILE_NAV_ITEMS: NavItem[] = [
+  { href: '/contractor/dashboard', labelKey: 'dashboard', icon: LayoutDashboard },
+  { href: '/contractor/offers/active', labelKey: 'activeOffers', icon: ClipboardList },
   { href: '/contractor/projects', labelKey: 'projects', icon: FolderKanban },
   { href: '/contractor/profile', labelKey: 'profile', icon: UserCircle },
 ];
@@ -101,8 +107,20 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
         <span className="badge-accent text-xs ms-auto">{t('contractorBadge')}</span>
       </div>
 
+      {/* CTA: Create Offer */}
+      <div className="px-3 pt-4 pb-2">
+        <Link
+          href="/contractor/offers/create"
+          onClick={() => setSidebarOpen(false)}
+          className="flex items-center justify-center gap-2 w-full px-4 py-3 rounded-xl bg-accent-500 text-white hover:bg-accent-600 active:bg-accent-700 transition-colors text-sm font-bold shadow-lg shadow-accent-500/25"
+        >
+          <Plus className="h-5 w-5" />
+          <span>{t('newOffer')}</span>
+        </Link>
+      </div>
+
       {/* Nav links */}
-      <div className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
+      <div className="flex-1 py-2 px-3 space-y-1 overflow-y-auto">
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon;
           const active = isActive(item.href);
@@ -123,17 +141,6 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
             </Link>
           );
         })}
-      </div>
-
-      {/* Quick create button */}
-      <div className="px-3 pb-3">
-        <Link
-          href="/contractor/offers/create"
-          className="flex items-center gap-3 px-4 py-3 rounded-xl bg-accent-500 text-white hover:bg-accent-600 transition-colors text-sm font-medium"
-        >
-          <PlusCircle className="h-5 w-5" />
-          <span>{t('newOffer')}</span>
-        </Link>
       </div>
 
       {/* User section */}
@@ -190,7 +197,7 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
       </aside>
 
       {/* Main content area */}
-      <div className="lg:ps-72">
+      <div className="lg:ps-72 pb-20 lg:pb-0">
         {/* Unverified email banner */}
         {!isVerified && (
           <div
@@ -297,6 +304,58 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
         {/* Page content */}
         <main className="p-4 sm:p-6 lg:p-8">{children}</main>
       </div>
+
+      {/* Mobile bottom nav */}
+      <nav className="fixed bottom-0 inset-x-0 z-30 bg-white border-t border-gray-200 lg:hidden safe-area-bottom">
+        <div className="flex items-center justify-around h-16 relative">
+          {MOBILE_NAV_ITEMS.slice(0, 2).map((item) => {
+            const Icon = item.icon;
+            const active = isActive(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  'flex flex-col items-center justify-center gap-0.5 flex-1 h-full text-xs font-medium transition-colors',
+                  active ? 'text-primary-600' : 'text-gray-400'
+                )}
+              >
+                <Icon className="h-5 w-5" />
+                <span>{t(item.labelKey)}</span>
+              </Link>
+            );
+          })}
+
+          {/* Center Create button */}
+          <div className="flex flex-col items-center justify-center flex-1">
+            <Link
+              href="/contractor/offers/create"
+              className="flex items-center justify-center w-14 h-14 -mt-6 rounded-full bg-accent-500 text-white shadow-lg shadow-accent-500/30 hover:bg-accent-600 active:scale-95 transition-all"
+              aria-label={t('newOffer')}
+            >
+              <Plus className="h-7 w-7" />
+            </Link>
+          </div>
+
+          {MOBILE_NAV_ITEMS.slice(2).map((item) => {
+            const Icon = item.icon;
+            const active = isActive(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  'flex flex-col items-center justify-center gap-0.5 flex-1 h-full text-xs font-medium transition-colors',
+                  active ? 'text-primary-600' : 'text-gray-400'
+                )}
+              >
+                <Icon className="h-5 w-5" />
+                <span>{t(item.labelKey)}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
     </div>
   );
 }

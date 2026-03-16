@@ -290,6 +290,21 @@ export default function EscalationsPage() {
         />
       </div>
 
+      {/* SLA Indicators */}
+      {stats.urgent > 0 && (
+        <div className="flex items-start gap-3 p-3 rounded-lg bg-danger-50 border border-danger-200">
+          <Clock className="w-5 h-5 text-danger-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-danger-700">
+              SLA Alert: {stats.urgent} urgent escalation{stats.urgent > 1 ? "s" : ""} pending
+            </p>
+            <p className="text-xs text-danger-600 mt-0.5">
+              Urgent escalations require resolution within 2 hours. Open escalations beyond SLA are highlighted.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* ================================================================== */}
       {/* Filters                                                             */}
       {/* ================================================================== */}

@@ -52,6 +52,7 @@ def _row_to_user(row: dict) -> dict:
         "building_id": row.get("building_id"),
         "contractor_id": row.get("contractor_id"),
         "last_login": row.get("last_login"),
+        "notification_settings": row.get("notification_settings"),
         "created_at": row.get("created_at") or datetime.now(UTC),
         "updated_at": row.get("updated_at") or datetime.now(UTC),
     }
@@ -310,6 +311,8 @@ class PostgresClient:
             "last_login",
             "role",
             "onboarded_at",
+            "notification_settings",
+            "push_token",
         }
         filtered = {k: v for k, v in update_data.items() if k in allowed}
         if not filtered:
@@ -986,21 +989,6 @@ class PostgresClient:
             )
             or []
         )
-
-    async def get_user_orders(self, user_id: str, limit: int = 5) -> list[dict[str, Any]]:
-        """Get recent orders for a user."""
-        if self._use_supabase_client():
-            client = await self._get_client()
-            result = (
-                await client.table("orders")
-                .select("*, contractors(business_name), buildings(address)")
-                .eq("resident_id", user_id)
-                .order("created_at", desc=True)
-                .limit(limit)
-                .execute()
-            )
-            return result.data or []
-        return []
 
     async def get_market_data(self, category: str, region: str, months: int = 6) -> dict[str, Any]:
         """Get market pricing data for a category and region."""
@@ -2784,6 +2772,26 @@ class PostgresClient:
             if isinstance(val, dict) and "v" in val:
                 return str(val["v"])
         return None
+
+    async def get_user_orders(self, user_id: str, limit: int = 50, offset: int = 0) -> list[dict[str, Any]]:
+        """Fetch orders for a user from the user_orders view."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            result = (
+                await client.table("user_orders")
+                .select("*")
+                .eq("user_id", user_id)
+                .order("joined_at", desc=True)
+                .range(offset, offset + limit - 1)
+                .execute()
+            )
+            return result.data or []
+        return await self._pg_fetch_all(
+            "SELECT * FROM user_orders WHERE user_id = $1 ORDER BY joined_at DESC LIMIT $2 OFFSET $3",
+            user_id,
+            limit,
+            offset,
+        )
 
     async def health_check(self) -> bool:
         """Check if PostgreSQL is accessible."""

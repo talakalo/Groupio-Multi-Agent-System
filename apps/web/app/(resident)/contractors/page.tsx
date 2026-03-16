@@ -17,6 +17,9 @@ import { useTranslations } from 'next-intl';
 import { useState, useMemo } from 'react';
 
 import { ContractorTrustBadge } from '@/components/features/ContractorTrustBadge';
+import { CategoryChips } from '@/components/shared/CategoryChips';
+import { TrustBadgeCluster } from '@/components/shared/TrustBadgeCluster';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { apiClient } from '@/lib/api/client';
 import { cn } from '@/lib/utils/cn';
 
@@ -141,6 +144,17 @@ function ContractorCard({ contractor }: { contractor: ContractorWithScore }) {
               licenseNumber={contractor.licenseNumber}
             />
           </div>
+
+          {/* Trust badges */}
+          <TrustBadgeCluster
+            badges={[
+              ...(contractor.verified ? ['verified' as const] : []),
+              'escrow' as const,
+              ...(contractor.licenseNumber ? ['licensed' as const] : []),
+            ]}
+            size="sm"
+            className="mt-2"
+          />
 
           {/* Specialties */}
           <div className="flex flex-wrap gap-1.5 mt-3">
@@ -429,49 +443,30 @@ export default function ContractorsPage() {
       )}
 
       {/* Category chips */}
-      <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
-        <button
-          type="button"
-          onClick={() => setFilters((prev) => ({ ...prev, category: 'all' }))}
-          className={cn(
-            'px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors',
-            filters.category === 'all'
-              ? 'bg-primary-500 text-white'
-              : 'bg-white border border-gray-200 text-gray-600 hover:border-gray-300'
-          )}
-        >
-          {t('allSpecialties')}
-        </button>
-        {categories.map((cat) => (
-          <button
-            key={cat}
-            type="button"
-            onClick={() => setFilters((prev) => ({ ...prev, category: cat }))}
-            className={cn(
-              'px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors',
-              filters.category === cat
-                ? 'bg-primary-500 text-white'
-                : 'bg-white border border-gray-200 text-gray-600 hover:border-gray-300'
-            )}
-          >
-            {tCat(cat)}
-          </button>
-        ))}
-      </div>
+      <CategoryChips
+        categories={[
+          { id: 'all', label: t('allSpecialties') },
+          ...categories.map((cat) => ({ id: cat, label: tCat(cat) })),
+        ]}
+        selected={filters.category}
+        onSelect={(id) => setFilters((prev) => ({ ...prev, category: id as ServiceCategory | 'all' }))}
+        className="mb-6"
+      />
 
       {/* Results */}
       {contractorsQuery.isLoading ? (
         <div className="space-y-4">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="card animate-pulse">
+            <div key={i} className="card">
               <div className="flex gap-4">
-                <div className="w-14 h-14 bg-gray-200 rounded-xl" />
-                <div className="flex-1">
-                  <div className="h-5 bg-gray-200 rounded w-40 mb-2" />
-                  <div className="h-4 bg-gray-200 rounded w-24 mb-3" />
+                <Skeleton variant="avatar" className="w-14 h-14 rounded-xl" />
+                <div className="flex-1 space-y-3">
+                  <Skeleton variant="text" className="h-5 w-40" />
+                  <Skeleton variant="text" className="h-4 w-24" />
                   <div className="flex gap-2">
-                    <div className="h-5 bg-gray-200 rounded-full w-16" />
-                    <div className="h-5 bg-gray-200 rounded-full w-16" />
+                    <Skeleton variant="text" className="h-5 w-16 rounded-full" />
+                    <Skeleton variant="text" className="h-5 w-16 rounded-full" />
+                    <Skeleton variant="text" className="h-5 w-20 rounded-full" />
                   </div>
                 </div>
               </div>

@@ -16,7 +16,6 @@ import {
   RefreshCw,
   ChevronRight,
   AlertCircle,
-  Loader2,
   Shield,
   Star,
   Phone,
@@ -24,6 +23,9 @@ import {
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
+import { Badge } from "@/components/ui/Badge";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { EscrowBadge } from "@/components/features/payments/EscrowBadge";
 import { apiClient, ApiError } from "@/lib/api/client";
 import { cn } from "@/lib/utils/cn";
 
@@ -47,13 +49,18 @@ type OrderTab = "active" | "completed" | "all";
 
 // ---- Status config ----
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ElementType; tab: OrderTab }> = {
-  pending: { label: "ממתין לתשלום", color: "bg-amber-100 text-amber-800", icon: Clock, tab: "active" },
-  processing: { label: "בעיבוד", color: "bg-blue-100 text-blue-800", icon: RefreshCw, tab: "active" },
-  succeeded: { label: "שולם — בנאמנות", color: "bg-indigo-100 text-indigo-800", icon: Shield, tab: "active" },
-  released: { label: "הושלם", color: "bg-green-100 text-green-800", icon: CheckCircle2, tab: "completed" },
-  failed: { label: "נכשל", color: "bg-red-100 text-red-800", icon: XCircle, tab: "all" },
-  refunded: { label: "הוחזר", color: "bg-purple-100 text-purple-800", icon: RefreshCw, tab: "completed" },
+type BadgeVariant = "warning" | "info" | "primary" | "success" | "error" | "accent";
+
+const STATUS_CONFIG: Record<
+  string,
+  { label: string; variant: BadgeVariant; icon: React.ElementType; tab: OrderTab }
+> = {
+  pending: { label: "ממתין", variant: "warning", icon: Clock, tab: "active" },
+  processing: { label: "בעיבוד", variant: "info", icon: RefreshCw, tab: "active" },
+  succeeded: { label: "פעיל", variant: "primary", icon: Shield, tab: "active" },
+  released: { label: "הושלם", variant: "success", icon: CheckCircle2, tab: "completed" },
+  failed: { label: "נכשל", variant: "error", icon: XCircle, tab: "all" },
+  refunded: { label: "הוחזר", variant: "accent", icon: RefreshCw, tab: "completed" },
 };
 
 function getOrderTab(status: string): OrderTab {
@@ -157,10 +164,10 @@ function OrderCard({ order }: { order: Order }) {
           </div>
         </div>
         <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-          <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium", config.color)}>
-            <StatusIcon className="w-3 h-3" aria-hidden="true" />
+          <Badge variant={config.variant} size="sm">
+            <StatusIcon className="w-3 h-3 me-1" aria-hidden="true" />
             {config.label}
-          </span>
+          </Badge>
           <span className="text-sm font-bold text-gray-900" dir="ltr">
             {formatCurrency(order.amount, order.currency)}
           </span>
@@ -178,12 +185,8 @@ function OrderCard({ order }: { order: Order }) {
 
           {/* Escrow explanation for active escrow */}
           {order.status === "succeeded" && (
-            <div className="mt-4 bg-indigo-50 rounded-xl p-3 text-xs text-indigo-700 flex items-start gap-2">
-              <Shield className="w-4 h-4 flex-shrink-0 mt-0.5" aria-hidden="true" />
-              <span>
-                התשלום שלך מוגן בנאמנות. הכסף ישוחרר לקבלן לאחר השלמת העבודה ואישור מנהל המערכת.
-                אם יש בעיה, <a href="mailto:support@groupio.co.il" className="underline">פנו לתמיכה</a>.
-              </span>
+            <div className="mt-4">
+              <EscrowBadge variant="block" />
             </div>
           )}
 
@@ -415,9 +418,25 @@ export default function OrdersPage() {
 
       {/* Order list */}
       {loading ? (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 className="w-6 h-6 animate-spin text-indigo-600" aria-hidden="true" />
-          <span className="mr-3 text-gray-500">טוען הזמנות...</span>
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="bg-white rounded-xl border border-gray-200 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3 flex-1">
+                  <Skeleton variant="avatar" className="w-10 h-10 rounded-lg" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton variant="text" className="h-4 w-32" />
+                    <Skeleton variant="text" className="h-3 w-24" />
+                    <Skeleton variant="text" className="h-3 w-20" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Skeleton variant="text" className="h-5 w-16 rounded-full" />
+                  <Skeleton variant="text" className="h-4 w-20" />
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       ) : error ? (
         <div className="flex flex-col items-center py-12 text-center">
@@ -428,14 +447,22 @@ export default function OrdersPage() {
           </button>
         </div>
       ) : displayed.length === 0 ? (
-        <div className="flex flex-col items-center py-16 text-center">
-          <Package className="w-10 h-10 text-gray-300 mb-3" aria-hidden="true" />
-          <p className="text-gray-500 font-medium">
+        <div className="flex flex-col items-center py-16 text-center bg-white rounded-xl border border-gray-200">
+          <div className="w-16 h-16 rounded-full bg-gray-50 flex items-center justify-center mb-4">
+            <Package className="w-8 h-8 text-gray-300" aria-hidden="true" />
+          </div>
+          <p className="text-gray-700 font-semibold text-lg">
             {tab === "active" ? "אין הזמנות פעילות" : tab === "completed" ? "אין הזמנות שהושלמו" : "אין הזמנות עדיין"}
           </p>
-          <p className="text-sm text-gray-400 mt-1">הזמנות יופיעו לאחר הצטרפות להצעה ותשלום</p>
-          <Link href="/offers" className="btn-primary mt-4 text-sm">
-            גלה הצעות
+          <p className="text-sm text-gray-400 mt-2 max-w-xs">
+            הזמנות יופיעו כאן לאחר שתצטרפו להצעה ותבצעו תשלום
+          </p>
+          <Link
+            href="/offers"
+            className="mt-5 inline-flex items-center gap-2 px-5 py-2.5 bg-primary-500 text-white text-sm font-medium rounded-lg hover:bg-primary-600 transition-colors"
+          >
+            גלו הצעות
+            <ChevronRight className="w-4 h-4 rtl:rotate-180" aria-hidden="true" />
           </Link>
         </div>
       ) : (

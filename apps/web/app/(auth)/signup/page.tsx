@@ -5,6 +5,7 @@ import {
   Building2,
   User,
   Wrench,
+  ClipboardList,
   ArrowLeft,
   Loader2,
   Check,
@@ -39,14 +40,14 @@ const signupSchema = z.object({
 
 type SignupFormData = z.infer<typeof signupSchema>;
 
-type UserRole = "resident" | "contractor";
+type UserRole = "resident" | "contractor" | "buildings_manager";
 
 const ROLE_OPTIONS = [
   {
     value: "resident" as UserRole,
     icon: User,
     title: "דייר",
-    description: "אני גר בבניין ורוצה ליהנות מהנחות קבוצתיות",
+    description: "אני דייר בבניין ומחפש להצטרף להצעות קבוצתיות",
     features: [
       "גישה להצעות קבוצתיות",
       "צ׳אט AI חכם למציאת קבלנים",
@@ -57,11 +58,22 @@ const ROLE_OPTIONS = [
     value: "contractor" as UserRole,
     icon: Wrench,
     title: "קבלן",
-    description: "אני קבלן ורוצה להציע שירותים לבניינים",
+    description: "אני קבלן ומעוניין להציע שירותים לבניינים",
     features: [
       "גישה לביקוש מוכח",
       "ניהול הצעות מחיר",
       "חשיפה לדיירים חדשים",
+    ],
+  },
+  {
+    value: "buildings_manager" as UserRole,
+    icon: ClipboardList,
+    title: "מנהל בניין",
+    description: "אני מנהל בניין ורוצה לנהל את הבניין שלי",
+    features: [
+      "ניהול דיירים וועד בית",
+      "מעקב אחר פניות ותחזוקה",
+      "גישה לדוחות ומידע",
     ],
   },
 ];
@@ -128,10 +140,15 @@ export default function SignupPage() {
         user = { role: selectedRole };
       }
       setAuthCookie(response.token, user);
+      if (selectedRole === "buildings_manager") {
+        const adminUrl = process.env.NEXT_PUBLIC_ADMIN_URL || "http://localhost:3001";
+        window.location.href = `${adminUrl}/dashboard#token=${encodeURIComponent(response.token)}`;
+        return;
+      }
       router.push(
-        selectedRole === "resident"
-          ? "/dashboard"
-          : "/contractor/dashboard"
+        selectedRole === "contractor"
+          ? "/contractor/dashboard"
+          : "/dashboard"
       );
     } catch (err) {
       setError(
