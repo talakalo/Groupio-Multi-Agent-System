@@ -1,3 +1,4 @@
+import { useRouter } from "expo-router";
 import React, { useCallback } from "react";
 import {
   View,
@@ -5,14 +6,12 @@ import {
   StyleSheet,
   RefreshControl,
 } from "react-native";
-import { Text, Chip, useTheme, ActivityIndicator } from "react-native-paper";
+import { Text, Chip, useTheme, ActivityIndicator , IconButton } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
-import { IconButton } from "react-native-paper";
 
-import { usePayments } from "../lib/hooks";
 import type { PaymentRecord } from "../lib/api";
+import { usePayments } from "../lib/hooks";
 import i18n from "../lib/i18n";
 
 const STATUS_CONFIG: Record<

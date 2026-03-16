@@ -1,8 +1,9 @@
+import { Tabs } from "expo-router";
 import React from "react";
 import { Platform, StyleSheet } from "react-native";
-import { Tabs } from "expo-router";
 import { useTheme } from "react-native-paper";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
+
 import i18n from "../../lib/i18n";
 
 interface TabIconProps {

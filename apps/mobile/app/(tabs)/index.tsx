@@ -1,3 +1,5 @@
+import type { Offer, OfferStatus, ServiceCategory } from "@groupio/types";
+import { useRouter } from "expo-router";
 import React, { useCallback } from "react";
 import {
   View,
@@ -8,13 +10,12 @@ import {
   Pressable,
 } from "react-native";
 import { Text, Card, useTheme, Avatar, Divider, Chip } from "react-native-paper";
-import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
-import type { Offer, OfferStatus, ServiceCategory } from "@groupio/types";
 
-import { StatCard } from "../../components/StatCard";
 import { MobileOfferCard } from "../../components/MobileOfferCard";
+import { StatCard } from "../../components/StatCard";
+import type { ActivityItem, NewsItem } from "../../lib/api";
 import {
   useProfile,
   useOffers,
@@ -24,9 +25,8 @@ import {
   useContractorOffers,
   useContractorProjects,
 } from "../../lib/hooks";
-import type { ActivityItem, NewsItem } from "../../lib/api";
-import { storage } from "../../lib/storage";
 import i18n from "../../lib/i18n";
+import { storage } from "../../lib/storage";
 
 // ---------------------------------------------------------------------------
 // Constants

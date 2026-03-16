@@ -19,6 +19,7 @@ import {
   Shield,
   Star,
   Phone,
+  Loader2,
 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";

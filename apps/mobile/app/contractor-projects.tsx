@@ -1,3 +1,5 @@
+import type { OfferStatus, ProjectWithStats, ServiceCategory } from "@groupio/types";
+import { useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
 import {
   View,
@@ -15,10 +17,8 @@ import {
   ActivityIndicator,
   ProgressBar,
 } from "react-native-paper";
-import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
-import type { OfferStatus, ProjectWithStats, ServiceCategory } from "@groupio/types";
 
 import { useContractorProjects } from "../lib/hooks";
 import i18n from "../lib/i18n";

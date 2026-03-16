@@ -1,10 +1,10 @@
+import type { Offer } from '@groupio/types';
 import { render, fireEvent } from '@testing-library/react-native';
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 
 import MobileOfferCard from '../components/MobileOfferCard';
 
-import type { Offer } from '@groupio/types';
 
 const mockOffer = {
   id: 'offer-123',

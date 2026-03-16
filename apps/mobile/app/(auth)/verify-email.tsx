@@ -1,8 +1,8 @@
+import { useRouter, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
 import { View, StyleSheet } from "react-native";
 import { Text, Button, useTheme } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter, useLocalSearchParams } from "expo-router";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 
 import { resendVerification } from "../../lib/api";

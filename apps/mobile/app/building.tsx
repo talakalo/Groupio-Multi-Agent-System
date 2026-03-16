@@ -1,3 +1,4 @@
+import { useRouter, useLocalSearchParams } from "expo-router";
 import React, { useCallback } from "react";
 import { View, ScrollView, StyleSheet, Share, Platform } from "react-native";
 import {
@@ -9,7 +10,6 @@ import {
   IconButton,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter, useLocalSearchParams } from "expo-router";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 
 import { useBuildingDetail } from "../lib/hooks";

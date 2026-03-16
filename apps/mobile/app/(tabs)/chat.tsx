@@ -1,3 +1,4 @@
+import type { Message } from "@groupio/types";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   View,
@@ -12,7 +13,6 @@ import {
 import { Text, TextInput, useTheme, IconButton, Chip } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
-import type { Message } from "@groupio/types";
 
 import { ChatBubble } from "../../components/ChatBubble";
 import { useChat, useProfile } from "../../lib/hooks";

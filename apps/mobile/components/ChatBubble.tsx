@@ -1,8 +1,8 @@
+import type { Message } from "@groupio/types";
 import React, { useEffect, useMemo } from "react";
 import { StyleSheet, View, Animated, Easing } from "react-native";
 import { Text, useTheme } from "react-native-paper";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
-import type { Message } from "@groupio/types";
 
 interface ChatBubbleProps {
   message: Message;

@@ -1,30 +1,29 @@
-import React, { createContext, useCallback, useContext } from "react";
-import { useEffect, useState } from "react";
-import { I18nManager, Platform } from "react-native";
-import * as Localization from "expo-localization";
-import { Stack, useRouter, useSegments } from "expo-router";
-import { loadAuthToken, clearAuthSession } from "../lib/api";
-import {
-  registerForPushNotifications,
-  sendPushTokenToServer,
-  setupNotificationNavigation,
-} from "../lib/notifications";
-import { StatusBar } from "expo-status-bar";
-import * as SplashScreen from "expo-splash-screen";
-import { SafeAreaProvider } from "react-native-safe-area-context";
-import {
-  PaperProvider,
-  MD3DarkTheme,
-  MD3LightTheme,
-  adaptNavigationTheme,
-} from "react-native-paper";
 import {
   DarkTheme as NavigationDarkTheme,
   DefaultTheme as NavigationDefaultTheme,
   ThemeProvider,
 } from "@react-navigation/native";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useColorScheme } from "react-native";
+import * as Localization from "expo-localization";
+import { Stack, useRouter, useSegments } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
+import { StatusBar } from "expo-status-bar";
+import React, { createContext, useCallback, useContext , useEffect, useState } from "react";
+import { I18nManager, Platform , useColorScheme } from "react-native";
+import {
+  PaperProvider,
+  MD3DarkTheme,
+  MD3LightTheme,
+  adaptNavigationTheme,
+} from "react-native-paper";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+
+import { loadAuthToken, clearAuthSession } from "../lib/api";
+import {
+  registerForPushNotifications,
+  sendPushTokenToServer,
+  setupNotificationNavigation,
+} from "../lib/notifications";
 
 // Prevent the splash screen from auto-hiding
 SplashScreen.preventAutoHideAsync();

@@ -188,10 +188,8 @@ export default function CreateOfferPage() {
           <section className="bg-white rounded-xl shadow-sm border p-6 space-y-6">
             <h2 className="text-xl font-semibold">פרטי ההצעה</h2>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                קטגוריה *
-              </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              <span className="block mb-2">קטגוריה *</span>
               <CategoryChips
                 categories={categories}
                 selected={watchAll.category}
@@ -200,13 +198,14 @@ export default function CreateOfferPage() {
               {errors.category && (
                 <p className="text-red-500 text-sm mt-1">{errors.category.message}</p>
               )}
-            </div>
+            </label>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="create-title" className="block text-sm font-medium text-gray-700 mb-1">
                 {t('fields.title')} *
               </label>
               <input
+                id="create-title"
                 type="text"
                 {...register('title')}
                 className="w-full rounded-lg border-gray-300 shadow-sm focus:border-sky-500 focus:ring-sky-500"
@@ -218,10 +217,11 @@ export default function CreateOfferPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="create-description" className="block text-sm font-medium text-gray-700 mb-1">
                 {t('fields.description')} *
               </label>
               <textarea
+                id="create-description"
                 {...register('description')}
                 rows={4}
                 className="w-full rounded-lg border-gray-300 shadow-sm focus:border-sky-500 focus:ring-sky-500"
@@ -233,10 +233,11 @@ export default function CreateOfferPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="create-timeline" className="block text-sm font-medium text-gray-700 mb-1">
                 לוח זמנים *
               </label>
               <input
+                id="create-timeline"
                 type="text"
                 {...register('timeline')}
                 className="w-full rounded-lg border-gray-300 shadow-sm focus:border-sky-500 focus:ring-sky-500"
@@ -255,12 +256,13 @@ export default function CreateOfferPage() {
             <h2 className="text-xl font-semibold">תמחור</h2>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="create-basePrice" className="block text-sm font-medium text-gray-700 mb-1">
                 {t('fields.basePrice')} *
               </label>
               <div className="relative">
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">₪</span>
                 <input
+                  id="create-basePrice"
                   type="number"
                   {...register('basePrice', { valueAsNumber: true })}
                   className="w-full rounded-lg border-gray-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 pr-8"
@@ -276,9 +278,9 @@ export default function CreateOfferPage() {
             {/* Pricing Tiers */}
             <div>
               <div className="flex items-center justify-between mb-3">
-                <label className="block text-sm font-medium text-gray-700">
+                <span className="block text-sm font-medium text-gray-700">
                   דרגות מחיר (אופציונלי)
-                </label>
+                </span>
                 <button
                   type="button"
                   onClick={() => addTier({ minResidents: 0, pricePerUnit: 0 })}
@@ -296,10 +298,11 @@ export default function CreateOfferPage() {
                     className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg"
                   >
                     <div className="flex-1">
-                      <label className="block text-xs text-gray-500 mb-1">
+                      <label htmlFor={`create-tier-min-${index}`} className="block text-xs text-gray-500 mb-1">
                         החל מ-X דיירים
                       </label>
                       <input
+                        id={`create-tier-min-${index}`}
                         type="number"
                         {...register(`pricingTiers.${index}.minResidents`, { valueAsNumber: true })}
                         className="w-full rounded-lg border-gray-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"
@@ -307,10 +310,11 @@ export default function CreateOfferPage() {
                       />
                     </div>
                     <div className="flex-1">
-                      <label className="block text-xs text-gray-500 mb-1">
+                      <label htmlFor={`create-tier-price-${index}`} className="block text-xs text-gray-500 mb-1">
                         מחיר ליחידה (₪)
                       </label>
                       <input
+                        id={`create-tier-price-${index}`}
                         type="number"
                         {...register(`pricingTiers.${index}.pricePerUnit`, { valueAsNumber: true })}
                         className="w-full rounded-lg border-gray-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-sm"

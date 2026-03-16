@@ -1,8 +1,8 @@
+import type { ServiceCategory } from "@groupio/types";
 import React from "react";
 import { StyleSheet } from "react-native";
 import { Chip, useTheme } from "react-native-paper";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
-import type { ServiceCategory } from "@groupio/types";
 
 // Hebrew labels for service categories
 const CATEGORY_LABELS: Record<ServiceCategory, string> = {

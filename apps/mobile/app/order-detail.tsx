@@ -1,3 +1,4 @@
+import { useRouter, useLocalSearchParams } from "expo-router";
 import React from "react";
 import { View, ScrollView, StyleSheet } from "react-native";
 import {
@@ -10,11 +11,10 @@ import {
   ActivityIndicator,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter, useLocalSearchParams } from "expo-router";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 
-import { useOrder } from "../lib/hooks";
 import type { Order, OrderTimelineEvent } from "../lib/api";
+import { useOrder } from "../lib/hooks";
 import i18n from "../lib/i18n";
 
 const STATUS_I18N: Record<Order["status"], string> = {

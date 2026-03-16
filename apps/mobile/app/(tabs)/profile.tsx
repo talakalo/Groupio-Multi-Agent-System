@@ -1,3 +1,4 @@
+import * as ImagePicker from "expo-image-picker";
 import React, { useCallback, useMemo, useState } from "react";
 import {
   View,
@@ -21,14 +22,13 @@ import {
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
-import * as ImagePicker from "expo-image-picker";
 
-import { useProfile, useUpdateProfile, useContractorStats } from "../../lib/hooks";
 import { uploadAvatar, setAuthToken } from "../../lib/api";
-import { useAuth } from "../_layout";
 import type { ProfileResponse } from "../../lib/api";
-import { storage } from "../../lib/storage";
+import { useProfile, useUpdateProfile, useContractorStats } from "../../lib/hooks";
 import i18n from "../../lib/i18n";
+import { storage } from "../../lib/storage";
+import { useAuth } from "../_layout";
 
 // ---------------------------------------------------------------------------
 // Constants

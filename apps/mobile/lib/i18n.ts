@@ -1,7 +1,8 @@
 import * as Localization from "expo-localization";
 import { I18n } from "i18n-js";
-import he from "../messages/he.json";
+
 import en from "../messages/en.json";
+import he from "../messages/he.json";
 
 const i18n = new I18n({ he, en });
 i18n.defaultLocale = "he";

@@ -1,3 +1,5 @@
+import type { Offer, OfferStatus, ServiceCategory } from "@groupio/types";
+import { useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
 import {
   View,
@@ -16,10 +18,8 @@ import {
   SegmentedButtons,
   ActivityIndicator,
 } from "react-native-paper";
-import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
-import type { Offer, OfferStatus, ServiceCategory } from "@groupio/types";
 
 import { useContractorOffers } from "../lib/hooks";
 import i18n from "../lib/i18n";

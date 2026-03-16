@@ -1,11 +1,3 @@
-import { useCallback, useRef, useState } from "react";
-import {
-  useQuery,
-  useMutation,
-  useQueryClient,
-  type UseQueryOptions,
-  type UseMutationOptions,
-} from "@tanstack/react-query";
 import type {
   Offer,
   Contractor,
@@ -17,6 +9,15 @@ import type {
   ContractorStats,
   ProjectWithStats,
 } from "@groupio/types";
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  type UseQueryOptions,
+  type UseMutationOptions,
+} from "@tanstack/react-query";
+import { useCallback, useRef, useState } from "react";
+
 import {
   getOffers,
   getOffer,

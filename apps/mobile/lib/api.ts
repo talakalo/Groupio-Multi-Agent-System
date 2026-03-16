@@ -1,4 +1,3 @@
-import Constants from "expo-constants";
 import type {
   Offer,
   Contractor,
@@ -13,6 +12,7 @@ import type {
   ContractorStats,
   ProjectWithStats,
 } from "@groupio/types";
+import Constants from "expo-constants";
 
 // ---------------------------------------------------------------------------
 // Configuration

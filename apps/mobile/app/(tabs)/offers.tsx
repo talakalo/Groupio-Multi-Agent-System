@@ -1,3 +1,5 @@
+import type { Offer, OfferStatus, ServiceCategory } from "@groupio/types";
+import { useRouter } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
 import {
   View,
@@ -19,12 +21,10 @@ import {
   Snackbar,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
-import type { Offer, OfferStatus, ServiceCategory } from "@groupio/types";
 
-import { MobileOfferCard } from "../../components/MobileOfferCard";
 import { CategoryChip } from "../../components/CategoryChip";
+import { MobileOfferCard } from "../../components/MobileOfferCard";
 import { useOffers, useJoinOffer, useProfile } from "../../lib/hooks";
 import i18n from "../../lib/i18n";
 

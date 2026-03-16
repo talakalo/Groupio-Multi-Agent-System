@@ -1,3 +1,4 @@
+import { useRouter, useLocalSearchParams } from "expo-router";
 import React, { useState, useCallback } from "react";
 import { View, ScrollView, StyleSheet } from "react-native";
 import {
@@ -8,11 +9,10 @@ import {
   ActivityIndicator,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter, useLocalSearchParams } from "expo-router";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 
-import { useOffer } from "../lib/hooks";
 import { createCheckout } from "../lib/api";
+import { useOffer } from "../lib/hooks";
 import i18n from "../lib/i18n";
 
 type CheckoutState = "review" | "processing" | "success" | "error";
