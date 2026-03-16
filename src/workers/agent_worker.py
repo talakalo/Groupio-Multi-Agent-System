@@ -12,6 +12,8 @@ import sys
 from typing import Any
 
 import redis.asyncio as redis
+
+from src.models.agent_state import AgentState
 import structlog
 
 from src.agents.router import RouterAgent
@@ -84,12 +86,15 @@ class AgentWorker:
             if self.router_agent is None:
                 raise RuntimeError("Router agent not initialized")
 
-            state = {
+            state: AgentState = {  # type: ignore[typeddict-item]
                 "messages": [{"role": "user", "content": message}] if message else [],
-                "user_id": user_id,
-                "conversation_id": session_id,
-                "context": context,
+                "user_id": user_id or "",
+                "building_id": None,
+                "conversation_id": session_id or "",
+                "current_agent": "router",
                 "intent": None,
+                "confidence": 0.0,
+                "context": context,
                 "actions_taken": [],
             }
             result = await self.router_agent.run(state)
