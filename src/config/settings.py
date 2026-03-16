@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     # Qdrant
     QDRANT_URL: str = "http://localhost:6333"
     QDRANT_API_KEY: str | None = None
+    # Use REST (False) when gRPC port 6334 is not available (typical for local Docker)
+    QDRANT_PREFER_GRPC: bool = False
 
     # Neo4j
     NEO4J_URI: str = "bolt://localhost:7687"
@@ -129,20 +131,12 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     SMTP_FROM_EMAIL: str = "noreply@groupio.co.il"
     SMTP_FROM_NAME: str = "Groupio"
-    # When True, login rejects unverified users with 403. Enabled by default for production safety.
-    # Set ENFORCE_EMAIL_VERIFICATION=false in .env to disable during local development.
-    ENFORCE_EMAIL_VERIFICATION: bool = True
+    # When True, login rejects unverified users with 403. Set for broader launch.
+    ENFORCE_EMAIL_VERIFICATION: bool = False
     # Base URL for verification links in emails (default for production)
     FRONTEND_URL: str = "https://groupio.co.il"
     # Admin inbox for system alerts (vetting escalations, expiry errors, etc.)
     ADMIN_EMAIL: str = ""
-
-    # Push Notifications (Firebase Cloud Messaging)
-    # Set FCM_SERVER_KEY to your Firebase project's server key to enable push notifications.
-    # When empty, push notifications are silently skipped (log at DEBUG level).
-    FCM_SERVER_KEY: str = ""
-    # FCM endpoint (override only for testing)
-    FCM_ENDPOINT: str = "https://fcm.googleapis.com/fcm/send"
 
     # Payment provider ("mock" for dev/demos, "stripe" or "payplus" for production)
     PAYMENT_PROVIDER: str = "mock"
@@ -214,6 +208,19 @@ class Settings(BaseSettings):
             if self.DATABASE_URL and any(p in self.DATABASE_URL for p in placeholder_patterns):
                 raise ValueError(
                     f"DATABASE_URL contains a placeholder value. Set a real connection string in {self.ENVIRONMENT}."
+                )
+            _insecure_db_passwords = ("postgres", "password", "123456", "admin")
+            if self.DATABASE_URL:
+                for pw in _insecure_db_passwords:
+                    if f":{pw}@" in self.DATABASE_URL:
+                        raise ValueError(
+                            f"DATABASE_URL uses an insecure default password '{pw}' in {self.ENVIRONMENT}. "
+                            "Use a strong, generated password for production databases."
+                        )
+            if self.REDIS_URL and not self.REDIS_PASSWORD and "@" not in self.REDIS_URL:
+                raise ValueError(
+                    f"Redis must be authenticated in {self.ENVIRONMENT}. "
+                    "Set REDIS_PASSWORD or embed credentials in REDIS_URL (redis://:password@host:port)."
                 )
 
         return self
