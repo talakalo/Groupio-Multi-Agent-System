@@ -1,6 +1,5 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
 import { clsx } from "clsx";
 import {
   ArrowUpDown,
@@ -11,6 +10,7 @@ import {
   Inbox,
   Loader2,
 } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
 
 // ---------------------------------------------------------------------------
 // Types

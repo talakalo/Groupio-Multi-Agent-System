@@ -1,19 +1,16 @@
 "use client";
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type {
-  AgentMetrics,
-  Escalation,
-  SystemStatus,
-  Contractor,
-} from "@groupio/types";
 import {
   GroupioApiClient,
   type MetricsResponse,
   type EscalationsResponse,
   type HealthStatus,
-  type ContractorsListResponse,
 } from "@groupio/api-client";
+import type {
+  SystemStatus,
+  Contractor,
+} from "@groupio/types";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 // ---- Client Singleton ----
 

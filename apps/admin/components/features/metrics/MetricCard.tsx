@@ -1,8 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { clsx } from "clsx";
 import { TrendingUp, TrendingDown, Minus, ArrowUpRight } from "lucide-react";
+import Link from "next/link";
 
 // ---------------------------------------------------------------------------
 // Types

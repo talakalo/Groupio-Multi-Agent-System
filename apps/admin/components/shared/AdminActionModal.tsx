@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
-import { X, AlertTriangle, Loader2 } from "lucide-react";
 import { clsx } from "clsx";
+import { X, AlertTriangle, Loader2 } from "lucide-react";
+import { useState, useCallback, useEffect } from "react";
 
 export interface ModalField {
   key: string;
@@ -68,8 +68,13 @@ export function AdminActionModal({
   return (
     <div
       className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="admin-modal-title"
       onClick={onClose}
+      onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}
     >
+      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
       <div
         className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4"
         onClick={(e) => e.stopPropagation()}
@@ -133,6 +138,7 @@ export function AdminActionModal({
                   placeholder={field.placeholder}
                   value={values[field.key] ?? ""}
                   onChange={(e) => setField(field.key, e.target.value)}
+                  /* eslint-disable-next-line jsx-a11y/no-autofocus */
                   autoFocus={fields.indexOf(field) === 0}
                 />
               )}

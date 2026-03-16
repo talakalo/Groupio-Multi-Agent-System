@@ -1,7 +1,5 @@
 "use client";
 
-import { useMemo } from "react";
-import Link from "next/link";
 import { clsx } from "clsx";
 import {
   DollarSign,
@@ -23,6 +21,9 @@ import {
   Database,
   Wifi,
 } from "lucide-react";
+import Link from "next/link";
+import { useMemo } from "react";
+
 import { MetricCard } from "@/components/features/metrics/MetricCard";
 import { AgentMetricsChart } from "@/components/features/metrics/AgentMetricsChart";
 import type { AgentChartSeries } from "@/components/features/metrics/AgentMetricsChart";
