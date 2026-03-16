@@ -125,17 +125,23 @@ Groupio-Multi-Agent-System/           # Root monorepo
 - Hebrew as primary language with English toggle via `next-intl`
 
 ### Forms and CTAs
-- Signup form: 2-step process (role selection → details form) with ToS checkbox — GOOD
-- Login: JSON body endpoint (`/login/json`) + OAuth2 form endpoint (`/login`) — correctly wired
+- **Validation framework**: Zod schemas + react-hook-form + @hookform/resolvers — VERIFIED proper integration
+- Signup form: 2-step process (role selection → details form), Zod schema validates password (8+ chars, uppercase, number), auto-login after registration — GOOD
+- Login: JSON body endpoint (`/login/json`) + OAuth2 form endpoint (`/login`) — correctly wired; email/phone toggle with Zod refine validation
+- Create Offer form: Full Zod validation (title min 10 chars, description min 50, base price min ₪100, min/max participants 3-100, required services array) — GOOD
 - Phone validation: Israeli format (`^0\d{8,9}$`) — GOOD
+- Form error display: `aria-describedby`, `aria-invalid`, field-level red error text — GOOD
+- **Password requirements mismatch**: Frontend requires 8+ chars with uppercase + number; backend `UserCreate` requires only `min_length=8` — validation gap
 
 ### Loading/Error/Empty States
 - **Email verification banner**: Shown for unverified users with resend button — GOOD
 - **Auth guard**: Resident layout redirects to `/login` when no token — GOOD
-- **Missing in web app**: No generic error boundary component visible across resident/contractor routes
+- **Web app error boundaries**: VERIFIED — `app/error.tsx` (global), `app/(resident)/error.tsx`, `app/(resident)/dashboard/error.tsx`, `app/(resident)/offers/error.tsx`, `app/(resident)/payments/error.tsx`, `app/contractor/error.tsx` — multiple layers of error handling
 - **Admin app**: Has `error.tsx` and `not-found.tsx` — GOOD
-- **Missing in web app**: No loading skeletons for data-fetching pages (standard Next.js `loading.tsx` files not found)
-- **Missing in web app**: No `error.tsx` files for route-level error boundaries
+- **Web app loading states**: VERIFIED — skeleton cards with `animate-pulse` in dashboard/offers, `loading.tsx` files in contractor routes (`offers/active/loading.tsx`, `offers/create/loading.tsx`, `projects/loading.tsx`, `projects/[id]/loading.tsx`)
+- **Empty states**: VERIFIED — `EmptyState` shared component used across pages (no building joined, no offers, no payments, no contractors found) with icons, descriptions, and CTAs
+- **Inline error handling**: Retry buttons on error states, `role="alert"` on error cards — GOOD
+- **Toast notifications**: `ToastContainer` with color-coded types (success/error/warning/info), auto-dismiss, action buttons — GOOD
 
 ### Accessibility/RTL/i18n Findings
 - `aria-label` on sidebar toggle buttons — GOOD
@@ -248,10 +254,18 @@ Groupio-Multi-Agent-System/           # Root monorepo
 2. **`clearAuth()` clears both localStorage and a cookie named `groupio-auth`** but the cookie set by the backend is named `access_token` and `refresh_token` — mismatch in cookie names
 3. **`API_URL` defaults to `http://localhost:8000`** — if `NEXT_PUBLIC_API_URL` is not set in production, all API calls will fail silently
 
+### Data Fetching Strategy
+- **React Query** for offers, contractors, building, payments — with query key factory, staleTime: 60s, 2 retries — GOOD
+- **Direct fetch** in some components (dashboard stats, payments page) — inconsistent with React Query usage
+- **Zustand `offerStore`** exists as fallback alongside React Query `useOffers` hook — duplication risk
+- **API client** supports single-flight refresh token mechanism (reuses in-flight refresh) — GOOD
+- **Chat**: React Query for message history with cursor-based pagination (50 messages/page), 30s timeout with slow-response notice — GOOD
+
 ### Dead Code / Legacy Components
 - `apps/web/__tests__/apiClient.test.ts` tests exist but API client file path needs verification
 - Orders pages exist without visible backend connection or sidebar links
 - Mobile app `lib/api.ts`, `lib/hooks.ts`, `lib/storage.ts` exist but are minimal stubs
+- Dual offer stores (Zustand `offerStore` + React Query `useOffers`) — should consolidate to React Query
 
 ### Testability
 - 13 frontend unit tests covering auth store, API client, key pages (Login, Signup, Payments, etc.)
@@ -547,7 +561,7 @@ The backend has **16 well-organized route modules** under `/api/v1/`:
 
 | # | Title | Category | Evidence | Impact | Blocks |
 |---|-------|----------|----------|--------|--------|
-| G13 | **No `loading.tsx` or `error.tsx` files** | UX GAP | No route-level loading/error boundaries in `apps/web/app/` | Poor UX during loading, unhandled errors show white screen | Broader beta |
+| G13 | **Password validation mismatch front/back** | FRONTEND GAP | Signup Zod schema requires uppercase+number; backend `UserCreate` only enforces `min_length=8` | Passwords accepted by backend may be rejected by frontend and vice versa | Broader beta |
 | G14 | **Orders pages orphaned** | FRONTEND GAP | `app/(resident)/orders/` exists but not in sidebar | Users can't discover order tracking | Broader beta |
 | G15 | **No foreign key: users.building_id → buildings.id** | DATABASE GAP | Migration 001 — column exists without FK | Referential integrity not enforced | Broader beta |
 | G16 | **Concurrent offer join race condition** | BACKEND GAP | Both trigger (008) and API code update participant count | Potential double-counting | Broader beta |
@@ -583,7 +597,7 @@ The backend has **16 well-organized route modules** under `/api/v1/`:
 6. **[G6] Scope buildings_manager permissions**: Create separate `get_buildings_manager_user` dependency that restricts access to their assigned buildings only.
 7. **[G8] Add real E2E tests**: Create at least one Playwright spec that runs against a live backend (use Docker Compose in CI).
 8. **[G9] Add admin app tests**: Create basic smoke tests for admin dashboard, users, offers pages.
-9. **[G13] Add loading.tsx and error.tsx**: Create route-level error boundaries for all major route groups.
+9. **[G13] Align password validation**: Ensure backend `UserCreate` model enforces the same rules as the frontend Zod schema (uppercase + number required), or relax the frontend to match backend.
 10. **[G14] Wire orders pages**: Either connect to backend and add to sidebar, or remove the orphaned pages.
 11. **[G16] Fix offer join race condition**: Remove the client-side participant count update; rely solely on the DB trigger.
 12. **[G21] Add auto-unlock mechanism**: Reset login failure counter after a configurable cooldown period (e.g., 15 minutes).
@@ -628,7 +642,7 @@ The backend has **16 well-organized route modules** under `/api/v1/`:
 - **Verdict**: Can pilot with 10-20 known users if G1/G3 are fixed and users are informed payments are simulated
 
 ### Broader Beta: NOT READY
-- **What's missing**: G2 (real payments), G6 (role scoping), G8 (real E2E tests), G13 (error boundaries), G16 (race condition), G22 (transactions)
+- **What's missing**: G2 (real payments), G6 (role scoping), G8 (real E2E tests), G13 (password validation mismatch), G16 (race condition), G22 (transactions)
 - **Estimated effort**: 2-3 sprint cycles
 - **Verdict**: Requires all "Must Fix Before Broader Beta" items
 
