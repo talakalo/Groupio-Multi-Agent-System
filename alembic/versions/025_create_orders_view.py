@@ -25,9 +25,9 @@ def upgrade() -> None:
             o.status AS offer_status,
             op.status AS participation_status,
             op.joined_at,
-            o.contractor_id,
-            u.full_name AS contractor_name,
-            COALESCE(i.amount, o.current_price) AS amount,
+            o.matched_contractor_id AS contractor_id,
+            COALESCE(c.business_name, u.full_name) AS contractor_name,
+            COALESCE(i.amount, o.base_price) AS amount,
             COALESCE(i.status, 'pending') AS payment_status,
             i.id AS invoice_id,
             p.id AS payment_id,
@@ -35,7 +35,8 @@ def upgrade() -> None:
             p.paid_at
         FROM offer_participants op
         JOIN offers o ON o.id = op.offer_id
-        LEFT JOIN users u ON u.id = o.contractor_id
+        LEFT JOIN contractors c ON c.id = o.matched_contractor_id
+        LEFT JOIN users u ON u.id = c.user_id
         LEFT JOIN invoices i ON i.offer_participant_id = op.id
         LEFT JOIN payments p ON p.invoice_id = i.id
         ORDER BY op.joined_at DESC
