@@ -9,6 +9,7 @@ from src.agents.analytics import AnalyticsAgent
 from src.agents.architecture import ArchitectureAgent
 from src.agents.influencer import InfluencerAgent
 from src.agents.matching import MatchingAgent
+from src.agents.notification import NotificationAgent
 from src.agents.outreach import OutreachAgent
 from src.agents.pricing import PricingAgent
 from src.agents.router import RouterAgent
@@ -43,6 +44,7 @@ INTENT_AGENT_MAP = {
     "viral_invite_query": "outreach",
     "building_social_proof": "pricing",
     "influencer_campaign": "influencer",
+    "notification_request": "notification",
 }
 
 
@@ -66,6 +68,7 @@ class GroupioOrchestrator:
             "analytics": AnalyticsAgent(),
             "architecture": ArchitectureAgent(),
             "influencer": InfluencerAgent(),
+            "notification": NotificationAgent(),
         }
         # Payment agent imported lazily to avoid circular imports during Phase 3
         try:
@@ -129,6 +132,8 @@ class GroupioOrchestrator:
         workflow.add_node("influencer", self._run_agent_safe("influencer"))
         if "payment" in self.agents:
             workflow.add_node("payment", self._run_agent_safe("payment"))
+        if "notification" in self.agents:
+            workflow.add_node("notification", self._run_agent_safe("notification"))
         workflow.add_node("human_handoff", self._handoff_to_human)
         workflow.add_node("final_response", self._format_final_response)
 
@@ -150,6 +155,8 @@ class GroupioOrchestrator:
         }
         if "payment" in self.agents:
             edge_map["payment"] = "payment"
+        if "notification" in self.agents:
+            edge_map["notification"] = "notification"
         workflow.add_conditional_edges(
             "router",
             self._determine_next_agent,
@@ -169,6 +176,8 @@ class GroupioOrchestrator:
         ]
         if "payment" in self.agents:
             specialist_agents.append("payment")
+        if "notification" in self.agents:
+            specialist_agents.append("notification")
         for agent_name in specialist_agents:
             workflow.add_conditional_edges(
                 agent_name,

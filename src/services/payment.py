@@ -270,11 +270,10 @@ def get_payment_provider() -> PaymentProvider:
             _payment_provider = StripePaymentProvider(secret_key=settings.STRIPE_SECRET_KEY)
 
         elif provider_name == "mock":
-            is_prod = settings.ENVIRONMENT == "production"
-            if is_prod:
-                logger.warning(
-                    "MOCK PAYMENT PROVIDER is active in production (PAYMENT_PROVIDER=mock). "
-                    "All charges will succeed without real money movement. "
+            if settings.ENVIRONMENT in ("production", "staging"):
+                raise RuntimeError(
+                    "PAYMENT_PROVIDER=mock is not allowed in production/staging. "
+                    "Real money flows would silently succeed without actual charges. "
                     "Set PAYMENT_PROVIDER=stripe and configure STRIPE_SECRET_KEY."
                 )
             _payment_provider = MockPaymentProvider()

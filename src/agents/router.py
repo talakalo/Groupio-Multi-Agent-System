@@ -25,6 +25,7 @@ INTENT_AGENT_MAP = {
     "viral_invite_query": "outreach",
     "building_social_proof": "pricing",
     "influencer_campaign": "influencer",
+    "notification_request": "notification",
 }
 
 VALID_AGENTS = frozenset(INTENT_AGENT_MAP.values())
@@ -50,7 +51,7 @@ class RouterAgent(BaseAgent):
         super().__init__(config)
 
     @track_agent_execution("router")
-    async def run(self, state: AgentState) -> AgentState:
+    async def _run_impl(self, state: AgentState) -> AgentState:
         """Classify intent and determine routing."""
         user_message = self._get_last_user_message(state)
 

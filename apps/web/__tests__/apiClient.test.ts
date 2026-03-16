@@ -275,17 +275,17 @@ describe('ApiClient', () => {
     it('posts to join endpoint', async () => {
       (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ success: true, participants: 11 }),
+        json: async () => ({ status: 'joined', offer_id: 'offer-123' }),
       });
 
-      const result = await apiClient.joinOffer('offer-123', 'user-456');
+      const result = await apiClient.joinOffer('offer-123', 2);
 
       const [url, options] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
       expect(url).toContain('/api/v1/offers/offer-123/join');
       expect(options.method).toBe('POST');
       const body = JSON.parse(options.body);
-      expect(body.userId).toBe('user-456');
-      expect(result.success).toBe(true);
+      expect(body.unit_count).toBe(2);
+      expect(result.status).toBe('joined');
     });
   });
 

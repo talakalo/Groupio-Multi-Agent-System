@@ -286,6 +286,7 @@ export default function SignupPage() {
               <input
                 id="name"
                 type="text"
+                autoComplete="name"
                 placeholder="ישראל ישראלי"
                 className="input-field"
                 aria-describedby={errors.name ? "name-error" : undefined}
@@ -309,6 +310,7 @@ export default function SignupPage() {
               <input
                 id="email"
                 type="email"
+                autoComplete="email"
                 placeholder="your@email.com"
                 className="input-field"
                 aria-describedby={errors.email ? "email-error" : undefined}
@@ -332,12 +334,15 @@ export default function SignupPage() {
               <input
                 id="phone"
                 type="tel"
+                autoComplete="tel"
                 placeholder="0501234567"
                 className="input-field"
+                aria-describedby={errors.phone ? "phone-error" : undefined}
+                aria-invalid={!!errors.phone}
                 {...register("phone")}
               />
               {errors.phone && (
-                <p className="text-red-500 text-sm mt-1">
+                <p id="phone-error" role="alert" className="text-red-500 text-sm mt-1">
                   {errors.phone.message}
                 </p>
               )}
@@ -353,12 +358,15 @@ export default function SignupPage() {
               <input
                 id="password"
                 type="password"
+                autoComplete="new-password"
                 placeholder="לפחות 8 תווים, אות גדולה ומספר"
                 className="input-field"
+                aria-describedby={errors.password ? "password-error" : undefined}
+                aria-invalid={!!errors.password}
                 {...register("password")}
               />
               {errors.password && (
-                <p className="text-red-500 text-sm mt-1">
+                <p id="password-error" role="alert" className="text-red-500 text-sm mt-1">
                   {errors.password.message}
                 </p>
               )}
@@ -375,6 +383,7 @@ export default function SignupPage() {
                 <input
                   id="buildingId"
                   type="text"
+                  autoComplete="off"
                   placeholder="הזינו קוד בניין אם קיבלתם מהוועד"
                   className="input-field"
                   {...register("buildingId")}

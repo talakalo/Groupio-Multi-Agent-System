@@ -242,7 +242,7 @@ export default function OfferDetailPage() {
   const joinMutation = useMutation({
     mutationFn: async () => {
       if (!user?.id) throw new Error('Not authenticated');
-      return apiClient.joinOffer(offerId, user.id);
+      return apiClient.joinOffer(offerId);
     },
     onSuccess: () => {
       setShowJoinModal(false);

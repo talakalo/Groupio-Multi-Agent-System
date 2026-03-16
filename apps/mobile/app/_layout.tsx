@@ -1,9 +1,9 @@
-import React from "react";
+import React, { createContext, useCallback, useContext } from "react";
 import { useEffect, useState } from "react";
 import { I18nManager, Platform } from "react-native";
 import * as Localization from "expo-localization";
 import { Stack, useRouter, useSegments } from "expo-router";
-import { loadAuthToken } from "../lib/api";
+import { loadAuthToken, clearAuthSession } from "../lib/api";
 import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -157,6 +157,19 @@ const { LightTheme: navLightTheme, DarkTheme: navDarkTheme } =
     materialDark: darkTheme,
   });
 
+type AuthContextValue = {
+  isAuthenticated: boolean;
+  logout: () => Promise<void>;
+};
+
+const AuthContext = createContext<AuthContextValue | null>(null);
+
+export function useAuth(): AuthContextValue {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useAuth must be used within RootLayout");
+  return ctx;
+}
+
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
@@ -166,6 +179,12 @@ export default function RootLayout() {
   const segments = useSegments();
   const [authChecked, setAuthChecked] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  const logout = useCallback(async () => {
+    await clearAuthSession();
+    setIsAuthenticated(false);
+    router.replace("/(auth)/login");
+  }, [router]);
 
   useEffect(() => {
     // Restore token from SecureStore and redirect accordingly
@@ -195,17 +214,24 @@ export default function RootLayout() {
     return null;
   }
 
+  const authContextValue: AuthContextValue = {
+    isAuthenticated,
+    logout,
+  };
+
   return (
-    <QueryClientProvider client={queryClient}>
-      <PaperProvider theme={paperTheme}>
-        <SafeAreaProvider>
-          <ThemeProvider value={navigationTheme}>
+    <AuthContext.Provider value={authContextValue}>
+      <QueryClientProvider client={queryClient}>
+        <PaperProvider theme={paperTheme}>
+          <SafeAreaProvider>
+            <ThemeProvider value={navigationTheme}>
             <Stack
               screenOptions={{
                 headerShown: false,
                 animation: "slide_from_right",
               }}
             >
+              <Stack.Screen name="(auth)" options={{ headerShown: false }} />
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
               <Stack.Screen
                 name="create-offer"
@@ -228,5 +254,6 @@ export default function RootLayout() {
         </SafeAreaProvider>
       </PaperProvider>
     </QueryClientProvider>
+    </AuthContext.Provider>
   );
 }

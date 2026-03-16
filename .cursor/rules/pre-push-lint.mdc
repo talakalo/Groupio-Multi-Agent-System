@@ -1,0 +1,26 @@
+---
+description: Always run lint and format checks before committing or pushing code
+globs:
+alwaysApply: true
+---
+
+# Pre-Push Lint Rule
+
+Before every `git commit` or `git push`, you MUST run and verify these checks pass:
+
+```bash
+python -m ruff check src/ tests/ --output-format=github
+python -m ruff format src/ tests/ --check
+```
+
+If either command fails:
+1. Fix the lint/format errors FIRST
+2. Re-run both checks to confirm they pass
+3. Only then proceed with the commit/push
+
+For TypeScript files, also verify:
+```bash
+pnpm typecheck
+```
+
+Never push code that fails `ruff check`, `ruff format --check`, or `pnpm typecheck`.

@@ -4,6 +4,7 @@ import logging
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 
 from src.api.middleware.auth import get_current_user, is_admin
 from src.databases.postgres import get_postgres_client
@@ -67,6 +68,58 @@ async def get_my_building(
         "totalSavings": building.get("total_savings") or stats.get("total_savings", 0),
         "inviteCode": invite_code,
     }
+
+
+class JoinBuildingRequest(BaseModel):
+    """Request body for joining a building by invite code or building ID."""
+
+    building_id: str | None = None
+    invite_code: str | None = None
+
+
+@router.post("/join")
+async def join_building(
+    request: JoinBuildingRequest,
+    current_user: UserInDB = Depends(get_current_user),
+) -> dict:
+    """Join a building by invite code or building ID. User must not already be a resident."""
+    if not request.building_id and not request.invite_code:
+        raise HTTPException(status_code=400, detail="Provide building_id or invite_code")
+
+    db = get_postgres_client()
+    building_id: str | None = None
+
+    if request.building_id:
+        building = await db.get_building(request.building_id)
+        if not building:
+            raise HTTPException(status_code=404, detail="Building not found")
+        building_id = request.building_id
+    else:
+        code = (request.invite_code or "").strip().upper()
+        if len(code) < 8:
+            raise HTTPException(status_code=400, detail="Invite code must be at least 8 characters")
+        rows = await db.execute_query(
+            "SELECT id FROM buildings WHERE UPPER(LEFT(REPLACE(id::text, '-', ''), 8)) = $1 LIMIT 1",
+            {"code": code},
+        )
+        if not rows:
+            raise HTTPException(status_code=404, detail="No building found for this invite code")
+        building_id = rows[0]["id"]
+
+    is_resident = await db.is_user_in_building(current_user.id, building_id)
+    if is_resident:
+        raise HTTPException(status_code=400, detail="Already a resident")
+
+    unit_number = f"invite-{uuid4().hex[:8]}"
+    await db.add_resident_to_building(
+        user_id=current_user.id,
+        building_id=building_id,
+        unit_number=unit_number,
+        floor=0,
+        is_owner=False,
+    )
+
+    return {"status": "joined", "building_id": building_id}
 
 
 @router.post("/", response_model=BuildingResponse)

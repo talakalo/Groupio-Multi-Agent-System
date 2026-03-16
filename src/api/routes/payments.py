@@ -34,6 +34,7 @@ class PaymentInitiateRequest(BaseModel):
     offer_id: str
     payment_method_id: str | None = None
     force_escrow: bool = False  # Resident can opt-in to escrow
+    idempotency_key: str | None = None
 
 
 VAT_RATE = 0.18  # Israeli מע"מ — 18% as of 2025
@@ -203,15 +204,49 @@ async def get_my_payments(
 @router.post("/initiate", response_model=PaymentResponse)
 async def initiate_payment(
     request: PaymentInitiateRequest,
+    http_request: Request,
     current_user: UserInDB = Depends(get_current_user),
 ) -> PaymentResponse:
     """Initiate a payment for an offer.
 
     Creates an invoice if one doesn't already exist for the offer,
     creates a payment record, and calls the payment provider.
+
+    Supports idempotency via ``idempotency_key`` in the body or
+    ``X-Idempotency-Key`` header. When a duplicate key is detected
+    within its TTL the original payment is returned instead of
+    creating a new one.
     """
+    from src.databases.redis_client import get_redis_client as _get_redis
+
     db = get_postgres_client()
     provider = get_payment_provider()
+
+    # --- Idempotency guard ---
+    idem_key = request.idempotency_key or http_request.headers.get("X-Idempotency-Key")
+    if idem_key:
+        redis = _get_redis()
+        cache_key = f"payment_idem:{current_user.id}:{idem_key}"
+        existing_payment_id = await redis.get(cache_key)
+        if existing_payment_id:
+            existing = await db.get_payment(existing_payment_id)
+            if existing:
+                raw = existing.get("amount", 0)
+                sub = existing.get("subtotal", round(raw / (1 + VAT_RATE), 2))
+                tax = existing.get("tax_amount", round(sub * VAT_RATE, 2))
+                return PaymentResponse(
+                    id=existing["id"],
+                    user_id=existing.get("user_id", current_user.id),
+                    offer_id=existing.get("offer_id", ""),
+                    subtotal=sub,
+                    tax_rate=VAT_RATE,
+                    tax_amount=tax,
+                    amount=raw,
+                    currency=existing.get("currency", "ILS"),
+                    status=existing.get("status", "unknown"),
+                    transaction_id=existing.get("transaction_id"),
+                    created_at=existing.get("created_at", ""),
+                )
 
     # Verify the offer exists and the user is associated with it
     offer = await db.get_offer(request.offer_id)
@@ -346,6 +381,14 @@ async def initiate_payment(
     # For escrow payments, invoice stays pending until admin releases
     if payment_data["status"] == "succeeded" and payment_type == "direct":
         await db.update_invoice(existing_invoice["id"], {"status": "paid"})
+
+    # Store idempotency mapping (TTL: 24 hours)
+    if idem_key:
+        try:
+            redis = _get_redis()
+            await redis.set(cache_key, payment_id, ex=86400)
+        except Exception:
+            pass  # Non-critical; worst case is a duplicate on retry
 
     return PaymentResponse(
         id=payment_data["id"],
@@ -646,6 +689,55 @@ async def request_refund(
         "amount": refund_amount,
         "reason": body.reason,
     }
+
+
+@router.post("/{payment_id}/approve-work")
+async def approve_work(
+    payment_id: str,
+    current_user: UserInDB = Depends(get_current_user),
+) -> dict:
+    """Approve work completion for a payment. Resident confirms work was done."""
+    db = get_postgres_client()
+    payment = await db.get_payment(payment_id)
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    if payment.get("user_id") != current_user.id:
+        raise HTTPException(status_code=403, detail="Not your payment")
+
+    await db.update_payment(payment_id, {"status": "work_approved"})
+
+    return {"status": "work_approved", "payment_id": payment_id}
+
+
+@router.get("/invoices/my", response_model=list[InvoiceResponse])
+async def get_my_invoices(
+    current_user: UserInDB = Depends(get_current_user),
+) -> list[InvoiceResponse]:
+    """Get the current user's invoices."""
+    db = get_postgres_client()
+    invoices = await db.list_invoices_for_user(current_user.id)
+    result = []
+    for inv in invoices:
+        raw_total = inv.get("total", inv.get("amount", 0))
+        inv_subtotal = inv.get("subtotal", round(raw_total / (1 + VAT_RATE), 2))
+        inv_tax_amount = inv.get("tax_amount", round(inv_subtotal * VAT_RATE, 2))
+        result.append(
+            InvoiceResponse(
+                id=inv["id"],
+                offer_id=inv.get("offer_id", ""),
+                subtotal=inv_subtotal,
+                tax_rate=inv.get("tax_rate", VAT_RATE),
+                tax_amount=inv_tax_amount,
+                amount=raw_total,
+                currency=inv.get("currency", "ILS"),
+                status=inv.get("status", "unknown"),
+                payment_type=inv.get("payment_type", "direct"),
+                issued_at=inv.get("created_at", inv.get("issued_at", "")),
+                due_date=inv.get("due_date"),
+                items=inv.get("items", []),
+            )
+        )
+    return result
 
 
 @router.get("/invoices/{invoice_id}", response_model=InvoiceResponse)

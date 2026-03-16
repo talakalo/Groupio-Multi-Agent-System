@@ -24,7 +24,8 @@ import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import * as ImagePicker from "expo-image-picker";
 
 import { useProfile, useUpdateProfile } from "../../lib/hooks";
-import { uploadAvatar, setAuthToken } from "../../lib/api";
+import { uploadAvatar } from "../../lib/api";
+import { useAuth } from "../_layout";
 import type { ProfileResponse } from "../../lib/api";
 
 // ---------------------------------------------------------------------------
@@ -166,6 +167,7 @@ function SettingToggle({
 
 export default function ProfileScreen() {
   const theme = useTheme();
+  const { logout } = useAuth();
 
   // Data
   const { data: profile, isLoading: profileLoading } = useProfile();
@@ -256,14 +258,11 @@ export default function ProfileScreen() {
         {
           text: "\u05D4\u05EA\u05E0\u05EA\u05E7",
           style: "destructive",
-          onPress: () => {
-            setAuthToken(null);
-            // Navigate to login screen via router
-          },
+          onPress: () => void logout(),
         },
       ],
     );
-  }, []);
+  }, [logout]);
 
   // Loading
   if (profileLoading) {

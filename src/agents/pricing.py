@@ -58,7 +58,7 @@ class PricingAgent(BaseAgent):
         )
 
     @track_agent_execution("pricing")
-    async def run(self, state: AgentState) -> AgentState:
+    async def _run_impl(self, state: AgentState) -> AgentState:
         """Analyze pricing and generate tier recommendations."""
         user_message = self._get_last_user_message(state)
         context_next = state.get("context_for_next_agent") or {}

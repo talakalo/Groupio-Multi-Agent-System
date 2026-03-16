@@ -284,9 +284,11 @@ export default function LoginPage() {
           </div>
 
           <div className="flex items-center justify-between text-sm">
-            <label className="flex items-center gap-2">
+            <label htmlFor="remember" className="flex items-center gap-2">
               <input
+                id="remember"
                 type="checkbox"
+                autoComplete="off"
                 className="rounded border-gray-300 text-primary-500 focus:ring-primary-500"
               />
               <span className="text-gray-600">זכור אותי</span>

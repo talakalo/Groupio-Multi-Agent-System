@@ -65,7 +65,7 @@ class VettingAgent(BaseAgent):
         self._graph_store = get_graph_store()
 
     @track_agent_execution("vetting")
-    async def run(self, state: AgentState) -> AgentState:
+    async def _run_impl(self, state: AgentState) -> AgentState:
         """Run the full vetting pipeline for a contractor."""
         self._get_last_user_message(state)
 

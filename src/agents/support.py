@@ -88,7 +88,7 @@ class SupportAgent(BaseAgent):
         self._memory = ConversationMemory()
 
     @track_agent_execution("support")
-    async def run(self, state: AgentState) -> AgentState:
+    async def _run_impl(self, state: AgentState) -> AgentState:
         """Handle support request with intent-based RAG."""
         user_message = self._get_last_user_message(state)
         user_id = state["user_id"]
