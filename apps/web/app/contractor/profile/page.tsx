@@ -8,9 +8,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
-import { Badge } from '@/components/ui/Badge';
-import { VettingStatusTimeline } from '@/components/features/contractor/VettingStatusTimeline';
 import { TrustScoreProgress } from '@/components/features/contractor/TrustScoreProgress';
+import { VettingStatusTimeline } from '@/components/features/contractor/VettingStatusTimeline';
+import { Badge } from '@/components/ui/Badge';
 import { useAuthStore } from '@/lib/stores/authStore';
 
 const profileSchema = z.object({

@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { Users, ShieldCheck, BadgeCheck, ArrowLeft } from "lucide-react";
+import Link from "next/link";
 
 const TRUST_BADGES = [
   { icon: Users, text: "3,200+ דיירים פעילים" },

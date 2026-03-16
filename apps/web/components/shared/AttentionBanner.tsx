@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import clsx from "clsx";
 import { AlertTriangle, Info, AlertCircle, X } from "lucide-react";
 import { useTranslations } from "next-intl";
-import clsx from "clsx";
+import { useState, type ReactNode } from "react";
 
 type BannerVariant = "warning" | "error" | "info";
 

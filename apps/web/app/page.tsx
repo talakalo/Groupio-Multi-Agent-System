@@ -1,12 +1,13 @@
+import { Building2 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Building2 } from "lucide-react";
+
+import ContractorCTA from "@/components/landing/ContractorCTA";
+import FeaturedOffers from "@/components/landing/FeaturedOffers";
 import HeroSection from "@/components/landing/HeroSection";
 import HowItWorksSection from "@/components/landing/HowItWorksSection";
-import FeaturedOffers from "@/components/landing/FeaturedOffers";
-import TrustSection from "@/components/landing/TrustSection";
-import ContractorCTA from "@/components/landing/ContractorCTA";
 import LandingFooter from "@/components/landing/LandingFooter";
+import TrustSection from "@/components/landing/TrustSection";
 
 const SITE_URL = "https://groupio.co.il";
 const organizationJsonLd = {

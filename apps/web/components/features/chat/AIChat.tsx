@@ -3,11 +3,11 @@
 import type { MessageResponse, ServiceCategory } from '@groupio/types';
 import { useQuery } from '@tanstack/react-query';
 import { Send, Bot, User, Loader2, Sparkles, Headphones } from 'lucide-react';
-import { useState, useRef, useEffect, useCallback, type FormEvent } from 'react';
 import { useTranslations } from 'next-intl';
+import { useState, useRef, useEffect, useCallback, type FormEvent } from 'react';
 
-import { cn } from '@/lib/utils/cn';
 import { useAccessToken } from '@/lib/stores/authStore';
+import { cn } from '@/lib/utils/cn';
 
 const THINKING_KEYS = [
   'searchingContractors',

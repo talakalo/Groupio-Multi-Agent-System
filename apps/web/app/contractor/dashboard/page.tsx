@@ -13,9 +13,9 @@ import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useState, useEffect } from 'react';
 
-import { AttentionBanner } from '@/components/shared/AttentionBanner';
 import { AIChat } from '@/components/features/chat/AIChat';
 import { OfferCard } from '@/components/features/offers/OfferCard';
+import { AttentionBanner } from '@/components/shared/AttentionBanner';
 import { StatCard } from '@/components/shared/StatCard';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';

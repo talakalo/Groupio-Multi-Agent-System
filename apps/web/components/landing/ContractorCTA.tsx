@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { Users, TrendingUp, BadgeCheck, ArrowLeft } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import Link from "next/link";
 
 interface ValueProp {
   icon: LucideIcon;

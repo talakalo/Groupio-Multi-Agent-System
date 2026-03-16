@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import {
   CreditCard,
   Clock,
@@ -14,12 +13,13 @@ import {
   Shield,
   ArrowRight,
 } from 'lucide-react';
-import { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import { useTranslations } from 'next-intl';
+import { useState, useEffect, useCallback } from 'react';
 
+import { EscrowBadge } from '@/components/features/payments/EscrowBadge';
 import { Badge } from '@/components/ui/Badge';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { EscrowBadge } from '@/components/features/payments/EscrowBadge';
 import { apiClient } from '@/lib/api/client';
 
 // ---- Types ----

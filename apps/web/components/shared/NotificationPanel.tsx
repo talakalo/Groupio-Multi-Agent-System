@@ -1,14 +1,15 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
 import { Bell, CheckCircle, XCircle, AlertTriangle, Info, CheckCheck, Trash2 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+
 import {
   useNotifications,
   useUnreadCount,
   useNotificationStore,
 } from '@/lib/stores/notificationStore';
-import { cn } from '@/lib/utils/cn';
 import type { Notification, NotificationType } from '@/lib/stores/notificationStore';
+import { cn } from '@/lib/utils/cn';
 
 // ---------------------------------------------------------------------------
 // Constants

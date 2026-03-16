@@ -1,7 +1,7 @@
 "use client";
 
-import { type ReactNode } from "react";
 import clsx from "clsx";
+import { type ReactNode } from "react";
 
 type BadgeVariant = "default" | "primary" | "success" | "warning" | "error" | "accent" | "info";
 type BadgeSize = "sm" | "md";

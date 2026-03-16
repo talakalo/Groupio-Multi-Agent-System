@@ -19,12 +19,12 @@ import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useState, useCallback } from 'react';
 
+import { CategoryChips } from '@/components/shared/CategoryChips';
+import { LanguageToggle } from '@/components/shared/LanguageToggle';
+import { StepIndicator } from '@/components/shared/StepIndicator';
 import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
-import { LanguageToggle } from '@/components/shared/LanguageToggle';
-import { StepIndicator } from '@/components/shared/StepIndicator';
-import { CategoryChips } from '@/components/shared/CategoryChips';
 
 
 // ---------------------------------------------------------------------------

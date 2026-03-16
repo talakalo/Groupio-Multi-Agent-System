@@ -1,7 +1,7 @@
 "use client";
 
-import { Check } from "lucide-react";
 import clsx from "clsx";
+import { Check } from "lucide-react";
 
 interface TimelineStep {
   key: string;

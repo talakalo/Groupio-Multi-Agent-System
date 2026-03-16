@@ -14,11 +14,11 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
+import { OrderTimeline } from "@/components/features/orders/OrderTimeline";
+import { EscrowBadge } from "@/components/features/payments/EscrowBadge";
+import { Breadcrumb } from "@/components/shared/Breadcrumb";
 import { Badge } from "@/components/ui/Badge";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { Breadcrumb } from "@/components/shared/Breadcrumb";
-import { EscrowBadge } from "@/components/features/payments/EscrowBadge";
-import { OrderTimeline } from "@/components/features/orders/OrderTimeline";
 import { apiClient } from "@/lib/api/client";
 
 interface OrderDetail {

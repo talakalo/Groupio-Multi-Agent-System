@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
+
 import { TrustBadgeCluster } from "./TrustBadgeCluster";
 
 const meta: Meta<typeof TrustBadgeCluster> = {

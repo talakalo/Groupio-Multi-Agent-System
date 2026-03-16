@@ -5,8 +5,8 @@ import { Users, BarChart2, DollarSign, ChevronDown, ChevronUp, Loader2, Mail, Ph
 import { useTranslations } from 'next-intl';
 import { useState, useEffect, useCallback } from 'react';
 
-import { Badge } from '@/components/ui/Badge';
 import { OfferCard } from '@/components/features/offers/OfferCard';
+import { Badge } from '@/components/ui/Badge';
 import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';

@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { Building2 } from "lucide-react";
+import Link from "next/link";
 
 const FOOTER_LINKS = [
   { label: "אודות", href: "/about" },

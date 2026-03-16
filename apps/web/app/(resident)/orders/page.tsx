@@ -23,9 +23,9 @@ import {
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
+import { EscrowBadge } from "@/components/features/payments/EscrowBadge";
 import { Badge } from "@/components/ui/Badge";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { EscrowBadge } from "@/components/features/payments/EscrowBadge";
 import { apiClient, ApiError } from "@/lib/api/client";
 import { cn } from "@/lib/utils/cn";
 

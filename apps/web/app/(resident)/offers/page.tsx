@@ -20,10 +20,10 @@ import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useState, useMemo } from 'react';
 
-import { useAuthStore } from '@/lib/stores/authStore';
-import { cn } from '@/lib/utils/cn';
 import { CategoryChips } from '@/components/shared/CategoryChips';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { useAuthStore } from '@/lib/stores/authStore';
+import { cn } from '@/lib/utils/cn';
 
 // ---------------------------------------------------------------------------
 // Types

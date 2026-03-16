@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
+
 import { CategoryChips } from "./CategoryChips";
 
 const meta: Meta<typeof CategoryChips> = {

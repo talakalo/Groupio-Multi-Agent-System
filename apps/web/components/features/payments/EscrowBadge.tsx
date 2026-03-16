@@ -1,5 +1,5 @@
-import { Lock } from "lucide-react";
 import clsx from "clsx";
+import { Lock } from "lucide-react";
 
 interface EscrowBadgeProps {
   variant?: "inline" | "block";

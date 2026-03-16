@@ -22,10 +22,10 @@ import {
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 
-import { Badge } from '@/components/ui/Badge';
-import { Skeleton } from '@/components/ui/Skeleton';
 import { BuildingSummaryCard } from '@/components/features/building/BuildingSummaryCard';
 import { EmptyState } from '@/components/shared/EmptyState';
+import { Badge } from '@/components/ui/Badge';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
 

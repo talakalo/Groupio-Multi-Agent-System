@@ -1,5 +1,5 @@
-import { Shield, Lock, BadgeCheck, FileCheck } from "lucide-react";
 import clsx from "clsx";
+import { Shield, Lock, BadgeCheck, FileCheck } from "lucide-react";
 
 type TrustBadge = "verified" | "escrow" | "licensed" | "insured";
 

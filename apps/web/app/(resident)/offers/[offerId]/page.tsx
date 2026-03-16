@@ -21,16 +21,16 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { EscrowBadge } from '@/components/features/payments/EscrowBadge';
+import { Breadcrumb } from '@/components/shared/Breadcrumb';
+import { TrustBadgeCluster } from '@/components/shared/TrustBadgeCluster';
 import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { useNotificationStore } from '@/lib/stores/notificationStore';
 import { cn } from '@/lib/utils/cn';
-import { Breadcrumb } from '@/components/shared/Breadcrumb';
-import { TrustBadgeCluster } from '@/components/shared/TrustBadgeCluster';
-import { EscrowBadge } from '@/components/features/payments/EscrowBadge';
 
 // ---------------------------------------------------------------------------
 // Join Confirmation Modal with cancellation policy disclosure
