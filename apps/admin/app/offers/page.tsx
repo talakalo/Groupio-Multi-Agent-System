@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
-import { clsx } from "clsx";
 import {
   useQuery,
   useMutation,
   useQueryClient,
 } from "@tanstack/react-query";
+import { clsx } from "clsx";
 import {
   Search,
   Filter,
@@ -26,11 +25,14 @@ import {
   Building2,
   MoreHorizontal,
 } from "lucide-react";
+import { useState, useMemo, useCallback, type ReactNode } from "react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 // ---------------------------------------------------------------------------
 // Types
+// TODO: Offer shape here differs from @groupio/types Offer (admin API response);
+// consider aligning or documenting the divergence.
 // ---------------------------------------------------------------------------
 
 interface Offer {
@@ -84,6 +86,40 @@ const STATUS_BADGE_CLASSES: Record<string, string> = {
   completed: "bg-success-50 text-success-700",
   cancelled: "bg-danger-50 text-danger-700",
 };
+
+function OffersSortTh({
+  field,
+  sortField,
+  sortDir,
+  onSort,
+  children,
+}: {
+  field: SortField;
+  sortField: SortField;
+  sortDir: SortDir;
+  onSort: (f: SortField) => void;
+  children: ReactNode;
+}) {
+  return (
+    <th
+      className="table-header cursor-pointer select-none"
+      onClick={() => onSort(field)}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onSort(field); }}
+      role="columnheader"
+      tabIndex={0}
+    >
+      <div className="flex items-center gap-1">
+        {children}
+        {sortField === field &&
+          (sortDir === "asc" ? (
+            <ChevronUp className="w-3.5 h-3.5" />
+          ) : (
+            <ChevronDown className="w-3.5 h-3.5" />
+          ))}
+      </div>
+    </th>
+  );
+}
 
 const CATEGORY_OPTIONS = [
   "ac_installation",
@@ -299,32 +335,6 @@ export default function OffersPage() {
     cancelMutation.isPending ||
     flagMutation.isPending;
 
-  // ---- Sort header helper ----
-  function SortTh({
-    field,
-    children,
-  }: {
-    field: SortField;
-    children: React.ReactNode;
-  }) {
-    return (
-      <th
-        className="table-header cursor-pointer select-none"
-        onClick={() => toggleSort(field)}
-      >
-        <div className="flex items-center gap-1">
-          {children}
-          {sortField === field &&
-            (sortDir === "asc" ? (
-              <ChevronUp className="w-3.5 h-3.5" />
-            ) : (
-              <ChevronDown className="w-3.5 h-3.5" />
-            ))}
-        </div>
-      </th>
-    );
-  }
-
   return (
     <div className="space-y-6">
       {/* ---- Page header ---- */}
@@ -508,13 +518,13 @@ export default function OffersPage() {
           <table className="w-full text-left">
             <thead>
               <tr>
-                <SortTh field="title">Title</SortTh>
-                <SortTh field="category">Category</SortTh>
+                <OffersSortTh field="title" sortField={sortField} sortDir={sortDir} onSort={toggleSort}>Title</OffersSortTh>
+                <OffersSortTh field="category" sortField={sortField} sortDir={sortDir} onSort={toggleSort}>Category</OffersSortTh>
                 <th className="table-header">Building</th>
-                <SortTh field="status">Status</SortTh>
-                <SortTh field="participants">Participants</SortTh>
-                <SortTh field="price">Price</SortTh>
-                <SortTh field="created_at">Created</SortTh>
+                <OffersSortTh field="status" sortField={sortField} sortDir={sortDir} onSort={toggleSort}>Status</OffersSortTh>
+                <OffersSortTh field="participants" sortField={sortField} sortDir={sortDir} onSort={toggleSort}>Participants</OffersSortTh>
+                <OffersSortTh field="price" sortField={sortField} sortDir={sortDir} onSort={toggleSort}>Price</OffersSortTh>
+                <OffersSortTh field="created_at" sortField={sortField} sortDir={sortDir} onSort={toggleSort}>Created</OffersSortTh>
                 <th className="table-header">Actions</th>
               </tr>
             </thead>

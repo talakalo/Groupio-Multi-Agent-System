@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import React from 'react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ---- next/navigation mock ----
 const mockPush = vi.fn();
@@ -43,9 +43,9 @@ describe('ResidentLayout — sidebar navigation links', () => {
   const EXPECTED_HREFS = [
     '/dashboard',
     '/offers',
-    '/contractors',
-    '/architecture',
+    '/orders',
     '/building',
+    '/contractors',
     '/profile',
     '/payments',
     '/chat',

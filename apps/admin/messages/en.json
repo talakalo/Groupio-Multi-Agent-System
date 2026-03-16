@@ -1,0 +1,42 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "users": "Users",
+    "contractors": "Contractors",
+    "offers": "Offers",
+    "payments": "Payments",
+    "escalations": "Escalations",
+    "agents": "AI Agents",
+    "analytics": "Analytics",
+    "settings": "Settings",
+    "auditLogs": "Audit Log",
+    "buildings": "Buildings"
+  },
+  "navSections": {
+    "operations": "Operations",
+    "management": "Management",
+    "system": "System"
+  },
+  "common": {
+    "search": "Search...",
+    "loading": "Loading...",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "approve": "Approve",
+    "reject": "Reject",
+    "actions": "Actions",
+    "noData": "No data",
+    "total": "Total",
+    "status": "Status"
+  },
+  "dashboard": {
+    "title": "Main Dashboard",
+    "pendingVerifications": "Pending Verifications",
+    "openEscalations": "Open Escalations",
+    "pendingPayments": "Pending Payments",
+    "systemHealth": "System Health",
+    "pendingActions": "Pending Actions"
+  }
+}

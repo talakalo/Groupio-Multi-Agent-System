@@ -19,10 +19,12 @@ import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useState, useCallback } from 'react';
 
+import { CategoryChips } from '@/components/shared/CategoryChips';
+import { LanguageToggle } from '@/components/shared/LanguageToggle';
+import { StepIndicator } from '@/components/shared/StepIndicator';
 import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
-import { LanguageToggle } from '@/components/shared/LanguageToggle';
 
 
 // ---------------------------------------------------------------------------
@@ -103,6 +105,7 @@ export default function OnboardingPage() {
   const [currentStep, setCurrentStep] = useState<OnboardingStep>('role');
   const [role, setRole] = useState<UserRole | null>(null);
   const [selectedCategories, setSelectedCategories] = useState<ServiceCategory[]>([]);
+  const [isComplete, setIsComplete] = useState(false);
 
   // Resident-specific state
   const [residentInfo, setResidentInfo] = useState<ResidentInfo>({
@@ -223,7 +226,7 @@ export default function OnboardingPage() {
       return response.json();
     },
     onSuccess: () => {
-      router.push(role === 'resident' ? '/dashboard' : '/contractor/dashboard');
+      setIsComplete(true);
     },
   });
 
@@ -628,46 +631,41 @@ export default function OnboardingPage() {
         {role === 'resident' ? t('residentPreferencesDescription') : t('contractorPreferencesDescription')}
       </p>
 
-      <div className="grid grid-cols-2 gap-3">
-        {SERVICE_CATEGORIES.map((cat) => {
-          const isSelected = selectedCategories.includes(cat.value);
-          return (
-            <button
-              key={cat.value}
-              type="button"
-              onClick={() => toggleCategory(cat.value)}
-              className={cn(
-                'flex items-center gap-3 p-4 rounded-xl border transition-all text-start',
-                isSelected
-                  ? 'border-primary-500 bg-primary-50 ring-1 ring-primary-500/20'
-                  : 'border-gray-200 hover:border-gray-300'
-              )}
-            >
-              {isSelected ? (
-                <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary-500 flex items-center justify-center">
-                  <Check className="h-3.5 w-3.5 text-white" />
-                </div>
-              ) : (
-                <div className="flex-shrink-0 w-6 h-6 rounded-full border-2 border-gray-300" />
-              )}
-              <span
-                className={cn(
-                  'text-sm font-medium',
-                  isSelected ? 'text-primary-700' : 'text-gray-700'
-                )}
-              >
-                {cat.labelHe}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+      <CategoryChips
+        categories={SERVICE_CATEGORIES.map((cat) => ({
+          id: cat.value,
+          label: cat.labelHe,
+        }))}
+        selectedItems={selectedCategories}
+        onSelect={(id) => toggleCategory(id as ServiceCategory)}
+        wrap
+      />
 
       {selectedCategories.length > 0 && (
         <p className="text-center text-sm text-gray-500">
           {t('selectedCount', { count: selectedCategories.length })}
         </p>
       )}
+    </div>
+  );
+
+  const renderCompleteStep = () => (
+    <div className="text-center py-8">
+      <div className="w-20 h-20 rounded-full bg-primary-100 flex items-center justify-center mx-auto mb-6 ring-4 ring-primary-50">
+        <Sparkles className="h-10 w-10 text-primary-600" />
+      </div>
+      <h2 className="text-2xl font-bold text-gray-900 mb-3">כל הכבוד!</h2>
+      <p className="text-gray-600 mb-8">
+        הפרופיל שלכם מוכן. עכשיו אפשר להתחיל לגלות הצעות מדהימות!
+      </p>
+      <button
+        type="button"
+        onClick={() => router.push(role === 'resident' ? '/dashboard' : '/contractor/dashboard')}
+        className="btn-primary w-full flex items-center justify-center gap-2"
+      >
+        <span>התחילו לגלות הצעות</span>
+        <ArrowLeft className="h-4 w-4 rtl-flip" />
+      </button>
     </div>
   );
 
@@ -695,88 +693,76 @@ export default function OnboardingPage() {
           <p className="text-gray-600">{t('subtitle')}</p>
         </div>
 
-        {/* Step indicator */}
-        <div className="flex items-center justify-center gap-2 mb-8">
-          {STEPS.map((step, idx) => (
-            <div key={step} className="flex items-center gap-2">
-              <div
-                className={cn(
-                  'w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors',
-                  idx < stepIndex
-                    ? 'bg-primary-500 text-white'
-                    : idx === stepIndex
-                      ? 'bg-primary-500 text-white'
-                      : 'bg-gray-200 text-gray-500'
-                )}
-              >
-                {idx < stepIndex ? <Check className="h-4 w-4" /> : idx + 1}
-              </div>
-              {idx < STEPS.length - 1 && (
-                <div
-                  className={cn(
-                    'w-12 h-0.5 transition-colors',
-                    idx < stepIndex ? 'bg-primary-500' : 'bg-gray-200'
-                  )}
-                />
-              )}
-            </div>
-          ))}
-        </div>
+        {/* Step indicator — progress bar at top */}
+        {!isComplete && (
+          <StepIndicator
+            steps={[
+              { label: t('selectRole') },
+              { label: role === 'resident' ? t('buildingInfo') : t('businessInfo') },
+              { label: t('servicePreferences') },
+            ]}
+            currentStep={stepIndex}
+            variant="bar"
+            className="mb-8"
+          />
+        )}
 
         {/* Step content */}
         <div className="card">
-          {currentStep === 'role' && renderRoleStep()}
-          {currentStep === 'info' &&
-            (role === 'resident' ? renderResidentInfoStep() : renderContractorInfoStep())}
-          {currentStep === 'preferences' && renderPreferencesStep()}
+          {isComplete ? renderCompleteStep() : (
+            <>
+              {currentStep === 'role' && renderRoleStep()}
+              {currentStep === 'info' &&
+                (role === 'resident' ? renderResidentInfoStep() : renderContractorInfoStep())}
+              {currentStep === 'preferences' && renderPreferencesStep()}
 
-          {/* Error message */}
-          {submitMutation.isError && (
-            <div className="mt-4 bg-red-50 text-red-700 rounded-xl px-4 py-3 text-sm">
-              {t('submitError')}
-            </div>
-          )}
+              {submitMutation.isError && (
+                <div className="mt-4 bg-red-50 text-red-700 rounded-xl px-4 py-3 text-sm">
+                  {t('submitError')}
+                </div>
+              )}
 
-          {/* Navigation buttons */}
-          <div className="flex gap-3 mt-8">
-            {stepIndex > 0 && (
-              <button type="button" onClick={goBack} className="btn-secondary flex items-center gap-2">
-                <ArrowRight className="h-4 w-4 rtl-flip" />
-                <span>{tCommon('back')}</span>
-              </button>
-            )}
-
-            {currentStep === 'preferences' ? (
-              <button
-                type="button"
-                onClick={handleFinish}
-                disabled={!canProceed() || submitMutation.isPending}
-                className="btn-primary flex-1 flex items-center justify-center gap-2"
-              >
-                {submitMutation.isPending ? (
-                  <>
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                    <span>{tCommon('loading')}</span>
-                  </>
-                ) : (
-                  <>
-                    <span>{t('finish')}</span>
-                    <Check className="h-4 w-4" />
-                  </>
+              <div className="flex gap-3 mt-8">
+                {stepIndex > 0 && (
+                  <button type="button" onClick={goBack} className="btn-secondary flex items-center gap-2">
+                    <ArrowRight className="h-4 w-4 rtl-flip" />
+                    <span>{tCommon('back')}</span>
+                  </button>
                 )}
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={goNext}
-                disabled={!canProceed()}
-                className="btn-primary flex-1 flex items-center justify-center gap-2"
-              >
-                <span>{tCommon('next')}</span>
-                <ArrowLeft className="h-4 w-4 rtl-flip" />
-              </button>
-            )}
-          </div>
+
+                {currentStep === 'preferences' ? (
+                  <button
+                    type="button"
+                    onClick={handleFinish}
+                    disabled={!canProceed() || submitMutation.isPending}
+                    className="btn-primary flex-1 flex items-center justify-center gap-2"
+                  >
+                    {submitMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        <span>{tCommon('loading')}</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>{t('finish')}</span>
+                        <Check className="h-4 w-4" />
+                      </>
+                    )}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={goNext}
+                    disabled={!canProceed()}
+                    className="btn-primary flex-1 flex items-center justify-center gap-2"
+                  >
+                    <span>{tCommon('next')}</span>
+                    <ArrowLeft className="h-4 w-4 rtl-flip" />
+                  </button>
+                )}
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

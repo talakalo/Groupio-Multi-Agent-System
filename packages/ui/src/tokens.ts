@@ -1,13 +1,13 @@
 // ---- Color Tokens ----
 
 export const colors = {
-  primary: "#0ea5e9",
-  primaryLight: "#38bdf8",
-  primaryDark: "#0284c7",
+  primary: "#1a9a76",
+  primaryLight: "#3fb08f",
+  primaryDark: "#147a5e",
 
-  accent: "#8b5cf6",
-  accentLight: "#a78bfa",
-  accentDark: "#7c3aed",
+  accent: "#f59e0b",
+  accentLight: "#fbbf24",
+  accentDark: "#d97706",
 
   success: "#22c55e",
   successLight: "#4ade80",
@@ -21,18 +21,22 @@ export const colors = {
   errorLight: "#f87171",
   errorDark: "#dc2626",
 
+  info: "#3b82f6",
+  infoLight: "#60a5fa",
+  infoDark: "#2563eb",
+
   neutral: {
-    50: "#f8fafc",
-    100: "#f1f5f9",
-    200: "#e2e8f0",
-    300: "#cbd5e1",
-    400: "#94a3b8",
-    500: "#64748b",
-    600: "#475569",
-    700: "#334155",
-    800: "#1e293b",
-    900: "#0f172a",
-    950: "#020617",
+    50: "#f9fafb",
+    100: "#f3f4f6",
+    200: "#e5e7eb",
+    300: "#d1d5db",
+    400: "#9ca3af",
+    500: "#6b7280",
+    600: "#4b5563",
+    700: "#374151",
+    800: "#1f2937",
+    900: "#111827",
+    950: "#030712",
   },
 
   white: "#ffffff",
@@ -40,29 +44,29 @@ export const colors = {
 
   background: {
     primary: "#ffffff",
-    secondary: "#f8fafc",
-    tertiary: "#f1f5f9",
+    secondary: "#f9fafb",
+    tertiary: "#f3f4f6",
   },
 
   text: {
-    primary: "#0f172a",
-    secondary: "#475569",
-    tertiary: "#94a3b8",
+    primary: "#111827",
+    secondary: "#4b5563",
+    tertiary: "#9ca3af",
     inverse: "#ffffff",
   },
 
   border: {
-    light: "#e2e8f0",
-    medium: "#cbd5e1",
-    dark: "#94a3b8",
+    light: "#e5e7eb",
+    medium: "#d1d5db",
+    dark: "#9ca3af",
   },
 } as const;
 
 // ---- Typography Tokens ----
 
 export const fontFamilies = {
-  sans: "'Inter', 'Heebo', sans-serif",
-  heading: "'Inter', 'Heebo', sans-serif",
+  sans: "'Heebo', 'Inter', sans-serif",
+  heading: "'Heebo', 'Inter', sans-serif",
   mono: "'JetBrains Mono', 'Fira Code', monospace",
 } as const;
 
@@ -139,12 +143,12 @@ export const spacing = {
 
 export const radii = {
   none: "0",
-  sm: "0.125rem",
-  base: "0.25rem",
-  md: "0.375rem",
-  lg: "0.5rem",
-  xl: "0.75rem",
-  "2xl": "1rem",
+  sm: "4px",
+  base: "6px",
+  md: "6px",
+  lg: "8px",
+  xl: "12px",
+  "2xl": "16px",
   "3xl": "1.5rem",
   full: "9999px",
 } as const;
@@ -153,7 +157,8 @@ export const radii = {
 
 export const shadows = {
   none: "none",
-  sm: "0 1px 2px 0 rgb(0 0 0 / 0.05)",
+  xs: "0 1px 2px 0 rgb(0 0 0 / 0.05)",
+  sm: "0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)",
   base: "0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)",
   md: "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)",
   lg: "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)",

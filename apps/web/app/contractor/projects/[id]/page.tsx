@@ -1,11 +1,13 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useState } from 'react';
 
+import { Badge } from '@/components/ui/Badge';
 import { useAuthStore } from '@/lib/stores/authStore';
+import { cn } from '@/lib/utils/cn';
 
 // API returns snake_case: title, building_id, current_participants, pricing_tiers, deadline, created_at
 // pricing_tiers: { min_participants, max_participants, discount_percent, price_per_unit }[]
@@ -114,18 +116,16 @@ export default function ContractorProjectDetailPage() {
     fetchProject();
   }, [fetchProject]);
 
-  const getStatusBadge = (status: string) => {
-    const styles: Record<string, string> = {
-      draft: 'bg-gray-100 text-gray-800',
-      pending: 'bg-amber-100 text-amber-800',
-      matching: 'bg-blue-100 text-blue-800',
-      matched: 'bg-indigo-100 text-indigo-800',
-      in_progress: 'bg-blue-100 text-blue-800',
-      completed: 'bg-green-100 text-green-800',
-      cancelled: 'bg-red-100 text-red-800',
-      active: 'bg-emerald-100 text-emerald-800',
-    };
-    return styles[status] || 'bg-gray-100 text-gray-800';
+  type BadgeVariant = 'default' | 'primary' | 'success' | 'warning' | 'error' | 'accent' | 'info';
+  const STATUS_BADGE_MAP: Record<string, { variant: BadgeVariant; label: string }> = {
+    draft: { variant: 'default', label: 'טיוטה' },
+    pending: { variant: 'warning', label: 'ממתין' },
+    matching: { variant: 'info', label: 'בהתאמה' },
+    matched: { variant: 'primary', label: 'הותאם' },
+    in_progress: { variant: 'info', label: 'בביצוע' },
+    completed: { variant: 'success', label: 'הושלם' },
+    cancelled: { variant: 'error', label: 'בוטל' },
+    active: { variant: 'success', label: 'פעיל' },
   };
 
   if (isLoading) {
@@ -203,13 +203,11 @@ export default function ContractorProjectDetailPage() {
               <p className="text-gray-500 mt-1">
                 {tCat(project.category)} • {buildingLabel}
               </p>
-              <span
-                className={`inline-block mt-2 px-2.5 py-1 rounded-full text-xs font-medium ${getStatusBadge(
-                  project.status ?? 'draft'
-                )}`}
-              >
-                {t(`statuses.${project.status ?? 'draft'}`)}
-              </span>
+              <div className="mt-2">
+                <Badge variant={STATUS_BADGE_MAP[project.status ?? 'draft']?.variant ?? 'default'} size="sm">
+                  {STATUS_BADGE_MAP[project.status ?? 'draft']?.label ?? t(`statuses.${project.status ?? 'draft'}`)}
+                </Badge>
+              </div>
             </div>
             <div className="text-left">
               <p className="text-2xl font-bold text-gray-900">
@@ -229,6 +227,63 @@ export default function ContractorProjectDetailPage() {
             <p className="text-gray-600 text-sm">{project.description}</p>
           </div>
         )}
+
+        {/* Milestone Timeline */}
+        <div className="p-6 border-b border-gray-100">
+          <h2 className="text-sm font-semibold text-gray-700 mb-4">ציר זמן</h2>
+          <div className="flex flex-col gap-0">
+            {[
+              {
+                label: 'יצירת הצעה',
+                date: project.createdAt ?? project.created_at,
+                done: true,
+              },
+              {
+                label: 'התחלת עבודה',
+                date: project.status === 'in_progress' || project.status === 'completed'
+                  ? project.createdAt ?? project.created_at
+                  : null,
+                done: project.status === 'in_progress' || project.status === 'completed',
+              },
+              {
+                label: 'השלמה',
+                date: project.completedAt ?? null,
+                done: project.status === 'completed',
+              },
+            ].map((milestone, idx, arr) => (
+              <div key={idx} className="flex items-start gap-3">
+                <div className="flex flex-col items-center">
+                  <div
+                    className={cn(
+                      'w-4 h-4 rounded-full border-2 shrink-0',
+                      milestone.done
+                        ? 'bg-emerald-500 border-emerald-500'
+                        : 'bg-white border-gray-300'
+                    )}
+                  />
+                  {idx < arr.length - 1 && (
+                    <div
+                      className={cn(
+                        'w-0.5 h-8',
+                        milestone.done ? 'bg-emerald-500' : 'bg-gray-200'
+                      )}
+                    />
+                  )}
+                </div>
+                <div className="-mt-0.5">
+                  <p className={cn('text-sm font-medium', milestone.done ? 'text-gray-900' : 'text-gray-400')}>
+                    {milestone.label}
+                  </p>
+                  {milestone.date && (
+                    <p className="text-xs text-gray-500">
+                      {new Date(milestone.date).toLocaleDateString('he-IL')}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
 
         {/* Details grid */}
         <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">

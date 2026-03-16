@@ -397,7 +397,7 @@ test.describe("Admin Contractor Management", () => {
   });
 
   test("should request additional documents", async ({ page }) => {
-    await page.route("**/api/v1/contractors/con_pending_001/request-documents", (route) =>
+    await page.route("**/api/v1/admin/contractors/con_pending_001/request-docs", (route) =>
       route.fulfill({
         status: 200,
         body: JSON.stringify({ success: true }),

@@ -637,7 +637,7 @@ test("14. Checkout page — mock payment succeeds immediately without Stripe UI"
   // Navigate to checkout. Without NEXT_PUBLIC_STRIPE_KEY the page shows an
   // error, and the Zustand hydration race may cause a redirect through
   // /login -> /dashboard. Either outcome proves the route + middleware work.
-  const response = await page.goto("/checkout?offer=offer-pilot-1");
+  const response = await page.goto("/checkout?offerId=offer-pilot-1");
   expect(response?.status()).toBeLessThan(500);
 
   // Wait for navigation to settle

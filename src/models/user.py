@@ -51,6 +51,7 @@ class UserUpdate(BaseModel):
     phone: str | None = Field(None, pattern=r"^0\d{8,9}$")
     preferred_language: str | None = Field(None, pattern=r"^(he|en)$")
     avatar_url: str | None = None
+    notification_settings: dict[str, bool] | None = None
 
 
 class UserInDB(UserBase):
@@ -66,6 +67,7 @@ class UserInDB(UserBase):
     building_id: str | None = None
     contractor_id: str | None = None
     last_login: datetime | None = None
+    notification_settings: dict[str, bool] | None = None
     created_at: datetime
     updated_at: datetime
 

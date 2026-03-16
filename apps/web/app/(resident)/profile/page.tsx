@@ -8,7 +8,6 @@ import {
   Phone,
   Building2,
   Bell,
-  BellOff,
   Globe,
   Shield,
   Save,
@@ -17,11 +16,14 @@ import {
   LogOut,
   Camera,
   Trash2,
+  KeyRound,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
 
@@ -60,14 +62,21 @@ function NotificationToggle({
   description,
   checked,
   onChange,
+  disabled,
 }: {
   label: string;
   description: string;
   checked: boolean;
   onChange: (checked: boolean) => void;
+  disabled?: boolean;
 }) {
   return (
-    <div className="flex items-start justify-between py-3 cursor-pointer group">
+    <div
+      className={cn(
+        'flex items-start justify-between py-3 group',
+        disabled && 'cursor-not-allowed opacity-75'
+      )}
+    >
       <div className="flex-1 pe-4">
         <p className="text-sm font-medium text-gray-900 group-hover:text-primary-600 transition-colors">
           {label}
@@ -79,10 +88,13 @@ function NotificationToggle({
         role="switch"
         aria-checked={checked}
         aria-label={label}
-        onClick={() => onChange(!checked)}
+        disabled={disabled}
+        title={disabled ? 'בקרוב' : undefined}
+        onClick={() => !disabled && onChange(!checked)}
         className={cn(
           'relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0',
-          checked ? 'bg-primary-500' : 'bg-gray-300'
+          checked ? 'bg-primary-500' : 'bg-gray-300',
+          disabled && 'cursor-not-allowed opacity-60'
         )}
       >
         <span
@@ -449,34 +461,42 @@ export default function ResidentProfilePage() {
       {/* Notifications tab */}
       {activeTab === 'notifications' && (
         <div className="card">
-          <h3 className="text-sm font-bold text-gray-900 mb-1">{t('offerNotifications')}</h3>
+          <div className="flex items-center gap-2 mb-3">
+            <h3 className="text-sm font-bold text-gray-900">{t('offerNotifications')}</h3>
+            <span className="text-xs text-gray-500">(בקרוב)</span>
+          </div>
           <p className="text-xs text-gray-500 mb-3">{t('offerNotificationsDescription')}</p>
           <div className="divide-y divide-gray-50">
             <NotificationToggle
+              disabled
               label={t('newOffers')}
               description={t('newOffersDescription')}
               checked={notifications.newOffers}
               onChange={(v) => setNotifications((prev) => ({ ...prev, newOffers: v }))}
             />
             <NotificationToggle
+              disabled
               label={t('offerUpdates')}
               description={t('offerUpdatesDescription')}
               checked={notifications.offerUpdates}
               onChange={(v) => setNotifications((prev) => ({ ...prev, offerUpdates: v }))}
             />
             <NotificationToggle
+              disabled
               label={t('neighborJoined')}
               description={t('neighborJoinedDescription')}
               checked={notifications.neighborJoined}
               onChange={(v) => setNotifications((prev) => ({ ...prev, neighborJoined: v }))}
             />
             <NotificationToggle
+              disabled
               label={t('tierReached')}
               description={t('tierReachedDescription')}
               checked={notifications.tierReached}
               onChange={(v) => setNotifications((prev) => ({ ...prev, tierReached: v }))}
             />
             <NotificationToggle
+              disabled
               label={t('contractorMessages')}
               description={t('contractorMessagesDescription')}
               checked={notifications.contractorMessages}
@@ -485,22 +505,28 @@ export default function ResidentProfilePage() {
           </div>
 
           <div className="border-t border-gray-100 mt-4 pt-4">
-            <h3 className="text-sm font-bold text-gray-900 mb-1">{t('channels')}</h3>
+            <div className="flex items-center gap-2 mb-3">
+              <h3 className="text-sm font-bold text-gray-900">{t('channels')}</h3>
+              <span className="text-xs text-gray-500">(בקרוב)</span>
+            </div>
             <p className="text-xs text-gray-500 mb-3">{t('channelsDescription')}</p>
             <div className="divide-y divide-gray-50">
               <NotificationToggle
+                disabled
                 label={t('pushNotifications')}
                 description={t('pushNotificationsDescription')}
                 checked={notifications.pushEnabled}
                 onChange={(v) => setNotifications((prev) => ({ ...prev, pushEnabled: v }))}
               />
               <NotificationToggle
+                disabled
                 label={t('emailNotifications')}
                 description={t('emailNotificationsDescription')}
                 checked={notifications.emailEnabled}
                 onChange={(v) => setNotifications((prev) => ({ ...prev, emailEnabled: v }))}
               />
               <NotificationToggle
+                disabled
                 label={t('whatsappNotifications')}
                 description={t('whatsappNotificationsDescription')}
                 checked={notifications.whatsappEnabled}
@@ -511,6 +537,7 @@ export default function ResidentProfilePage() {
 
           <div className="border-t border-gray-100 mt-4 pt-4">
             <NotificationToggle
+              disabled
               label={t('weeklyDigest')}
               description={t('weeklyDigestDescription')}
               checked={notifications.weeklyDigest}
@@ -522,9 +549,13 @@ export default function ResidentProfilePage() {
 
       {/* Security tab */}
       {activeTab === 'security' && (
-        <div className="space-y-4">
+        <div className="space-y-5">
+          {/* Change Password */}
           <div className="card space-y-4">
-            <h3 className="text-sm font-bold text-gray-900">{t('changePassword')}</h3>
+            <div className="flex items-center gap-2">
+              <KeyRound className="h-4 w-4 text-gray-500" />
+              <h3 className="text-sm font-bold text-gray-900">{t('changePassword')}</h3>
+            </div>
             <div>
               <label htmlFor="currentPassword" className="block text-sm font-medium text-gray-700 mb-1.5">
                 {t('currentPassword')}
@@ -537,83 +568,82 @@ export default function ResidentProfilePage() {
                 onChange={(e) => setPasswordForm((prev) => ({ ...prev, current: e.target.value }))}
               />
             </div>
-            <div>
-              <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 mb-1.5">
-                {t('newPassword')}
-              </label>
-              <input
-                id="newPassword"
-                type="password"
-                className="input-field"
-                value={passwordForm.newPassword}
-                onChange={(e) => setPasswordForm((prev) => ({ ...prev, newPassword: e.target.value }))}
-              />
-            </div>
-            <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1.5">
-                {t('confirmPassword')}
-              </label>
-              <input
-                id="confirmPassword"
-                type="password"
-                className="input-field"
-                value={passwordForm.confirm}
-                onChange={(e) => setPasswordForm((prev) => ({ ...prev, confirm: e.target.value }))}
-              />
-              {passwordForm.confirm && passwordForm.newPassword !== passwordForm.confirm && (
-                <p className="text-xs text-red-500 mt-1">{t('passwordMismatch')}</p>
-              )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 mb-1.5">
+                  {t('newPassword')}
+                </label>
+                <input
+                  id="newPassword"
+                  type="password"
+                  className="input-field"
+                  value={passwordForm.newPassword}
+                  onChange={(e) => setPasswordForm((prev) => ({ ...prev, newPassword: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1.5">
+                  {t('confirmPassword')}
+                </label>
+                <input
+                  id="confirmPassword"
+                  type="password"
+                  className="input-field"
+                  value={passwordForm.confirm}
+                  onChange={(e) => setPasswordForm((prev) => ({ ...prev, confirm: e.target.value }))}
+                />
+                {passwordForm.confirm && passwordForm.newPassword !== passwordForm.confirm && (
+                  <p className="text-xs text-red-500 mt-1">{t('passwordMismatch')}</p>
+                )}
+              </div>
             </div>
             <div className="flex items-center gap-3">
-              <button
-                type="button"
-                className="btn-primary text-sm"
+              <Button
+                variant="primary"
+                size="sm"
                 onClick={handlePasswordChange}
+                loading={passwordStatus === 'loading'}
                 disabled={
-                  passwordStatus === 'loading' ||
                   !passwordForm.current ||
                   !passwordForm.newPassword ||
                   passwordForm.newPassword !== passwordForm.confirm
                 }
               >
-                {passwordStatus === 'loading' ? (
-                  <span className="flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    {t('updating')}
-                  </span>
-                ) : (
-                  t('updatePassword')
-                )}
-              </button>
+                {t('updatePassword')}
+              </Button>
               {passwordStatus === 'success' && (
-                <span className="text-sm text-green-600 flex items-center gap-1">
-                  <Check className="h-4 w-4" />
+                <Badge variant="success" size="sm">
+                  <Check className="h-3 w-3 me-1" />
                   {t('passwordUpdated')}
-                </span>
+                </Badge>
               )}
               {passwordStatus === 'error' && (
-                <span className="text-sm text-red-600">{t('passwordUpdateFailed')}</span>
+                <Badge variant="error" size="sm">{t('passwordUpdateFailed')}</Badge>
               )}
             </div>
           </div>
 
+          {/* Session */}
           <div className="card">
+            <h3 className="text-sm font-bold text-gray-900 mb-3">{t('session') ?? 'חשבון'}</h3>
+            <Button variant="secondary" size="sm" onClick={handleLogout}>
+              <LogOut className="h-4 w-4" />
+              {t('logout')}
+            </Button>
+          </div>
+
+          {/* Danger Zone */}
+          <div className="card border-red-100">
             <h3 className="text-sm font-bold text-red-600 mb-2">{t('dangerZone')}</h3>
             <p className="text-xs text-gray-500 mb-4">{t('deleteAccountWarning')}</p>
             {deletePhase === 'idle' ? (
-              <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => setDeletePhase('confirm')}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 transition-colors text-sm font-medium"
-              >
+              <Button variant="danger" size="sm" onClick={() => setDeletePhase('confirm')}>
                 <Trash2 className="h-4 w-4" />
                 {t('deleteAccount')}
-              </button>
-              </div>
+              </Button>
             ) : (
               <div className="space-y-3 p-4 rounded-xl border border-red-200 bg-red-50">
-                <p className="text-sm font-semibold text-red-700">⚠️ פעולה זו אינה הפיכה</p>
+                <p className="text-sm font-semibold text-red-700">פעולה זו אינה הפיכה</p>
                 <p className="text-xs text-red-600">הקלידו <strong>DELETE</strong> כדי לאשר מחיקת החשבון:</p>
                 <input
                   type="text"
@@ -626,63 +656,53 @@ export default function ResidentProfilePage() {
                 />
                 {deleteError && <p className="text-xs text-red-600" role="alert">{deleteError}</p>}
                 <div className="flex gap-2">
-                  <button
-                    type="button"
+                  <Button
+                    variant="danger"
+                    size="sm"
                     onClick={handleDeleteAccount}
                     disabled={deleteInput !== 'DELETE'}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
                   >
                     <Trash2 className="h-4 w-4" />
                     מחק את החשבון שלי
-                  </button>
-                  <button
-                    type="button"
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
                     onClick={() => { setDeletePhase('idle'); setDeleteInput(''); setDeleteError(''); }}
-                    className="px-4 py-2 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors text-sm font-medium"
                   >
                     ביטול
-                  </button>
+                  </Button>
                 </div>
-              </div>
-            )}
-            {deletePhase === 'idle' && (
-              <div className="flex gap-3 mt-3">
-              <button type="button" onClick={handleLogout} className="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors text-sm font-medium">
-                <LogOut className="h-4 w-4" />
-                {t('logout')}
-              </button>
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* Save button (fixed at bottom) */}
-      <div className="sticky bottom-4">
-        <button
-          type="button"
-          onClick={() => saveMutation.mutate()}
-          disabled={saveMutation.isPending}
-          className="btn-primary w-full flex items-center justify-center gap-2 shadow-lg"
-        >
-          {saveMutation.isPending ? (
-            <>
-              <Loader2 className="h-5 w-5 animate-spin" />
-              <span>{tCommon('loading')}</span>
-            </>
-          ) : saveMutation.isSuccess ? (
-            <>
-              <Check className="h-5 w-5" />
-              <span>{t('saved')}</span>
-            </>
-          ) : (
-            <>
-              <Save className="h-5 w-5" />
-              <span>{tCommon('save')}</span>
-            </>
-          )}
-        </button>
-      </div>
+      {/* Save button — only for personal/notifications tabs */}
+      {activeTab !== 'security' && (
+        <div className="sticky bottom-4">
+          <Button
+            variant="primary"
+            size="lg"
+            className="w-full shadow-lg"
+            onClick={() => saveMutation.mutate()}
+            loading={saveMutation.isPending}
+          >
+            {saveMutation.isSuccess ? (
+              <>
+                <Check className="h-5 w-5" />
+                <span>{t('saved')}</span>
+              </>
+            ) : (
+              <>
+                <Save className="h-5 w-5" />
+                <span>{tCommon('save')}</span>
+              </>
+            )}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

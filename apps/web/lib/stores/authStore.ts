@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 
+// TODO: User overlaps with Resident/contractor profile from @groupio/types; consider sharing a base type.
+
 export interface User {
   id: string;
   email: string;

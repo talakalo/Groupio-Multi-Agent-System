@@ -1,27 +1,25 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { clsx } from "clsx";
 import {
   useQuery,
   useMutation,
   useQueryClient,
 } from "@tanstack/react-query";
+import { clsx } from "clsx";
 import {
-  Settings,
   Bell,
   Bot,
   ShieldCheck,
   Globe,
   Mail,
   MessageSquare,
-  Smartphone,
   Save,
   Loader2,
   AlertCircle,
   CheckCircle2,
   RotateCcw,
 } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -127,6 +125,39 @@ async function saveSettings(settings: SystemSettings): Promise<SystemSettings> {
   return res.json();
 }
 
+function SettingsToggle({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+}) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-sm text-surface-700">{label}</span>
+      <button
+        onClick={() => onChange(!checked)}
+        className={clsx(
+          "relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200",
+          checked ? "bg-primary-600" : "bg-surface-300"
+        )}
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
+      >
+        <span
+          className={clsx(
+            "inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200",
+            checked ? "translate-x-6" : "translate-x-1"
+          )}
+        />
+      </button>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Page component
 // ---------------------------------------------------------------------------
@@ -201,40 +232,6 @@ export default function SettingsPage() {
     },
     []
   );
-
-  // ---- Toggle helper component ----
-  function Toggle({
-    checked,
-    onChange,
-    label,
-  }: {
-    checked: boolean;
-    onChange: (v: boolean) => void;
-    label: string;
-  }) {
-    return (
-      <div className="flex items-center justify-between">
-        <span className="text-sm text-surface-700">{label}</span>
-        <button
-          onClick={() => onChange(!checked)}
-          className={clsx(
-            "relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200",
-            checked ? "bg-primary-600" : "bg-surface-300"
-          )}
-          role="switch"
-          aria-checked={checked}
-          aria-label={label}
-        >
-          <span
-            className={clsx(
-              "inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200",
-              checked ? "translate-x-6" : "translate-x-1"
-            )}
-          />
-        </button>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
@@ -403,17 +400,17 @@ export default function SettingsPage() {
               </h2>
 
               <div className="space-y-4">
-                <Toggle
+                <SettingsToggle
                   checked={settings.notifications.emailEnabled}
                   onChange={(v) => updateNotifications({ emailEnabled: v })}
                   label="Email Notifications"
                 />
-                <Toggle
+                <SettingsToggle
                   checked={settings.notifications.whatsappEnabled}
                   onChange={(v) => updateNotifications({ whatsappEnabled: v })}
                   label="WhatsApp Notifications"
                 />
-                <Toggle
+                <SettingsToggle
                   checked={settings.notifications.pushEnabled}
                   onChange={(v) => updateNotifications({ pushEnabled: v })}
                   label="Push Notifications"
@@ -627,7 +624,7 @@ export default function SettingsPage() {
                 </p>
               </div>
 
-              <Toggle
+              <SettingsToggle
                 checked={settings.security.enforce2FA}
                 onChange={(v) => updateSecurity({ enforce2FA: v })}
                 label="Enforce 2FA for all admin users"

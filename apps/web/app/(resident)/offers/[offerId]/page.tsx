@@ -21,9 +21,12 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { useCallback, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { EscrowBadge } from '@/components/features/payments/EscrowBadge';
+import { Breadcrumb } from '@/components/shared/Breadcrumb';
+import { TrustBadgeCluster } from '@/components/shared/TrustBadgeCluster';
 import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { useNotificationStore } from '@/lib/stores/notificationStore';
@@ -213,6 +216,58 @@ function TimelineStep({
 }
 
 // ---------------------------------------------------------------------------
+// Sticky CTA — visible when main join button scrolls out of view (desktop)
+// ---------------------------------------------------------------------------
+
+function StickyJoinCTA({
+  offerTitle,
+  price,
+  onJoin,
+  disabled,
+  targetRef,
+}: {
+  offerTitle: string;
+  price: string;
+  onJoin: () => void;
+  disabled: boolean;
+  targetRef: React.RefObject<HTMLButtonElement | null>;
+}) {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const target = targetRef.current;
+    if (!target) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setVisible(!entry.isIntersecting),
+      { threshold: 0 },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [targetRef]);
+
+  if (!visible) return null;
+
+  return (
+    <div className="fixed bottom-0 inset-x-0 z-40 hidden lg:block bg-white/95 backdrop-blur-sm border-t border-gray-200 shadow-lg">
+      <div className="max-w-4xl mx-auto flex items-center justify-between px-6 py-3">
+        <div>
+          <p className="font-bold text-gray-900 text-sm">{offerTitle}</p>
+          <p className="text-primary-600 font-semibold">{price}</p>
+        </div>
+        <button
+          type="button"
+          onClick={onJoin}
+          disabled={disabled}
+          className="btn-primary px-8 py-2.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          הצטרפו עכשיו
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main page
 // ---------------------------------------------------------------------------
 
@@ -228,6 +283,7 @@ export default function OfferDetailPage() {
 
   const offerId = params.offerId;
   const [showJoinModal, setShowJoinModal] = useState(false);
+  const joinButtonRef = useRef<HTMLButtonElement>(null);
 
   const offerQuery = useQuery<Offer>({
     queryKey: ['offer', offerId],
@@ -319,13 +375,13 @@ export default function OfferDetailPage() {
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Breadcrumb */}
-      <nav className="flex items-center gap-2 text-sm text-gray-400">
-        <Link href="/offers" className="hover:text-primary-600 transition-colors">
-          {t('title')}
-        </Link>
-        <ChevronLeft className="h-3.5 w-3.5 rtl-flip" />
-        <span className="text-gray-700">{tCat(offer.category)}</span>
-      </nav>
+      <Breadcrumb
+        items={[
+          { label: 'ראשי', href: '/' },
+          { label: t('title'), href: '/offers' },
+          { label: `${tCat(offer.category)} - ${t('groupOffer')}` },
+        ]}
+      />
 
       {/* Main info card */}
       <div className="card">
@@ -345,6 +401,22 @@ export default function OfferDetailPage() {
           >
             <Share2 className="h-5 w-5" />
           </button>
+        </div>
+
+        {/* Pricing tiers — prominent */}
+        <div className="mb-6">
+          <h2 className="text-sm font-semibold text-gray-500 mb-3">{t('pricingTiers')}</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {offer.tiers.map((tier, idx) => (
+              <TierCard
+                key={idx}
+                tier={tier}
+                index={idx}
+                isCurrentTier={idx === offer.currentTier}
+                participants={offer.participants}
+              />
+            ))}
+          </div>
         </div>
 
         {/* Pricing highlight */}
@@ -425,8 +497,40 @@ export default function OfferDetailPage() {
           </div>
         </div>
 
+        {/* Contractor trust block + Escrow — prominent adjacent to CTA */}
+        {contractor && (
+          <div className="mb-5 flex flex-col gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-primary-100 flex items-center justify-center text-sm font-bold text-primary-600">
+                {contractor.businessName?.charAt(0) ?? '?'}
+              </div>
+              <div className="flex-1">
+                <p className="font-semibold text-gray-900">{contractor.businessName}</p>
+                {contractor.verified && (
+                  <span className="flex items-center gap-1 text-xs text-emerald-600">
+                    <Shield className="h-3 w-3" />
+                    {tContractors('verified')}
+                  </span>
+                )}
+              </div>
+            </div>
+            <TrustBadgeCluster
+              badges={[
+                ...(contractor.verified ? ['verified' as const] : []),
+                'escrow' as const,
+                ...(contractor.licenseNumber ? ['licensed' as const] : []),
+                ...((contractor as { insured?: boolean }).insured ? ['insured' as const] : []),
+              ]}
+              size="sm"
+            />
+            <EscrowBadge variant="block" className="border-0 bg-white/80" />
+          </div>
+        )}
+        {!contractor && <EscrowBadge variant="block" className="mb-5" />}
+
         {/* Join button — opens confirmation modal with policy disclosure */}
         <button
+          ref={joinButtonRef}
           type="button"
           onClick={() => setShowJoinModal(true)}
           disabled={joinMutation.isPending || joinMutation.isSuccess || offer.status !== 'active' || !user?.id}
@@ -483,6 +587,16 @@ export default function OfferDetailPage() {
             תנאי שימוש מלאים ←
           </Link>
         </div>
+
+        {/* Share with neighbors CTA */}
+        <button
+          type="button"
+          onClick={handleShare}
+          className="w-full flex items-center justify-center gap-2 mt-4 py-3 rounded-xl border-2 border-dashed border-primary-200 bg-primary-50/50 text-primary-700 font-semibold text-sm hover:bg-primary-50 transition-colors"
+        >
+          <Share2 className="h-4 w-4" />
+          שתפו עם השכנים — ככל שמצטרפים יותר, המחיר יורד!
+        </button>
       </div>
 
       {/* Join confirmation modal */}
@@ -498,21 +612,8 @@ export default function OfferDetailPage() {
 
       {/* Two-column layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Pricing tiers - takes 2 cols */}
+        {/* Detail column - takes 2 cols */}
         <div className="lg:col-span-2">
-          <h2 className="text-lg font-bold text-gray-900 mb-4">{t('pricingTiers')}</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {offer.tiers.map((tier, idx) => (
-              <TierCard
-                key={idx}
-                tier={tier}
-                index={idx}
-                isCurrentTier={idx === offer.currentTier}
-                participants={offer.participants}
-              />
-            ))}
-          </div>
-
           {/* Pricing rationale (Task 3.4) */}
           <details className="mt-4 text-sm text-gray-500">
             <summary className="cursor-pointer font-medium text-primary-600 hover:text-primary-700">
@@ -570,6 +671,17 @@ export default function OfferDetailPage() {
                   )}
                 </div>
               </div>
+
+              <TrustBadgeCluster
+                badges={[
+                  ...(contractor.verified ? ['verified' as const] : []),
+                  'escrow' as const,
+                  ...(contractor.licenseNumber ? ['licensed' as const] : []),
+                  ...((contractor as { insured?: boolean }).insured ? ['insured' as const] : []),
+                ]}
+                size="sm"
+                className="mb-4"
+              />
 
               <div className="space-y-3 mb-4">
                 <div className="flex items-center justify-between text-sm">
@@ -641,6 +753,15 @@ export default function OfferDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Sticky desktop CTA */}
+      <StickyJoinCTA
+        offerTitle={`${tCat(offer.category)} - ${t('groupOffer')}`}
+        price={formatPrice(currentTier?.price ?? offer.basePrice)}
+        onJoin={() => setShowJoinModal(true)}
+        disabled={joinMutation.isPending || joinMutation.isSuccess || offer.status !== 'active' || !user?.id}
+        targetRef={joinButtonRef}
+      />
     </div>
   );
 }

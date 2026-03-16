@@ -1,3 +1,5 @@
+import type { ServiceCategory } from "@groupio/types";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useState } from "react";
 import { View, ScrollView, StyleSheet } from "react-native";
 import {
@@ -12,9 +14,7 @@ import {
   IconButton,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter, useLocalSearchParams } from "expo-router";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
-import type { ServiceCategory } from "@groupio/types";
 
 import { useOffer, useJoinOffer } from "../lib/hooks";
 

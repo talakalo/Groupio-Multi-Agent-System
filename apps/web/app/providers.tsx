@@ -1,12 +1,13 @@
 "use client";
 
-import React, { Component, type ErrorInfo, type ReactNode, useState, useEffect } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import * as Sentry from "@sentry/nextjs";
-import { apiClient } from "@/lib/api/client";
-import { useAuthStore } from "@/lib/stores/authStore";
-import { LocaleSyncProvider } from "@/lib/providers/LocaleSyncProvider";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import React, { Component, type ErrorInfo, type ReactNode, useState, useEffect } from "react";
+
 import { ToastContainer } from "@/components/shared/ToastContainer";
+import { apiClient } from "@/lib/api/client";
+import { LocaleSyncProvider } from "@/lib/providers/LocaleSyncProvider";
+import { useAuthStore } from "@/lib/stores/authStore";
 
 // PostHog analytics — optional, requires NEXT_PUBLIC_POSTHOG_KEY
 if (typeof window !== "undefined" && process.env.NEXT_PUBLIC_POSTHOG_KEY) {

@@ -1,11 +1,13 @@
 'use client';
 
 import type { Offer } from '@groupio/types';
+import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useState, useEffect } from 'react';
 
-import Link from 'next/link';
+import { Badge } from '@/components/ui/Badge';
 import { useAuthStore } from '@/lib/stores/authStore';
+import { cn } from '@/lib/utils/cn';
 
 type ProjectStatus = 'all' | 'in_progress' | 'completed' | 'cancelled';
 
@@ -18,6 +20,65 @@ interface ProjectWithStats extends Offer {
   actualRevenue?: number;
   rating?: number;
   review?: string;
+}
+
+type BadgeVariant = 'default' | 'primary' | 'success' | 'warning' | 'error' | 'accent' | 'info';
+
+const STATUS_BADGE_MAP: Record<string, { variant: BadgeVariant; label: string }> = {
+  in_progress: { variant: 'info', label: 'בביצוע' },
+  completed: { variant: 'success', label: 'הושלם' },
+  cancelled: { variant: 'error', label: 'בוטל' },
+  pending: { variant: 'warning', label: 'ממתין' },
+  active: { variant: 'primary', label: 'פעיל' },
+  draft: { variant: 'default', label: 'טיוטה' },
+};
+
+function MilestoneTimeline({ project }: { project: ProjectWithStats }) {
+  const milestones = [
+    {
+      label: 'יצירת הצעה',
+      date: project.createdAt,
+      done: true,
+    },
+    {
+      label: 'התחלת עבודה',
+      date: project.status === 'in_progress' || project.status === 'completed' ? project.createdAt : null,
+      done: project.status === 'in_progress' || project.status === 'completed',
+    },
+    {
+      label: 'השלמה',
+      date: project.completedAt ?? null,
+      done: project.status === 'completed',
+    },
+  ];
+
+  return (
+    <div className="flex items-center gap-0">
+      {milestones.map((m, idx) => (
+        <div key={idx} className="flex items-center">
+          <div className="flex flex-col items-center">
+            <div
+              className={cn(
+                'w-3 h-3 rounded-full border-2',
+                m.done
+                  ? 'bg-emerald-500 border-emerald-500'
+                  : 'bg-white border-gray-300'
+              )}
+            />
+            <span className="text-[10px] text-gray-500 mt-1 whitespace-nowrap">{m.label}</span>
+          </div>
+          {idx < milestones.length - 1 && (
+            <div
+              className={cn(
+                'h-0.5 w-8 mx-1 -mt-4',
+                m.done ? 'bg-emerald-500' : 'bg-gray-200'
+              )}
+            />
+          )}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export default function ContractorProjectsPage() {
@@ -76,15 +137,6 @@ export default function ContractorProjectsPage() {
         projects.filter((p) => p.rating).length || 0,
   };
 
-  const getStatusBadge = (status: string) => {
-    const styles = {
-      in_progress: 'bg-blue-100 text-blue-800',
-      completed: 'bg-green-100 text-green-800',
-      cancelled: 'bg-red-100 text-red-800',
-    };
-    return styles[status as keyof typeof styles] || 'bg-gray-100 text-gray-800';
-  };
-
   return (
     <div className="container mx-auto px-4 py-8" dir="rtl">
       <header className="mb-8">
@@ -113,7 +165,7 @@ export default function ContractorProjectsPage() {
         <div className="bg-white rounded-xl shadow-sm border p-4">
           <p className="text-gray-500 text-sm">{t('stats.avgRating')}</p>
           <p className="text-2xl font-bold text-yellow-600">
-            {stats.avgRating.toFixed(1)} ⭐
+            {stats.avgRating.toFixed(1)} ★
           </p>
         </div>
       </div>
@@ -167,79 +219,88 @@ export default function ContractorProjectsPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          {projects.map((project) => (
-            <div
-              key={project.id}
-              className="bg-white rounded-xl shadow-sm border p-6 hover:shadow-md transition-shadow"
-            >
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <div className="flex items-center gap-3">
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      {project.title}
-                    </h3>
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(
-                        project.status
-                      )}`}
-                    >
-                      {t(`statuses.${project.status}`)}
-                    </span>
-                  </div>
-                  <p className="text-gray-500 text-sm mt-1">
-                    {project.building?.name} • {t(`categories.${project.category}`)}
-                  </p>
-                </div>
-                <div className="text-left">
-                  <p className="text-lg font-bold text-gray-900">
-                    ₪{(project.actualRevenue || project.finalPrice || 0).toLocaleString()}
-                  </p>
-                  <p className="text-gray-500 text-sm">
-                    {project.participantCount} {t('participants')}
-                  </p>
-                </div>
-              </div>
+          {projects.map((project) => {
+            const badgeInfo = STATUS_BADGE_MAP[project.status] ?? { variant: 'default' as BadgeVariant, label: project.status };
 
-              <div className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-4 text-gray-500">
-                  <span>
-                    {t('startedAt')}: {new Date(project.createdAt).toLocaleDateString('he-IL')}
-                  </span>
-                  {project.completedAt && (
+            return (
+              <div
+                key={project.id}
+                className="bg-white rounded-xl shadow-sm border p-6 hover:shadow-md transition-shadow"
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <div className="flex items-center gap-3">
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        {project.title}
+                      </h3>
+                      <Badge variant={badgeInfo.variant} size="sm">
+                        {badgeInfo.label}
+                      </Badge>
+                    </div>
+                    <p className="text-gray-500 text-sm mt-1">
+                      {project.building?.name} • {t(`categories.${project.category}`)}
+                    </p>
+                  </div>
+                  <div className="text-left">
+                    <p className="text-lg font-bold text-gray-900">
+                      ₪{(project.actualRevenue || project.finalPrice || 0).toLocaleString()}
+                    </p>
+                    <p className="text-gray-500 text-sm">
+                      {project.participantCount} {t('participants')}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Milestone Timeline */}
+                <div className="mb-4">
+                  <MilestoneTimeline project={project} />
+                </div>
+
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-4 text-gray-500">
                     <span>
-                      {t('completedAt')}: {new Date(project.completedAt).toLocaleDateString('he-IL')}
+                      {t('startedAt')}: {new Date(project.createdAt).toLocaleDateString('he-IL')}
                     </span>
+                    {project.completedAt && (
+                      <span>
+                        {t('completedAt')}: {new Date(project.completedAt).toLocaleDateString('he-IL')}
+                      </span>
+                    )}
+                  </div>
+                  {project.rating && (
+                    <div className="flex items-center gap-1">
+                      <span className="text-yellow-500">★</span>
+                      <span className="font-medium">{project.rating.toFixed(1)}</span>
+                    </div>
                   )}
                 </div>
-                {project.rating && (
-                  <div className="flex items-center gap-1">
-                    <span className="text-yellow-500">★</span>
-                    <span className="font-medium">{project.rating.toFixed(1)}</span>
+
+                {project.review && (
+                  <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                    <p className="text-gray-600 text-sm italic">&ldquo;{project.review}&rdquo;</p>
                   </div>
                 )}
-              </div>
 
-              {project.review && (
-                <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                  <p className="text-gray-600 text-sm italic">&ldquo;{project.review}&rdquo;</p>
+                <div className="mt-4 pt-4 border-t flex gap-2">
+                  <Link
+                    href={`/contractor/projects/${project.id}`}
+                    className="text-sky-600 hover:text-sky-700 text-sm font-medium"
+                  >
+                    {t('viewDetails')}
+                  </Link>
+                  {project.status === 'completed' && !project.review && (
+                    <button
+                      disabled
+                      title="בקרוב"
+                      className="text-gray-500 hover:text-gray-700 text-sm font-medium mr-4 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {t('requestReview')}
+                    </button>
+                  )}
                 </div>
-              )}
-
-              <div className="mt-4 pt-4 border-t flex gap-2">
-                <Link
-                  href={`/contractor/projects/${project.id}`}
-                  className="text-sky-600 hover:text-sky-700 text-sm font-medium"
-                >
-                  {t('viewDetails')}
-                </Link>
-                {project.status === 'completed' && !project.review && (
-                  <button className="text-gray-500 hover:text-gray-700 text-sm font-medium mr-4">
-                    {t('requestReview')}
-                  </button>
-                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

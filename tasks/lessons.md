@@ -26,4 +26,13 @@ Transcribed from screenshot:
 
 ## Lessons
 
+### Design system and frontend
+
+- **Design token changes are high-blast-radius** — Always verify on key pages first before rolling out token updates.
+- **RTL requires logical CSS properties** — Use `start`/`end` (and `margin-inline-start`, `padding-inline-end`, etc.) not `left`/`right`.
+- **Hebrew typography needs line-height >= 1.4** — Improves readability for Hebrew text.
+- **Skeleton loading is better UX than spinners** — Use skeleton placeholders for content-heavy loading states.
+- **Trust badges above the fold increase checkout conversion** — Position trust indicators prominently in checkout flows.
+- **window.prompt() and window.location.reload() are anti-patterns** — Use modals and state invalidation instead.
+
 <!-- Add entries below as corrections and patterns emerge -->

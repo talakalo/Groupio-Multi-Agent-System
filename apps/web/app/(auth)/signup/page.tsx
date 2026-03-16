@@ -5,6 +5,7 @@ import {
   Building2,
   User,
   Wrench,
+  ClipboardList,
   ArrowLeft,
   Loader2,
   Check,
@@ -15,6 +16,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
+import { StepIndicator } from "@/components/shared/StepIndicator";
 import { apiClient } from "@/lib/api/client";
 import { setAuthCookie } from "@/lib/auth/setAuthCookie";
 import { useAuthStore } from "@/lib/stores/authStore";
@@ -39,14 +41,14 @@ const signupSchema = z.object({
 
 type SignupFormData = z.infer<typeof signupSchema>;
 
-type UserRole = "resident" | "contractor";
+type UserRole = "resident" | "contractor" | "buildings_manager";
 
 const ROLE_OPTIONS = [
   {
     value: "resident" as UserRole,
     icon: User,
     title: "דייר",
-    description: "אני גר בבניין ורוצה ליהנות מהנחות קבוצתיות",
+    description: "אני דייר בבניין ומחפש להצטרף להצעות קבוצתיות",
     features: [
       "גישה להצעות קבוצתיות",
       "צ׳אט AI חכם למציאת קבלנים",
@@ -57,11 +59,22 @@ const ROLE_OPTIONS = [
     value: "contractor" as UserRole,
     icon: Wrench,
     title: "קבלן",
-    description: "אני קבלן ורוצה להציע שירותים לבניינים",
+    description: "אני קבלן ומעוניין להציע שירותים לבניינים",
     features: [
       "גישה לביקוש מוכח",
       "ניהול הצעות מחיר",
       "חשיפה לדיירים חדשים",
+    ],
+  },
+  {
+    value: "buildings_manager" as UserRole,
+    icon: ClipboardList,
+    title: "מנהל בניין",
+    description: "אני מנהל בניין ורוצה לנהל את הבניין שלי",
+    features: [
+      "ניהול דיירים וועד בית",
+      "מעקב אחר פניות ותחזוקה",
+      "גישה לדוחות ומידע",
     ],
   },
 ];
@@ -94,7 +107,7 @@ export default function SignupPage() {
         email: data.email,
         phone: data.phone,
         password: data.password,
-        role: selectedRole,
+        role: selectedRole === "buildings_manager" ? "resident" : selectedRole,
         buildingId: data.buildingId || undefined,
       });
 
@@ -128,10 +141,15 @@ export default function SignupPage() {
         user = { role: selectedRole };
       }
       setAuthCookie(response.token, user);
+      if (selectedRole === "buildings_manager") {
+        const adminUrl = process.env.NEXT_PUBLIC_ADMIN_URL || "http://localhost:3001";
+        window.location.href = `${adminUrl}/dashboard#token=${encodeURIComponent(response.token)}`;
+        return;
+      }
       router.push(
-        selectedRole === "resident"
-          ? "/dashboard"
-          : "/contractor/dashboard"
+        selectedRole === "contractor"
+          ? "/contractor/dashboard"
+          : "/dashboard"
       );
     } catch (err) {
       setError(
@@ -161,39 +179,13 @@ export default function SignupPage() {
           <p className="text-gray-600">התחילו לחסוך עם השכנים שלכם</p>
         </div>
 
-        {/* Step Indicator */}
-        <div className="flex items-center justify-center gap-3 mb-8">
-          <div
-            className={cn(
-              "flex items-center gap-1.5 text-sm font-medium",
-              step === "role" ? "text-primary-600" : "text-gray-400"
-            )}
-          >
-            <span className="w-6 h-6 rounded-full bg-primary-500 text-white flex items-center justify-center text-xs">
-              1
-            </span>
-            בחירת תפקיד
-          </div>
-          <div className="w-8 h-px bg-gray-300" />
-          <div
-            className={cn(
-              "flex items-center gap-1.5 text-sm font-medium",
-              step === "details" ? "text-primary-600" : "text-gray-400"
-            )}
-          >
-            <span
-              className={cn(
-                "w-6 h-6 rounded-full flex items-center justify-center text-xs",
-                step === "details"
-                  ? "bg-primary-500 text-white"
-                  : "bg-gray-200 text-gray-500"
-              )}
-            >
-              2
-            </span>
-            פרטים אישיים
-          </div>
-        </div>
+        {/* Progress indicator */}
+        <StepIndicator
+          steps={[{ label: "בחירת תפקיד" }, { label: "פרטים אישיים" }]}
+          currentStep={step === "role" ? 0 : 1}
+          variant="bar"
+          className="mb-8"
+        />
 
         {step === "role" && (
           <div className="space-y-4">
@@ -208,22 +200,22 @@ export default function SignupPage() {
                   onClick={() => setSelectedRole(option.value)}
                   aria-pressed={isSelected}
                   className={cn(
-                    "w-full text-right card transition-all",
+                    "w-full text-right p-5 rounded-xl border-2 transition-all duration-200",
                     isSelected
-                      ? "border-primary-500 ring-2 ring-primary-500/20"
-                      : "hover:border-gray-300"
+                      ? "border-primary-500 bg-primary-50/50 shadow-sm ring-2 ring-primary-500/20"
+                      : "border-gray-200 bg-white hover:border-primary-200 hover:bg-gray-50/50"
                   )}
                 >
                   <div className="flex items-start gap-4">
                     <div
                       className={cn(
-                        "flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center transition-colors",
+                        "flex-shrink-0 w-14 h-14 rounded-xl flex items-center justify-center transition-colors",
                         isSelected
-                          ? "bg-primary-500 text-white"
+                          ? "bg-primary-500 text-white shadow-md"
                           : "bg-gray-100 text-gray-500"
                       )}
                     >
-                      <Icon className="h-6 w-6" />
+                      <Icon className="h-7 w-7" />
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center justify-between">

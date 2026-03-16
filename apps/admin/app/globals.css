@@ -15,6 +15,16 @@
   body {
     @apply bg-surface-50 text-surface-900 font-sans;
   }
+
+  [dir="rtl"] input,
+  [dir="rtl"] textarea,
+  [dir="rtl"] select {
+    text-align: right;
+  }
+
+  [dir="rtl"] .table-header {
+    text-align: right;
+  }
 }
 
 @layer components {

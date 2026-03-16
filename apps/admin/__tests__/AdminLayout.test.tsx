@@ -9,6 +9,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import React from 'react';
 
+// ---- next/font/google (layout uses Inter) ----
+vi.mock('next/font/google', () => ({
+  Inter: () => ({ className: 'font-inter', variable: '--font-inter' }),
+}));
+
 // ---- next/navigation ----
 const mockPush = vi.fn();
 vi.mock('next/navigation', () => ({

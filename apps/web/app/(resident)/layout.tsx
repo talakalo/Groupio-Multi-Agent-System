@@ -1,31 +1,36 @@
 'use client';
 
 import {
+  Building2,
   CreditCard,
   LayoutDashboard,
-  Tag,
-  Wrench,
-  Building2,
-  UserCircle,
-  Menu,
-  X,
-  LogOut,
-  MessageSquare,
-  ChevronDown,
-  FileImage,
-  Mail,
   Loader2,
+  LogOut,
+  Mail,
+  Menu,
+  MessageSquare,
+  MoreHorizontal,
+  ShoppingBag,
+  Tag,
+  UserCircle,
+  Wrench,
+  X,
+  ChevronDown,
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, type ReactNode } from 'react';
 
+import { LanguageToggle } from '@/components/shared/LanguageToggle';
+import { NotificationPanel } from '@/components/shared/NotificationPanel';
 import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
-import { NotificationPanel } from '@/components/shared/NotificationPanel';
-import { LanguageToggle } from '@/components/shared/LanguageToggle';
+
+// ---------------------------------------------------------------------------
+// Nav config
+// ---------------------------------------------------------------------------
 
 interface NavItem {
   href: string;
@@ -33,21 +38,137 @@ interface NavItem {
   icon: React.ElementType;
 }
 
-const NAV_ITEMS: NavItem[] = [
+const PRIMARY_NAV: NavItem[] = [
   { href: '/dashboard', labelKey: 'dashboard', icon: LayoutDashboard },
   { href: '/offers', labelKey: 'offers', icon: Tag },
-  { href: '/contractors', labelKey: 'contractors', icon: Wrench },
-  { href: '/architecture', labelKey: 'architecture', icon: FileImage },
+  { href: '/orders', labelKey: 'orders', icon: ShoppingBag },
   { href: '/building', labelKey: 'building', icon: Building2 },
-  { href: '/profile', labelKey: 'profile', icon: UserCircle },
-  { href: '/payments', labelKey: 'payments', icon: CreditCard },
 ];
 
-export default function ResidentLayout({ children }: { children: React.ReactNode }) {
+const SECONDARY_NAV: NavItem[] = [
+  { href: '/contractors', labelKey: 'contractors', icon: Wrench },
+  { href: '/payments', labelKey: 'payments', icon: CreditCard },
+  { href: '/chat', labelKey: 'aiChat', icon: MessageSquare },
+];
+
+const BOTTOM_NAV: NavItem[] = [
+  { href: '/dashboard', labelKey: 'dashboard', icon: LayoutDashboard },
+  { href: '/offers', labelKey: 'offers', icon: Tag },
+  { href: '/orders', labelKey: 'orders', icon: ShoppingBag },
+  { href: '/building', labelKey: 'building', icon: Building2 },
+];
+
+// ---------------------------------------------------------------------------
+// Mobile "More" sheet
+// ---------------------------------------------------------------------------
+
+function MobileMoreSheet({
+  open,
+  onClose,
+  items,
+  isActive,
+}: {
+  open: boolean;
+  onClose: () => void;
+  items: NavItem[];
+  isActive: (href: string) => boolean;
+}) {
+  const t = useTranslations('residentNav');
+
+  if (!open) return null;
+
+  return (
+    <>
+      <div className="fixed inset-0 z-40 bg-black/30" onClick={onClose} />
+      <div className="fixed bottom-0 inset-x-0 z-50 bg-white rounded-t-2xl shadow-xl pb-safe animate-in slide-in-from-bottom duration-200">
+        <div className="flex justify-center py-3">
+          <div className="w-10 h-1 rounded-full bg-gray-300" />
+        </div>
+        <nav className="px-4 pb-6 space-y-1">
+          {items.map((item) => {
+            const Icon = item.icon;
+            const active = isActive(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={onClose}
+                className={cn(
+                  'flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors',
+                  active
+                    ? 'bg-primary-50 text-primary-700'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                )}
+              >
+                <Icon className={cn('h-5 w-5', active ? 'text-primary-500' : 'text-gray-400')} />
+                <span>{t(item.labelKey)}</span>
+              </Link>
+            );
+          })}
+
+          <Link
+            href="/profile"
+            onClick={onClose}
+            className={cn(
+              'flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors',
+              isActive('/profile')
+                ? 'bg-primary-50 text-primary-700'
+                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+            )}
+          >
+            <UserCircle className={cn('h-5 w-5', isActive('/profile') ? 'text-primary-500' : 'text-gray-400')} />
+            <span>{t('profile')}</span>
+          </Link>
+        </nav>
+      </div>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Sidebar nav link
+// ---------------------------------------------------------------------------
+
+function SidebarLink({
+  item,
+  active,
+  onClick,
+}: {
+  item: NavItem;
+  active: boolean;
+  onClick?: () => void;
+}) {
+  const t = useTranslations('residentNav');
+  const Icon = item.icon;
+
+  return (
+    <Link
+      href={item.href}
+      onClick={onClick}
+      className={cn(
+        'flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors',
+        active
+          ? 'bg-primary-50 text-primary-700'
+          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+      )}
+    >
+      <Icon className={cn('h-5 w-5 flex-shrink-0', active ? 'text-primary-500' : 'text-gray-400')} />
+      <span>{t(item.labelKey)}</span>
+    </Link>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Layout
+// ---------------------------------------------------------------------------
+
+export default function ResidentLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const t = useTranslations('residentNav');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+
   const token = useAuthStore((s) => s.accessToken);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const isVerified = useAuthStore((s) => s.user?.isVerified ?? true);
@@ -66,21 +187,28 @@ export default function ResidentLayout({ children }: { children: React.ReactNode
     }
   }, [token, isAuthenticated, router, refreshAccessToken]);
 
-  if (!token && !isAuthenticated) {
-    return null;
-  }
+  const closeSidebar = useCallback(() => setSidebarOpen(false), []);
+
+  if (!token && !isAuthenticated) return null;
 
   const handleLogout = async () => {
     try {
       await logout();
     } catch {
-      // Ignore logout errors — always redirect to login
+      // Always redirect
     }
     router.push('/login');
   };
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
+  // Check if "more" items have an active route (to highlight the more button)
+  const moreItems = [...SECONDARY_NAV, { href: '/profile', labelKey: 'profile', icon: UserCircle }];
+  const moreHasActive = moreItems.some((item) => isActive(item.href));
+
+  // ---------------------------------------------------------------------------
+  // Sidebar content (shared between mobile drawer and desktop sidebar)
+  // ---------------------------------------------------------------------------
   const sidebar = (
     <nav className="flex flex-col h-full">
       {/* Logo */}
@@ -89,42 +217,37 @@ export default function ResidentLayout({ children }: { children: React.ReactNode
         <span className="text-xl font-bold text-primary-600">Groupio</span>
       </div>
 
-      {/* Nav links */}
-      <div className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
-        {NAV_ITEMS.map((item) => {
-          const Icon = item.icon;
-          const active = isActive(item.href);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={() => setSidebarOpen(false)}
-              className={cn(
-                'flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors',
-                active
-                  ? 'bg-primary-50 text-primary-700'
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-              )}
-            >
-              <Icon className={cn('h-5 w-5 flex-shrink-0', active ? 'text-primary-500' : 'text-gray-400')} />
-              <span>{t(item.labelKey)}</span>
-            </Link>
-          );
-        })}
+      {/* Primary nav */}
+      <div className="flex-1 overflow-y-auto py-4 px-3">
+        <div className="space-y-1">
+          {PRIMARY_NAV.map((item) => (
+            <SidebarLink key={item.href} item={item} active={isActive(item.href)} onClick={closeSidebar} />
+          ))}
+        </div>
+
+        {/* Secondary nav */}
+        <div className="mt-6 pt-4 border-t border-gray-100">
+          <p className="px-4 mb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+            {t('more')}
+          </p>
+          <div className="space-y-1">
+            {SECONDARY_NAV.map((item) => (
+              <SidebarLink key={item.href} item={item} active={isActive(item.href)} onClick={closeSidebar} />
+            ))}
+          </div>
+        </div>
       </div>
 
-      {/* AI chat shortcut */}
-      <div className="px-3 pb-3">
-        <Link
-          href="/chat"
-          className="flex items-center gap-3 px-4 py-3 rounded-xl bg-primary-500 text-white hover:bg-primary-600 transition-colors text-sm font-medium"
-        >
-          <MessageSquare className="h-5 w-5" />
-          <span>{t('aiAssistant')}</span>
-        </Link>
+      {/* Profile link at bottom */}
+      <div className="border-t border-gray-100 px-3 py-3">
+        <SidebarLink
+          item={{ href: '/profile', labelKey: 'profile', icon: UserCircle }}
+          active={isActive('/profile')}
+          onClick={closeSidebar}
+        />
       </div>
 
-      {/* User section */}
+      {/* Logout */}
       <div className="border-t border-gray-100 px-4 py-4">
         <button
           type="button"
@@ -144,16 +267,13 @@ export default function ResidentLayout({ children }: { children: React.ReactNode
   );
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 pb-16 sm:pb-0">
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/30 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
+        <div className="fixed inset-0 z-40 bg-black/30 lg:hidden" onClick={closeSidebar} />
       )}
 
-      {/* Sidebar - mobile */}
+      {/* Sidebar — mobile drawer */}
       <aside
         className={cn(
           'fixed inset-y-0 start-0 z-50 w-72 bg-white shadow-xl transform transition-transform duration-300 lg:hidden',
@@ -162,7 +282,7 @@ export default function ResidentLayout({ children }: { children: React.ReactNode
       >
         <button
           type="button"
-          onClick={() => setSidebarOpen(false)}
+          onClick={closeSidebar}
           className="absolute top-4 end-4 p-1 text-gray-400 hover:text-gray-600"
           aria-label="Close sidebar"
         >
@@ -171,7 +291,7 @@ export default function ResidentLayout({ children }: { children: React.ReactNode
         {sidebar}
       </aside>
 
-      {/* Sidebar - desktop */}
+      {/* Sidebar — desktop (RTL-aware: start-0 = right in RTL) */}
       <aside className="fixed inset-y-0 start-0 z-30 w-72 bg-white border-e border-gray-100 hidden lg:block">
         {sidebar}
       </aside>
@@ -238,16 +358,15 @@ export default function ResidentLayout({ children }: { children: React.ReactNode
             <div className="flex items-center gap-3">
               <LanguageToggle />
               <NotificationPanel />
-
-              <button
-                type="button"
+              <Link
+                href="/profile"
                 className="flex items-center gap-2 ps-3 pe-2 py-1.5 rounded-xl hover:bg-gray-100 transition-colors"
               >
                 <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center">
                   <UserCircle className="h-5 w-5 text-primary-600" />
                 </div>
                 <ChevronDown className="h-4 w-4 text-gray-400" />
-              </button>
+              </Link>
             </div>
           </div>
         </header>
@@ -255,6 +374,52 @@ export default function ResidentLayout({ children }: { children: React.ReactNode
         {/* Page content */}
         <main className="p-4 sm:p-6 lg:p-8">{children}</main>
       </div>
+
+      {/* ------------------------------------------------------------ */}
+      {/* Mobile bottom navigation (visible sm and below)              */}
+      {/* ------------------------------------------------------------ */}
+      <nav className="fixed bottom-0 inset-x-0 z-30 bg-white border-t border-gray-200 sm:hidden">
+        <div className="flex items-center justify-around h-16">
+          {BOTTOM_NAV.map((item) => {
+            const Icon = item.icon;
+            const active = isActive(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  'flex flex-col items-center justify-center gap-0.5 flex-1 h-full text-[10px] font-medium transition-colors',
+                  active ? 'text-primary-700' : 'text-gray-500'
+                )}
+              >
+                <Icon className={cn('h-5 w-5', active ? 'text-primary-500' : 'text-gray-400')} />
+                <span>{t(item.labelKey)}</span>
+              </Link>
+            );
+          })}
+
+          {/* "More" button */}
+          <button
+            type="button"
+            onClick={() => setMoreOpen(true)}
+            className={cn(
+              'flex flex-col items-center justify-center gap-0.5 flex-1 h-full text-[10px] font-medium transition-colors',
+              moreHasActive ? 'text-primary-700' : 'text-gray-500'
+            )}
+          >
+            <MoreHorizontal className={cn('h-5 w-5', moreHasActive ? 'text-primary-500' : 'text-gray-400')} />
+            <span>{t('more')}</span>
+          </button>
+        </div>
+      </nav>
+
+      {/* Mobile "More" bottom sheet */}
+      <MobileMoreSheet
+        open={moreOpen}
+        onClose={() => setMoreOpen(false)}
+        items={SECONDARY_NAV}
+        isActive={isActive}
+      />
     </div>
   );
 }

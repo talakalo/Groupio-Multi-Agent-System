@@ -1,25 +1,29 @@
-import React, { createContext, useCallback, useContext } from "react";
-import { useEffect, useState } from "react";
-import { I18nManager, Platform } from "react-native";
-import * as Localization from "expo-localization";
-import { Stack, useRouter, useSegments } from "expo-router";
-import { loadAuthToken, clearAuthSession } from "../lib/api";
-import { StatusBar } from "expo-status-bar";
-import * as SplashScreen from "expo-splash-screen";
-import { SafeAreaProvider } from "react-native-safe-area-context";
-import {
-  PaperProvider,
-  MD3DarkTheme,
-  MD3LightTheme,
-  adaptNavigationTheme,
-} from "react-native-paper";
 import {
   DarkTheme as NavigationDarkTheme,
   DefaultTheme as NavigationDefaultTheme,
   ThemeProvider,
 } from "@react-navigation/native";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useColorScheme } from "react-native";
+import * as Localization from "expo-localization";
+import { Stack, useRouter, useSegments } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
+import { StatusBar } from "expo-status-bar";
+import React, { createContext, useCallback, useContext , useEffect, useState } from "react";
+import { I18nManager, Platform , useColorScheme } from "react-native";
+import {
+  PaperProvider,
+  MD3DarkTheme,
+  MD3LightTheme,
+  adaptNavigationTheme,
+} from "react-native-paper";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+
+import { loadAuthToken, clearAuthSession } from "../lib/api";
+import {
+  registerForPushNotifications,
+  sendPushTokenToServer,
+  setupNotificationNavigation,
+} from "../lib/notifications";
 
 // Prevent the splash screen from auto-hiding
 SplashScreen.preventAutoHideAsync();
@@ -52,10 +56,10 @@ const queryClient = new QueryClient({
 
 // Custom theme colors for Groupio
 const groupioColors = {
-  primary: "#1976D2",
-  primaryContainer: "#BBDEFB",
-  secondary: "#FF6F00",
-  secondaryContainer: "#FFE0B2",
+  primary: "#1a9a76",
+  primaryContainer: "#d1f0e6",
+  secondary: "#f59e0b",
+  secondaryContainer: "#fef3c7",
   tertiary: "#2E7D32",
   tertiaryContainer: "#C8E6C9",
   error: "#D32F2F",
@@ -64,9 +68,9 @@ const groupioColors = {
   surfaceVariant: "#F5F5F5",
   background: "#FAFAFA",
   onPrimary: "#FFFFFF",
-  onPrimaryContainer: "#0D47A1",
+  onPrimaryContainer: "#065f46",
   onSecondary: "#FFFFFF",
-  onSecondaryContainer: "#E65100",
+  onSecondaryContainer: "#92400e",
   onTertiary: "#FFFFFF",
   onTertiaryContainer: "#1B5E20",
   onError: "#FFFFFF",
@@ -78,7 +82,7 @@ const groupioColors = {
   outlineVariant: "#E0E0E0",
   inverseSurface: "#303030",
   inverseOnSurface: "#F5F5F5",
-  inversePrimary: "#90CAF9",
+  inversePrimary: "#6ee7b7",
   shadow: "#000000",
   scrim: "#000000",
   backdrop: "rgba(0, 0, 0, 0.4)",
@@ -93,10 +97,10 @@ const groupioColors = {
 };
 
 const groupioDarkColors = {
-  primary: "#90CAF9",
-  primaryContainer: "#0D47A1",
-  secondary: "#FFB74D",
-  secondaryContainer: "#E65100",
+  primary: "#6ee7b7",
+  primaryContainer: "#065f46",
+  secondary: "#fbbf24",
+  secondaryContainer: "#92400e",
   tertiary: "#81C784",
   tertiaryContainer: "#1B5E20",
   error: "#EF9A9A",
@@ -104,10 +108,10 @@ const groupioDarkColors = {
   surface: "#121212",
   surfaceVariant: "#1E1E1E",
   background: "#121212",
-  onPrimary: "#0D47A1",
-  onPrimaryContainer: "#BBDEFB",
-  onSecondary: "#E65100",
-  onSecondaryContainer: "#FFE0B2",
+  onPrimary: "#065f46",
+  onPrimaryContainer: "#d1f0e6",
+  onSecondary: "#92400e",
+  onSecondaryContainer: "#fef3c7",
   onTertiary: "#1B5E20",
   onTertiaryContainer: "#C8E6C9",
   onError: "#B71C1C",
@@ -119,7 +123,7 @@ const groupioDarkColors = {
   outlineVariant: "#424242",
   inverseSurface: "#EEEEEE",
   inverseOnSurface: "#303030",
-  inversePrimary: "#1976D2",
+  inversePrimary: "#1a9a76",
   shadow: "#000000",
   scrim: "#000000",
   backdrop: "rgba(0, 0, 0, 0.6)",
@@ -209,6 +213,25 @@ export default function RootLayout() {
     }
   }, [authChecked, isAuthenticated, segments]);
 
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    return setupNotificationNavigation({
+      push: (href: string) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        router.push(href as any);
+      },
+    });
+  }, [isAuthenticated, router]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    registerForPushNotifications().then((result) => {
+      if (result.token) {
+        sendPushTokenToServer(result.token);
+      }
+    });
+  }, [isAuthenticated]);
+
   if (!authChecked) {
     // Splash is still visible while we check auth
     return null;
@@ -233,6 +256,7 @@ export default function RootLayout() {
             >
               <Stack.Screen name="(auth)" options={{ headerShown: false }} />
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="(auth)" options={{ headerShown: false }} />
               <Stack.Screen
                 name="create-offer"
                 options={{
@@ -243,6 +267,49 @@ export default function RootLayout() {
               />
               <Stack.Screen
                 name="offer-detail"
+                options={{
+                  headerShown: false,
+                  animation: "slide_from_right",
+                }}
+              />
+              <Stack.Screen
+                name="contractor-offers"
+                options={{
+                  headerShown: false,
+                  animation: "slide_from_right",
+                }}
+              />
+              <Stack.Screen
+                name="contractor-projects"
+                options={{
+                  headerShown: false,
+                  animation: "slide_from_right",
+                }}
+              />
+              <Stack.Screen
+                name="checkout"
+                options={{
+                  headerShown: false,
+                  presentation: "modal",
+                  animation: "slide_from_bottom",
+                }}
+              />
+              <Stack.Screen
+                name="order-detail"
+                options={{
+                  headerShown: false,
+                  animation: "slide_from_right",
+                }}
+              />
+              <Stack.Screen
+                name="building"
+                options={{
+                  headerShown: false,
+                  animation: "slide_from_right",
+                }}
+              />
+              <Stack.Screen
+                name="payments"
                 options={{
                   headerShown: false,
                   animation: "slide_from_right",

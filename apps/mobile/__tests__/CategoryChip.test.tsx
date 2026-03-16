@@ -1,10 +1,10 @@
+import type { ServiceCategory } from '@groupio/types';
 import { render, fireEvent } from '@testing-library/react-native';
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 
 import CategoryChip from '../components/CategoryChip';
 
-import type { ServiceCategory } from '@groupio/types';
 
 describe('CategoryChip', () => {
   it('renders category label for ac_installation', () => {

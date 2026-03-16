@@ -1,5 +1,5 @@
-import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 const AUTH_KEY = 'groupio_auth';
 const USER_KEY = 'groupio_user';

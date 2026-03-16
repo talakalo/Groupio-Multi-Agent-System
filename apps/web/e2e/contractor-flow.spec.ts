@@ -158,14 +158,18 @@ test.describe("Contractor Dashboard", () => {
         body: JSON.stringify({ items: MOCK_CONTRACTOR_OFFERS, offers: MOCK_CONTRACTOR_OFFERS }),
       })
     );
+
+    await page.route("**/api/v1/contractors/me/doc-requests", (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ pending: false }) })
+    );
   });
 
   test("should display contractor dashboard with stats", async ({ page }) => {
     await page.goto("/contractor/dashboard");
 
-    // Wait for dashboard to load — heading then stat value in main content
-    await expect(page.getByRole("heading", { name: "לוח בקרה" })).toBeVisible({ timeout: 5000 });
-    await expect(page.locator("main").getByText("3").first()).toBeVisible({ timeout: 10000 });
+    // Wait for dashboard to load — heading (translated "לוח בקרה") and stat value
+    await expect(page.getByRole("heading", { name: /לוח בקרה|Dashboard/i })).toBeVisible({ timeout: 10000 });
+    await expect(page.locator("main").getByText("3").first()).toBeVisible({ timeout: 15000 });
   });
 
   test("should navigate to create offer", async ({ page }) => {
@@ -211,10 +215,12 @@ test.describe("Contractor Create Offer Flow", () => {
   test("should display offer creation form", async ({ page }) => {
     await page.goto("/contractor/offers/create");
 
-    // Form inputs are registered via react-hook-form (name attr only, no id)
+    // Step 1 (Details): title input and category section (CategoryChips, not select)
     await expect(page.locator('input[name="title"]')).toBeVisible({ timeout: 10000 });
-    await expect(page.locator('select[name="category"]')).toBeVisible();
-    await expect(page.locator('input[name="basePrice"]')).toBeVisible();
+    await expect(page.getByText(/קטגוריה/)).toBeVisible();
+    // basePrice is on step 2 — click next to advance
+    await page.getByRole("button", { name: /הבא|next/i }).click();
+    await expect(page.locator('input[name="basePrice"]')).toBeVisible({ timeout: 5000 });
   });
 
   test("should fill in and submit offer form", async ({ page }) => {
@@ -229,51 +235,45 @@ test.describe("Contractor Create Offer Flow", () => {
       }
       return route.continue();
     });
-    await page.route("**/api/v1/offers/offer_new", (route) =>
+    await page.route("**/api/v1/buildings*", (route) =>
       route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({
-          id: "offer_new",
-          status: "active",
-          title: "התקנת מזגנים מקצועית",
-          building_id: "bld_001",
-          current_participants: 0,
-          base_price: 4500,
-        }),
+        body: JSON.stringify({ items: [{ id: "bld_001", name: "Test Building" }] }),
       })
     );
 
     await page.goto("/contractor/offers/create");
     await expect(page).toHaveURL(/contractor\/offers\/create/, { timeout: 20000 });
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("networkidle");
 
-    // Wait for create form (title input only exists on create page, not login)
-    const titleInput = page.locator('input[name="title"]');
-    await expect(titleInput).toBeVisible({ timeout: 20000 });
-    await titleInput.scrollIntoViewIfNeeded();
-    await titleInput.fill("התקנת מזגנים מקצועית", { timeout: 10000 });
-    await page.locator('textarea[name="description"]').scrollIntoViewIfNeeded();
-    await page.locator('textarea[name="description"]').fill("שירות מקצועי ואחריות מלאה. התקנה מקצועית עם אחריות לשנה. לפחות 50 תווים נדרשים כאן.", { timeout: 10000 });
-    await page.locator('select[name="category"]').selectOption("ac_installation");
+    // Step 0: Details — category (click chip), title, description, timeline
+    await expect(page.locator('input[name="title"]')).toBeVisible({ timeout: 20000 });
+    await page.getByRole("button", { name: /התקנת מזגנים|ac_installation/i }).first().click();
+    await page.locator('input[name="title"]').fill("התקנת מזגנים מקצועית");
+    await page.locator('textarea[name="description"]').fill("שירות מקצועי ואחריות מלאה. התקנה מקצועית עם אחריות לשנה. לפחות 50 תווים נדרשים כאן.");
+    await page.locator('input[name="timeline"]').fill("2-3 שבועות");
+    await page.getByRole("button", { name: "הבא" }).click();
+
+    // Step 1: Pricing
+    await expect(page.locator('input[name="basePrice"]')).toBeVisible({ timeout: 5000 });
+    await page.locator('input[name="basePrice"]').fill("4500");
+    await page.getByRole("button", { name: "הבא" }).click();
+
+    // Step 2: Target — buildingId, region, validUntil, includedServices
+    await expect(page.locator('input[name="buildingId"]')).toBeVisible({ timeout: 5000 });
+    await page.locator('input[name="buildingId"]').fill("bld_001");
     await page.locator('select[name="region"]').selectOption("center");
-    await page.locator('input[name="buildingId"]').fill("bld_001", { timeout: 10000 });
-
-    // Pricing section may be below fold; scroll and fill (re-query to avoid detached refs)
-    await page.locator('input[name="basePrice"]').scrollIntoViewIfNeeded();
-    await page.locator('input[name="basePrice"]').fill("4500", { timeout: 15000 });
-
     const futureDate = new Date();
     futureDate.setMonth(futureDate.getMonth() + 2);
-    await page.locator('input[name="validUntil"]').scrollIntoViewIfNeeded();
-    await page.locator('input[name="validUntil"]').fill(futureDate.toISOString().split("T")[0]!, { timeout: 15000 });
-
-    await page.locator('input[value="installation"]').scrollIntoViewIfNeeded();
+    await page.locator('input[name="validUntil"]').fill(futureDate.toISOString().split("T")[0]!);
     await page.locator('input[value="installation"]').check({ force: true });
+    await page.getByRole("button", { name: "הבא" }).click();
 
-    await page.locator('button[type="submit"]').click();
-    await expect(page).toHaveURL(/contractor\/projects\//, { timeout: 10000 });
+    // Step 3: Preview — submit
+    await expect(page.getByRole("button", { name: /פרסום|submit/i })).toBeVisible({ timeout: 5000 });
+    await page.getByRole("button", { name: /פרסום/i }).click();
+    await expect(page).toHaveURL(/contractor\/projects/, { timeout: 15000 });
   });
 });
 

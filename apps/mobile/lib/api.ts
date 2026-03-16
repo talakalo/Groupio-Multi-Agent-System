@@ -1,4 +1,3 @@
-import Constants from "expo-constants";
 import type {
   Offer,
   Contractor,
@@ -10,7 +9,10 @@ import type {
   MessageRequest,
   MessageResponse,
   ContractorMatch,
+  ContractorStats,
+  ProjectWithStats,
 } from "@groupio/types";
+import Constants from "expo-constants";
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -480,6 +482,136 @@ export interface ActivityItem {
   icon?: string;
 }
 
+// ---------------------------------------------------------------------------
+// Auth – signup & verify
+// ---------------------------------------------------------------------------
+
+export interface SignupPayload {
+  fullName: string;
+  email: string;
+  password: string;
+  role: "resident" | "contractor";
+}
+
+export interface SignupResponse {
+  userId: string;
+  email: string;
+  requiresVerification: boolean;
+}
+
+export async function signup(payload: SignupPayload): Promise<SignupResponse> {
+  return request<SignupResponse>("POST", "/auth/register", { body: payload });
+}
+
+export async function resendVerification(email: string): Promise<void> {
+  return request<void>("POST", "/auth/resend-verification", {
+    body: { email },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Orders
+// ---------------------------------------------------------------------------
+
+export interface Order {
+  id: string;
+  offerId: string;
+  offerTitle: string;
+  status: "pending" | "confirmed" | "in_progress" | "completed" | "cancelled";
+  amount: number;
+  createdAt: string;
+  updatedAt: string;
+  contractorName: string;
+  contractorId: string;
+  category: ServiceCategory;
+  timeline?: OrderTimelineEvent[];
+  paymentStatus: "pending" | "escrow" | "released" | "refunded";
+}
+
+export interface OrderTimelineEvent {
+  id: string;
+  title: string;
+  description: string;
+  timestamp: string;
+  status: "completed" | "current" | "upcoming";
+}
+
+export async function getOrders(
+  signal?: AbortSignal,
+): Promise<PaginatedResponse<Order>> {
+  return request<PaginatedResponse<Order>>("GET", "/orders", { signal });
+}
+
+export async function getOrder(
+  id: string,
+  signal?: AbortSignal,
+): Promise<Order> {
+  return request<Order>("GET", `/orders/${id}`, { signal });
+}
+
+// ---------------------------------------------------------------------------
+// Checkout
+// ---------------------------------------------------------------------------
+
+export interface CheckoutPayload {
+  offerId: string;
+  tierId: number;
+}
+
+export interface CheckoutResponse {
+  orderId: string;
+  paymentUrl?: string;
+  status: "success" | "requires_payment";
+}
+
+export async function createCheckout(
+  payload: CheckoutPayload,
+): Promise<CheckoutResponse> {
+  return request<CheckoutResponse>("POST", "/checkout", { body: payload });
+}
+
+// ---------------------------------------------------------------------------
+// Building detail
+// ---------------------------------------------------------------------------
+
+export interface BuildingDetail {
+  id: string;
+  name: string;
+  address: string;
+  inviteCode: string;
+  memberCount: number;
+  activeOffers: number;
+}
+
+export async function getBuildingDetail(
+  buildingId: string,
+  signal?: AbortSignal,
+): Promise<BuildingDetail> {
+  return request<BuildingDetail>("GET", `/buildings/${buildingId}`, { signal });
+}
+
+// ---------------------------------------------------------------------------
+// Payments
+// ---------------------------------------------------------------------------
+
+export interface PaymentRecord {
+  id: string;
+  orderId: string;
+  amount: number;
+  status: "pending" | "completed" | "refunded" | "failed";
+  method: string;
+  createdAt: string;
+  description: string;
+}
+
+export async function getPayments(
+  signal?: AbortSignal,
+): Promise<PaginatedResponse<PaymentRecord>> {
+  return request<PaginatedResponse<PaymentRecord>>("GET", "/payments", {
+    signal,
+  });
+}
+
 /** Fetch building news / announcements. */
 export async function getBuildingNews(
   buildingId: string,
@@ -495,4 +627,53 @@ export interface NewsItem {
   category: "maintenance" | "general" | "offer" | "community";
   createdAt: string;
   author?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Contractor API
+// ---------------------------------------------------------------------------
+
+/** Fetch stats for the currently authenticated contractor. */
+export async function getContractorStats(
+  signal?: AbortSignal,
+): Promise<ContractorStats> {
+  return request<ContractorStats>("GET", "/contractors/me/stats", { signal });
+}
+
+/** Fetch offers belonging to the authenticated contractor. */
+export async function getContractorOffers(
+  filters?: ContractorOffersFilters,
+  signal?: AbortSignal,
+): Promise<PaginatedResponse<Offer>> {
+  return request<PaginatedResponse<Offer>>("GET", "/contractors/me/offers", {
+    params: filters as Record<string, string | number | boolean | undefined>,
+    signal,
+  });
+}
+
+/** Fetch projects for the authenticated contractor. */
+export async function getContractorProjects(
+  filters?: ContractorProjectsFilters,
+  signal?: AbortSignal,
+): Promise<PaginatedResponse<ProjectWithStats>> {
+  return request<PaginatedResponse<ProjectWithStats>>(
+    "GET",
+    "/contractors/me/projects",
+    {
+      params: filters as Record<string, string | number | boolean | undefined>,
+      signal,
+    },
+  );
+}
+
+export interface ContractorOffersFilters {
+  status?: OfferStatus;
+  page?: number;
+  limit?: number;
+}
+
+export interface ContractorProjectsFilters {
+  status?: OfferStatus;
+  page?: number;
+  limit?: number;
 }

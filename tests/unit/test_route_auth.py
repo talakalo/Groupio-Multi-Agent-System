@@ -623,6 +623,23 @@ class TestGetMe:
         finally:
             app.dependency_overrides.clear()
 
+    def test_get_me_returns_notification_settings(self):
+        """GET /auth/me returns notification_settings when present."""
+        user = _make_user()
+        user.notification_settings = {"email_offers": True, "push_enabled": False}
+
+        from src.api.main import app
+        from src.api.middleware.auth import get_current_user
+
+        app.dependency_overrides[get_current_user] = lambda: user
+        try:
+            client = TestClient(app, raise_server_exceptions=False)
+            resp = client.get("/api/v1/auth/me")
+            assert resp.status_code == 200
+            assert resp.json().get("notification_settings") == {"email_offers": True, "push_enabled": False}
+        finally:
+            app.dependency_overrides.clear()
+
 
 # ---------------------------------------------------------------------------
 # PUT /auth/me
@@ -673,6 +690,32 @@ class TestUpdateMe:
                 client = TestClient(app, raise_server_exceptions=False)
                 resp = client.put("/api/v1/auth/me", json={"phone": "0509999999"})
             assert resp.status_code == 400
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_update_me_notification_settings(self):
+        """PUT /auth/me with notification_settings persists and returns them."""
+        user = _make_user()
+        updated_user = _make_user()
+        updated_user.notification_settings = {"email_offers": True, "push_enabled": False}
+
+        db = AsyncMock()
+        db.get_user_by_phone = AsyncMock(return_value=None)
+        db.update_user = AsyncMock(return_value=updated_user)
+
+        from src.api.main import app
+        from src.api.middleware.auth import get_current_user
+
+        app.dependency_overrides[get_current_user] = lambda: user
+        try:
+            with patch("src.api.routes.auth.get_postgres_client", return_value=db):
+                client = TestClient(app, raise_server_exceptions=False)
+                resp = client.put(
+                    "/api/v1/auth/me",
+                    json={"notification_settings": {"email_offers": True, "push_enabled": False}},
+                )
+            assert resp.status_code == 200
+            assert resp.json().get("notification_settings") == {"email_offers": True, "push_enabled": False}
         finally:
             app.dependency_overrides.clear()
 
