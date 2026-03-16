@@ -65,6 +65,7 @@ class TestSignupRequestRoleValidation:
 
     def test_signup_request_admin_blocked(self):
         from src.api.routes.auth import SignupRequest
+
         with pytest.raises(ValidationError, match="Cannot self-register"):
             SignupRequest(
                 name="Test",
@@ -76,6 +77,7 @@ class TestSignupRequestRoleValidation:
 
     def test_signup_request_resident_allowed(self):
         from src.api.routes.auth import SignupRequest
+
         req = SignupRequest(
             name="Test",
             email="test@example.com",
@@ -103,15 +105,14 @@ class TestPaymentIdempotency:
 
     def test_idempotency_key_field_exists(self):
         from src.api.routes.payments import PaymentInitiateRequest
+
         req = PaymentInitiateRequest(offer_id="test-offer")
         assert req.idempotency_key is None
 
     def test_idempotency_key_accepted(self):
         from src.api.routes.payments import PaymentInitiateRequest
-        req = PaymentInitiateRequest(
-            offer_id="test-offer",
-            idempotency_key="unique-key-123"
-        )
+
+        req = PaymentInitiateRequest(offer_id="test-offer", idempotency_key="unique-key-123")
         assert req.idempotency_key == "unique-key-123"
 
 
@@ -120,11 +121,13 @@ class TestVATConsistency:
 
     def test_payments_vat_rate(self):
         from src.api.routes.payments import VAT_RATE
+
         assert VAT_RATE == 0.18
 
     def test_constants_vat_rate(self):
         try:
             from src.config.constants import TAX_RATE
+
             assert TAX_RATE == 0.18
         except ImportError:
             pass  # constants module may not exist
@@ -132,6 +135,7 @@ class TestVATConsistency:
     def test_invoice_service_vat_rate(self):
         try:
             from src.services.invoice import InvoiceService
+
             svc = InvoiceService()
             assert svc.tax_rate == 0.18
         except (ImportError, AttributeError, TypeError):

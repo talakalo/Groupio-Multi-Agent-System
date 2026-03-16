@@ -98,8 +98,12 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
     if origin:
         _allowed = set(get_settings().CORS_ORIGINS)
         if get_settings().ENVIRONMENT == "development":
-            _allowed |= {"http://localhost:3000", "http://localhost:3001",
-                         "http://127.0.0.1:3000", "http://127.0.0.1:3001"}
+            _allowed |= {
+                "http://localhost:3000",
+                "http://localhost:3001",
+                "http://127.0.0.1:3000",
+                "http://127.0.0.1:3001",
+            }
         if origin in _allowed:
             response.headers["Access-Control-Allow-Origin"] = origin
             response.headers["Access-Control-Allow-Credentials"] = "true"

@@ -39,8 +39,7 @@ class UserCreate(UserBase):
     def _block_privileged_roles(cls, v: UserRole) -> UserRole:
         if v not in _SELF_REGISTERABLE_ROLES:
             raise ValueError(
-                f"Cannot self-register with role '{v}'. "
-                f"Allowed: {', '.join(sorted(_SELF_REGISTERABLE_ROLES))}"
+                f"Cannot self-register with role '{v}'. Allowed: {', '.join(sorted(_SELF_REGISTERABLE_ROLES))}"
             )
         return v
 
