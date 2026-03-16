@@ -1,6 +1,5 @@
 "use client";
 
-import React, { useState, useMemo, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import {
@@ -29,10 +28,11 @@ import {
   ExternalLink,
   Loader2,
 } from "lucide-react";
+import React, { useState, useMemo, useCallback } from "react";
+
 import { MetricCard } from "@/components/features/metrics/MetricCard";
 import { useContractors } from "@/lib/hooks";
 import type { ContractorListItem } from "@/lib/hooks";
-import type { ServiceCategory, Region } from "@groupio/types";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -439,7 +439,6 @@ function VerificationChecklistSection({ contractorId }: { contractorId: string }
                   </div>
                   {isImage && doc.file_url && (
                     <div className="mt-2 rounded-lg overflow-hidden border border-surface-200">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={doc.file_url}
                         alt={doc.file_name}
@@ -1103,13 +1102,18 @@ export default function ContractorsPage() {
       {/* Contractor Detail Modal                                             */}
       {/* ================================================================== */}
       {detailContractor && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
-          onClick={() => setDetailContractor(null)}
+        <button
+          type="button"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm cursor-default"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setDetailContractor(null);
+          }}
+          aria-label="Close modal"
         >
           <div
-            className="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 max-h-[85vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 max-h-[85vh] overflow-y-auto cursor-default"
+            role="dialog"
+            aria-modal
           >
             {/* Modal header */}
             <div className="flex items-center justify-between p-5 border-b border-surface-100">
@@ -1336,7 +1340,7 @@ export default function ContractorsPage() {
               </div>
             </div>
           </div>
-        </div>
+        </button>
       )}
     </div>
   );

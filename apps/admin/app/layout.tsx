@@ -2,8 +2,9 @@
 // All client-only state (sidebar collapse, query client) lives in AdminShell.
 // TODO: Wire up i18n (next-intl) — translation files are in messages/he.json and messages/en.json
 import type { Metadata } from "next";
-import type { ReactNode } from "react";
 import { Inter } from "next/font/google";
+import type { ReactNode } from "react";
+
 
 import "./globals.css";
 import { AdminShell } from "@/components/AdminShell";

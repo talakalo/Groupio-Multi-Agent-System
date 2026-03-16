@@ -4,8 +4,6 @@
 // Keeping this separate allows app/layout.tsx to remain a Server Component
 // (Next.js requirement: root layouts must be RSC for metadata/SEO to work).
 
-import { useState, useEffect } from "react";
-import { usePathname, useRouter } from "next/navigation";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import {
@@ -25,7 +23,8 @@ import {
   Building2,
   FileText,
 } from "lucide-react";
-import type { ReactNode } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useState, useEffect, type ReactNode } from "react";
 
 import { useAdminUser } from "@/lib/hooks";
 

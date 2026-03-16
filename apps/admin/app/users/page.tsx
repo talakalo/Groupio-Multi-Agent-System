@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
-import { clsx } from "clsx";
 import {
   useQuery,
   useMutation,
   useQueryClient,
 } from "@tanstack/react-query";
+import { clsx } from "clsx";
 import {
   Search,
   Filter,
@@ -26,6 +25,7 @@ import {
   Phone,
   Lock,
 } from "lucide-react";
+import { useState, useMemo, useCallback, type ReactNode } from "react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -62,6 +62,40 @@ const ROLE_BADGE_CLASSES: Record<string, string> = {
   admin: "bg-warning-50 text-warning-700",
   super_admin: "bg-danger-50 text-danger-700",
 };
+
+function SortTh({
+  field,
+  sortField,
+  sortDir,
+  onSort,
+  children,
+}: {
+  field: SortField;
+  sortField: SortField;
+  sortDir: SortDir;
+  onSort: (f: SortField) => void;
+  children: ReactNode;
+}) {
+  return (
+    <th
+      className="table-header cursor-pointer select-none"
+      onClick={() => onSort(field)}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onSort(field); }}
+      role="columnheader"
+      tabIndex={0}
+    >
+      <div className="flex items-center gap-1">
+        {children}
+        {sortField === field &&
+          (sortDir === "asc" ? (
+            <ChevronUp className="w-3.5 h-3.5" />
+          ) : (
+            <ChevronDown className="w-3.5 h-3.5" />
+          ))}
+      </div>
+    </th>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // API helpers
@@ -270,32 +304,6 @@ export default function UsersPage() {
     [createForm, createMutation]
   );
 
-  // ---- Sort header helper ----
-  function SortTh({
-    field,
-    children,
-  }: {
-    field: SortField;
-    children: React.ReactNode;
-  }) {
-    return (
-      <th
-        className="table-header cursor-pointer select-none"
-        onClick={() => toggleSort(field)}
-      >
-        <div className="flex items-center gap-1">
-          {children}
-          {sortField === field &&
-            (sortDir === "asc" ? (
-              <ChevronUp className="w-3.5 h-3.5" />
-            ) : (
-              <ChevronDown className="w-3.5 h-3.5" />
-            ))}
-        </div>
-      </th>
-    );
-  }
-
   return (
     <div className="space-y-6">
       {/* ---- Page header ---- */}
@@ -426,12 +434,12 @@ export default function UsersPage() {
           <table className="w-full text-left">
             <thead>
               <tr>
-                <SortTh field="name">Name</SortTh>
-                <SortTh field="email">Email</SortTh>
+                <SortTh field="name" sortField={sortField} sortDir={sortDir} onSort={toggleSort}>Name</SortTh>
+                <SortTh field="email" sortField={sortField} sortDir={sortDir} onSort={toggleSort}>Email</SortTh>
                 <th className="table-header">Phone</th>
-                <SortTh field="role">Role</SortTh>
-                <SortTh field="status">Status</SortTh>
-                <SortTh field="created_at">Created</SortTh>
+                <SortTh field="role" sortField={sortField} sortDir={sortDir} onSort={toggleSort}>Role</SortTh>
+                <SortTh field="status" sortField={sortField} sortDir={sortDir} onSort={toggleSort}>Status</SortTh>
+                <SortTh field="created_at" sortField={sortField} sortDir={sortDir} onSort={toggleSort}>Created</SortTh>
                 <th className="table-header">Actions</th>
               </tr>
             </thead>
@@ -586,14 +594,14 @@ export default function UsersPage() {
       {/* Create Admin User Modal                                            */}
       {/* ================================================================== */}
       {showCreateModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
-          onClick={() => setShowCreateModal(false)}
-        >
-          <div
-            className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4"
-            onClick={(e) => e.stopPropagation()}
-          >
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <button
+            type="button"
+            className="absolute inset-0 cursor-default"
+            onClick={() => setShowCreateModal(false)}
+            aria-label="Close modal"
+          />
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md mx-4">
             {/* Modal header */}
             <div className="flex items-center justify-between p-5 border-b border-surface-100">
               <h2 className="text-lg font-bold text-surface-900">
@@ -738,14 +746,14 @@ export default function UsersPage() {
       {/* User Detail Modal                                                 */}
       {/* ================================================================== */}
       {detailUser && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
-          onClick={() => setDetailUser(null)}
-        >
-          <div
-            className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4"
-            onClick={(e) => e.stopPropagation()}
-          >
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <button
+            type="button"
+            className="absolute inset-0 cursor-default"
+            onClick={() => setDetailUser(null)}
+            aria-label="Close modal"
+          />
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md mx-4">
             <div className="flex items-center justify-between p-5 border-b border-surface-100">
               <h2 className="text-lg font-bold text-surface-900">User Details</h2>
               <button

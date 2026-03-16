@@ -2786,12 +2786,21 @@ class PostgresClient:
                 .execute()
             )
             return result.data or []
-        return await self._pg_fetch_all(
-            "SELECT * FROM user_orders WHERE user_id = $1 ORDER BY joined_at DESC LIMIT $2 OFFSET $3",
-            user_id,
-            limit,
-            offset,
-        )
+        try:
+            return await self._pg_fetch_all(
+                "SELECT * FROM user_orders WHERE user_id = $1 ORDER BY joined_at DESC LIMIT $2 OFFSET $3",
+                user_id,
+                limit,
+                offset,
+            )
+        except Exception as e:
+            err_str = str(e).lower()
+            err_type = type(e).__name__.lower()
+            if "user_orders" in err_str and "does not exist" in err_str:
+                return []
+            if "undefinedtableerror" in err_type:
+                return []
+            raise
 
     async def health_check(self) -> bool:
         """Check if PostgreSQL is accessible."""

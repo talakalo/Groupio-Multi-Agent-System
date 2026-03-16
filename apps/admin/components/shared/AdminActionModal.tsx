@@ -71,14 +71,15 @@ export function AdminActionModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="admin-modal-title"
-      onClick={onClose}
-      onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}
     >
-      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
-      <div
-        className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <button
+        type="button"
+        className="absolute inset-0 cursor-default"
+        onClick={onClose}
+        onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}
+        aria-label="Close modal"
+      />
+      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md mx-4">
         <div className="flex items-center justify-between p-5 border-b border-surface-100">
           <div className="flex items-center gap-3">
             {destructive && (

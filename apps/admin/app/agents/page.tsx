@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
 import { clsx } from "clsx";
 import {
   RefreshCw,
@@ -16,16 +15,17 @@ import {
   Megaphone,
   BarChart3,
   LayoutGrid,
-  Cpu,
   CreditCard,
   Bell,
 } from "lucide-react";
-import { AgentStatusDot, type AgentHealthStatus } from "@/components/features/agents/AgentStatusDot";
-import { AgentModeLabel, type AgentMode } from "@/components/features/agents/AgentModeLabel";
-import { PendingDecisionCard, type PendingDecision, type DecisionType } from "@/components/features/agents/PendingDecisionCard";
-import { AgentConfigPanel, type AgentConfig } from "@/components/features/agents/AgentConfigPanel";
+import { useState, useMemo, useCallback } from "react";
+
 import { AgentActivityLog, type AgentActivityEntry, type ActivityActionType } from "@/components/features/agents/AgentActivityLog";
+import { AgentConfigPanel, type AgentConfig } from "@/components/features/agents/AgentConfigPanel";
+import { AgentModeLabel, type AgentMode } from "@/components/features/agents/AgentModeLabel";
 import { AgentOrchestrationGraph } from "@/components/features/agents/AgentOrchestrationGraph";
+import { AgentStatusDot, type AgentHealthStatus } from "@/components/features/agents/AgentStatusDot";
+import { PendingDecisionCard, type PendingDecision, type DecisionType } from "@/components/features/agents/PendingDecisionCard";
 import { AgentMetricsChart } from "@/components/features/metrics/AgentMetricsChart";
 import type { AgentChartSeries } from "@/components/features/metrics/AgentMetricsChart";
 import {
@@ -274,12 +274,20 @@ export default function AgentsPage() {
           return (
             <div
               key={agent.key}
+              role="button"
+              tabIndex={0}
               className={clsx(
                 "card card-hover p-5 cursor-pointer transition-all duration-150",
                 selectedAgent === agent.key ? "ring-2 ring-primary-500 ring-offset-2" : "ring-0",
                 !agent.enabled && "opacity-60",
               )}
               onClick={() => setSelectedAgent((prev) => (prev === agent.key ? null : agent.key))}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setSelectedAgent((prev) => (prev === agent.key ? null : agent.key));
+                }
+              }}
             >
               {/* Card header */}
               <div className="flex items-start justify-between mb-3">

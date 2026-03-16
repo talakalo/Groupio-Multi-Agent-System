@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useMemo } from "react";
 import { clsx } from "clsx";
 import { Clock, ChevronLeft, ChevronRight, Filter } from "lucide-react";
+import { useState, useMemo } from "react";
 
 export type ActivityActionType = "decision" | "escalation" | "api_call" | "config_change" | "error";
 

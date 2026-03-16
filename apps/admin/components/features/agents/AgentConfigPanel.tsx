@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
 import { clsx } from "clsx";
 import { X, Save } from "lucide-react";
+import { useCallback, useState } from "react";
+
 import type { AgentMode } from "./AgentModeLabel";
 
 export interface AgentConfig {
@@ -27,18 +28,20 @@ const MODE_OPTIONS: { value: AgentMode; label: string }[] = [
   { value: "gated", label: "מבוקר (Gated)" },
 ];
 
-export function AgentConfigPanel({ agent, open, onClose, onSave }: AgentConfigPanelProps) {
-  const [draft, setDraft] = useState<AgentConfig | null>(null);
-
-  useEffect(() => {
-    if (agent) setDraft({ ...agent });
-  }, [agent]);
+function AgentConfigForm({
+  agent,
+  onClose,
+  onSave,
+}: {
+  agent: AgentConfig;
+  onClose: () => void;
+  onSave: (config: AgentConfig) => void;
+}) {
+  const [draft, setDraft] = useState<AgentConfig>(() => ({ ...agent }));
 
   const handleSave = useCallback(() => {
-    if (draft) onSave(draft);
+    onSave(draft);
   }, [draft, onSave]);
-
-  if (!open || !draft) return null;
 
   return (
     <>
@@ -53,8 +56,7 @@ export function AgentConfigPanel({ agent, open, onClose, onSave }: AgentConfigPa
       <div
         className={clsx(
           "fixed inset-y-0 end-0 z-50 w-full max-w-md bg-white shadow-xl",
-          "flex flex-col transition-transform duration-300",
-          open ? "translate-x-0" : "translate-x-full rtl:-translate-x-full",
+          "flex flex-col transition-transform duration-300 translate-x-0",
         )}
         role="dialog"
         aria-label={`Configure ${draft.name}`}
@@ -73,10 +75,11 @@ export function AgentConfigPanel({ agent, open, onClose, onSave }: AgentConfigPa
         <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin">
           {/* Mode */}
           <div>
-            <label className="block text-sm font-medium text-surface-700 mb-1.5">
+            <label htmlFor="agent-mode" className="block text-sm font-medium text-surface-700 mb-1.5">
               Autonomy Mode
             </label>
             <select
+              id="agent-mode"
               className="input"
               value={draft.mode}
               onChange={(e) => setDraft({ ...draft, mode: e.target.value as AgentMode })}
@@ -89,10 +92,13 @@ export function AgentConfigPanel({ agent, open, onClose, onSave }: AgentConfigPa
             </select>
           </div>
 
-          {/* Enabled toggle */}
-          <div className="flex items-center justify-between">
-            <label className="text-sm font-medium text-surface-700">Enabled</label>
+          {/* Enabled toggle - custom switch, label uses aria-labelledby for a11y */}
+          <div className="flex items-center justify-between" role="group" aria-labelledby="agent-enabled-label">
+            <span id="agent-enabled-label" className="text-sm font-medium text-surface-700">
+              Enabled
+            </span>
             <button
+              type="button"
               onClick={() => setDraft({ ...draft, enabled: !draft.enabled })}
               className={clsx(
                 "relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200",
@@ -100,6 +106,7 @@ export function AgentConfigPanel({ agent, open, onClose, onSave }: AgentConfigPa
               )}
               role="switch"
               aria-checked={draft.enabled}
+              aria-labelledby="agent-enabled-label"
             >
               <span
                 className={clsx(
@@ -112,10 +119,11 @@ export function AgentConfigPanel({ agent, open, onClose, onSave }: AgentConfigPa
 
           {/* Temperature */}
           <div>
-            <label className="block text-sm font-medium text-surface-700 mb-1.5">
+            <label htmlFor="agent-temperature" className="block text-sm font-medium text-surface-700 mb-1.5">
               Temperature: {draft.temperature.toFixed(2)}
             </label>
             <input
+              id="agent-temperature"
               type="range"
               min={0}
               max={1}
@@ -132,10 +140,11 @@ export function AgentConfigPanel({ agent, open, onClose, onSave }: AgentConfigPa
 
           {/* Custom prompt */}
           <div>
-            <label className="block text-sm font-medium text-surface-700 mb-1.5">
+            <label htmlFor="agent-prompt" className="block text-sm font-medium text-surface-700 mb-1.5">
               Custom System Prompt
             </label>
             <textarea
+              id="agent-prompt"
               className="input min-h-[120px] resize-y"
               value={draft.customPrompt}
               onChange={(e) => setDraft({ ...draft, customPrompt: e.target.value })}
@@ -157,4 +166,9 @@ export function AgentConfigPanel({ agent, open, onClose, onSave }: AgentConfigPa
       </div>
     </>
   );
+}
+
+export function AgentConfigPanel({ agent, open, onClose, onSave }: AgentConfigPanelProps) {
+  if (!open || !agent) return null;
+  return <AgentConfigForm key={agent.id} agent={agent} onClose={onClose} onSave={onSave} />;
 }

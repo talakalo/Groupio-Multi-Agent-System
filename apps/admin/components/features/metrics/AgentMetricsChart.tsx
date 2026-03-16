@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
 import { clsx } from "clsx";
+import { useState, useMemo } from "react";
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -141,9 +141,9 @@ export function AgentMetricsChart({
     return merged;
   }, [series, comparisonMode]);
 
-  const currentMetricInfo = METRIC_OPTIONS.find(
-    (m) => m.value === selectedMetric
-  )!;
+  const currentMetricInfo =
+    METRIC_OPTIONS.find((m) => m.value === selectedMetric) ??
+    METRIC_OPTIONS[0];
 
   return (
     <div className={clsx("card p-5", className)}>

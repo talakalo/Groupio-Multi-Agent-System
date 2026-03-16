@@ -1,9 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { AdminActionModal, type ModalField } from "@/components/shared/AdminActionModal";
 import {
-  DollarSign,
   ArrowDownToLine,
   ArrowUpFromLine,
   Shield,
@@ -12,19 +9,15 @@ import {
   XCircle,
   AlertTriangle,
   RefreshCw,
-  Search,
-  Filter,
-  ChevronDown,
-  Loader2,
   Eye,
-  CreditCard,
   Banknote,
   TrendingUp,
-  Building2,
   Users,
-  FileText,
   Settings,
 } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+
+import { AdminActionModal, type ModalField } from "@/components/shared/AdminActionModal";
 
 // ---- Types ----
 // TODO: PaymentSummary, ContractorPayout, EscrowAccount, EscrowStatus, PayoutStatus duplicate @groupio/types.

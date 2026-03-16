@@ -9,9 +9,7 @@ import {
   Ticket,
   Activity,
   Server,
-  Clock,
   AlertTriangle,
-  TrendingUp,
   Users,
   Zap,
   ChevronRight,
@@ -24,9 +22,8 @@ import {
 import Link from "next/link";
 import { useMemo } from "react";
 
+import { AgentMetricsChart, type AgentChartSeries } from "@/components/features/metrics/AgentMetricsChart";
 import { MetricCard } from "@/components/features/metrics/MetricCard";
-import { AgentMetricsChart } from "@/components/features/metrics/AgentMetricsChart";
-import type { AgentChartSeries } from "@/components/features/metrics/AgentMetricsChart";
 import {
   useDashboardMetrics,
   useSystemStatus,
@@ -87,7 +84,7 @@ export default function DashboardPage() {
   const { data: vettingStatus } = useVettingStatus();
   const { data: unverifiedContractors = [] } = useContractors({ verified: false });
 
-  const hasCriticalError = metricsError || systemError;
+  const _hasCriticalError = metricsError || systemError;
 
   // Derive agent summary data from system status
   const agentSummary = useMemo(() => {
