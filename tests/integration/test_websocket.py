@@ -1,43 +1,82 @@
 """Tests for WebSocket endpoint and ConnectionManager."""
 
 import asyncio
+from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
 
 from src.api.main import app
 from src.api.routes.websocket import ConnectionManager
+from src.models.user import TokenPayload, UserInDB, UserRole
+
+
+def _fake_admin_token_payload() -> TokenPayload:
+    """Return a fake admin token payload for WebSocket auth tests."""
+    from datetime import UTC, datetime
+
+    return TokenPayload(
+        sub="admin-test-id",
+        email="admin@test.com",
+        role=UserRole.ADMIN,
+        exp=datetime(2099, 1, 1, tzinfo=UTC),
+        iat=datetime(2026, 1, 1, tzinfo=UTC),
+    )
+
+
+def _fake_admin_user() -> UserInDB:
+    from datetime import UTC, datetime
+
+    return UserInDB(
+        id="admin-test-id",
+        email="admin@test.com",
+        full_name="Test Admin",
+        phone="0501234567",
+        role=UserRole.ADMIN,
+        is_active=True,
+        is_verified=True,
+        created_at=datetime(2026, 1, 1, tzinfo=UTC),
+        updated_at=datetime(2026, 1, 1, tzinfo=UTC),
+    )
 
 
 class TestAdminWebSocket:
     """Tests for the /api/v1/ws/admin WebSocket endpoint."""
 
-    def test_admin_websocket_ping_pong(self):
+    def _connect(self, client: TestClient):
+        """Open an authenticated WebSocket connection."""
+        return client.websocket_connect("/api/v1/ws/admin?token=fake-jwt")
+
+    @patch("src.api.routes.websocket.get_postgres_client")
+    @patch("src.api.routes.websocket.verify_access_token", return_value=_fake_admin_token_payload())
+    def test_admin_websocket_ping_pong(self, _mock_verify, mock_db):
         """WebSocket responds to 'ping' with 'pong'."""
+        mock_db.return_value.get_user = AsyncMock(return_value=_fake_admin_user())
         client = TestClient(app)
-        with client.websocket_connect("/api/v1/ws/admin") as ws:
+        with self._connect(client) as ws:
             ws.send_text("ping")
             response = ws.receive_text()
             assert response == "pong"
 
-    def test_admin_websocket_multiple_pings(self):
+    @patch("src.api.routes.websocket.get_postgres_client")
+    @patch("src.api.routes.websocket.verify_access_token", return_value=_fake_admin_token_payload())
+    def test_admin_websocket_multiple_pings(self, _mock_verify, mock_db):
         """WebSocket handles multiple sequential ping/pong exchanges."""
+        mock_db.return_value.get_user = AsyncMock(return_value=_fake_admin_user())
         client = TestClient(app)
-        with client.websocket_connect("/api/v1/ws/admin") as ws:
+        with self._connect(client) as ws:
             for _ in range(3):
                 ws.send_text("ping")
                 response = ws.receive_text()
                 assert response == "pong"
 
-    def test_admin_websocket_non_ping_no_response(self):
-        """Non-ping messages are received by the server without crashing.
-
-        The server reads the text but only replies to 'ping', so we
-        verify that sending something else and then a ping still works.
-        """
+    @patch("src.api.routes.websocket.get_postgres_client")
+    @patch("src.api.routes.websocket.verify_access_token", return_value=_fake_admin_token_payload())
+    def test_admin_websocket_non_ping_no_response(self, _mock_verify, mock_db):
+        """Non-ping messages are received by the server without crashing."""
+        mock_db.return_value.get_user = AsyncMock(return_value=_fake_admin_user())
         client = TestClient(app)
-        with client.websocket_connect("/api/v1/ws/admin") as ws:
+        with self._connect(client) as ws:
             ws.send_text("hello")
-            # Server loops back to receive_text; send a ping to confirm it's alive
             ws.send_text("ping")
             response = ws.receive_text()
             assert response == "pong"

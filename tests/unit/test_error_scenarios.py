@@ -29,7 +29,7 @@ class TestLLMErrorScenarios:
         )
 
         class TestAgent(BaseAgent):
-            async def run(self, state):
+            async def _run_impl(self, state):
                 return state
 
         agent = TestAgent(config)
@@ -67,7 +67,7 @@ class TestLLMErrorScenarios:
         )
 
         class TestAgent(BaseAgent):
-            async def run(self, state):
+            async def _run_impl(self, state):
                 return state
 
         agent = TestAgent(config)
