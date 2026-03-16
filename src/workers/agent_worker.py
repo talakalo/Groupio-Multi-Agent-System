@@ -12,12 +12,11 @@ import sys
 from typing import Any
 
 import redis.asyncio as redis
-
-from src.models.agent_state import AgentState
 import structlog
 
 from src.agents.router import RouterAgent
 from src.config.settings import get_settings
+from src.models.agent_state import AgentState
 
 logger = structlog.get_logger(__name__)
 
