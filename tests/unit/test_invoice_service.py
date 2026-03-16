@@ -45,14 +45,14 @@ async def test_create_invoice_calculates_correctly(invoice_svc, mock_db):
         offer_id="off_1",
         contractor_id="con_1",
         subtotal=1000,
-        tax_rate=0.17,
+        tax_rate=0.18,
         platform_fee_rate=0.05,
     )
 
     assert result["subtotal"] == 1000
-    assert result["tax"] == 170.0
+    assert result["tax"] == 180.0
     assert result["platform_fee"] == 50.0
-    assert result["total"] == 1220.0
+    assert result["total"] == 1230.0
     assert result["status"] == "pending"
 
 

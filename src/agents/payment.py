@@ -78,7 +78,7 @@ class PaymentAgent(BaseAgent):
         super().__init__(config)
 
     @track_agent_execution("payment")
-    async def run(self, state: AgentState) -> AgentState:
+    async def _run_impl(self, state: AgentState) -> AgentState:
         """Route to the appropriate sub-handler based on payment sub-intent."""
         user_message = self._get_last_user_message(state)
         sub_intent = _detect_sub_intent(user_message)

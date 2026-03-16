@@ -149,12 +149,16 @@ class ApiClient {
     );
   }
 
-  async joinOffer(offerId: string, userId: string) {
-    return this.request<{ success: boolean; participants: number }>(
+  async joinOffer(offerId: string, unitCount: number = 1, inviteToken?: string) {
+    return this.request<{ status: string; offer_id: string }>(
       `/api/v1/offers/${offerId}/join`,
       {
         method: "POST",
-        body: { userId },
+        body: {
+          user_id: "",
+          unit_count: unitCount,
+          ...(inviteToken ? { invite_token: inviteToken } : {}),
+        },
       }
     );
   }

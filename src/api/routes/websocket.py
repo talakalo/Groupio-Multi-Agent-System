@@ -5,9 +5,14 @@ import logging
 import time
 from typing import Any
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
+
+from src.api.middleware.auth import verify_access_token
+from src.databases.postgres import get_postgres_client
 
 logger = logging.getLogger(__name__)
+
+_ADMIN_ROLES = frozenset({"admin", "super_admin", "buildings_manager"})
 
 router = APIRouter()
 
@@ -87,6 +92,29 @@ def _validate_message(data: str) -> tuple[bool, str]:
 
 @router.websocket("/ws/admin")
 async def admin_websocket(websocket: WebSocket):
+    # Authenticate via query param (?token=...) or cookie (access_token)
+    token = websocket.query_params.get("token") or websocket.cookies.get("access_token")
+    if not token:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Missing auth token")
+        return
+
+    payload = verify_access_token(token)
+    if not payload:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid or expired token")
+        return
+
+    role = payload.role.value
+    if role not in _ADMIN_ROLES:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Insufficient permissions")
+        return
+
+    user_id = payload.sub
+    db = get_postgres_client()
+    user = await db.get_user(user_id) if user_id else None
+    if not user or not user.is_active:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="User not found or disabled")
+        return
+
     await manager.connect(websocket)
     try:
         while True:

@@ -49,7 +49,7 @@ class MatchingAgent(BaseAgent):
         self._graph_store = get_graph_store()
 
     @track_agent_execution("matching")
-    async def run(self, state: AgentState) -> AgentState:
+    async def _run_impl(self, state: AgentState) -> AgentState:
         """Find and rank matching contractors."""
         user_message = self._get_last_user_message(state)
         building_context = state.get("building_context", {})

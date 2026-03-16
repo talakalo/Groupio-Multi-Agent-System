@@ -3,7 +3,7 @@
 from datetime import datetime
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 
 class UserRole(StrEnum):
@@ -25,11 +25,24 @@ class UserBase(BaseModel):
     preferred_language: str = Field(default="he", pattern=r"^(he|en)$")
 
 
+_SELF_REGISTERABLE_ROLES = frozenset({UserRole.RESIDENT, UserRole.CONTRACTOR})
+
+
 class UserCreate(UserBase):
     """Create user request."""
 
     password: str = Field(..., min_length=8)
     role: UserRole = UserRole.RESIDENT
+
+    @field_validator("role")
+    @classmethod
+    def _block_privileged_roles(cls, v: UserRole) -> UserRole:
+        if v not in _SELF_REGISTERABLE_ROLES:
+            raise ValueError(
+                f"Cannot self-register with role '{v}'. "
+                f"Allowed: {', '.join(sorted(_SELF_REGISTERABLE_ROLES))}"
+            )
+        return v
 
 
 class UserUpdate(BaseModel):

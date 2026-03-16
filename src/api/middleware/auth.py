@@ -185,9 +185,40 @@ async def get_current_active_user(
 async def get_admin_user(
     current_user: UserInDB = Depends(get_current_user),
 ) -> UserInDB:
-    """Get current user and verify they have admin privileges."""
+    """Get current user and verify they have admin privileges.
+
+    Allows: admin, super_admin, buildings_manager.
+    Use ``get_buildings_manager_user`` for buildings-specific endpoints.
+    Use ``require_admin_only`` for sensitive admin ops (user mgmt, system settings, agents).
+    """
     if current_user.role not in (UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.BUILDINGS_MANAGER):
         raise HTTPException(status_code=403, detail="Admin access required")
+    return current_user
+
+
+async def get_buildings_manager_user(
+    current_user: UserInDB = Depends(get_current_user),
+) -> UserInDB:
+    """Get current user for buildings-specific endpoints.
+
+    Allows: buildings_manager, admin, super_admin.
+    Use for building management, building-scoped offers, etc.
+    """
+    if current_user.role not in (UserRole.BUILDINGS_MANAGER, UserRole.ADMIN, UserRole.SUPER_ADMIN):
+        raise HTTPException(status_code=403, detail="Buildings manager or admin access required")
+    return current_user
+
+
+async def require_admin_only(
+    current_user: UserInDB = Depends(get_current_user),
+) -> UserInDB:
+    """Get current user for admin-only endpoints (excludes buildings_manager).
+
+    Allows: admin, super_admin only.
+    Use for sensitive operations: user management, system settings, agent management.
+    """
+    if current_user.role not in (UserRole.ADMIN, UserRole.SUPER_ADMIN):
+        raise HTTPException(status_code=403, detail="Admin-only access required")
     return current_user
 
 

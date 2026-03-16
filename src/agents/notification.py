@@ -39,7 +39,7 @@ class NotificationAgent(BaseAgent):
         super().__init__(config)
 
     @track_agent_execution("notification")
-    async def run(self, state: AgentState) -> AgentState:
+    async def _run_impl(self, state: AgentState) -> AgentState:
         """Determine which notifications to send and craft personalised messages."""
         notification_type = self._resolve_notification_type(state)
         channels = self._resolve_channels(state)

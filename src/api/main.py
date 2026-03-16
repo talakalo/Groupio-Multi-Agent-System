@@ -91,11 +91,18 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
         show_detail = get_settings().ENVIRONMENT == "development"
         content = {"detail": str(exc) if show_detail else "Internal server error"}
     response = JSONResponse(status_code=status_code, content=content)
-    # Add CORS headers so browser doesn't mask error as CORS
+    # Add CORS headers only for allowed origins so browser shows real error,
+    # not a CORS error. Do NOT reflect arbitrary origins — that would bypass
+    # the CORS allowlist.
     origin = request.headers.get("origin")
     if origin:
-        response.headers["Access-Control-Allow-Origin"] = origin
-        response.headers["Access-Control-Allow-Credentials"] = "true"
+        _allowed = set(get_settings().CORS_ORIGINS)
+        if get_settings().ENVIRONMENT == "development":
+            _allowed |= {"http://localhost:3000", "http://localhost:3001",
+                         "http://127.0.0.1:3000", "http://127.0.0.1:3001"}
+        if origin in _allowed:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
     return response
 
 

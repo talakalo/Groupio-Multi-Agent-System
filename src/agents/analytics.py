@@ -118,7 +118,7 @@ class AnalyticsAgent(BaseAgent):
         )
 
     @track_agent_execution("analytics")
-    async def run(self, state: AgentState) -> AgentState:
+    async def _run_impl(self, state: AgentState) -> AgentState:
         """Handle analytics query."""
         user_message = self._get_last_user_message(state)
 

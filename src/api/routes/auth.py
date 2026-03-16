@@ -6,7 +6,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.security import OAuth2PasswordRequestForm
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, model_validator
 
 from src.api.middleware.auth import (
     create_access_token,
@@ -40,15 +40,23 @@ router = APIRouter(tags=["auth"])
 
 async def check_auth_rate_limit(request: Request) -> None:
     """Enforce IP-based rate limit on auth endpoints (20 req/min)."""
-    redis = get_redis_client()
-    client_ip = request.client.host if request.client else "unknown"
-    allowed = await redis.check_ip_rate_limit(client_ip, limit=20, window=60)
-    if not allowed:
-        raise HTTPException(
-            status_code=429,
-            detail="Too many authentication attempts. Try again in a minute.",
-            headers={"Retry-After": "60"},
-        )
+    try:
+        redis = get_redis_client()
+        client_ip = request.client.host if request.client else "unknown"
+        allowed = await redis.check_ip_rate_limit(client_ip, limit=20, window=60)
+        if not allowed:
+            raise HTTPException(
+                status_code=429,
+                detail="Too many authentication attempts. Try again in a minute.",
+                headers={"Retry-After": "60"},
+            )
+    except HTTPException:
+        raise  # Re-raise 429
+    except Exception:
+        logger.warning("Redis unavailable for rate limiting — allowing request (degraded mode)")
+
+
+_SELF_REGISTERABLE_ROLES = frozenset({UserRole.RESIDENT, UserRole.CONTRACTOR})
 
 
 class SignupRequest(BaseModel):
@@ -62,6 +70,15 @@ class SignupRequest(BaseModel):
     building_id: str | None = Field(None, alias="buildingId")
 
     model_config = {"populate_by_name": True}
+
+    @model_validator(mode="after")
+    def _block_privileged_roles(self) -> "SignupRequest":
+        if self.role not in _SELF_REGISTERABLE_ROLES:
+            raise ValueError(
+                f"Cannot self-register with role '{self.role}'. "
+                f"Allowed roles: {', '.join(sorted(_SELF_REGISTERABLE_ROLES))}"
+            )
+        return self
 
 
 class RefreshRequest(BaseModel):
@@ -148,7 +165,7 @@ async def signup(request: SignupRequest, _: None = Depends(check_auth_rate_limit
 
 
 @router.post("/register", response_model=UserResponse)
-async def register(request: UserCreate) -> UserResponse:
+async def register(request: UserCreate, _: None = Depends(check_auth_rate_limit)) -> UserResponse:
     """Register a new user."""
     db = get_postgres_client()
 
