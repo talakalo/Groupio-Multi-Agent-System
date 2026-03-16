@@ -90,12 +90,12 @@ class TestPaymentProviderSafety:
     """P0-2: Mock provider blocked in production."""
 
     def test_mock_blocked_in_production(self):
-        from src.services.payment import MockPaymentProvider, StripePaymentProvider, get_payment_provider
         import src.services.payment as pm
-        # Reset singleton
+
         pm._payment_provider = None
-        # This test verifies the factory logic exists - actual env testing
-        # requires mocking settings, which is done in the payment test suite.
+        assert hasattr(pm, "MockPaymentProvider")
+        assert hasattr(pm, "StripePaymentProvider")
+        assert callable(pm.get_payment_provider)
 
 
 class TestPaymentIdempotency:

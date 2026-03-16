@@ -1,7 +1,5 @@
 """Tests for WebSocket authentication (P0-4)."""
 
-import pytest
-
 from src.api.routes.websocket import _ADMIN_ROLES
 
 
