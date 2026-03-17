@@ -7,6 +7,9 @@ import { Providers } from "./providers";
 import "@/styles/globals.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+  ),
   title: {
     default: "Groupio — רכישה קבוצתית לדיירים",
     template: "%s | Groupio",
@@ -50,11 +53,15 @@ const heebo = Heebo({
   display: "swap",
 });
 
-export default async function RootLayout({
-  children,
-}: {
+type RootLayoutProps = {
   children: React.ReactNode;
-}) {
+  params?: Promise<Record<string, string | string[]>>;
+  searchParams?: Promise<Record<string, string | string[]>>;
+};
+
+export default async function RootLayout({ children, params, searchParams }: RootLayoutProps) {
+  if (params) await params;
+  if (searchParams) await searchParams;
   const locale = await getLocale();
   const messages = await getMessages();
   const dir = locale === "he" ? "rtl" : "ltr";

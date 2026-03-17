@@ -8,6 +8,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/Badge';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
+import { unwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
 
 // API returns snake_case: title, building_id, current_participants, pricing_tiers, deadline, created_at
 // pricing_tiers: { min_participants, max_participants, discount_percent, price_per_unit }[]
@@ -49,7 +50,8 @@ interface ProjectDetail {
   currentTier?: number;
 }
 
-export default function ContractorProjectDetailPage() {
+export default function ContractorProjectDetailPage(props: PageParamsProps) {
+  unwrapPageParams(props);
   const params = useParams();
   const router = useRouter();
   const id = params?.id as string | undefined;

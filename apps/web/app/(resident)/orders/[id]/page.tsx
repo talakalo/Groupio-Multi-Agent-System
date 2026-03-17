@@ -20,6 +20,7 @@ import { Breadcrumb } from "@/components/shared/Breadcrumb";
 import { Badge } from "@/components/ui/Badge";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { apiClient } from "@/lib/api/client";
+import { unwrapPageParams, PageParamsProps } from "@/lib/utils/unwrapPageParams";
 
 interface OrderDetail {
   id: string;
@@ -81,7 +82,8 @@ function formatDate(dateStr: string) {
   });
 }
 
-export default function OrderDetailPage() {
+export default function OrderDetailPage(props: PageParamsProps) {
+  unwrapPageParams(props);
   const { id } = useParams<{ id: string }>();
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);

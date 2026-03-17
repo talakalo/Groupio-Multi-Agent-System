@@ -12,6 +12,7 @@ import { TrustScoreProgress } from '@/components/features/contractor/TrustScoreP
 import { VettingStatusTimeline } from '@/components/features/contractor/VettingStatusTimeline';
 import { Badge } from '@/components/ui/Badge';
 import { useAuthStore } from '@/lib/stores/authStore';
+import { unwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
 
 const profileSchema = z.object({
   businessName: z.string().min(2, 'Business name is required'),
@@ -30,7 +31,8 @@ const profileSchema = z.object({
 
 type ProfileForm = z.infer<typeof profileSchema>;
 
-export default function ContractorProfilePage() {
+export default function ContractorProfilePage(props: PageParamsProps) {
+  unwrapPageParams(props);
   const t = useTranslations('contractor.profile');
   const accessToken = useAuthStore((s) => s.accessToken);
   const [contractor, setContractor] = useState<Contractor | null>(null);

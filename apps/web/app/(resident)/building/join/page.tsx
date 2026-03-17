@@ -6,8 +6,10 @@ import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 
 import { cn } from '@/lib/utils/cn';
+import { unwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
 
-export default function BuildingJoinPage() {
+export default function BuildingJoinPage(props: PageParamsProps) {
+  unwrapPageParams(props);
   const t = useTranslations('building');
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -25,7 +27,8 @@ export default function BuildingJoinPage() {
     setError(null);
 
     try {
-      const res = await fetch('/api/v1/buildings/join', {
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const res = await fetch(`${apiBase}/api/v1/buildings/join`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ invite_code: code.trim() }),

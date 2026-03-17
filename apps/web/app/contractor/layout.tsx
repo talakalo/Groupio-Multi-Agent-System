@@ -23,6 +23,7 @@ import { NotificationPanel } from '@/components/shared/NotificationPanel';
 import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
+import { unwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
 
 interface NavItem {
   href: string;
@@ -44,7 +45,9 @@ const MOBILE_NAV_ITEMS: NavItem[] = [
   { href: '/contractor/profile', labelKey: 'profile', icon: UserCircle },
 ];
 
-export default function ContractorLayout({ children }: { children: React.ReactNode }) {
+export default function ContractorLayout(props: { children: React.ReactNode } & PageParamsProps) {
+  unwrapPageParams(props);
+  const { children } = props;
   const pathname = usePathname();
   const router = useRouter();
   const t = useTranslations('contractorNav');

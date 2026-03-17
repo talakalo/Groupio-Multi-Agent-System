@@ -14,6 +14,24 @@ interface RequestOptions {
 /** Callback that tries to refresh the access token; returns new token or null. */
 export type On401Retry = () => Promise<string | null>;
 
+/** Auth endpoints where 401 means "invalid credentials" or "no session" — never retry via refresh. */
+const AUTH_PUBLIC_ENDPOINTS = [
+  "/api/v1/auth/login",
+  "/api/v1/auth/login/json",
+  "/api/v1/auth/signup",
+  "/api/v1/auth/register",
+  "/api/v1/auth/refresh",
+  "/api/v1/auth/password/reset",
+  "/api/v1/auth/password/reset/confirm",
+  "/api/v1/auth/verify-email",
+  "/api/v1/auth/resend-verification",
+  "/api/v1/auth/resend-verification-by-email",
+];
+
+function isAuthPublicEndpoint(endpoint: string): boolean {
+  return AUTH_PUBLIC_ENDPOINTS.some((p) => endpoint.startsWith(p));
+}
+
 class ApiClient {
   private baseUrl: string;
   private defaultHeaders: Record<string, string>;
@@ -74,7 +92,12 @@ class ApiClient {
       signal,
     });
 
-    if (response.status === 401 && this._on401Retry && !isRetry) {
+    if (
+      response.status === 401 &&
+      this._on401Retry &&
+      !isRetry &&
+      !isAuthPublicEndpoint(endpoint)
+    ) {
       const newToken = await this.refreshToken();
       if (newToken) {
         return this.request<T>(endpoint, options, true);

@@ -14,10 +14,14 @@ export const metadata: Metadata = {
   },
 };
 
-export default function OffersLayout({
-  children,
-}: {
+type LayoutProps = {
   children: React.ReactNode;
-}) {
+  params?: Promise<Record<string, string | string[]>>;
+  searchParams?: Promise<Record<string, string | string[]>>;
+};
+
+export default async function OffersLayout({ children, params, searchParams }: LayoutProps) {
+  if (params) await params;
+  if (searchParams) await searchParams;
   return children;
 }

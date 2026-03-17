@@ -165,6 +165,44 @@ class TestWebSocketValidation:
         assert "Unknown" in reason
 
 
+class TestSchemaNotReady:
+    """Test DB schema-not-ready returns 503 with clear classification."""
+
+    def test_is_schema_not_ready_recognises_undefined_table_error(self):
+        """_is_schema_not_ready returns True for asyncpg UndefinedTableError."""
+        import asyncpg.exceptions
+
+        from src.api.main import _is_schema_not_ready
+
+        exc = asyncpg.exceptions.UndefinedTableError("relation \"users\" does not exist")
+        assert _is_schema_not_ready(exc) is True
+
+    def test_login_returns_503_when_users_table_missing(self):
+        """POST /auth/login/json returns 503 when users table does not exist."""
+        import asyncpg.exceptions
+
+        from src.api.main import app
+        from src.api.routes.auth import get_postgres_client
+
+        db = MagicMock()
+        db.get_user_by_email = AsyncMock(
+            side_effect=asyncpg.exceptions.UndefinedTableError("relation \"users\" does not exist")
+        )
+
+        with patch("src.api.routes.auth.get_postgres_client", return_value=db):
+            with patch("src.api.routes.auth.get_redis_client"):
+                from fastapi.testclient import TestClient
+
+                client = TestClient(app, raise_server_exceptions=False)
+                resp = client.post(
+                    "/api/v1/auth/login/json",
+                    json={"email": "u@ex.com", "password": "x"},
+                )
+        assert resp.status_code == 503
+        data = resp.json()
+        assert "schema" in data.get("detail", "").lower() or data.get("code") == "DB_SCHEMA_NOT_READY"
+
+
 class TestRateLimiting:
     """Test rate limiting edge cases."""
 

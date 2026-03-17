@@ -9,19 +9,8 @@ import { apiClient } from "@/lib/api/client";
 import { LocaleSyncProvider } from "@/lib/providers/LocaleSyncProvider";
 import { useAuthStore } from "@/lib/stores/authStore";
 
-// PostHog analytics — optional, requires NEXT_PUBLIC_POSTHOG_KEY
-if (typeof window !== "undefined" && process.env.NEXT_PUBLIC_POSTHOG_KEY) {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const posthog = require("posthog-js").default;
-    posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY, {
-      api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://app.posthog.com",
-      capture_pageview: false,
-    });
-  } catch {
-    // posthog-js not installed
-  }
-}
+// PostHog: Add when NEXT_PUBLIC_POSTHOG_KEY is set and posthog-js is installed.
+// Example: import("posthog-js").then(({ default: posthog }) => posthog.init(...))
 
 // ---------------------------------------------------------------------------
 // Error boundary (class component, as required by React)

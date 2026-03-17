@@ -31,6 +31,7 @@ import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { useNotificationStore } from '@/lib/stores/notificationStore';
 import { cn } from '@/lib/utils/cn';
+import { unwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
 
 // ---------------------------------------------------------------------------
 // Join Confirmation Modal with cancellation policy disclosure
@@ -271,7 +272,8 @@ function StickyJoinCTA({
 // Main page
 // ---------------------------------------------------------------------------
 
-export default function OfferDetailPage() {
+export default function OfferDetailPage(props: PageParamsProps) {
+  unwrapPageParams(props);
   const params = useParams<{ offerId: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();

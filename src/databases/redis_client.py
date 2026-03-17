@@ -5,11 +5,19 @@ import logging
 from typing import Any
 
 import redis.asyncio as redis
-from tenacity import retry, stop_after_attempt, wait_exponential
-
 from src.config.settings import get_settings
 
 logger = logging.getLogger(__name__)
+
+
+from tenacity import retry, stop_after_attempt, wait_exponential
+
+
+def _normalize_redis_url(url: str) -> str:
+    """Replace localhost with 127.0.0.1 to avoid IPv6 errno 99 on macOS/Linux."""
+    if not url or "localhost" not in url:
+        return url
+    return url.replace("localhost", "127.0.0.1")
 
 
 # Atomic rate-limit Lua script — INCR + EXPIRE in a single round-trip.
@@ -41,7 +49,8 @@ class RedisClient:
         # Support REDIS_PASSWORD override when the URL does not embed credentials.
         if settings.REDIS_PASSWORD and "://:@" not in settings.REDIS_URL and "@" not in settings.REDIS_URL:
             redis_kwargs["password"] = settings.REDIS_PASSWORD
-        self._redis = redis.from_url(settings.REDIS_URL, **redis_kwargs)
+        url = _normalize_redis_url(settings.REDIS_URL)
+        self._redis = redis.from_url(url, **redis_kwargs)
         self._context_window = 10
         self._conversation_ttl = 86400  # 24 hours
 

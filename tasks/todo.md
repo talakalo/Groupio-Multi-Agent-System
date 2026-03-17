@@ -43,6 +43,33 @@ pytest tests/unit/test_route_enrichment.py -v
 pytest tests/ -k onboarding -v
 ```
 
+## Runtime Config & DB Readiness Audit (Complete)
+
+### Implemented
+
+- [x] **Migration bootstrap in Docker** — API runs `alembic upgrade head` before uvicorn
+- [x] **Startup schema verification** — `auth_tables_exist()` checks `users` table; logs clear error if missing
+- [x] **Schema-not-ready 503** — `UndefinedTableError` returns 503 + `DB_SCHEMA_NOT_READY` (not 500)
+- [x] **Alembic env for Docker** — `alembic/env.py` uses `DOCKER_POSTGRES_*` when running in container
+- [x] **Metrics Bearer auth** — `/metrics` accepts `Authorization: Bearer <key>` for Prometheus scrape
+- [x] **Worker Postgres config** — Worker gets `DOCKER_POSTGRES_*` and `depends_on: postgres`
+- [x] **check_auth_deps.py** — Schema readiness check; local Postgres URL when `USE_LOCAL_POSTGRES=1`
+
+### Report
+
+See `tasks/RUNTIME_CONFIG_AUDIT_REPORT.md`.
+
+### Validation
+
+```bash
+docker compose -f docker/docker-compose.yml build api --no-cache
+docker compose -f docker/docker-compose.yml up -d
+# Login should work after migrations run on startup
+python scripts/check_auth_deps.py
+```
+
+---
+
 ## Current focus
 
 Phase 2 complete. Phase 3: wire real gov APIs, extend verification flow.

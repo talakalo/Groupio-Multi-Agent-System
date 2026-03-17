@@ -848,3 +848,68 @@ class TestWhatsAppWebhook:
             response = client.post("/api/v1/webhooks/whatsapp", json={})
         assert response.status_code == 200
         assert response.json()["status"] in ("ignored", "error")
+
+
+class TestGlobalExceptionHandler:
+    """Tests for global exception handler — connection errors return 503."""
+
+    def test_connection_error_errno_99_returns_503(self):
+        """OSError errno 99 (EADDRNOTAVAIL) should return 503, not 500."""
+        import errno as errno_module
+
+        err = OSError()
+        err.errno = errno_module.EADDRNOTAVAIL  # portable (49 on macOS, 99 on Linux)
+        redis_mock = AsyncMock()
+        redis_mock.check_ip_rate_limit = AsyncMock(return_value=True)
+        with TestClient(app, raise_server_exceptions=False) as c:
+            with patch("src.api.routes.auth.get_redis_client", return_value=redis_mock):
+                with patch("src.api.routes.auth.get_postgres_client") as mock_get_db:
+                    db_mock = AsyncMock()
+                    db_mock.get_user_by_email = AsyncMock(side_effect=err)
+                    mock_get_db.return_value = db_mock
+                    response = c.post(
+                        "/api/v1/auth/login/json",
+                        json={"email": "test@example.com", "password": "test123"},
+                    )
+        assert response.status_code == 503
+        assert "unavailable" in response.json().get("detail", "").lower()
+
+    def test_connection_error_errno_111_returns_503(self):
+        """OSError errno 111 (ECONNREFUSED) should return 503."""
+        import errno as errno_module
+
+        err = OSError()
+        err.errno = errno_module.ECONNREFUSED  # portable (61 on macOS, 111 on Linux)
+        redis_mock = AsyncMock()
+        redis_mock.check_ip_rate_limit = AsyncMock(return_value=True)
+        with TestClient(app, raise_server_exceptions=False) as c:
+            with patch("src.api.routes.auth.get_redis_client", return_value=redis_mock):
+                with patch("src.api.routes.auth.get_postgres_client") as mock_get_db:
+                    db_mock = AsyncMock()
+                    db_mock.get_user_by_email = AsyncMock(side_effect=err)
+                    mock_get_db.return_value = db_mock
+                    response = c.post(
+                        "/api/v1/auth/login/json",
+                        json={"email": "test@example.com", "password": "test123"},
+                    )
+        assert response.status_code == 503
+
+    def test_gaierror_returns_503(self):
+        """socket.gaierror (DNS resolution failure) should return 503."""
+        import socket as socket_module
+
+        err = socket_module.gaierror(-2, "Name or service not known")
+        redis_mock = AsyncMock()
+        redis_mock.check_ip_rate_limit = AsyncMock(return_value=True)
+        with TestClient(app, raise_server_exceptions=False) as c:
+            with patch("src.api.routes.auth.get_redis_client", return_value=redis_mock):
+                with patch("src.api.routes.auth.get_postgres_client") as mock_get_db:
+                    db_mock = AsyncMock()
+                    db_mock.get_user_by_email = AsyncMock(side_effect=err)
+                    mock_get_db.return_value = db_mock
+                    response = c.post(
+                        "/api/v1/auth/login/json",
+                        json={"email": "test@example.com", "password": "test123"},
+                    )
+        assert response.status_code == 503
+        assert "unavailable" in response.json().get("detail", "").lower()

@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/Badge';
 import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
+import { unwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
 
 interface Participant {
   id: string;
@@ -132,7 +133,8 @@ function OfferAnalyticsPanel({ offer }: { offer: Offer }) {
 
 type OfferTab = 'all' | 'active' | 'pending' | 'completed' | 'drafts';
 
-export default function ContractorActiveOffersPage() {
+export default function ContractorActiveOffersPage(props: PageParamsProps) {
+  unwrapPageParams(props);
   const t = useTranslations('contractor.offers');
   const accessToken = useAuthStore((s) => s.accessToken);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);

@@ -52,8 +52,12 @@ async def check_auth_rate_limit(request: Request) -> None:
             )
     except HTTPException:
         raise  # Re-raise 429
-    except Exception:
-        logger.warning("Redis unavailable for rate limiting — allowing request (degraded mode)")
+    except Exception as e:
+        logger.warning(
+            "Redis unavailable for rate limiting — allowing request (degraded mode): %s: %s",
+            type(e).__name__,
+            e,
+        )
 
 
 _SELF_REGISTERABLE_ROLES = frozenset({UserRole.RESIDENT, UserRole.CONTRACTOR})
@@ -128,20 +132,25 @@ async def signup(request: SignupRequest, _: None = Depends(check_auth_rate_limit
 
     # Send verification email (if SMTP configured)
     verify_token = str(uuid4())
-    redis = get_redis_client()
-    await redis.set(
-        f"email_verify:{verify_token}",
-        user.id,
-        ex=24 * 60 * 60,  # 24 hour expiry
-    )
-    email_service = get_email_service()
     settings = get_settings()
-    await email_service.send_verification_email(
-        to_email=user.email,
-        user_name=user.full_name or user.email.split("@")[0],
-        verification_token=verify_token,
-        base_url=settings.FRONTEND_URL,
-    )
+    try:
+        redis = get_redis_client()
+        await redis.set(
+            f"email_verify:{verify_token}",
+            user.id,
+            ex=24 * 60 * 60,  # 24 hour expiry
+        )
+    except Exception as e:
+        logger.warning("Redis unavailable for verify token; skipping verification email: %s", e)
+        verify_token = ""  # Skip email if we cannot store token
+    if verify_token:
+        email_service = get_email_service()
+        await email_service.send_verification_email(
+            to_email=user.email,
+            user_name=user.full_name or user.email.split("@")[0],
+            verification_token=verify_token,
+            base_url=settings.FRONTEND_URL,
+        )
 
     # Auto-login: create token
     access_token = create_access_token(
@@ -151,12 +160,15 @@ async def signup(request: SignupRequest, _: None = Depends(check_auth_rate_limit
     )
     refresh_token = create_refresh_token(user_id=user.id)
 
-    redis = get_redis_client()
-    await redis.set(
-        f"refresh_token:{user.id}",
-        refresh_token,
-        ex=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
-    )
+    try:
+        redis = get_redis_client()
+        await redis.set(
+            f"refresh_token:{user.id}",
+            refresh_token,
+            ex=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+        )
+    except Exception as e:
+        logger.warning("Redis unavailable for refresh token; login works but refresh may fail: %s", e)
 
     return SignupResponse(
         token=access_token,
@@ -194,21 +206,25 @@ async def register(request: UserCreate, _: None = Depends(check_auth_rate_limit)
 
     # Send verification email
     verify_token = str(uuid4())
-    redis = get_redis_client()
-    await redis.set(
-        f"email_verify:{verify_token}",
-        user.id,
-        ex=24 * 60 * 60,  # 24 hour expiry
-    )
-
-    email_service = get_email_service()
     settings = get_settings()
-    await email_service.send_verification_email(
-        to_email=user.email,
-        user_name=user.full_name or user.email.split("@")[0],
-        verification_token=verify_token,
-        base_url=settings.FRONTEND_URL,
-    )
+    try:
+        redis = get_redis_client()
+        await redis.set(
+            f"email_verify:{verify_token}",
+            user.id,
+            ex=24 * 60 * 60,  # 24 hour expiry
+        )
+    except Exception as e:
+        logger.warning("Redis unavailable for verify token: %s", e)
+        verify_token = ""
+    if verify_token:
+        email_service = get_email_service()
+        await email_service.send_verification_email(
+            to_email=user.email,
+            user_name=user.full_name or user.email.split("@")[0],
+            verification_token=verify_token,
+            base_url=settings.FRONTEND_URL,
+        )
 
     return user
 
@@ -310,17 +326,24 @@ async def login_json(
     db = get_postgres_client()
     redis = get_redis_client()
 
+    identifier = request.email or (request.phone if request.phone else "")
     if request.email:
         user = await db.get_user_by_email(request.email)
     else:
         assert request.phone is not None  # validated by LoginRequest
         user = await db.get_user_by_phone(request.phone)
     if not user:
+        logger.info("Login 401: user not found for identifier=%s", identifier[:3] + "***" if len(identifier) > 3 else "***")
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     hashed = await db.get_user_password_hash(user.id)
     if not hashed or not verify_password(request.password, hashed):
-        fail_count = await redis.increment_login_failures(user.id)
+        logger.info("Login 401: invalid password for user_id=%s", user.id)
+        try:
+            fail_count = await redis.increment_login_failures(user.id)
+        except Exception as e:
+            logger.warning("Redis unavailable for login failure tracking: %s", e)
+            fail_count = 0
         if fail_count >= 5:
             await db.update_user(user.id, {"is_active": False})
             logger.warning("Account locked due to too many failed logins: %s", user.email)
@@ -344,12 +367,15 @@ async def login_json(
     )
     refresh_token = create_refresh_token(user_id=user.id)
 
-    await redis.set(
-        f"refresh_token:{user.id}",
-        refresh_token,
-        ex=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
-    )
-    await redis.clear_login_failures(user.id)
+    try:
+        await redis.set(
+            f"refresh_token:{user.id}",
+            refresh_token,
+            ex=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+        )
+        await redis.clear_login_failures(user.id)
+    except Exception as e:
+        logger.warning("Redis unavailable for token storage; login will work but refresh may fail: %s", e)
 
     await db.update_user(user.id, {"last_login": datetime.now(UTC)})
 

@@ -7,6 +7,7 @@ import { Suspense, useEffect, useState } from "react";
 
 import { apiClient, ApiError } from "@/lib/api/client";
 import { cn } from "@/lib/utils/cn";
+import { unwrapPageParams, PageParamsProps } from "@/lib/utils/unwrapPageParams";
 
 function VerifyEmailContent() {
   const searchParams = useSearchParams();
@@ -104,7 +105,8 @@ function VerifyEmailContent() {
   );
 }
 
-export default function VerifyEmailPage() {
+export default function VerifyEmailPage(props: PageParamsProps) {
+  unwrapPageParams(props);
   return (
     <Suspense
       fallback={

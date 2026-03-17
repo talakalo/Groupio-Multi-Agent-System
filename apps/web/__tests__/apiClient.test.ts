@@ -121,6 +121,24 @@ describe('ApiClient', () => {
 
       await expect(apiClient.getOffer('offer-1')).rejects.toThrow('Cannot refresh');
     });
+
+    it('does NOT trigger refresh on 401 for auth endpoints (login, signup, refresh)', async () => {
+      const refreshFn = vi.fn();
+      apiClient.setOn401Retry(refreshFn);
+
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        statusText: 'Unauthorized',
+        json: async () => ({ detail: 'Invalid credentials' }),
+      });
+
+      await expect(apiClient.login({ email: 'u@ex.com', password: 'x' })).rejects.toThrow(
+        'Invalid credentials'
+      );
+      expect(refreshFn).not.toHaveBeenCalled();
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+    });
   });
 
   // ---- ApiError ----

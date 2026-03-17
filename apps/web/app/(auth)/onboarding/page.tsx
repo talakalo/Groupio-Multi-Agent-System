@@ -25,6 +25,7 @@ import { StepIndicator } from '@/components/shared/StepIndicator';
 import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
+import { unwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
 
 
 // ---------------------------------------------------------------------------
@@ -96,7 +97,8 @@ const STEPS: OnboardingStep[] = ['role', 'info', 'preferences'];
 // Component
 // ---------------------------------------------------------------------------
 
-export default function OnboardingPage() {
+export default function OnboardingPage(props: PageParamsProps) {
+  unwrapPageParams(props);
   const router = useRouter();
   const t = useTranslations('onboarding');
   const tCommon = useTranslations('common');

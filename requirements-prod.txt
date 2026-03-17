@@ -19,6 +19,10 @@ langgraph>=0.0.30
 tiktoken>=0.5.0
 
 # Databases
+alembic>=1.13.0
+# Alembic uses SQLAlchemy create_engine with postgresql:// — defaults to psycopg2 (sync).
+# App runtime uses asyncpg (async). Both connect to the same Postgres.
+psycopg2-binary>=2.9.0
 qdrant-client>=1.7.0
 neo4j>=5.15.0
 supabase>=2.3.0

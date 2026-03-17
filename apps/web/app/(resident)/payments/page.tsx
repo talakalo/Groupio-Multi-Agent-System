@@ -21,6 +21,7 @@ import { EscrowBadge } from '@/components/features/payments/EscrowBadge';
 import { Badge } from '@/components/ui/Badge';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { apiClient } from '@/lib/api/client';
+import { unwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
 
 // ---- Types ----
 // TODO: Payment duplicates @groupio/types Payment; consider importing when API shape aligns.
@@ -188,7 +189,8 @@ function EscrowExplainer() {
 
 // ---- Main Page ----
 
-export default function PaymentsPage() {
+export default function PaymentsPage(props: PageParamsProps) {
+  unwrapPageParams(props);
   const t = useTranslations('payments');
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);

@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { Badge } from '@/components/ui/Badge';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
+import { unwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
 
 type EscalationStatus = 'open' | 'in_progress' | 'resolved';
 type EscalationPriority = 'low' | 'medium' | 'high' | 'critical';
@@ -59,7 +60,8 @@ const STATUS_STYLES: Record<EscalationStatus, string> = {
   resolved: 'text-emerald-500',
 };
 
-export default function BuildingsManagerEscalationsPage() {
+export default function BuildingsManagerEscalationsPage(props: PageParamsProps) {
+  unwrapPageParams(props);
   const t = useTranslations('buildingsManager.escalations');
   const accessToken = useAuthStore((s) => s.accessToken);
   const queryClient = useQueryClient();

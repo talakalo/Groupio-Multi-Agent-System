@@ -43,8 +43,17 @@ def _role_exists(name: str) -> bool:
     )
 
 
+def _is_supabase(conn) -> bool:
+    """Supabase uses database 'postgres' and does not allow custom roles/GRANTs."""
+    return (
+        conn.execute(sa.text("SELECT current_database()")).scalar() == "postgres"
+    )
+
+
 def upgrade() -> None:
     conn = op.get_bind()
+    if _is_supabase(conn):
+        return  # Supabase: managed roles, skip custom groupio_app/groupio_readonly
 
     # ── 1. Create application role ─────────────────────────────────────────
     if not _role_exists("groupio_app"):
@@ -141,6 +150,10 @@ def _policy_exists(conn, table: str, policy: str) -> bool:
 
 
 def downgrade() -> None:
+    conn = op.get_bind()
+    if _is_supabase(conn):
+        return
+
     # Remove policies
     for table in _SENSITIVE_TABLES:
         op.execute(f"DROP POLICY IF EXISTS owner_bypass_{table} ON {table}")

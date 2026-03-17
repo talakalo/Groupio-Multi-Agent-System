@@ -27,6 +27,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
+import { unwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
 
 
 // ---------------------------------------------------------------------------
@@ -118,7 +119,8 @@ function GroupOfferCard({ offer }: { offer: Offer }) {
 // Main page
 // ---------------------------------------------------------------------------
 
-export default function BuildingPage() {
+export default function BuildingPage(props: PageParamsProps) {
+  unwrapPageParams(props);
   const t = useTranslations('building');
   const tCommon = useTranslations('common');
   const [copiedCode, setCopiedCode] = useState(false);

@@ -18,15 +18,10 @@ depends_on = None
 def upgrade() -> None:
     op.create_table(
         "notifications",
-        sa.Column(
-            "id",
-            postgresql.UUID(as_uuid=True),
-            server_default=sa.text("gen_random_uuid()"),
-            primary_key=True,
-        ),
+        sa.Column("id", sa.String(36), primary_key=True),
         sa.Column(
             "user_id",
-            postgresql.UUID(as_uuid=True),
+            sa.String(36),
             sa.ForeignKey("users.id", ondelete="CASCADE"),
             nullable=False,
             index=True,

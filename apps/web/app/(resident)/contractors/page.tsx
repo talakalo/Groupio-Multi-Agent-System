@@ -22,6 +22,7 @@ import { TrustBadgeCluster } from '@/components/shared/TrustBadgeCluster';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { apiClient } from '@/lib/api/client';
 import { cn } from '@/lib/utils/cn';
+import { unwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
 
 
 // ---------------------------------------------------------------------------
@@ -238,7 +239,8 @@ function ContractorCard({ contractor }: { contractor: ContractorWithScore }) {
 // Main page
 // ---------------------------------------------------------------------------
 
-export default function ContractorsPage() {
+export default function ContractorsPage(props: PageParamsProps) {
+  unwrapPageParams(props);
   const t = useTranslations('contractors');
   const tCat = useTranslations('categories');
   const tRegions = useTranslations('regions');

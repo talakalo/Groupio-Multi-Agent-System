@@ -1,10 +1,21 @@
 import { Users, ShieldCheck, BadgeCheck, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
+import {
+  PLATFORM_STATS,
+  PLATFORM_STATS_LABELS,
+} from "@/lib/constants/platformStats";
+
 const TRUST_BADGES = [
-  { icon: Users, text: "3,200+ דיירים פעילים" },
+  {
+    icon: Users,
+    text: `${PLATFORM_STATS.activeResidents} ${PLATFORM_STATS_LABELS.activeResidents}`,
+  },
   { icon: ShieldCheck, text: "תשלום מוגן בנאמנות" },
-  { icon: BadgeCheck, text: "קבלנים מאומתים בלבד" },
+  {
+    icon: BadgeCheck,
+    text: `${PLATFORM_STATS.verifiedContractors} ${PLATFORM_STATS_LABELS.verifiedContractors} בלבד`,
+  },
 ];
 
 export default function HeroSection() {

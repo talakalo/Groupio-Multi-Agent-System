@@ -7,6 +7,7 @@ import { useState, useMemo } from 'react';
 
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
+import { unwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
 
 interface Building {
   id: string;
@@ -21,7 +22,8 @@ interface Building {
   admin_user_id?: string;
 }
 
-export default function BuildingsManagerBuildingsPage() {
+export default function BuildingsManagerBuildingsPage(props: PageParamsProps) {
+  unwrapPageParams(props);
   const t = useTranslations('buildingsManager.buildings');
   const accessToken = useAuthStore((s) => s.accessToken);
   const [search, setSearch] = useState('');

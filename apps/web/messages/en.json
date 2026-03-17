@@ -49,7 +49,63 @@
     "newOffer": "New Offer",
     "myBusiness": "My Business"
   },
+  "admin": {
+    "dashboard": {
+      "title": "Admin Dashboard",
+      "subtitle": "System administration and oversight",
+      "buildingsManagerCard": {
+        "title": "Buildings Manager",
+        "description": "Manage buildings, escalations and residents"
+      },
+      "systemSettingsCard": {
+        "title": "System Settings",
+        "description": "Coming soon"
+      }
+    }
+  },
+  "adminNav": {
+    "dashboard": "Dashboard",
+    "buildingsManager": "Buildings Manager",
+    "roleSuperAdmin": "Super Admin",
+    "roleAdmin": "Admin",
+    "myAccount": "My Account"
+  },
   "buildingsManager": {
+    "dashboard": {
+      "title": "Buildings Manager Dashboard",
+      "subtitle": "Overview of buildings, escalations and active offers",
+      "stats": {
+        "openEscalations": "Open Escalations",
+        "activeOffers": "Active Offers",
+        "totalResidents": "Total Residents",
+        "totalBuildings": "Total Buildings"
+      },
+      "viewAll": "View All",
+      "recentBuildings": "Recent Buildings",
+      "openEscalations": "Open Escalations",
+      "noBuildings": "No buildings",
+      "noEscalations": "No open escalations",
+      "units": "units",
+      "open": "open"
+    },
+    "escalations": {
+      "title": "Escalations",
+      "total": "{count} escalations",
+      "filters": {
+        "allStatuses": "All statuses",
+        "open": "Open",
+        "inProgress": "In progress",
+        "resolved": "Resolved",
+        "allPriorities": "All priorities",
+        "critical": "Critical",
+        "high": "High",
+        "medium": "Medium",
+        "low": "Low"
+      },
+      "empty": "No escalations",
+      "resolving": "Resolving...",
+      "resolve": "Resolve"
+    },
     "buildings": {
       "title": "Buildings",
       "total": "{count} buildings total",
@@ -631,6 +687,15 @@
       "failed": "Failed",
       "refunded": "Refunded"
     }
+  },
+  "buildingsManagerNav": {
+    "dashboard": "Dashboard",
+    "buildings": "Buildings",
+    "escalations": "Escalations",
+    "role": "Buildings Manager",
+    "roleSuperAdmin": "Super Admin",
+    "roleAdmin": "Admin",
+    "myAccount": "My Account"
   },
   "contractorNav": {
     "dashboard": "Dashboard",
