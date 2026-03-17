@@ -1,7 +1,7 @@
 """Unit tests for PostgresClient using mocks (asyncpg path)."""
 
 from datetime import UTC, datetime
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -82,6 +82,59 @@ async def test_get_user_by_phone_returns_none(client):
     ):
         user = await client.get_user_by_phone("0500000000")
         assert user is None
+
+
+@pytest.mark.asyncio
+async def test_auth_tables_exist_true_when_users_table_exists(client):
+    """auth_tables_exist returns True when users table is present."""
+    mock_conn = AsyncMock()
+    mock_conn.fetchrow = AsyncMock(return_value={"1": 1})
+
+    class _AcquireCM:
+        async def __aenter__(self):
+            return mock_conn
+
+        async def __aexit__(self, *a):
+            pass
+
+    mock_pool = MagicMock()  # acquire() is sync, returns context manager
+    mock_pool.acquire.return_value = _AcquireCM()
+
+    with (
+        patch.object(client, "_use_supabase_client", return_value=False),
+        patch.object(client, "_get_client", new_callable=AsyncMock, return_value=mock_pool),
+    ):
+        assert await client.auth_tables_exist() is True
+
+
+@pytest.mark.asyncio
+async def test_auth_tables_exist_false_when_users_table_missing(client):
+    """auth_tables_exist returns False when users table is absent."""
+    mock_conn = AsyncMock()
+    mock_conn.fetchrow = AsyncMock(return_value=None)
+
+    class _AcquireCM:
+        async def __aenter__(self):
+            return mock_conn
+
+        async def __aexit__(self, *a):
+            pass
+
+    mock_pool = MagicMock()
+    mock_pool.acquire.return_value = _AcquireCM()
+
+    with (
+        patch.object(client, "_use_supabase_client", return_value=False),
+        patch.object(client, "_get_client", new_callable=AsyncMock, return_value=mock_pool),
+    ):
+        assert await client.auth_tables_exist() is False
+
+
+@pytest.mark.asyncio
+async def test_auth_tables_exist_returns_true_for_supabase(client):
+    """auth_tables_exist returns True for Supabase (schema managed externally)."""
+    with patch.object(client, "_use_supabase_client", return_value=True):
+        assert await client.auth_tables_exist() is True
 
 
 @pytest.mark.asyncio

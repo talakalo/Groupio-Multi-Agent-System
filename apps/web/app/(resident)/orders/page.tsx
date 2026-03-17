@@ -30,6 +30,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { apiClient, ApiError } from "@/lib/api/client";
 import { cn } from "@/lib/utils/cn";
+import { unwrapPageParams, PageParamsProps } from "@/lib/utils/unwrapPageParams";
 
 // ---- Types ----
 
@@ -337,7 +338,8 @@ function ReviewButton({
 
 // ---- Main page ----
 
-export default function OrdersPage() {
+export default function OrdersPage(props: PageParamsProps) {
+  unwrapPageParams(props);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

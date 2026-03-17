@@ -32,7 +32,14 @@ export const metadata: Metadata = {
   },
 };
 
-export default function LandingPage() {
+type LandingPageProps = {
+  params?: Promise<Record<string, string | string[]>>;
+  searchParams?: Promise<Record<string, string | string[]>>;
+};
+
+export default async function LandingPage(props: LandingPageProps) {
+  if (props.params) await props.params;
+  if (props.searchParams) await props.searchParams;
   return (
     <div className="min-h-screen">
       <script type="application/ld+json">

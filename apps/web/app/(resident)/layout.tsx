@@ -27,6 +27,7 @@ import { NotificationPanel } from '@/components/shared/NotificationPanel';
 import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
+import { unwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
 
 // ---------------------------------------------------------------------------
 // Nav config
@@ -162,7 +163,9 @@ function SidebarLink({
 // Layout
 // ---------------------------------------------------------------------------
 
-export default function ResidentLayout({ children }: { children: ReactNode }) {
+export default function ResidentLayout(props: { children: ReactNode } & PageParamsProps) {
+  unwrapPageParams(props);
+  const { children } = props;
   const pathname = usePathname();
   const router = useRouter();
   const t = useTranslations('residentNav');

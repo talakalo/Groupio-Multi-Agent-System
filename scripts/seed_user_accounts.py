@@ -3,12 +3,14 @@
 Seed predefined user accounts for development and demo.
 
 Usage:
-    # With Supabase (default if SUPABASE_URL is set):
+    # Preferred: run inside API container (same DB as login):
+    docker compose -f docker/docker-compose.yml run --rm api python scripts/seed_user_accounts.py
+
+    # With Supabase (unset USE_LOCAL_POSTGRES or use SUPABASE_URL):
     python scripts/seed_user_accounts.py
 
-    # With local PostgreSQL:
-    USE_LOCAL_POSTGRES=1 python scripts/seed_user_accounts.py
-    # Requires: pip install asyncpg, PostgreSQL running, alembic upgrade head
+    # Against Docker Postgres from host (127.0.0.1) — only if 127.0.0.1:5432 is Docker, not local Postgres:
+    python scripts/seed_user_accounts.py
 
 Creates (skips if email already exists):
 - Buildings Manager: groupioappofficial@gmail.com / T2207al!@#
@@ -66,7 +68,7 @@ ACCOUNTS = [
         "email": "tal.akalo@gmail.com",
         "password": "T220782al!@#",
         "full_name": "Super Admin",
-        "phone": "0500000004",
+        "phone": "0525140908",
         "role": UserRole.SUPER_ADMIN,
     },
 ]
@@ -81,6 +83,7 @@ async def seed_user_accounts() -> None:
     except Exception as e:
         print("Database connection failed:", e)
         print("  Local PostgreSQL: start the server (e.g. brew services start postgresql@14)")
+        print("  Docker Postgres from host: USE_LOCAL_POSTGRES=1 DOCKER_POSTGRES_LOCALHOST=1 python scripts/seed_user_accounts.py")
         print("  Or use Supabase: unset USE_LOCAL_POSTGRES and set SUPABASE_URL/SUPABASE_KEY in docker/.env")
         raise SystemExit(1) from e
 

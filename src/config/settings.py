@@ -42,6 +42,16 @@ class Settings(BaseSettings):
     SUPABASE_KEY: str = ""
     # Local PostgreSQL (used when SUPABASE_URL is empty or USE_LOCAL_POSTGRES=1)
     DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/groupio"
+    # When set (e.g. by Docker Compose), used instead of DATABASE_URL when USE_LOCAL_POSTGRES=1.
+    # Resolves errno 99: API in Docker must use service name "postgres", not localhost/Supabase host.
+    # Prefer DOCKER_POSTGRES_* when all set — builds URL with proper encoding (fixes @ in password).
+    DOCKER_DATABASE_URL: str = ""
+    DOCKER_POSTGRES_HOST: str = ""
+    DOCKER_POSTGRES_USER: str = ""
+    DOCKER_POSTGRES_PASSWORD: str = ""
+    DOCKER_POSTGRES_DB: str = ""
+    # Set to 1 when running scripts from host against Docker Postgres (127.0.0.1)
+    DOCKER_POSTGRES_LOCALHOST: str = ""
     # Set to "1" or "true" to force local PostgreSQL (useful when Supabase has connection issues)
     USE_LOCAL_POSTGRES: str = ""
 
@@ -49,7 +59,7 @@ class Settings(BaseSettings):
     # In production, set REDIS_URL to include credentials, e.g.:
     #   redis://:yourpassword@redis:6379/0
     # Or set REDIS_PASSWORD separately (used when REDIS_URL has no password).
-    REDIS_URL: str = "redis://localhost:6379"
+    REDIS_URL: str = "redis://127.0.0.1:6379"
     REDIS_PASSWORD: str = ""
 
     # LLM Settings

@@ -18,6 +18,7 @@ import { useEffect, useState } from 'react';
 import { NotificationPanel } from '@/components/shared/NotificationPanel';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
+import { unwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
 
 interface NavItem {
   href: string;
@@ -31,7 +32,9 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/buildings-manager/escalations', labelKey: 'escalations', icon: AlertCircle },
 ];
 
-export default function BuildingsManagerLayout({ children }: { children: React.ReactNode }) {
+export default function BuildingsManagerLayout(props: { children: React.ReactNode } & PageParamsProps) {
+  unwrapPageParams(props);
+  const { children } = props;
   const pathname = usePathname();
   const router = useRouter();
   const t = useTranslations('buildingsManagerNav');
@@ -45,10 +48,16 @@ export default function BuildingsManagerLayout({ children }: { children: React.R
       router.replace('/login');
       return;
     }
-    if (user && user.role !== 'buildings_manager' && user.role !== 'admin' && user.role !== 'super_admin') {
+    if (!user) return;
+    // Admin/super_admin default home is /admin/dashboard; redirect if they landed on buildings-manager dashboard
+    if ((user.role === 'admin' || user.role === 'super_admin') && pathname === '/buildings-manager/dashboard') {
+      router.replace('/admin/dashboard');
+      return;
+    }
+    if (user.role !== 'buildings_manager' && user.role !== 'admin' && user.role !== 'super_admin') {
       router.replace('/dashboard');
     }
-  }, [token, user, router]);
+  }, [token, user, pathname, router]);
 
   if (!token) {
     return null;
@@ -72,7 +81,9 @@ export default function BuildingsManagerLayout({ children }: { children: React.R
         <Building2 className="h-8 w-8 text-emerald-500" />
         <div>
           <span className="text-xl font-bold text-emerald-600">Groupio</span>
-          <p className="text-xs text-gray-400 leading-none mt-0.5">{t('role')}</p>
+          <p className="text-xs text-gray-400 leading-none mt-0.5">
+            {user?.role === 'super_admin' ? t('roleSuperAdmin') : user?.role === 'admin' ? t('roleAdmin') : t('role')}
+          </p>
         </div>
       </div>
 

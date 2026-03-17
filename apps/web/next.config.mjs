@@ -54,6 +54,16 @@ const securityHeaders = [
 const nextConfig = {
   transpilePackages: ["@groupio/types", "@groupio/api-client", "@groupio/utils"],
 
+  webpack: (config) => {
+    // Suppress Sentry/OpenTelemetry critical dependency warnings (require-in-the-middle, dynamic require)
+    config.ignoreWarnings = [
+      ...(config.ignoreWarnings || []),
+      { module: /require-in-the-middle/ },
+      { module: /@opentelemetry\/instrumentation/, message: /Critical depend|request of a dependency/ },
+    ];
+    return config;
+  },
+
   images: {
     remotePatterns: [
       {
@@ -65,6 +75,9 @@ const nextConfig = {
   },
 
   experimental: {
+    // Suppress params/searchParams enumeration warning from dev tools (e.g. Cursor
+    // element picker) that serialize React props — app code unwraps via use()/await.
+    internal_disableSyncDynamicAPIWarnings: true,
     optimizePackageImports: [
       "lucide-react",
       "recharts",          // used in admin charts; tree-shakes unused components

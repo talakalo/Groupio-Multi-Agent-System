@@ -35,4 +35,18 @@ Transcribed from screenshot:
 - **Trust badges above the fold increase checkout conversion** — Position trust indicators prominently in checkout flows.
 - **window.prompt() and window.location.reload() are anti-patterns** — Use modals and state invalidation instead.
 
+### Backend / DevOps
+- **REDIS_URL with localhost can cause Errno 99 on macOS** — Use `127.0.0.1` instead of `localhost` in Redis/DB URLs to avoid IPv6 resolution issues. Code now normalizes this in `redis_client.py` and `postgres.py`.
+- **API must be restarted after .env changes** — `uvicorn --reload` only reloads on Python file changes. Restart manually for env/config changes.
+- **503 on login** — Usually DB or Redis unreachable. Run `python scripts/check_auth_deps.py` to diagnose. Verify: (1) Redis running (Docker: `docker compose -f docker/docker-compose.yml up -d redis`), (2) Postgres reachable (Supabase not paused), (3) When API runs in Docker, REDIS_URL uses hostname `redis` not 127.0.0.1. Restart API after .env changes.
+- **Docker errno 99 on DB connect** — API in Docker must use the `postgres` service hostname, not localhost or Supabase host. When `USE_LOCAL_POSTGRES=1`, the app uses `DOCKER_POSTGRES_*` (set by compose) instead of `DATABASE_URL` from .env. Do not set `DATABASE_URL` to Supabase when using local Docker Postgres.
+- **Docker must run migrations** — A fresh Postgres volume has no schema. Docker Compose must run `alembic upgrade head` before uvicorn. API command now does: `alembic upgrade head && uvicorn ...`. See `tasks/RUNTIME_CONFIG_AUDIT_REPORT.md`.
+- **Startup readiness ≠ schema readiness** — "Database connection verified" (pool creation) does not prove auth tables exist. Add `auth_tables_exist()` check and log clearly if `users` is missing. Return 503 (not 500) for `UndefinedTableError`.
+- **Runtime failure audit** — Login/signup: duplicate-submit guard (useRef), 423 (Locked) mapping, gaierror→503 in backend. See `tasks/runtime_failure_audit_report.md`.
+
+### API contracts
+- **Profile password change vs forgot password** — `POST /auth/password/reset` expects `{email}` (unauthenticated). For changing password when logged in, use `POST /auth/password/change` with `{current_password, new_password}` and auth header. Profile page was incorrectly using password-reset.
+- **Payments list** — Backend has `GET /payments/my`, not `GET /payments?status=...`. Dashboard was requesting wrong path (404).
+- **Building join in dev** — Relative `/api/v1/...` hits Next.js in dev (no rewrite). Use full `apiBase` URL so requests reach the backend.
+
 <!-- Add entries below as corrections and patterns emerge -->

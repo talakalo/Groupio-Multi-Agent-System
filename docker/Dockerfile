@@ -34,7 +34,10 @@ COPY --from=builder /install /usr/local
 
 # Copy only necessary source code
 COPY src/ ./src/
+COPY scripts/ ./scripts/
 COPY pyproject.toml ./
+COPY alembic/ ./alembic/
+COPY alembic.ini ./
 
 # Set ownership to non-root user
 RUN chown -R appuser:appuser /app

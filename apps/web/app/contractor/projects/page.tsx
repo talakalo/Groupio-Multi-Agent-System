@@ -8,6 +8,7 @@ import { useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/Badge';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
+import { unwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
 
 type ProjectStatus = 'all' | 'in_progress' | 'completed' | 'cancelled';
 
@@ -81,7 +82,8 @@ function MilestoneTimeline({ project }: { project: ProjectWithStats }) {
   );
 }
 
-export default function ContractorProjectsPage() {
+export default function ContractorProjectsPage(props: PageParamsProps) {
+  unwrapPageParams(props);
   const t = useTranslations('contractor.projects');
   const accessToken = useAuthStore((s) => s.accessToken);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);

@@ -49,7 +49,63 @@
     "newOffer": "הצעה חדשה",
     "myBusiness": "העסק שלי"
   },
+  "admin": {
+    "dashboard": {
+      "title": "לוח בקרה - מנהל מערכת",
+      "subtitle": "ניהול מערכת ופיקוח",
+      "buildingsManagerCard": {
+        "title": "מנהל בניינים",
+        "description": "ניהול בניינים, הסלמות ודיירים"
+      },
+      "systemSettingsCard": {
+        "title": "הגדרות מערכת",
+        "description": "בקרוב"
+      }
+    }
+  },
+  "adminNav": {
+    "dashboard": "לוח בקרה",
+    "buildingsManager": "מנהל בניינים",
+    "roleSuperAdmin": "מנהל מערכת",
+    "roleAdmin": "מנהל",
+    "myAccount": "החשבון שלי"
+  },
   "buildingsManager": {
+    "dashboard": {
+      "title": "לוח בקרה - מנהל בניינים",
+      "subtitle": "סקירת הבניינים, ההסלמות וההצעות הפעילות",
+      "stats": {
+        "openEscalations": "הסלמות פתוחות",
+        "activeOffers": "הצעות פעילות",
+        "totalResidents": "סה\"כ דיירים",
+        "totalBuildings": "סה\"כ בניינים"
+      },
+      "viewAll": "הצג הכל",
+      "recentBuildings": "בניינים אחרונים",
+      "openEscalations": "הסלמות פתוחות",
+      "noBuildings": "אין בניינים",
+      "noEscalations": "אין הסלמות פתוחות",
+      "units": "יחידות",
+      "open": "פתוח"
+    },
+    "escalations": {
+      "title": "הסלמות",
+      "total": "{count} הסלמות",
+      "filters": {
+        "allStatuses": "כל הסטטוסים",
+        "open": "פתוח",
+        "inProgress": "בתהליך",
+        "resolved": "הושלם",
+        "allPriorities": "כל העדיפויות",
+        "critical": "קריטי",
+        "high": "גבוה",
+        "medium": "בינוני",
+        "low": "נמוך"
+      },
+      "empty": "אין הסלמות",
+      "resolving": "מטפל...",
+      "resolve": "טפל"
+    },
     "buildings": {
       "title": "בניינים",
       "total": "סה\"כ {count} בניינים",
@@ -631,6 +687,15 @@
       "failed": "נכשל",
       "refunded": "הוחזר"
     }
+  },
+  "buildingsManagerNav": {
+    "dashboard": "לוח בקרה",
+    "buildings": "בניינים",
+    "escalations": "הסלמות",
+    "role": "מנהל בניינים",
+    "roleSuperAdmin": "מנהל מערכת",
+    "roleAdmin": "מנהל",
+    "myAccount": "החשבון שלי"
   },
   "contractorNav": {
     "dashboard": "לוח בקרה",

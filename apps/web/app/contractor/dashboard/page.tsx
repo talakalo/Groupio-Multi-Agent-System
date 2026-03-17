@@ -19,10 +19,12 @@ import { AttentionBanner } from '@/components/shared/AttentionBanner';
 import { StatCard } from '@/components/shared/StatCard';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
+import { unwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
 
 type OfferTab = 'all' | 'active' | 'pending' | 'completed';
 
-export default function ContractorDashboardPage() {
+export default function ContractorDashboardPage(props: PageParamsProps) {
+  unwrapPageParams(props);
   const t = useTranslations('contractor.dashboard');
   const accessToken = useAuthStore((s) => s.accessToken);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);

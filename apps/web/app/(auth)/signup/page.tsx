@@ -2,7 +2,6 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
-  Building2,
   User,
   Wrench,
   ClipboardList,
@@ -12,15 +11,16 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { StepIndicator } from "@/components/shared/StepIndicator";
-import { apiClient } from "@/lib/api/client";
+import { apiClient, ApiError } from "@/lib/api/client";
 import { setAuthCookie } from "@/lib/auth/setAuthCookie";
 import { useAuthStore } from "@/lib/stores/authStore";
 import { cn } from "@/lib/utils/cn";
+import { unwrapPageParams, PageParamsProps } from "@/lib/utils/unwrapPageParams";
 
 const signupSchema = z.object({
   name: z.string().min(2, "נא להזין שם מלא (לפחות 2 תווים)"),
@@ -79,7 +79,8 @@ const ROLE_OPTIONS = [
   },
 ];
 
-export default function SignupPage() {
+export default function SignupPage(props: PageParamsProps) {
+  unwrapPageParams(props);
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialRole = (searchParams.get("role") as UserRole) || "resident";
@@ -88,6 +89,7 @@ export default function SignupPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<"role" | "details">("role");
+  const submittingRef = useRef(false);
 
   const {
     register,
@@ -98,6 +100,8 @@ export default function SignupPage() {
   });
 
   const onSubmit = async (data: SignupFormData) => {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setIsLoading(true);
     setError(null);
 
@@ -142,8 +146,7 @@ export default function SignupPage() {
       }
       setAuthCookie(response.token, user);
       if (selectedRole === "buildings_manager") {
-        const adminUrl = process.env.NEXT_PUBLIC_ADMIN_URL || "http://localhost:3001";
-        window.location.href = `${adminUrl}/dashboard#token=${encodeURIComponent(response.token)}`;
+        router.push("/buildings-manager/dashboard");
         return;
       }
       router.push(
@@ -152,34 +155,34 @@ export default function SignupPage() {
           : "/dashboard"
       );
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "אירעה שגיאה בהרשמה. נסו שוב."
-      );
+      const status = err instanceof ApiError ? err.status : null;
+      const msg =
+        status === 503
+          ? "השירות לא זמין כרגע. נסו שוב מאוחר יותר."
+          : status === 500
+            ? "אירעה שגיאה בשרת. נסו שוב."
+            : status === 429
+              ? "יותר מדי ניסיונות. המתינו מספר דקות ונסו שוב."
+              : err instanceof Error
+                ? err.message
+                : "אירעה שגיאה בהרשמה. נסו שוב.";
+      setError(msg);
     } finally {
+      submittingRef.current = false;
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-primary-50 to-white flex items-center justify-center px-4 py-12">
-      <div className="w-full max-w-lg">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-2">
-            <Building2 className="h-10 w-10 text-primary-500" />
-            <span className="text-3xl font-bold text-primary-600">
-              Groupio
-            </span>
-          </Link>
-          <h1 className="text-2xl font-bold text-gray-900 mt-6 mb-2">
-            הצטרפו ל-Groupio
-          </h1>
-          <p className="text-gray-600">התחילו לחסוך עם השכנים שלכם</p>
-        </div>
+    <>
+      <div className="text-center mb-8">
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">
+          הצטרפו ל-Groupio
+        </h1>
+        <p className="text-gray-600">התחילו לחסוך עם השכנים שלכם</p>
+      </div>
 
-        {/* Progress indicator */}
+      {/* Progress indicator */}
         <StepIndicator
           steps={[{ label: "בחירת תפקיד" }, { label: "פרטים אישיים" }]}
           currentStep={step === "role" ? 0 : 1}
@@ -200,42 +203,42 @@ export default function SignupPage() {
                   onClick={() => setSelectedRole(option.value)}
                   aria-pressed={isSelected}
                   className={cn(
-                    "w-full text-right p-5 rounded-xl border-2 transition-all duration-200",
+                    "w-full text-right p-4 rounded-xl border-2 transition-all duration-200",
                     isSelected
-                      ? "border-primary-500 bg-primary-50/50 shadow-sm ring-2 ring-primary-500/20"
+                      ? "border-primary-500 bg-primary-50 shadow-sm ring-2 ring-primary-400/30"
                       : "border-gray-200 bg-white hover:border-primary-200 hover:bg-gray-50/50"
                   )}
                 >
-                  <div className="flex items-start gap-4">
+                  <div className="flex items-start gap-3">
                     <div
                       className={cn(
-                        "flex-shrink-0 w-14 h-14 rounded-xl flex items-center justify-center transition-colors",
+                        "flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center transition-colors",
                         isSelected
-                          ? "bg-primary-500 text-white shadow-md"
+                          ? "bg-primary-500 text-white"
                           : "bg-gray-100 text-gray-500"
                       )}
                     >
-                      <Icon className="h-7 w-7" />
+                      <Icon className="h-6 w-6" />
                     </div>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-lg font-bold text-gray-900">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <h3 className="text-base font-bold text-gray-900">
                           {option.title}
                         </h3>
                         {isSelected && (
-                          <Check className="h-5 w-5 text-primary-500" />
+                          <Check className="h-5 w-5 text-primary-500 flex-shrink-0" />
                         )}
                       </div>
-                      <p className="text-gray-600 text-sm mt-1">
+                      <p className="text-gray-600 text-sm mt-0.5">
                         {option.description}
                       </p>
-                      <ul className="mt-3 space-y-1.5">
-                        {option.features.map((feature) => (
+                      <ul className="mt-2 space-y-0.5">
+                        {option.features.slice(0, 3).map((feature) => (
                           <li
                             key={feature}
-                            className="flex items-center gap-2 text-sm text-gray-500"
+                            className="flex items-center gap-2 text-xs text-gray-500"
                           >
-                            <Check className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" />
+                            <Check className="h-3 w-3 text-primary-500 flex-shrink-0" />
                             {feature}
                           </li>
                         ))}
@@ -431,17 +434,16 @@ export default function SignupPage() {
           </form>
         )}
 
-        {/* Login link */}
-        <p className="text-center text-gray-600 mt-6">
-          כבר יש לכם חשבון?{" "}
-          <Link
-            href="/login"
-            className="text-primary-600 hover:text-primary-700 font-medium"
-          >
-            התחברו
-          </Link>
-        </p>
-      </div>
-    </div>
+      {/* Login link */}
+      <p className="text-center text-gray-600 mt-6">
+        כבר יש לכם חשבון?{" "}
+        <Link
+          href="/login"
+          className="text-primary-600 hover:text-primary-700 font-medium"
+        >
+          התחברו
+        </Link>
+      </p>
+    </>
   );
 }

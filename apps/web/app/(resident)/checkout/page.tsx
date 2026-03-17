@@ -40,6 +40,7 @@ import { EscrowBadge } from "@/components/features/payments/EscrowBadge";
 import { PriceBreakdown } from "@/components/features/payments/PriceBreakdown";
 import { TrustBadgeCluster } from "@/components/shared/TrustBadgeCluster";
 import { apiClient, ApiError } from "@/lib/api/client";
+import { unwrapPageParams, PageParamsProps } from "@/lib/utils/unwrapPageParams";
 
 // ---- Types ----
 
@@ -584,7 +585,8 @@ function CheckoutContent() {
 
 // ---- Page ----
 
-export default function CheckoutPage() {
+export default function CheckoutPage(props: PageParamsProps) {
+  unwrapPageParams(props);
   return (
     <div className="mx-auto max-w-4xl px-4 py-8" dir="rtl">
       {/* Breadcrumb */}

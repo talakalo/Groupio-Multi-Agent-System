@@ -28,6 +28,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
+import { unwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -227,7 +228,8 @@ function OrderRow({ order }: { order: DashboardOrder }) {
 // Main page
 // ---------------------------------------------------------------------------
 
-export default function ResidentDashboardPage() {
+export default function ResidentDashboardPage(props: PageParamsProps) {
+  unwrapPageParams(props);
   const t = useTranslations('dashboard');
 
   const accessToken = useAuthStore((s) => s.accessToken);
@@ -277,14 +279,27 @@ export default function ResidentDashboardPage() {
     enabled: !!accessToken,
   });
 
-  // Fetch active orders
+  // Fetch active orders (pending, processing, succeeded)
+  const ACTIVE_STATUSES = ['pending', 'processing', 'succeeded'];
   const ordersQuery = useQuery<DashboardOrder[]>({
     queryKey: ['resident', 'orders', 'active'],
     queryFn: async () => {
-      const res = await fetch(`${apiBase}/api/v1/payments?status=active&page_size=5`, { headers });
+      const res = await fetch(`${apiBase}/api/v1/payments/my`, { headers });
       if (!res.ok) return [];
       const data = await res.json();
-      return Array.isArray(data) ? data : data.items ?? data.payments ?? [];
+      const raw = Array.isArray(data) ? data : data.items ?? data.payments ?? [];
+      return raw
+        .filter((p: { status?: string }) => ACTIVE_STATUSES.includes(p?.status ?? ''))
+        .map((p: Record<string, unknown>) => ({
+          id: p.id,
+          offerId: p.offer_id ?? p.offerId ?? '',
+          offerTitle: (p.offer_title ?? p.offerTitle) as string | undefined,
+          amount: Number(p.amount ?? 0),
+          currency: (p.currency ?? 'ILS') as string,
+          status: (p.status ?? 'pending') as string,
+          createdAt: (p.created_at ?? p.createdAt ?? '') as string,
+          transactionId: (p.transaction_id ?? p.transactionId) as string | undefined,
+        }));
     },
     enabled: !!accessToken,
   });

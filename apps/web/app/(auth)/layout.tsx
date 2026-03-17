@@ -1,93 +1,74 @@
+import { Building2 } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-export default function AuthLayout({ children }: { children: ReactNode }) {
+import { AuthTrustBadges } from "@/components/auth/AuthTrustBadges";
+
+type AuthLayoutProps = {
+  children: ReactNode;
+  params?: Promise<Record<string, string | string[]>>;
+  searchParams?: Promise<Record<string, string | string[]>>;
+};
+
+export default async function AuthLayout({ children, params, searchParams }: AuthLayoutProps) {
+  if (params) await params;
+  if (searchParams) await searchParams;
   return (
-    <div className="min-h-screen flex">
-      {/* Left Side - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-600 to-blue-800 p-12 flex-col justify-between">
-        <div>
-          <Link href="/" className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center">
-              <span className="text-blue-600 font-bold text-xl">G</span>
-            </div>
-            <span className="text-white text-2xl font-bold">Groupio</span>
+    <div className="min-h-screen bg-gradient-to-b from-primary-50 to-white">
+      {/* Header — matches landing page */}
+      <header className="border-b border-gray-100 bg-white/80 backdrop-blur-md">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-2">
+            <Building2 className="h-8 w-8 text-primary-500" />
+            <span className="text-2xl font-bold text-primary-600">Groupio</span>
           </Link>
-        </div>
-
-        <div className="space-y-8">
-          <h1 className="text-4xl font-bold text-white leading-tight">
-            חסכו עד 40% בשירותים לבניין שלכם
-          </h1>
-          <p className="text-xl text-blue-100">
-            הצטרפו לאלפי דיירים שכבר נהנים מהצעות קבוצתיות משתלמות
-          </p>
-
-          {/* Stats */}
-          <div className="grid grid-cols-3 gap-6">
-            <div>
-              <div className="text-3xl font-bold text-white">5,000+</div>
-              <div className="text-blue-200 text-sm">דיירים פעילים</div>
-            </div>
-            <div>
-              <div className="text-3xl font-bold text-white">₪2M+</div>
-              <div className="text-blue-200 text-sm">נחסכו בסך הכל</div>
-            </div>
-            <div>
-              <div className="text-3xl font-bold text-white">200+</div>
-              <div className="text-blue-200 text-sm">קבלנים מאומתים</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Testimonial */}
-        <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6">
-          <p className="text-white text-lg mb-4">
-            &ldquo;חסכנו 35% על התקנת מזגנים לכל הבניין. התהליך היה פשוט ומהיר!&rdquo;
-          </p>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-400 rounded-full flex items-center justify-center">
-              <span className="text-white font-medium">יכ</span>
-            </div>
-            <div>
-              <div className="text-white font-medium">יוסי כהן</div>
-              <div className="text-blue-200 text-sm">ועד בית, תל אביב</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Right Side - Auth Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-gray-50 dark:bg-gray-900">
-        <div className="w-full max-w-md">
-          {/* Mobile Logo */}
-          <div className="lg:hidden mb-8 text-center">
-            <Link href="/" className="inline-flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-xl">G</span>
-              </div>
-              <span className="text-gray-900 dark:text-white text-2xl font-bold">Groupio</span>
+          <nav className="flex items-center gap-6">
+            <a
+              href="/#how-it-works"
+              className="text-gray-600 hover:text-primary-600 transition-colors"
+            >
+              איך זה עובד
+            </a>
+            <Link
+              href="/offers"
+              className="text-gray-600 hover:text-primary-600 transition-colors"
+            >
+              הצעות
             </Link>
-          </div>
-
-          {children}
-
-          {/* Footer Links */}
-          <div className="mt-8 text-center text-sm text-gray-500 dark:text-gray-400">
-            <p>
-              בהמשך התחברות, אתם מסכימים ל
-              <Link href="/terms" className="text-blue-600 hover:underline mx-1">
-                תנאי השימוש
-              </Link>
-              ול
-              <Link href="/privacy" className="text-blue-600 hover:underline mx-1">
-                מדיניות הפרטיות
-              </Link>
-            </p>
-          </div>
+            <Link
+              href="/login"
+              className="text-gray-700 font-medium hover:text-primary-600 transition-colors"
+            >
+              התחברות
+            </Link>
+            <Link href="/signup" className="btn-primary">
+              הרשמה חינם
+            </Link>
+          </nav>
         </div>
-      </div>
+      </header>
+
+      {/* Main content — centered, landing-style */}
+      <main className="max-w-lg mx-auto px-4 py-12">
+        {children}
+
+        {/* Trust badges — compact, matches landing */}
+        <AuthTrustBadges />
+
+        {/* Footer */}
+        <div className="mt-10 text-center text-sm text-gray-500">
+          <p>
+            בהתחברות או בהרשמה, אתם מסכימים ל
+            <Link href="/terms" className="text-primary-600 hover:underline mx-1">
+              תנאי השימוש
+            </Link>
+            ול
+            <Link href="/privacy" className="text-primary-600 hover:underline mx-1">
+              מדיניות הפרטיות
+            </Link>
+          </p>
+        </div>
+      </main>
     </div>
   );
 }
-

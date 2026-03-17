@@ -33,6 +33,27 @@ async def lifespan(app: FastAPI):
     init_monitoring()
     logger.info("Groupio Agent API starting up")
 
+    # Validate auth-critical dependencies (login/signup will fail without these)
+    try:
+        db = get_postgres_client()
+        await db._get_client()
+        logger.info("Database connection verified")
+        if not await db.auth_tables_exist():
+            logger.error(
+                "Database schema not ready — users table missing. "
+                "Run: alembic upgrade head (or alembic -c alembic.docker.ini upgrade head from host)"
+            )
+    except Exception as e:
+        logger.error("Database unreachable at startup — login/signup will fail: %s", e)
+        logger.info("Run: python scripts/check_auth_deps.py to diagnose")
+
+    try:
+        redis = get_redis_client()
+        await redis.health_check()
+        logger.info("Redis connection verified")
+    except Exception as e:
+        logger.warning("Redis unreachable at startup — rate limit/login tracking degraded: %s", e)
+
     # Ensure vector DB collections exist
     try:
         vs = get_vector_store()
@@ -79,13 +100,45 @@ def _is_db_connection_error(exc: Exception) -> bool:
     return False
 
 
+def _is_connection_error(exc: Exception) -> bool:
+    """True if exception is due to Redis/network (e.g. EADDRNOTAVAIL, ECONNREFUSED, gaierror)."""
+    import errno as _errno
+    import socket as _socket
+
+    if _is_db_connection_error(exc):
+        return True
+    if isinstance(exc, _socket.gaierror):
+        return True  # DNS resolution failure (Name or service not known)
+    errno_val = getattr(exc, "errno", None) if isinstance(exc, OSError) else None
+    # EADDRNOTAVAIL (localhost IPv6), ECONNREFUSED — portable across macOS/Linux
+    return errno_val in (_errno.EADDRNOTAVAIL, _errno.ECONNREFUSED)
+
+
+def _is_schema_not_ready(exc: Exception) -> bool:
+    """True if exception indicates database schema not ready (e.g. users table missing)."""
+    exc_type = type(exc).__name__
+    if exc_type == "UndefinedTableError":
+        return True
+    # asyncpg.exceptions.UndefinedTableError
+    mod = type(exc).__module__
+    if "asyncpg" in mod and "UndefinedTable" in exc_type:
+        return True
+    return False
+
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Ensure CORS headers on error responses so browser shows real error, not CORS."""
     logger.exception("Unhandled exception: %s", exc)
-    if _is_db_connection_error(exc):
+    if _is_connection_error(exc):
         status_code = 503
-        content = {"detail": "Database unavailable. Please try again later."}
+        content = {"detail": "Service temporarily unavailable. Please try again later."}
+    elif _is_schema_not_ready(exc):
+        status_code = 503
+        content = {
+            "detail": "Database schema not ready. Migrations may not have run.",
+            "code": "DB_SCHEMA_NOT_READY",
+        }
     else:
         status_code = 500
         show_detail = get_settings().ENVIRONMENT == "development"
@@ -329,11 +382,15 @@ async def db_pool_health() -> dict:
 @app.get("/metrics")
 async def prometheus_metrics(
     x_api_key: str | None = Header(None, alias="X-API-Key"),
+    authorization: str | None = Header(None),
 ) -> Response:
-    """Expose Prometheus metrics — requires a valid X-API-Key header."""
+    """Expose Prometheus metrics — requires X-API-Key or Authorization: Bearer <key>."""
     _settings = get_settings()
     if _settings.API_KEYS:
-        if not x_api_key or x_api_key not in _settings.API_KEYS:
+        token = x_api_key
+        if not token and authorization and authorization.lower().startswith("bearer "):
+            token = authorization[7:].strip()
+        if not token or token not in _settings.API_KEYS:
             raise HTTPException(status_code=403, detail="Invalid or missing API key")
 
     from prometheus_client import CONTENT_TYPE_LATEST, generate_latest

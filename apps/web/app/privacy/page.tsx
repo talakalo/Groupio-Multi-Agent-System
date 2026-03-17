@@ -8,7 +8,11 @@ export const metadata: Metadata = {
 
 const LAST_UPDATED = '27 בפברואר 2026';
 
-export default function PrivacyPage() {
+type PrivacyPageProps = { params?: Promise<Record<string, string | string[]>>; searchParams?: Promise<Record<string, string | string[]>> };
+
+export default async function PrivacyPage(props: PrivacyPageProps) {
+  if (props.params) await props.params;
+  if (props.searchParams) await props.searchParams;
   return (
     <main className="max-w-3xl mx-auto px-4 py-12" dir="rtl">
       <nav className="text-sm text-gray-500 mb-8">

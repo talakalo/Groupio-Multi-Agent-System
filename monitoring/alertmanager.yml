@@ -1,6 +1,8 @@
 global:
   resolve_timeout: 5m
-  slack_api_url: '${SLACK_WEBHOOK_URL}'
+  # Slack webhook URL - set via env or use placeholder to avoid "unsupported scheme" error.
+  # Alertmanager does not expand env vars; use docker env_file or a valid URL.
+  slack_api_url: 'https://hooks.slack.com/services/placeholder'
 
 route:
   group_by: ['alertname', 'severity']

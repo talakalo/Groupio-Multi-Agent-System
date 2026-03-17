@@ -24,8 +24,10 @@ import { useState } from 'react';
 
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
+import { unwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
 
 
 // ---------------------------------------------------------------------------
@@ -112,7 +114,8 @@ function NotificationToggle({
 // Main page
 // ---------------------------------------------------------------------------
 
-export default function ResidentProfilePage() {
+export default function ResidentProfilePage(props: PageParamsProps) {
+  unwrapPageParams(props);
   const t = useTranslations('profile');
   const tCommon = useTranslations('common');
   const queryClient = useQueryClient();
@@ -181,26 +184,10 @@ export default function ResidentProfilePage() {
     if (!passwordForm.newPassword || passwordForm.newPassword !== passwordForm.confirm) return;
     setPasswordStatus('loading');
     try {
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
-
-      const res = await fetch(`${apiBase}/api/v1/auth/password-reset`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          current_password: passwordForm.current,
-          new_password: passwordForm.newPassword,
-        }),
-      });
-
-      if (res.ok) {
-        setPasswordStatus('success');
-        setPasswordForm({ current: '', newPassword: '', confirm: '' });
-        setTimeout(() => setPasswordStatus('idle'), 3000);
-      } else {
-        setPasswordStatus('error');
-        setTimeout(() => setPasswordStatus('idle'), 3000);
-      }
+      await apiClient.changePassword(passwordForm.current, passwordForm.newPassword);
+      setPasswordStatus('success');
+      setPasswordForm({ current: '', newPassword: '', confirm: '' });
+      setTimeout(() => setPasswordStatus('idle'), 3000);
     } catch {
       setPasswordStatus('error');
       setTimeout(() => setPasswordStatus('idle'), 3000);
