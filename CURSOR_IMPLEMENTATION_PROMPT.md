@@ -856,6 +856,672 @@ Add `NEXT_PUBLIC_CHAT_TIMEOUT_MS` to `.env.example`.
 
 ---
 
+---
+
+## PERF — PERFORMANCE IMPROVEMENTS (Critical for production readiness)
+
+The app has severe performance bottlenecks across backend, frontend, and LLM integration layers. The Anthropic API returns `529 Overloaded` errors because there's no retry/backoff on the frontend API client and the backend makes redundant LLM calls.
+
+---
+
+### PERF-1: Add Retry Logic with Exponential Backoff to API Client (CRITICAL)
+
+**Problem:** `packages/api-client/src/client.ts` has **zero retry logic**. Any transient failure (network blip, 429 rate limit, 502 gateway error, 529 overloaded) immediately fails the entire request. Users see cryptic errors.
+
+**File:** `packages/api-client/src/client.ts`
+
+**Required fix:** Add a retry wrapper around the core `request()` method:
+
+```typescript
+private async requestWithRetry<T>(
+  method: string,
+  path: string,
+  options?: RequestInit & { body?: any },
+  retries = 3
+): Promise<T> {
+  const retryableStatuses = [429, 502, 503, 504, 529];
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await this.request<T>(method, path, options);
+    } catch (error: any) {
+      lastError = error;
+      const status = error?.status || error?.response?.status;
+
+      // Don't retry client errors (except rate limit/overload)
+      if (status && status >= 400 && status < 500 && !retryableStatuses.includes(status)) {
+        throw error;
+      }
+
+      // Don't retry on last attempt
+      if (attempt === retries) break;
+
+      // Exponential backoff: 1s, 2s, 4s
+      const delay = Math.min(1000 * Math.pow(2, attempt), 8000);
+      // Add jitter to prevent thundering herd
+      const jitter = Math.random() * delay * 0.3;
+      await new Promise(resolve => setTimeout(resolve, delay + jitter));
+
+      console.warn(`[API] Retry ${attempt + 1}/${retries} for ${method} ${path} (status: ${status})`);
+    }
+  }
+
+  throw lastError;
+}
+```
+
+Then update all public methods (`get`, `post`, `put`, `patch`, `delete`) to call `requestWithRetry` instead of `request`.
+
+**Also add request deduplication** for GET requests — if the same GET is already in-flight, return the existing promise:
+
+```typescript
+private inflightRequests = new Map<string, Promise<any>>();
+
+private async deduplicatedGet<T>(path: string): Promise<T> {
+  const key = `GET:${path}`;
+  if (this.inflightRequests.has(key)) {
+    return this.inflightRequests.get(key)!;
+  }
+  const promise = this.requestWithRetry<T>('GET', path)
+    .finally(() => this.inflightRequests.delete(key));
+  this.inflightRequests.set(key, promise);
+  return promise;
+}
+```
+
+**Acceptance criteria:**
+- 429/502/503/504/529 errors are retried up to 3 times with exponential backoff + jitter
+- 400/401/403/404 errors are NOT retried (immediate fail)
+- Duplicate concurrent GET requests are coalesced into a single network call
+- Console warning logged on each retry attempt
+- Total retry time capped at ~15 seconds (1s + 2s + 4s + jitter)
+
+---
+
+### PERF-2: Cache Auth Token Verification in Redis (CRITICAL)
+
+**Problem:** `src/api/middleware/auth.py` line ~165 calls `await db.get_user(payload.sub)` on **every single authenticated request**. This means every API call hits PostgreSQL to fetch the full user row, even though the JWT already contains the user ID and role.
+
+**File:** `src/api/middleware/auth.py`
+
+**Required fix:** Cache the user lookup in Redis with a short TTL:
+
+```python
+from src.databases.redis_client import RedisClient
+
+redis = RedisClient()
+
+async def get_current_user(token: str = Depends(oauth2_scheme)):
+    payload = decode_token(token)
+    user_id = payload.sub
+
+    # Try Redis cache first
+    cache_key = f"auth:user:{user_id}"
+    cached = await redis.get(cache_key)
+    if cached:
+        return json.loads(cached)
+
+    # Cache miss — fetch from DB
+    user = await db.get_user(user_id)
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+
+    # Cache for 5 minutes (matches typical session activity window)
+    await redis.set(cache_key, json.dumps(user), ex=300)
+
+    return user
+```
+
+**Also add cache invalidation** when user profile is updated:
+
+In `src/api/routes/auth.py`, after `PUT /me` and `DELETE /me`:
+```python
+await redis.delete(f"auth:user:{user['id']}")
+```
+
+In `src/api/routes/admin.py`, after suspend/activate user:
+```python
+await redis.delete(f"auth:user:{user_id}")
+```
+
+**Acceptance criteria:**
+- First request after login hits DB, subsequent requests use Redis cache
+- Cache TTL is 5 minutes
+- Profile update/delete/suspend invalidates the cache
+- If Redis is down, falls back to DB query (no crash)
+- Measure: response time for authenticated endpoints should drop from ~50ms to ~5ms
+
+---
+
+### PERF-3: Fix N+1 Query in Scheduler Contractor Rating Update (CRITICAL)
+
+**Problem:** `src/workers/scheduler.py` lines 162-168 fetches all verified contractors then updates ratings **one at a time** in a loop. With 1000 contractors, this is 1001 database queries.
+
+**File:** `src/workers/scheduler.py`
+
+**Current code:**
+```python
+contractors, _ = await db.list_contractors(filters={"verification_status": "verified"}, page=1, page_size=1000)
+for contractor in contractors:
+    await db.update_contractor_rating(contractor["id"])
+```
+
+**Required fix:** Create a batch update method in `src/databases/postgres.py`:
+
+```python
+async def batch_update_contractor_ratings(self, contractor_ids: list[str]) -> int:
+    """Update ratings for multiple contractors in a single query."""
+    if not contractor_ids:
+        return 0
+
+    if self.use_supabase:
+        # Supabase: batch RPC call
+        result = await self.supabase.rpc("batch_update_contractor_ratings", {
+            "contractor_ids": contractor_ids
+        }).execute()
+        return len(result.data) if result.data else 0
+    else:
+        # Direct SQL: single UPDATE with subquery
+        query = """
+            UPDATE contractors c SET
+                average_rating = sub.avg_rating,
+                review_count = sub.cnt,
+                updated_at = NOW()
+            FROM (
+                SELECT contractor_id,
+                       AVG(rating) as avg_rating,
+                       COUNT(*) as cnt
+                FROM reviews
+                WHERE contractor_id = ANY($1)
+                GROUP BY contractor_id
+            ) sub
+            WHERE c.id = sub.contractor_id
+        """
+        async with self.pool.acquire() as conn:
+            result = await conn.execute(query, contractor_ids)
+            return int(result.split()[-1])
+```
+
+Then update scheduler:
+```python
+contractors, _ = await db.list_contractors(filters={"verification_status": "verified"}, page=1, page_size=1000)
+contractor_ids = [c["id"] for c in contractors]
+updated = await db.batch_update_contractor_ratings(contractor_ids)
+logger.info(f"Batch-updated {updated} contractor ratings")
+```
+
+**Acceptance criteria:**
+- 1 query to list contractors + 1 query to batch-update ratings = 2 total queries
+- Same result as the loop-based approach
+- Scheduler task completes in seconds instead of minutes
+
+---
+
+### PERF-4: Fix N+1 Email Sends in Scheduler (HIGH)
+
+**Problem:** `src/workers/scheduler.py` lines 138-155 sends notification emails one-by-one in a loop for cancelled offers.
+
+**File:** `src/workers/scheduler.py`
+
+**Required fix:** Use `asyncio.gather()` for concurrent email sends (with a concurrency limit):
+
+```python
+import asyncio
+from itertools import islice
+
+async def send_batch_emails(participants, email_svc, offer):
+    """Send emails concurrently with a concurrency limiter."""
+    semaphore = asyncio.Semaphore(10)  # Max 10 concurrent sends
+
+    async def send_one(p):
+        async with semaphore:
+            try:
+                await email_svc.send_offer_cancelled(p["email"], offer)
+            except Exception as e:
+                logger.warning(f"Failed to send email to {p['email']}: {e}")
+
+    await asyncio.gather(*[send_one(p) for p in participants])
+```
+
+**Acceptance criteria:**
+- Emails sent concurrently (up to 10 at a time) instead of sequentially
+- Individual email failures don't block others
+- Total send time reduced proportionally
+
+---
+
+### PERF-5: Cache Orchestration Context Per Request (HIGH)
+
+**Problem:** `src/orchestration/graph.py` lines 227-268 makes 3-4 database calls on **every chat message** to fetch user profile, building, active offers, and RAG context — even if the user sends multiple messages in the same conversation.
+
+**File:** `src/orchestration/graph.py`
+
+**Required fix:** Add a short-lived cache for orchestration context:
+
+```python
+from functools import lru_cache
+from src.databases.redis_client import RedisClient
+
+redis = RedisClient()
+
+async def get_orchestration_context(user_id: str) -> dict:
+    """Get cached orchestration context for a user."""
+    cache_key = f"orch:ctx:{user_id}"
+    cached = await redis.get(cache_key)
+    if cached:
+        return json.loads(cached)
+
+    # Fetch all context in parallel
+    user_task = db.get_user(user_id)
+    building_task = db.get_user_building(user_id)
+    offers_task = db.list_offers(filters={"building_id": user_id}, page=1, page_size=20)
+
+    user, building, (offers, _) = await asyncio.gather(
+        user_task, building_task, offers_task
+    )
+
+    context = {
+        "user": user,
+        "building": building,
+        "active_offers": offers,
+    }
+
+    # Cache for 2 minutes
+    await redis.set(cache_key, json.dumps(context, default=str), ex=120)
+    return context
+```
+
+**Also make RAG prefetch conditional** — only fetch RAG context if the router agent determines it's needed:
+
+```python
+# Before (always runs):
+rag_results = await rag_pipeline.search(message)
+
+# After (conditional):
+if routed_agent in ['matching', 'support', 'architecture']:
+    rag_results = await rag_pipeline.search(message)
+else:
+    rag_results = []
+```
+
+**Acceptance criteria:**
+- First message fetches context in parallel (not sequential)
+- Subsequent messages within 2 minutes use cached context
+- RAG only runs when the routed agent needs it
+- Chat response time reduced by 200-500ms per message
+
+---
+
+### PERF-6: Add LLM Rate Limiting and 529 Handling (HIGH)
+
+**Problem:** `src/utils/llm_client.py` has retry with exponential backoff via tenacity, but doesn't specifically handle `529 Overloaded` from Anthropic. The retry logic retries on any exception, but doesn't differentiate between overloaded (should wait longer) vs. bad request (should not retry).
+
+**File:** `src/utils/llm_client.py`
+
+**Required fix:**
+
+1. Add specific handling for 529 errors with longer backoff:
+
+```python
+from anthropic import RateLimitError, APIStatusError
+
+def should_retry(exception):
+    """Determine if an exception is retryable."""
+    if isinstance(exception, RateLimitError):
+        return True  # 429
+    if isinstance(exception, APIStatusError) and exception.status_code == 529:
+        return True  # Overloaded
+    if isinstance(exception, (ConnectionError, TimeoutError)):
+        return True
+    return False
+
+@retry(
+    stop=stop_after_attempt(4),  # 4 attempts (up from 3)
+    wait=wait_exponential(multiplier=2, min=2, max=30),  # Longer backoff for LLM calls
+    retry=retry_if_exception(should_retry),
+    before_sleep=before_sleep_log(logger, logging.WARNING),
+)
+async def call_llm(self, messages, **kwargs):
+    ...
+```
+
+2. Add a token bucket rate limiter to prevent flooding:
+
+```python
+import asyncio
+import time
+
+class TokenBucketRateLimiter:
+    """Simple token bucket rate limiter for LLM API calls."""
+
+    def __init__(self, rate: float = 10.0, burst: int = 15):
+        self.rate = rate  # tokens per second
+        self.burst = burst
+        self.tokens = burst
+        self.last_refill = time.monotonic()
+        self._lock = asyncio.Lock()
+
+    async def acquire(self):
+        async with self._lock:
+            now = time.monotonic()
+            elapsed = now - self.last_refill
+            self.tokens = min(self.burst, self.tokens + elapsed * self.rate)
+            self.last_refill = now
+
+            if self.tokens < 1:
+                wait_time = (1 - self.tokens) / self.rate
+                await asyncio.sleep(wait_time)
+                self.tokens = 0
+            else:
+                self.tokens -= 1
+
+# Usage in LLMClient:
+class LLMClient:
+    def __init__(self):
+        self._rate_limiter = TokenBucketRateLimiter(rate=10, burst=15)
+
+    async def call_llm(self, messages, **kwargs):
+        await self._rate_limiter.acquire()
+        # ... existing call logic
+```
+
+3. Add client-level timeout to the Anthropic constructor:
+
+```python
+self.client = AsyncAnthropic(
+    api_key=settings.ANTHROPIC_API_KEY,
+    timeout=httpx.Timeout(60.0, connect=10.0),  # 60s total, 10s connect
+    max_retries=0,  # We handle retries ourselves
+)
+```
+
+**Acceptance criteria:**
+- 529 errors are retried with longer backoff (2s, 4s, 8s, 16s)
+- Rate limiter prevents more than 10 requests/second to Anthropic
+- Bad request errors (400) are NOT retried
+- Timeout set at both constructor and method level
+- Users see "AI is busy, retrying..." instead of raw 529 error
+
+---
+
+### PERF-7: Fix SELECT * in PostgreSQL Queries (MEDIUM)
+
+**Problem:** `src/databases/postgres.py` uses `SELECT *` on virtually every query (lines 215, 225, 235, 245, 294, 328, 354, and many more). This fetches unnecessary columns and increases payload size.
+
+**File:** `src/databases/postgres.py`
+
+**Required fix:** For the highest-traffic queries, specify columns explicitly:
+
+```python
+# Instead of:
+result = await conn.fetch("SELECT * FROM users WHERE id = $1", user_id)
+
+# Use:
+result = await conn.fetch("""
+    SELECT id, email, full_name, role, phone, building_id,
+           email_verified, avatar_url, created_at, updated_at
+    FROM users WHERE id = $1
+""", user_id)
+```
+
+**Priority queries to fix (highest traffic first):**
+1. `get_user()` — called on every authenticated request (after PERF-2 cache miss)
+2. `list_offers()` — called on offers listing pages
+3. `list_contractors()` — called on contractor search
+4. `get_offer()` — called on offer detail pages
+5. `list_payments()` — called on payment history
+
+**Acceptance criteria:**
+- Top 5 highest-traffic queries specify columns
+- No `SELECT *` on queries returning lists (only OK on single-row fetches if needed)
+- Payload sizes reduced
+
+---
+
+### PERF-8: Add Frontend Data Caching with SWR or React-Query (MEDIUM)
+
+**Problem:** Web app and admin app use raw `useEffect` + `fetch` for data loading. Every navigation and remount triggers a fresh API call with no client-side caching. Users see loading spinners on every page visit even for data they just saw.
+
+**Files:** All page components in `apps/web/app/` and `apps/admin/app/`
+
+**Required fix:** Install and configure SWR (lighter weight, fits existing pattern):
+
+```bash
+cd apps/web && npm install swr
+cd apps/admin && npm install swr
+```
+
+Create a shared hook factory in each app:
+
+```typescript
+// apps/web/lib/hooks/useApi.ts
+import useSWR from 'swr';
+import { apiClient } from '../api';
+
+export function useApiData<T>(key: string | null, fetcher: () => Promise<T>) {
+  return useSWR<T>(key, fetcher, {
+    revalidateOnFocus: false,      // Don't refetch when tab gets focus
+    revalidateOnReconnect: true,   // Refetch on network reconnect
+    dedupingInterval: 5000,        // Deduplicate requests within 5s
+    errorRetryCount: 3,            // Retry 3 times on error
+    errorRetryInterval: 2000,      // 2s between retries
+  });
+}
+
+// Usage in a page:
+export default function OffersPage() {
+  const { data: offers, error, isLoading, mutate } = useApiData(
+    'offers',
+    () => apiClient.getOffers({ page: 1, limit: 20 })
+  );
+
+  if (isLoading) return <OffersSkeleton />;
+  if (error) return <ErrorAlert error={error} onRetry={mutate} />;
+  // ...render offers
+}
+```
+
+**Priority pages to migrate (highest traffic):**
+1. Resident offers page
+2. Resident dashboard
+3. Resident payments
+4. Contractor dashboard
+5. Admin dashboard
+6. Admin offers/users/contractors pages
+
+**Acceptance criteria:**
+- Navigating away and back shows cached data instantly (no spinner)
+- Data revalidates in background after cache hit
+- Error retry happens automatically (3 times, 2s apart)
+- Concurrent identical requests are deduplicated
+- `mutate()` available for optimistic updates after mutations
+
+---
+
+### PERF-9: Add Pagination to Payment History Fetching (MEDIUM)
+
+**Problem:** `apps/web/app/(resident)/orders/page.tsx` line ~345 calls `getMyPayments()` which fetches ALL payments without pagination. For active users with hundreds of payments, this loads unnecessarily large payloads.
+
+**File:** `apps/web/app/(resident)/orders/page.tsx` and `packages/api-client/src/client.ts`
+
+**Required fix:**
+
+1. Update `getMyPayments()` in the API client to accept pagination params:
+```typescript
+async getMyPayments(params?: { page?: number; limit?: number; status?: string }): Promise<{
+  payments: Payment[];
+  total: number;
+  page: number;
+  pages: number;
+}> {
+  const query = new URLSearchParams();
+  if (params?.page) query.set('page', String(params.page));
+  if (params?.limit) query.set('limit', String(params.limit));
+  if (params?.status) query.set('status', params.status);
+  return this.get(`/payments/my?${query}`);
+}
+```
+
+2. Update the orders page to use paginated fetching:
+```typescript
+const [page, setPage] = useState(1);
+const ITEMS_PER_PAGE = 20;
+
+// Fetch with pagination
+const payments = await apiClient.getMyPayments({ page, limit: ITEMS_PER_PAGE });
+```
+
+3. Add pagination controls UI at the bottom of the list.
+
+**Acceptance criteria:**
+- Initial load fetches only 20 payments (not all)
+- Pagination controls allow navigating pages
+- Total count displayed
+- Filter changes reset to page 1
+
+---
+
+### PERF-10: Parallelize Orchestration Database Queries (MEDIUM)
+
+**Problem:** `src/orchestration/graph.py` lines 227-268 makes sequential database calls: first user profile, then building, then offers, then RAG. These are independent and can run in parallel.
+
+**File:** `src/orchestration/graph.py`
+
+**Required fix:** Use `asyncio.gather()` for independent queries:
+
+```python
+# Before (sequential — ~200ms total):
+user = await db.get_user(user_id)
+building = await db.get_user_building(user_id)
+offers, _ = await db.list_offers(filters={"building_id": building["id"]}, page=1, page_size=20)
+
+# After (parallel — ~70ms total):
+user, building = await asyncio.gather(
+    db.get_user(user_id),
+    db.get_user_building(user_id),
+)
+# Offers depends on building, so must be sequential:
+if building:
+    offers, _ = await db.list_offers(filters={"building_id": building["id"]}, page=1, page_size=20)
+else:
+    offers = []
+```
+
+**Acceptance criteria:**
+- Independent DB calls run in parallel
+- Dependent calls (offers needing building_id) remain sequential
+- Total context assembly time reduced by 40-60%
+
+---
+
+### PERF-11: Optimize Neo4j O(n²) Building Similarity (LOW)
+
+**Problem:** `src/databases/graph_store.py` `compute_and_store_similarity_edges()` (lines ~330-365) computes all-to-all building similarity for every building in a region. With 500 buildings in a region, that's 125,000 comparisons.
+
+**File:** `src/databases/graph_store.py`
+
+**Required fix:** Use approximate nearest neighbors instead of brute-force:
+
+```python
+async def compute_and_store_similarity_edges(self, region: str, top_k: int = 10):
+    """Compute similarity using top-K nearest neighbors instead of all-to-all."""
+    query = """
+        MATCH (b1:Building {region: $region})
+        MATCH (b2:Building {region: $region})
+        WHERE b1.id < b2.id
+        WITH b1, b2,
+             gds.similarity.cosine(b1.features, b2.features) AS similarity
+        WHERE similarity > 0.7
+        ORDER BY similarity DESC
+        WITH b1, b2, similarity
+        LIMIT $limit
+        MERGE (b1)-[r:SIMILAR_TO]-(b2)
+        SET r.score = similarity, r.updated_at = datetime()
+        RETURN count(r) as edges_created
+    """
+    # Limit to top-K per building instead of all-to-all
+    limit = top_k * await self._count_buildings_in_region(region)
+    result = await self.execute_query(query, {"region": region, "limit": limit})
+    return result[0]["edges_created"] if result else 0
+```
+
+**Alternatively**, run this as a background job with Neo4j GDS (Graph Data Science) library for native similarity computation.
+
+**Acceptance criteria:**
+- Similarity computation scales linearly instead of quadratically
+- Only stores top-K similar buildings per building (not all pairs)
+- Background job doesn't block API requests
+
+---
+
+### PERF-12: Add Response Caching Headers to Backend (LOW)
+
+**Problem:** FastAPI backend returns no `Cache-Control` or `ETag` headers. Every browser navigation triggers a full round-trip even for data that hasn't changed (e.g., static offer details, contractor profiles).
+
+**File:** `src/api/main.py` or create `src/api/middleware/caching.py`
+
+**Required fix:** Add caching middleware:
+
+```python
+from fastapi import Request, Response
+from starlette.middleware.base import BaseHTTPMiddleware
+
+class CacheHeaderMiddleware(BaseHTTPMiddleware):
+    # Routes that can be cached by the browser
+    CACHEABLE_ROUTES = {
+        "/api/v1/offers": 60,            # 1 minute
+        "/api/v1/contractors": 60,        # 1 minute
+        "/api/v1/buildings": 300,         # 5 minutes
+        "/api/v1/activity/recent": 30,    # 30 seconds
+    }
+
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+
+        if request.method == "GET":
+            for route, max_age in self.CACHEABLE_ROUTES.items():
+                if request.url.path.startswith(route):
+                    response.headers["Cache-Control"] = f"private, max-age={max_age}"
+                    break
+            else:
+                # Default: no-cache for unlisted routes
+                response.headers["Cache-Control"] = "no-cache"
+
+        # Never cache mutations
+        if request.method in ("POST", "PUT", "PATCH", "DELETE"):
+            response.headers["Cache-Control"] = "no-store"
+
+        return response
+
+# In main.py:
+app.add_middleware(CacheHeaderMiddleware)
+```
+
+**Acceptance criteria:**
+- GET /offers returns `Cache-Control: private, max-age=60`
+- POST/PUT/DELETE return `Cache-Control: no-store`
+- Browser caches offer listings for 60 seconds
+- Sensitive routes (auth, payments) never cached
+
+---
+
+## PERFORMANCE VERIFICATION CHECKLIST
+
+After completing performance fixes, measure:
+
+- [ ] **PERF-1:** API client retries 529 errors (simulate with network throttling)
+- [ ] **PERF-2:** Second authenticated API call is <10ms (Redis cached)
+- [ ] **PERF-3:** Scheduler contractor rating update completes in <5 seconds for 1000 contractors
+- [ ] **PERF-5:** Chat response starts within 1 second (cached context)
+- [ ] **PERF-6:** No more raw "529 Overloaded" errors shown to users
+- [ ] **PERF-8:** Navigating back to offers page shows cached data instantly
+- [ ] **PERF-9:** Payment history page loads in <1 second (paginated)
+- [ ] **PERF-10:** Orchestration context assembly <100ms (parallel queries)
+- [ ] Run load test: 50 concurrent users should not produce 529 errors
+
+---
+
 ## VERIFICATION CHECKLIST
 
 After completing all fixes, verify:
@@ -868,6 +1534,9 @@ After completing all fixes, verify:
 - [ ] **P1-2:** Admin app switches between Hebrew and English
 - [ ] **P1-3:** Web app core pages switch between Hebrew and English
 - [ ] **P1-4:** Admin dashboard pending payments shows real count
+- [ ] **PERF-1:** API calls retry on 529/502/503 errors automatically
+- [ ] **PERF-2:** Authenticated requests use Redis-cached user (check with Redis CLI)
+- [ ] **PERF-6:** LLM calls rate-limited and 529-resilient
 - [ ] All existing tests still pass: `pytest tests/` and `npm test` in each app
 - [ ] No TypeScript errors: `npx tsc --noEmit` in `apps/web`, `apps/admin`
 - [ ] No new console errors in browser dev tools
