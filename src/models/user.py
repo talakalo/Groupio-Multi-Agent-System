@@ -118,6 +118,7 @@ class TokenPayload(BaseModel):
     role: UserRole
     exp: datetime
     iat: datetime
+    jti: str | None = None  # JWT ID — used for token denylist (revocation)
 
 
 class PasswordReset(BaseModel):

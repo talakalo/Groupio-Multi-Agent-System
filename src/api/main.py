@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
-from src.api.middleware.auth import get_current_user
+from src.api.middleware.auth import get_current_user, verify_api_key
 from src.api.middleware.logging import RequestLoggingMiddleware
 from src.api.middleware.security import SecurityHeadersMiddleware
 from src.api.routes import api_router
@@ -183,7 +183,9 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-API-Key", "X-Request-ID"],
-    expose_headers=["Authorization"],
+    # Do NOT expose Authorization in expose_headers — this would allow JavaScript
+    # to read the token from XHR/fetch responses, increasing XSS token-theft risk.
+    expose_headers=[],
 )
 
 # Security headers middleware (HSTS, CSP, X-Frame-Options, etc.)
@@ -358,9 +360,9 @@ async def health_check() -> dict[str, Any]:
 @app.get(
     "/api/v1/health/db",
     summary="Database pool stats",
-    description="Returns asyncpg connection pool statistics (Task 3.5).",
+    description="Returns asyncpg connection pool statistics. Requires X-API-Key.",
 )
-async def db_pool_health() -> dict:
+async def db_pool_health(_: str = Depends(verify_api_key)) -> dict:
     """Return DB pool size/free/used stats for monitoring."""
     from src.databases.postgres import get_postgres_client
 

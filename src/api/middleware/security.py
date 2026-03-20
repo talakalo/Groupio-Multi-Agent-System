@@ -39,11 +39,14 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             # HSTS: 1 year, include subdomains, allow preload submission
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
 
-            # CSP: restrict to self + known API/CDN origins
+            # CSP: strict policy — no unsafe-inline.
+            # Note: Swagger UI (/docs) uses inline styles. Disable it in production
+            # (fastapi docs_url=None, redoc_url=None) or relax style-src only for
+            # the /docs path via a reverse proxy if documentation must be accessible.
             response.headers["Content-Security-Policy"] = (
                 "default-src 'self'; "
                 "script-src 'self'; "
-                "style-src 'self' 'unsafe-inline'; "
+                "style-src 'self'; "
                 "img-src 'self' data: https:; "
                 "font-src 'self'; "
                 "connect-src 'self'; "
