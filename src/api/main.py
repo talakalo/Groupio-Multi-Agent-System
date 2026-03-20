@@ -183,7 +183,9 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-API-Key", "X-Request-ID"],
-    expose_headers=["Authorization"],
+    # Do NOT expose Authorization in expose_headers — this would allow JavaScript
+    # to read the token from XHR/fetch responses, increasing XSS token-theft risk.
+    expose_headers=[],
 )
 
 # Security headers middleware (HSTS, CSP, X-Frame-Options, etc.)

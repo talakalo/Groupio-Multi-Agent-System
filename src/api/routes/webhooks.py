@@ -21,16 +21,21 @@ router = APIRouter(tags=["webhooks"])
 def _verify_whatsapp_signature(payload: bytes, signature: str | None) -> bool:
     """Verify WhatsApp webhook signature using HMAC-SHA256.
 
-    Returns True if valid. Logs warnings and returns False otherwise.
+    Fails closed: returns False if WHATSAPP_WEBHOOK_SECRET is not configured
+    or if the signature is missing/invalid. This prevents unauthenticated
+    webhook injection when the secret is not yet set.
     """
     settings = get_settings()
     secret = settings.WHATSAPP_WEBHOOK_SECRET
     if not secret:
-        logger.warning("WHATSAPP_WEBHOOK_SECRET not set — skipping signature check")
-        return True  # Allow in dev; will fail the validator in prod settings
+        logger.error(
+            "WHATSAPP_WEBHOOK_SECRET not configured — rejecting webhook request. "
+            "Set WHATSAPP_WEBHOOK_SECRET to enable WhatsApp webhook processing."
+        )
+        return False  # Fail closed — never accept unsigned webhooks
 
     if not signature:
-        logger.warning("Missing X-Hub-Signature-256 header")
+        logger.warning("Missing X-Hub-Signature-256 header on WhatsApp webhook")
         return False
 
     expected = "sha256=" + hmac.new(secret.encode(), payload, hashlib.sha256).hexdigest()
@@ -104,13 +109,15 @@ async def whatsapp_verify(
     expected_token = settings.WHATSAPP_WEBHOOK_SECRET
 
     if hub_mode == "subscribe":
-        if expected_token and hub_verify_token != expected_token:
+        if not expected_token:
+            # Fail closed — do not accept verification without a configured secret
+            logger.error(
+                "WHATSAPP_WEBHOOK_SECRET not configured — rejecting hub.subscribe verification. "
+                "Set WHATSAPP_WEBHOOK_SECRET to enable WhatsApp integration."
+            )
+            raise HTTPException(status_code=403, detail="Webhook secret not configured")
+        if hub_verify_token != expected_token:
             raise HTTPException(status_code=403, detail="Invalid verify token")
-        return int(hub_challenge)
-
-    if hub_mode == "subscribe" and not expected_token:
-        # Dev fallback: accept when no secret is configured
-        logger.warning("WhatsApp verification token not configured - accepting in dev mode")
         return int(hub_challenge)
 
     raise HTTPException(status_code=403, detail="Verification failed")

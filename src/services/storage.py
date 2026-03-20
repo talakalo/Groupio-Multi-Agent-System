@@ -27,6 +27,43 @@ ALLOWED_TYPES: dict[str, set[str]] = {
 MAX_FILE_SIZE = 20 * 1024 * 1024  # 20 MB
 BUCKETS = list(ALLOWED_TYPES.keys())
 
+# Magic bytes signatures for supported file types.
+# Each entry is (mime_type, [(offset, bytes_to_match), ...])
+# A file is accepted if ANY of its mime-type's signatures matches.
+_MAGIC_SIGNATURES: list[tuple[str, list[tuple[int, bytes]]]] = [
+    ("application/pdf", [(0, b"%PDF")]),
+    ("image/png", [(0, b"\x89PNG\r\n\x1a\n")]),
+    ("image/jpeg", [(0, b"\xff\xd8\xff")]),
+    # WebP: "RIFF" at 0, "WEBP" at 8
+    ("image/webp", [(0, b"RIFF"), (8, b"WEBP")]),
+    # HEIC/HEIF: "ftyp" at offset 4
+    ("image/heic", [(4, b"ftyp")]),
+]
+
+
+def _detect_magic_type(data: bytes) -> str | None:
+    """Return MIME type detected from magic bytes, or None if unknown."""
+    for mime, sigs in _MAGIC_SIGNATURES:
+        if all(
+            len(data) >= offset + len(magic) and data[offset : offset + len(magic)] == magic
+            for offset, magic in sigs
+        ):
+            return mime
+    return None
+
+
+def _verify_magic_bytes(data: bytes, declared_content_type: str) -> bool:
+    """Return True if the file's magic bytes match the declared content type.
+
+    Prevents Content-Type spoofing where an attacker uploads a malicious file
+    (e.g. an executable or HTML) with a trusted MIME type like image/jpeg.
+    """
+    detected = _detect_magic_type(data)
+    if detected is None:
+        # Unknown magic — reject to be safe
+        return False
+    return detected == declared_content_type
+
 
 class StorageError(Exception):
     """Raised when a storage operation fails."""
@@ -52,8 +89,19 @@ class StorageService:
     # Validation
     # ------------------------------------------------------------------
 
-    def validate_file(self, bucket: str, file_name: str, file_size: int, content_type: str | None) -> None:
-        """Raise *StorageError* if the file is not acceptable."""
+    def validate_file(
+        self,
+        bucket: str,
+        file_name: str,
+        file_size: int,
+        content_type: str | None,
+        file_data: bytes | None = None,
+    ) -> None:
+        """Raise *StorageError* if the file is not acceptable.
+
+        When *file_data* is supplied the actual magic bytes are verified against
+        the declared *content_type* to prevent Content-Type spoofing attacks.
+        """
         if bucket not in ALLOWED_TYPES:
             raise StorageError(f"Unknown bucket: {bucket}")
 
@@ -73,6 +121,15 @@ class StorageService:
                 f"File type '{content_type}' not allowed for bucket '{bucket}'. Allowed: {', '.join(sorted(allowed))}"
             )
 
+        # Verify actual file magic bytes to prevent Content-Type spoofing.
+        # Skip for unknown/unverifiable types (HEIC detection is less reliable).
+        if file_data is not None and content_type != "image/heic":
+            if not _verify_magic_bytes(file_data, content_type):
+                raise StorageError(
+                    f"File content does not match declared type '{content_type}'. "
+                    "Upload rejected to prevent Content-Type spoofing."
+                )
+
     # ------------------------------------------------------------------
     # Upload
     # ------------------------------------------------------------------
@@ -86,7 +143,7 @@ class StorageService:
         user_id: str | None = None,
     ) -> dict[str, str]:
         """Upload a file and return ``{storage_path, public_url}``."""
-        self.validate_file(bucket, file_name, len(file_data), content_type)
+        self.validate_file(bucket, file_name, len(file_data), content_type, file_data=file_data)
 
         ext = Path(file_name).suffix
         unique_name = f"{uuid4().hex}{ext}"

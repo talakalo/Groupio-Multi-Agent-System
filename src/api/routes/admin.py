@@ -10,7 +10,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, model_validator
 
 from src.api.middleware.auth import get_admin_user, hash_password
 from src.databases.postgres import get_postgres_client
@@ -26,9 +26,20 @@ logger = logging.getLogger(__name__)
 # --------------- Pydantic request models ---------------
 
 
+_VALID_USER_ROLES = {"resident", "contractor", "admin", "buildings_manager", "super_admin"}
+# Roles that can be assigned by a regular admin (not super_admin)
+_ADMIN_ASSIGNABLE_ROLES = {"resident", "contractor", "admin", "buildings_manager"}
+
+
 class AdminUserUpdate(BaseModel):
     role: str | None = None
     is_active: bool | None = None
+
+    @model_validator(mode="after")
+    def _validate_role(self) -> "AdminUserUpdate":
+        if self.role is not None and self.role not in _VALID_USER_ROLES:
+            raise ValueError(f"Invalid role '{self.role}'. Valid roles: {sorted(_VALID_USER_ROLES)}")
+        return self
 
 
 class AdminUserCreate(BaseModel):
@@ -37,6 +48,12 @@ class AdminUserCreate(BaseModel):
     phone: str
     password: str
     role: str = "admin"
+
+    @model_validator(mode="after")
+    def _validate_role(self) -> "AdminUserCreate":
+        if self.role not in _VALID_USER_ROLES:
+            raise ValueError(f"Invalid role '{self.role}'. Valid roles: {sorted(_VALID_USER_ROLES)}")
+        return self
 
 
 class ForceCancelRequest(BaseModel):
@@ -235,6 +252,12 @@ async def update_user(
     db = get_postgres_client()
     update_data: dict[str, Any] = {}
     if body.role is not None:
+        # Only super_admin can assign the super_admin role (privilege escalation guard)
+        if body.role == "super_admin" and admin.role not in ("super_admin",):
+            raise HTTPException(
+                status_code=403,
+                detail="Only super_admin can assign the super_admin role.",
+            )
         update_data["role"] = body.role
     if body.is_active is not None:
         update_data["is_active"] = body.is_active
@@ -262,6 +285,12 @@ async def create_admin_user(
     admin: UserInDB = Depends(get_admin_user),
 ) -> dict[str, Any]:
     """Create a new admin / staff user."""
+    # Only super_admin can create super_admin users (privilege escalation guard)
+    if body.role == "super_admin" and admin.role not in ("super_admin",):
+        raise HTTPException(
+            status_code=403,
+            detail="Only super_admin can create super_admin users.",
+        )
     db = get_postgres_client()
     user_id = str(uuid4())
     hashed = hash_password(body.password)

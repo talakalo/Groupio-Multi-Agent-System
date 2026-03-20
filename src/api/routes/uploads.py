@@ -7,12 +7,40 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 
 from src.api.middleware.auth import get_current_user
 from src.databases.postgres import get_postgres_client
+from src.databases.redis_client import get_redis_client
 from src.models.user import UserInDB
 from src.services.storage import StorageError, get_storage_service
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["uploads"])
+
+# File uploads are rate-limited separately from the main message endpoint.
+# Uploads are heavier operations (disk I/O, storage API calls) and must be
+# throttled more aggressively to prevent abuse/DoS.
+_UPLOAD_RATE_LIMIT = 10   # requests
+_UPLOAD_RATE_WINDOW = 60  # per 60 seconds
+
+
+async def _check_upload_rate_limit(current_user: UserInDB) -> None:
+    """Enforce per-user rate limit on upload endpoints (10 uploads/min)."""
+    try:
+        redis = get_redis_client()
+        allowed = await redis.check_rate_limit(
+            f"upload:{current_user.id}",
+            limit=_UPLOAD_RATE_LIMIT,
+            window=_UPLOAD_RATE_WINDOW,
+        )
+        if not allowed:
+            raise HTTPException(
+                status_code=429,
+                detail="Upload rate limit exceeded. Max 10 uploads per minute.",
+                headers={"Retry-After": str(_UPLOAD_RATE_WINDOW)},
+            )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.warning("Redis unavailable for upload rate limiting — allowing request: %s", exc)
 
 
 # ------------------------------------------------------------------
@@ -27,6 +55,7 @@ async def upload_architecture_plan(
     current_user: UserInDB = Depends(get_current_user),
 ) -> dict:
     """Upload a floor plan / architecture document for AI analysis."""
+    await _check_upload_rate_limit(current_user)
     storage = get_storage_service()
     data = await file.read()
 
@@ -36,6 +65,7 @@ async def upload_architecture_plan(
             file_name=file.filename or "unknown",
             file_size=len(data),
             content_type=file.content_type,
+            file_data=data,
         )
     except StorageError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -84,11 +114,12 @@ async def upload_contractor_doc(
     current_user: UserInDB = Depends(get_current_user),
 ) -> dict:
     """Upload a contractor document (license, insurance, certificate)."""
+    await _check_upload_rate_limit(current_user)
     storage = get_storage_service()
     data = await file.read()
 
     try:
-        storage.validate_file("contractor-docs", file.filename or "", len(data), file.content_type)
+        storage.validate_file("contractor-docs", file.filename or "", len(data), file.content_type, file_data=data)
     except StorageError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
@@ -129,11 +160,12 @@ async def upload_avatar(
     current_user: UserInDB = Depends(get_current_user),
 ) -> dict:
     """Upload user avatar."""
+    await _check_upload_rate_limit(current_user)
     storage = get_storage_service()
     data = await file.read()
 
     try:
-        storage.validate_file("avatars", file.filename or "", len(data), file.content_type)
+        storage.validate_file("avatars", file.filename or "", len(data), file.content_type, file_data=data)
     except StorageError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
