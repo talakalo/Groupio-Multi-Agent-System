@@ -76,9 +76,11 @@ async def test_upload_local_fallback(storage, tmp_path, monkeypatch):
     """Local fallback upload writes file and returns local path."""
     monkeypatch.chdir(tmp_path)
 
+    # Use real PDF magic bytes so the magic-byte validation passes
+    pdf_data = b"%PDF-1.4 fake content for testing"
     result = await storage.upload(
         bucket="contractor-docs",
-        file_data=b"hello world",
+        file_data=pdf_data,
         file_name="doc.pdf",
         content_type="application/pdf",
     )
@@ -87,7 +89,7 @@ async def test_upload_local_fallback(storage, tmp_path, monkeypatch):
     assert result["public_url"].startswith("/uploads/contractor-docs/")
     # Verify the file was actually written
     local_file = tmp_path / "uploads" / "contractor-docs" / result["storage_path"]
-    assert local_file.read_bytes() == b"hello world"
+    assert local_file.read_bytes() == pdf_data
 
 
 @pytest.mark.asyncio
