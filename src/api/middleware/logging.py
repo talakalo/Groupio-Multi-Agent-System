@@ -1,6 +1,7 @@
 """Request logging middleware with PII redaction."""
 
 import logging
+import re
 import time
 import uuid
 from collections.abc import Callable
@@ -13,6 +14,10 @@ from src.utils.pii import redact_pii
 
 logger = logging.getLogger(__name__)
 
+# Accept only alphanumeric + hyphen request IDs to prevent log injection.
+# Silently drop any X-Request-ID header that doesn't match.
+_REQUEST_ID_RE = re.compile(r"^[a-zA-Z0-9\-]{1,64}$")
+
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
     """Middleware that logs request/response metadata with request ID tracking.
@@ -20,10 +25,18 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
     All logged values are passed through :func:`redact_pii` so that emails,
     phone numbers, Israeli IDs, credit-card numbers, and JWTs never appear
     in plain text in application logs.
+
+    X-Request-ID is validated against a strict pattern before being logged or
+    propagated to prevent log injection via crafted header values.
     """
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+        raw_request_id = request.headers.get("X-Request-ID", "")
+        # Validate format to prevent log injection; generate fresh ID if invalid
+        if raw_request_id and _REQUEST_ID_RE.match(raw_request_id):
+            request_id = raw_request_id
+        else:
+            request_id = str(uuid.uuid4())
         start_time = time.time()
 
         # Add request ID to state for downstream access

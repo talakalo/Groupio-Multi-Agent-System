@@ -3,10 +3,14 @@
 import hashlib
 import hmac
 import logging
+import re
 from typing import Any
 
 import httpx
 from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Query, Request
+
+# E.164 phone number format (e.g. "972501234567" — digits only, 7-15 digits)
+_E164_PATTERN = re.compile(r"^\d{7,15}$")
 
 from src.config.settings import get_settings
 from src.databases.postgres import get_postgres_client
@@ -67,6 +71,12 @@ async def whatsapp_webhook(
     message = _parse_whatsapp_payload(payload)
 
     if not message:
+        return {"status": "ignored"}
+
+    # Validate phone number is E.164-like (digits only, 7-15 chars) to prevent
+    # injection if the phone value is used as an identifier downstream.
+    if not _E164_PATTERN.match(message["phone"]):
+        logger.warning("WhatsApp webhook: invalid phone format '%s' — ignoring", message["phone"][:20])
         return {"status": "ignored"}
 
     try:
