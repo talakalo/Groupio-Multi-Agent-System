@@ -195,6 +195,10 @@ async def get_current_user(
     if not user.is_active:
         raise HTTPException(status_code=403, detail="User is disabled")
 
+    settings = get_settings()
+    if settings.ENFORCE_EMAIL_VERIFICATION and not user.is_verified:
+        raise HTTPException(status_code=403, detail="Email not verified. Please verify your email before continuing.")
+
     return user
 
 

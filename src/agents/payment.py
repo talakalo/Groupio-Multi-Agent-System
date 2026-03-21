@@ -203,11 +203,23 @@ class PaymentAgent(BaseAgent):
 
         auto:            attempt the refund immediately, escalate to support if it fails.
         recommend/gated: queue a pending decision for admin review; no money moves yet.
+
+        Mode is read from system_settings DB first (reflects live admin UI changes),
+        falling back to the env-based Settings singleton.
         """
         from src.config.settings import get_settings
 
-        settings = get_settings()
-        mode = settings.PAYMENT_AGENT_MODE
+        env_settings = get_settings()
+        mode = env_settings.PAYMENT_AGENT_MODE
+        try:
+            db = get_postgres_client()
+            rows = await db.get_system_settings()
+            db_map = {row["key"]: row["value"] for row in rows}
+            db_mode = db_map.get("PAYMENT_AGENT_MODE")
+            if isinstance(db_mode, str) and db_mode:
+                mode = db_mode
+        except Exception as exc:
+            logger.warning("PaymentAgent: failed to read PAYMENT_AGENT_MODE from system_settings, using env: %s", exc)
 
         if mode in ("recommend", "gated"):
             return await self._handle_refund_gated(state, user_id, user_message, mode)
