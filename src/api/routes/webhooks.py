@@ -83,6 +83,23 @@ async def whatsapp_webhook(
         db = get_postgres_client()
         building_id = await db.get_building_by_phone(message["phone"])
 
+        # Verification gate: if the phone belongs to a registered but unverified
+        # user, degrade safely — send a prompt and skip orchestration entirely.
+        settings = get_settings()
+        if settings.ENFORCE_EMAIL_VERIFICATION:
+            wa_user = await db.get_user_by_phone(message["phone"])
+            if wa_user and not wa_user.is_verified:
+                logger.info(
+                    "WhatsApp: unverified user (phone prefix %s) — skipping orchestration",
+                    message["phone"][:4],
+                )
+                background_tasks.add_task(
+                    _send_whatsapp_reply,
+                    phone=message["phone"],
+                    text='חשבונך טרם אומת. אנא אמת את כתובת הדוא"ל שלך לפני שימוש בשירות.',
+                )
+                return {"status": "unverified"}
+
         orchestrator = get_orchestrator()
         result = await orchestrator.run(
             user_message=message["text"],
