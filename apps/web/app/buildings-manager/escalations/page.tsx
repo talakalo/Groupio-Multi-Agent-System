@@ -5,27 +5,11 @@ import { AlertCircle, CheckCircle2, Clock, ChevronDown } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 
-import { Badge } from '@/components/ui/Badge';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
-import { unwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
 
 type EscalationStatus = 'open' | 'in_progress' | 'resolved';
 type EscalationPriority = 'low' | 'medium' | 'high' | 'critical';
-
-const PRIORITY_ORDER: Record<EscalationPriority, number> = {
-  critical: 0,
-  high: 1,
-  medium: 2,
-  low: 3,
-};
-
-const PRIORITY_BADGE_VARIANT: Record<EscalationPriority, 'error' | 'warning' | 'primary' | 'default'> = {
-  critical: 'error',
-  high: 'warning',
-  medium: 'primary',
-  low: 'default',
-};
 
 interface Escalation {
   id: string;
@@ -60,8 +44,7 @@ const STATUS_STYLES: Record<EscalationStatus, string> = {
   resolved: 'text-emerald-500',
 };
 
-export default function BuildingsManagerEscalationsPage(props: PageParamsProps) {
-  unwrapPageParams(props);
+export default function BuildingsManagerEscalationsPage() {
   const t = useTranslations('buildingsManager.escalations');
   const accessToken = useAuthStore((s) => s.accessToken);
   const queryClient = useQueryClient();
@@ -102,10 +85,7 @@ export default function BuildingsManagerEscalationsPage(props: PageParamsProps) 
     },
   });
 
-  const rawEscalations = escalationsQuery.data?.items ?? [];
-  const escalations = [...rawEscalations].sort(
-    (a, b) => (PRIORITY_ORDER[a.priority] ?? 9) - (PRIORITY_ORDER[b.priority] ?? 9)
-  );
+  const escalations = escalationsQuery.data?.items ?? [];
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -177,9 +157,14 @@ export default function BuildingsManagerEscalationsPage(props: PageParamsProps) 
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-gray-900">{esc.reason}</p>
                       <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                        <Badge variant={PRIORITY_BADGE_VARIANT[esc.priority]} size="sm">
+                        <span
+                          className={cn(
+                            'text-xs font-medium px-2 py-0.5 rounded-full',
+                            PRIORITY_STYLES[esc.priority]
+                          )}
+                        >
                           {esc.priority}
-                        </Badge>
+                        </span>
                         <span className="text-xs text-gray-400">{esc.source_agent}</span>
                         <span className="text-xs text-gray-400">
                           {new Date(esc.created_at).toLocaleDateString('he-IL')}
@@ -199,13 +184,8 @@ export default function BuildingsManagerEscalationsPage(props: PageParamsProps) 
                         resolveMutation.mutate(esc.id);
                       }}
                       disabled={resolveMutation.isPending && resolvingId === esc.id}
-                      className={cn(
-                        'flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
-                        'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200',
-                        'disabled:opacity-50 disabled:cursor-not-allowed',
-                      )}
+                      className="flex-shrink-0 text-sm font-medium text-emerald-600 hover:text-emerald-700 disabled:opacity-50 transition-colors"
                     >
-                      <CheckCircle2 className="h-4 w-4" />
                       {resolveMutation.isPending && resolvingId === esc.id
                         ? t('resolving')
                         : t('resolve')}

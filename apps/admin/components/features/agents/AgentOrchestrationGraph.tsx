@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { clsx } from "clsx";
 
 // ---------------------------------------------------------------------------
 // Agent orchestration graph — interactive SVG visualization

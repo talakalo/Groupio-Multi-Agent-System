@@ -3,6 +3,7 @@
 import type { Offer, PricingTier, ServiceCategory } from '@groupio/types';
 import {
   Users,
+  Tag,
   Clock,
   ChevronLeft,
   BadgeCheck,
@@ -32,8 +33,6 @@ export interface OfferCardProps {
   showParticipants?: boolean;
   /** Compact mode for smaller cards */
   compact?: boolean;
-  /** Max participants (optional) - when provided, shows urgency badge and capacity progress bar */
-  maxParticipants?: number;
   /** Additional CSS class names */
   className?: string;
 }
@@ -101,8 +100,6 @@ function daysUntil(dateStr: string): number {
 // Component
 // ---------------------------------------------------------------------------
 
-const URGENCY_THRESHOLD = 5;
-
 export function OfferCard({
   offer,
   onJoin,
@@ -112,7 +109,6 @@ export function OfferCard({
   showActions = true,
   showParticipants = true,
   compact = false,
-  maxParticipants,
   className,
 }: OfferCardProps) {
   const currentTier = useMemo(() => getCurrentTier(offer), [offer]);
@@ -122,11 +118,6 @@ export function OfferCard({
   const currentPrice = currentTier?.price ?? offer.basePrice;
   const currentDiscount = currentTier?.discount ?? 0;
   const neededForNext = nextTier ? nextTier.min - offer.participants : 0;
-  const spotsLeft = maxParticipants != null ? maxParticipants - offer.participants : null;
-  const showUrgency = maxParticipants != null && spotsLeft != null && spotsLeft > 0 && spotsLeft <= URGENCY_THRESHOLD;
-  const fillPercent = maxParticipants != null && maxParticipants > 0
-    ? Math.min(100, (offer.participants / maxParticipants) * 100)
-    : null;
 
   return (
     <div
@@ -173,49 +164,26 @@ export function OfferCard({
         </div>
 
         {currentDiscount > 0 && (
-          <div className="flex items-center gap-1 rounded-full bg-accent-100 px-3 py-1">
-            <TrendingDown className="h-3.5 w-3.5 text-accent-600" />
-            <span className="text-sm font-bold text-accent-700">
-              חיסכון {currentDiscount}%
+          <div className="flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1">
+            <TrendingDown className="h-3.5 w-3.5 text-emerald-600" />
+            <span className="text-sm font-bold text-emerald-700">
+              {currentDiscount}%
             </span>
           </div>
         )}
       </div>
 
       {/* ---- Participants ---- */}
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-4 text-sm text-gray-600">
-          <div className="flex items-center gap-1.5">
-            <Users className="h-4 w-4 text-primary-500" />
-            <span>{offer.participants} שכנים הצטרפו</span>
-          </div>
-
-          {showUrgency && spotsLeft != null && (
-            <span className="rounded-full bg-accent-100 px-2.5 py-0.5 text-xs font-semibold text-accent-700">
-              {spotsLeft} מקומות נותרו!
-            </span>
-          )}
-
-          {offer.contractor?.verified && (
-            <div className="flex items-center gap-1 text-emerald-600">
-              <BadgeCheck className="h-4 w-4" />
-              <span className="text-xs font-medium">מאומת</span>
-            </div>
-          )}
+      <div className="flex items-center gap-4 text-sm text-gray-600">
+        <div className="flex items-center gap-1.5">
+          <Users className="h-4 w-4 text-primary-500" />
+          <span>{offer.participants} שכנים הצטרפו</span>
         </div>
 
-        {/* Capacity progress bar */}
-        {fillPercent != null && maxParticipants != null && (
-          <div className="flex items-center gap-2">
-            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-gray-200">
-              <div
-                className="h-full rounded-full bg-primary-500 transition-all duration-300"
-                style={{ width: `${fillPercent}%` }}
-              />
-            </div>
-            <span className="text-xs text-gray-500 shrink-0">
-              {offer.participants}/{maxParticipants}
-            </span>
+        {offer.contractor?.verified && (
+          <div className="flex items-center gap-1 text-emerald-600">
+            <BadgeCheck className="h-4 w-4" />
+            <span className="text-xs font-medium">מאומת</span>
           </div>
         )}
       </div>

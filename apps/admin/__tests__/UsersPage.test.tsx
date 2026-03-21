@@ -34,11 +34,11 @@ const MOCK_USERS = [
   },
 ];
 
-function createWrapper(): React.ComponentType<{ children: React.ReactNode }> {
+function createWrapper(): React.ComponentType<{ children?: React.ReactNode }> {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  return function Wrapper({ children }: { children: React.ReactNode }) {
+  return function Wrapper({ children }: { children?: React.ReactNode }) {
     return (
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     );

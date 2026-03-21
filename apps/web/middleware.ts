@@ -1,28 +1,23 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-import { getDefaultRouteForRole } from './lib/constants/roleRouting';
-
 // Routes that require authentication
 const protectedRoutes = [
   '/dashboard',
   '/offers',
-  '/orders',
   '/contractors',
   '/building',
   '/profile',
   '/chat',
   '/architecture',
   '/payments',
-  '/checkout',
-  '/change-password',
   '/contractor',
   '/admin',
   '/buildings-manager',
 ];
 
 // Routes only for unauthenticated users
-const authRoutes = ['/login', '/signup', '/forgot-password', '/reset-password'];
+const authRoutes = ['/login', '/signup'];
 
 // Routes that require specific roles (authentication already enforced above)
 const contractorRoutes = ['/contractor'];
@@ -92,19 +87,18 @@ export function middleware(request: NextRequest) {
 
   // Redirect authenticated users from auth routes (role-based default)
   if (isAuthRoute && isAuthenticated) {
-    const redirectParam = request.nextUrl.searchParams.get('redirect');
-    const role = userRole || '';
-    const defaultRoute = getDefaultRouteForRole(role);
-    // Admin/super_admin must never default-land on buildings-manager;
-    // ignore redirect param if it would send them there (avoids stale ?redirect= from prior session)
-    const isAdmin = ['admin', 'super_admin'].includes(role);
-    const redirectToBuildingsManager = redirectParam?.startsWith('/buildings-manager');
-    const pathname =
-      redirectParam && !(isAdmin && redirectToBuildingsManager)
-        ? redirectParam
-        : defaultRoute;
+    const redirect = request.nextUrl.searchParams.get('redirect');
     const url = request.nextUrl.clone();
-    url.pathname = pathname;
+    if (redirect) {
+      url.pathname = redirect;
+    } else if (['admin', 'super_admin', 'buildings_manager'].includes(userRole || '')) {
+      const adminUrl = process.env.NEXT_PUBLIC_ADMIN_URL || 'http://localhost:3001';
+      return NextResponse.redirect(`${adminUrl}/dashboard`);
+    } else if (userRole === 'contractor') {
+      url.pathname = '/contractor/dashboard';
+    } else {
+      url.pathname = '/dashboard';
+    }
     url.searchParams.delete('redirect');
     return NextResponse.redirect(url);
   }

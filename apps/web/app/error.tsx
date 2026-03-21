@@ -59,22 +59,22 @@ export default function Error({ error, reset }: ErrorPageProps) {
         <div className="flex gap-4 justify-center">
           <button
             onClick={reset}
-            className="px-6 py-3 bg-primary-500 text-white font-medium rounded-lg hover:bg-primary-600 transition-colors focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2"
+            className="px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/25"
           >
             נסה שוב
           </button>
-          <Link
+          <a
             href="/"
-            className="px-6 py-3 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors inline-flex items-center justify-center"
+            className="px-6 py-3 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
           >
             חזרה לדף הבית
-          </Link>
+          </a>
         </div>
 
         {/* Support Link - /chat serves as AI assistant and support */}
         <p className="mt-8 text-sm text-gray-500 dark:text-gray-400">
           הבעיה נמשכת?{" "}
-          <Link href="/chat" className="text-primary-600 hover:underline">
+          <Link href="/chat" className="text-blue-600 hover:underline">
             פנה לעוזר AI
           </Link>
         </p>

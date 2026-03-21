@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
-from src.api.middleware.auth import get_current_user, verify_api_key
+from src.api.middleware.auth import get_current_user
 from src.api.middleware.logging import RequestLoggingMiddleware
 from src.api.middleware.security import SecurityHeadersMiddleware
 from src.api.routes import api_router
@@ -32,27 +32,6 @@ async def lifespan(app: FastAPI):
     # Startup
     init_monitoring()
     logger.info("Groupio Agent API starting up")
-
-    # Validate auth-critical dependencies (login/signup will fail without these)
-    try:
-        db = get_postgres_client()
-        await db._get_client()
-        logger.info("Database connection verified")
-        if not await db.auth_tables_exist():
-            logger.error(
-                "Database schema not ready — users table missing. "
-                "Run: alembic upgrade head (or alembic -c alembic.docker.ini upgrade head from host)"
-            )
-    except Exception as e:
-        logger.error("Database unreachable at startup — login/signup will fail: %s", e)
-        logger.info("Run: python scripts/check_auth_deps.py to diagnose")
-
-    try:
-        redis = get_redis_client()
-        await redis.health_check()
-        logger.info("Redis connection verified")
-    except Exception as e:
-        logger.warning("Redis unreachable at startup — rate limit/login tracking degraded: %s", e)
 
     # Ensure vector DB collections exist
     try:
@@ -100,66 +79,23 @@ def _is_db_connection_error(exc: Exception) -> bool:
     return False
 
 
-def _is_connection_error(exc: Exception) -> bool:
-    """True if exception is due to Redis/network (e.g. EADDRNOTAVAIL, ECONNREFUSED, gaierror)."""
-    import errno as _errno
-    import socket as _socket
-
-    if _is_db_connection_error(exc):
-        return True
-    if isinstance(exc, _socket.gaierror):
-        return True  # DNS resolution failure (Name or service not known)
-    errno_val = getattr(exc, "errno", None) if isinstance(exc, OSError) else None
-    # EADDRNOTAVAIL (localhost IPv6), ECONNREFUSED — portable across macOS/Linux
-    return errno_val in (_errno.EADDRNOTAVAIL, _errno.ECONNREFUSED)
-
-
-def _is_schema_not_ready(exc: Exception) -> bool:
-    """True if exception indicates database schema not ready (e.g. users table missing)."""
-    exc_type = type(exc).__name__
-    if exc_type == "UndefinedTableError":
-        return True
-    # asyncpg.exceptions.UndefinedTableError
-    mod = type(exc).__module__
-    if "asyncpg" in mod and "UndefinedTable" in exc_type:
-        return True
-    return False
-
-
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Ensure CORS headers on error responses so browser shows real error, not CORS."""
     logger.exception("Unhandled exception: %s", exc)
-    if _is_connection_error(exc):
+    if _is_db_connection_error(exc):
         status_code = 503
-        content = {"detail": "Service temporarily unavailable. Please try again later."}
-    elif _is_schema_not_ready(exc):
-        status_code = 503
-        content = {
-            "detail": "Database schema not ready. Migrations may not have run.",
-            "code": "DB_SCHEMA_NOT_READY",
-        }
+        content = {"detail": "Database unavailable. Please try again later."}
     else:
         status_code = 500
         show_detail = get_settings().ENVIRONMENT == "development"
         content = {"detail": str(exc) if show_detail else "Internal server error"}
     response = JSONResponse(status_code=status_code, content=content)
-    # Add CORS headers only for allowed origins so browser shows real error,
-    # not a CORS error. Do NOT reflect arbitrary origins — that would bypass
-    # the CORS allowlist.
+    # Add CORS headers so browser doesn't mask error as CORS
     origin = request.headers.get("origin")
     if origin:
-        _allowed = set(get_settings().CORS_ORIGINS)
-        if get_settings().ENVIRONMENT == "development":
-            _allowed |= {
-                "http://localhost:3000",
-                "http://localhost:3001",
-                "http://127.0.0.1:3000",
-                "http://127.0.0.1:3001",
-            }
-        if origin in _allowed:
-            response.headers["Access-Control-Allow-Origin"] = origin
-            response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
     return response
 
 
@@ -183,9 +119,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-API-Key", "X-Request-ID"],
-    # Do NOT expose Authorization in expose_headers — this would allow JavaScript
-    # to read the token from XHR/fetch responses, increasing XSS token-theft risk.
-    expose_headers=[],
+    expose_headers=["Authorization"],
 )
 
 # Security headers middleware (HSTS, CSP, X-Frame-Options, etc.)
@@ -360,9 +294,9 @@ async def health_check() -> dict[str, Any]:
 @app.get(
     "/api/v1/health/db",
     summary="Database pool stats",
-    description="Returns asyncpg connection pool statistics. Requires X-API-Key.",
+    description="Returns asyncpg connection pool statistics (Task 3.5).",
 )
-async def db_pool_health(_: str = Depends(verify_api_key)) -> dict:
+async def db_pool_health() -> dict:
     """Return DB pool size/free/used stats for monitoring."""
     from src.databases.postgres import get_postgres_client
 
@@ -384,15 +318,11 @@ async def db_pool_health(_: str = Depends(verify_api_key)) -> dict:
 @app.get("/metrics")
 async def prometheus_metrics(
     x_api_key: str | None = Header(None, alias="X-API-Key"),
-    authorization: str | None = Header(None),
 ) -> Response:
-    """Expose Prometheus metrics — requires X-API-Key or Authorization: Bearer <key>."""
+    """Expose Prometheus metrics — requires a valid X-API-Key header."""
     _settings = get_settings()
     if _settings.API_KEYS:
-        token = x_api_key
-        if not token and authorization and authorization.lower().startswith("bearer "):
-            token = authorization[7:].strip()
-        if not token or token not in _settings.API_KEYS:
+        if not x_api_key or x_api_key not in _settings.API_KEYS:
             raise HTTPException(status_code=403, detail="Invalid or missing API key")
 
     from prometheus_client import CONTENT_TYPE_LATEST, generate_latest

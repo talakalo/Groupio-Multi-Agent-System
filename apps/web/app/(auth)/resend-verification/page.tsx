@@ -9,7 +9,6 @@ import { z } from "zod";
 
 import { apiClient } from "@/lib/api/client";
 import { cn } from "@/lib/utils/cn";
-import { unwrapPageParams, PageParamsProps } from "@/lib/utils/unwrapPageParams";
 
 const schema = z.object({
   email: z.string().email("נא להזין כתובת אימייל תקינה"),
@@ -17,8 +16,7 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
-export default function ResendVerificationPage(props: PageParamsProps) {
-  unwrapPageParams(props);
+export default function ResendVerificationPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);

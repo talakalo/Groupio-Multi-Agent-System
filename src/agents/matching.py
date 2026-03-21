@@ -5,9 +5,9 @@ from typing import Any
 
 from src.agents.base import AgentConfig, BaseAgent
 from src.config.prompts.matching import MATCHING_SYSTEM_PROMPT
-from src.config.settings import get_settings
 from src.databases.graph_store import get_graph_store
 from src.models.agent_state import AgentState
+from src.services.agent_config import get_agent_mode
 from src.utils.hebrew_utils import detect_language, translate_category
 from src.utils.monitoring import track_agent_execution
 
@@ -134,9 +134,9 @@ class MatchingAgent(BaseAgent):
         ]
 
         # Task 3.1 — Autonomy mode: in recommend mode, flag for human confirmation
-        settings = get_settings()
-        if settings.MATCHING_AGENT_MODE in ("recommend", "gated"):
-            reason = f"Matching results require admin confirmation (mode={settings.MATCHING_AGENT_MODE})"
+        mode = await get_agent_mode("matching")
+        if mode in ("recommend", "gated"):
+            reason = f"Matching results require admin confirmation (mode={mode})"
             state["needs_human"] = True
             state["escalation_reason"] = reason
             if state["actions_taken"]:
@@ -148,7 +148,7 @@ class MatchingAgent(BaseAgent):
                     "contractor_ids": state.get("actions_taken", [{}])[-1].get("contractor_ids", []),
                     "category": state.get("actions_taken", [{}])[-1].get("category", ""),
                     "building_id": state.get("actions_taken", [{}])[-1].get("building_id", ""),
-                    "mode": settings.MATCHING_AGENT_MODE,
+                    "mode": mode,
                 },
                 escalation_reason=reason,
             )

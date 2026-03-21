@@ -1,13 +1,12 @@
 "use client";
 
-import { Building2, CheckCircle, XCircle, Loader2, Mail } from "lucide-react";
+import { Building2, CheckCircle, XCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 
 import { apiClient, ApiError } from "@/lib/api/client";
 import { cn } from "@/lib/utils/cn";
-import { unwrapPageParams, PageParamsProps } from "@/lib/utils/unwrapPageParams";
 
 function VerifyEmailContent() {
   const searchParams = useSearchParams();
@@ -17,8 +16,6 @@ function VerifyEmailContent() {
 
   const displayStatus = !token ? "error" : status;
   const displayMessage = !token ? "קישור לאימות לא תקין." : errorMessage;
-
-  const router = useRouter();
 
   useEffect(() => {
     if (!token || status !== "pending") return;
@@ -41,12 +38,6 @@ function VerifyEmailContent() {
     };
   }, [token, status]);
 
-  useEffect(() => {
-    if (status !== "success") return;
-    const t = setTimeout(() => router.push("/login"), 3000);
-    return () => clearTimeout(t);
-  }, [status, router]);
-
   return (
     <div className="w-full max-w-md space-y-6">
       <div className="text-center">
@@ -59,21 +50,17 @@ function VerifyEmailContent() {
       <div className="card text-center">
         {displayStatus === "pending" && (
           <div className="flex flex-col items-center gap-4 py-8">
-            <div className="w-16 h-16 rounded-full bg-primary-50 flex items-center justify-center">
-              <Mail className="h-8 w-8 text-primary-500 animate-pulse" aria-hidden />
-            </div>
+            <Loader2 className="h-12 w-12 text-primary-500 animate-spin" aria-hidden />
             <h2 className="text-lg font-semibold text-gray-900">מאמתים את האימייל שלכם...</h2>
-            <p className="text-sm text-gray-600">אנא המתינו — בודקים את הקישור</p>
+            <p className="text-sm text-gray-600">אנא המתינו</p>
           </div>
         )}
 
         {displayStatus === "success" && (
           <div className="flex flex-col items-center gap-4 py-8">
-            <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center">
-              <CheckCircle className="h-10 w-10 text-emerald-500" aria-hidden />
-            </div>
+            <CheckCircle className="h-14 w-14 text-emerald-500" aria-hidden />
             <h2 className="text-lg font-semibold text-gray-900">האימייל אומת בהצלחה</h2>
-            <p className="text-sm text-gray-600">מפנים להתחברות תוך רגע...</p>
+            <p className="text-sm text-gray-600">אתם יכולים כעת להתחבר לחשבון שלכם</p>
             <Link
               href="/login"
               className="btn-primary mt-2 inline-flex items-center gap-2"
@@ -85,17 +72,15 @@ function VerifyEmailContent() {
 
         {displayStatus === "error" && (
           <div className="flex flex-col items-center gap-4 py-8">
-            <div className="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center">
-              <XCircle className="h-10 w-10 text-red-500" aria-hidden />
-            </div>
+            <XCircle className="h-14 w-14 text-red-500" aria-hidden />
             <h2 className="text-lg font-semibold text-gray-900">אימות נכשל</h2>
-            <p className={cn("text-sm text-center max-w-sm", "text-gray-600")}>{displayMessage}</p>
+            <p className={cn("text-sm text-gray-600", "text-red-600")}>{displayMessage}</p>
             <div className="flex flex-wrap justify-center gap-3 mt-2">
-              <Link href="/resend-verification" className="btn-primary">
-                שלחו שוב
-              </Link>
               <Link href="/login" className="btn-secondary">
                 חזרה להתחברות
+              </Link>
+              <Link href="/resend-verification" className="btn-primary">
+                שליחת קישור לאימות מחדש
               </Link>
             </div>
           </div>
@@ -105,8 +90,7 @@ function VerifyEmailContent() {
   );
 }
 
-export default function VerifyEmailPage(props: PageParamsProps) {
-  unwrapPageParams(props);
+export default function VerifyEmailPage() {
   return (
     <Suspense
       fallback={

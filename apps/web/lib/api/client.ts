@@ -14,24 +14,6 @@ interface RequestOptions {
 /** Callback that tries to refresh the access token; returns new token or null. */
 export type On401Retry = () => Promise<string | null>;
 
-/** Auth endpoints where 401 means "invalid credentials" or "no session" — never retry via refresh. */
-const AUTH_PUBLIC_ENDPOINTS = [
-  "/api/v1/auth/login",
-  "/api/v1/auth/login/json",
-  "/api/v1/auth/signup",
-  "/api/v1/auth/register",
-  "/api/v1/auth/refresh",
-  "/api/v1/auth/password/reset",
-  "/api/v1/auth/password/reset/confirm",
-  "/api/v1/auth/verify-email",
-  "/api/v1/auth/resend-verification",
-  "/api/v1/auth/resend-verification-by-email",
-];
-
-function isAuthPublicEndpoint(endpoint: string): boolean {
-  return AUTH_PUBLIC_ENDPOINTS.some((p) => endpoint.startsWith(p));
-}
-
 class ApiClient {
   private baseUrl: string;
   private defaultHeaders: Record<string, string>;
@@ -92,12 +74,7 @@ class ApiClient {
       signal,
     });
 
-    if (
-      response.status === 401 &&
-      this._on401Retry &&
-      !isRetry &&
-      !isAuthPublicEndpoint(endpoint)
-    ) {
+    if (response.status === 401 && this._on401Retry && !isRetry) {
       const newToken = await this.refreshToken();
       if (newToken) {
         return this.request<T>(endpoint, options, true);
@@ -172,23 +149,13 @@ class ApiClient {
     );
   }
 
-  async joinOffer(offerId: string, unitCount: number = 1, inviteToken?: string) {
-    return this.request<{ status: string; offer_id: string }>(
+  async joinOffer(offerId: string, userId: string) {
+    return this.request<{ success: boolean; participants: number }>(
       `/api/v1/offers/${offerId}/join`,
       {
         method: "POST",
-        body: {
-          user_id: "",
-          unit_count: unitCount,
-          ...(inviteToken ? { invite_token: inviteToken } : {}),
-        },
+        body: { userId },
       }
-    );
-  }
-
-  async getOfferParticipants(offerId: string) {
-    return this.request<{ items: unknown[]; total: number }>(
-      `/api/v1/offers/${offerId}/participants`,
     );
   }
 
@@ -207,16 +174,6 @@ class ApiClient {
   async getContractor(contractorId: string) {
     return this.request<import("@groupio/types").Contractor>(
       `/api/v1/contractors/${contractorId}`
-    );
-  }
-
-  async addContractorReview(
-    contractorId: string,
-    body: { offer_id: string; rating: number; comment?: string },
-  ) {
-    return this.request<{ status: string }>(
-      `/api/v1/contractors/${contractorId}/reviews`,
-      { method: "POST", body },
     );
   }
 
@@ -319,8 +276,7 @@ class ApiClient {
     });
   }
 
-  // ---- Password Reset endpoints ----
-
+  /** Request a password reset email (unauthenticated). */
   async requestPasswordReset(email: string) {
     return this.request<{ status: string }>("/api/v1/auth/password/reset", {
       method: "POST",
@@ -328,28 +284,15 @@ class ApiClient {
     });
   }
 
-  async confirmPasswordReset(token: string, newPassword: string) {
+  /** Confirm a password reset using the token from the email link. */
+  async confirmPasswordReset(token: string, new_password: string) {
     return this.request<{ status: string }>("/api/v1/auth/password/reset/confirm", {
       method: "POST",
-      body: { token, new_password: newPassword },
-    });
-  }
-
-  async changePassword(currentPassword: string, newPassword: string) {
-    return this.request<{ status: string }>("/api/v1/auth/password/change", {
-      method: "POST",
-      body: { current_password: currentPassword, new_password: newPassword },
+      body: { token, new_password },
     });
   }
 
   // ---- Payment endpoints ----
-
-  async approveWork(paymentId: string) {
-    return this.request<{ status: string }>(
-      `/api/v1/payments/${paymentId}/approve-work`,
-      { method: "POST" },
-    );
-  }
 
   async getMyPayments() {
     return this.request<import("@groupio/types").Payment[]>("/api/v1/payments/my");
@@ -376,6 +319,30 @@ class ApiClient {
 
   async getMyInvoices() {
     return this.request<import("@groupio/types").Invoice[]>("/api/v1/payments/invoices/my");
+  }
+
+  // ---- Review endpoints ----
+
+  async addContractorReview(
+    contractorId: string,
+    data: { offer_id: string; rating: number; comment?: string }
+  ) {
+    return this.request<{ id: string; contractor_id: string; rating: number; comment?: string; created_at: string }>(
+      `/api/v1/contractors/${encodeURIComponent(contractorId)}/reviews`,
+      { method: "POST", body: data }
+    );
+  }
+
+  // ---- Offer participants ----
+
+  async getOfferParticipants(offerId: string, params?: { page?: number; page_size?: number }) {
+    const search = new URLSearchParams();
+    if (params?.page != null) search.set("page", String(params.page));
+    if (params?.page_size != null) search.set("page_size", String(params.page_size));
+    const qs = search.toString();
+    return this.request<{ items: unknown[]; total: number; page: number; page_size: number }>(
+      `/api/v1/offers/${encodeURIComponent(offerId)}/participants${qs ? `?${qs}` : ""}`
+    );
   }
 }
 

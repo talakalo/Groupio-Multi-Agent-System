@@ -38,7 +38,7 @@ class InfluencerAgent(BaseAgent):
         self._graph = get_graph_store()
 
     @track_agent_execution("influencer")
-    async def _run_impl(self, state: AgentState) -> AgentState:
+    async def run(self, state: AgentState) -> AgentState:
         """Identify top influencers in the city, evaluate credit eligibility, and queue awards."""
         city = self._resolve_city(state)
         if not city:

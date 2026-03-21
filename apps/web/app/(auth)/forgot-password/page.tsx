@@ -8,7 +8,6 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { apiClient, ApiError } from "@/lib/api/client";
-import { unwrapPageParams, PageParamsProps } from "@/lib/utils/unwrapPageParams";
 
 const schema = z.object({
   email: z.string().email("נא להזין כתובת אימייל תקינה"),
@@ -16,8 +15,7 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
-export default function ForgotPasswordPage(props: PageParamsProps) {
-  unwrapPageParams(props);
+export default function ForgotPasswordPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);

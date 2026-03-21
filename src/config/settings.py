@@ -29,8 +29,6 @@ class Settings(BaseSettings):
     # Qdrant
     QDRANT_URL: str = "http://localhost:6333"
     QDRANT_API_KEY: str | None = None
-    # Use REST (False) when gRPC port 6334 is not available (typical for local Docker)
-    QDRANT_PREFER_GRPC: bool = False
 
     # Neo4j
     NEO4J_URI: str = "bolt://localhost:7687"
@@ -42,16 +40,6 @@ class Settings(BaseSettings):
     SUPABASE_KEY: str = ""
     # Local PostgreSQL (used when SUPABASE_URL is empty or USE_LOCAL_POSTGRES=1)
     DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/groupio"
-    # When set (e.g. by Docker Compose), used instead of DATABASE_URL when USE_LOCAL_POSTGRES=1.
-    # Resolves errno 99: API in Docker must use service name "postgres", not localhost/Supabase host.
-    # Prefer DOCKER_POSTGRES_* when all set — builds URL with proper encoding (fixes @ in password).
-    DOCKER_DATABASE_URL: str = ""
-    DOCKER_POSTGRES_HOST: str = ""
-    DOCKER_POSTGRES_USER: str = ""
-    DOCKER_POSTGRES_PASSWORD: str = ""
-    DOCKER_POSTGRES_DB: str = ""
-    # Set to 1 when running scripts from host against Docker Postgres (127.0.0.1)
-    DOCKER_POSTGRES_LOCALHOST: str = ""
     # Set to "1" or "true" to force local PostgreSQL (useful when Supabase has connection issues)
     USE_LOCAL_POSTGRES: str = ""
 
@@ -59,7 +47,7 @@ class Settings(BaseSettings):
     # In production, set REDIS_URL to include credentials, e.g.:
     #   redis://:yourpassword@redis:6379/0
     # Or set REDIS_PASSWORD separately (used when REDIS_URL has no password).
-    REDIS_URL: str = "redis://127.0.0.1:6379"
+    REDIS_URL: str = "redis://localhost:6379"
     REDIS_PASSWORD: str = ""
 
     # LLM Settings
@@ -142,13 +130,20 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     SMTP_FROM_EMAIL: str = "noreply@groupio.co.il"
     SMTP_FROM_NAME: str = "Groupio"
-    # When True, login rejects unverified users with 403.
-    # Default is True for security; set to False only in development/test environments.
+    # When True, login rejects unverified users with 403. Enabled by default for production safety.
+    # Set ENFORCE_EMAIL_VERIFICATION=false in .env to disable during local development.
     ENFORCE_EMAIL_VERIFICATION: bool = True
     # Base URL for verification links in emails (default for production)
     FRONTEND_URL: str = "https://groupio.co.il"
     # Admin inbox for system alerts (vetting escalations, expiry errors, etc.)
     ADMIN_EMAIL: str = ""
+
+    # Push Notifications (Firebase Cloud Messaging)
+    # Set FCM_SERVER_KEY to your Firebase project's server key to enable push notifications.
+    # When empty, push notifications are silently skipped (log at DEBUG level).
+    FCM_SERVER_KEY: str = ""
+    # FCM endpoint (override only for testing)
+    FCM_ENDPOINT: str = "https://fcm.googleapis.com/fcm/send"
 
     # Payment provider ("mock" for dev/demos, "stripe" or "payplus" for production)
     PAYMENT_PROVIDER: str = "mock"
@@ -228,19 +223,6 @@ class Settings(BaseSettings):
             if self.DATABASE_URL and any(p in self.DATABASE_URL for p in placeholder_patterns):
                 raise ValueError(
                     f"DATABASE_URL contains a placeholder value. Set a real connection string in {self.ENVIRONMENT}."
-                )
-            _insecure_db_passwords = ("postgres", "password", "123456", "admin")
-            if self.DATABASE_URL:
-                for pw in _insecure_db_passwords:
-                    if f":{pw}@" in self.DATABASE_URL:
-                        raise ValueError(
-                            f"DATABASE_URL uses an insecure default password '{pw}' in {self.ENVIRONMENT}. "
-                            "Use a strong, generated password for production databases."
-                        )
-            if self.REDIS_URL and not self.REDIS_PASSWORD and "@" not in self.REDIS_URL:
-                raise ValueError(
-                    f"Redis must be authenticated in {self.ENVIRONMENT}. "
-                    "Set REDIS_PASSWORD or embed credentials in REDIS_URL (redis://:password@host:port)."
                 )
 
         return self

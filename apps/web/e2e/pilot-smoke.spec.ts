@@ -627,26 +627,34 @@ test("13. Reset-password page — renders form with valid token in URL", async (
 });
 
 // ===========================================================================
-// 14. Checkout page — verifies checkout route is protected and renders
+// 14. Checkout page (mock mode) — shows success immediately (no client_secret)
 // ===========================================================================
 
 test("14. Checkout page — mock payment succeeds immediately without Stripe UI", async ({ page }) => {
   await setupBaseMocks(page);
   await setAuthToken(page);
 
-  // Navigate to checkout. Without NEXT_PUBLIC_STRIPE_KEY the page shows an
-  // error, and the Zustand hydration race may cause a redirect through
-  // /login -> /dashboard. Either outcome proves the route + middleware work.
-  const response = await page.goto("/checkout?offerId=offer-pilot-1");
-  expect(response?.status()).toBeLessThan(500);
+  // Mock payment initiate — mock provider returns "succeeded" with no client_secret
+  await page.route("**/api/v1/payments/initiate", (r) =>
+    r.fulfill({
+      status: 200,
+      body: JSON.stringify({
+        id: "pay-smoke-1",
+        status: "succeeded",
+        amount: 4050,
+        currency: "ILS",
+        client_secret: null,
+        offer_id: "offer-pilot-1",
+      }),
+    })
+  );
 
-  // Wait for navigation to settle
-  await page.waitForLoadState("domcontentloaded");
-  await page.waitForTimeout(3000);
+  await page.goto("/checkout?offerId=offer-pilot-1");
 
-  const url = page.url();
-  // The page either stays on /checkout (showing Stripe config error) or
-  // redirects to /dashboard (Zustand hydration race). Both are valid.
-  expect(url).toMatch(/checkout|dashboard|login/);
+  // Should show success state (no Stripe card form in mock mode)
+  await expect(page.getByText(/התשלום בוצע בהצלחה/i)).toBeVisible({ timeout: 10_000 });
+  // Escrow badge should be visible
+  await expect(page.getByText(/נאמנות|Escrow/i).first()).toBeVisible();
+  // Link to payments history
+  await expect(page.getByRole("link", { name: /להיסטוריית תשלומים/i })).toBeVisible();
 });
-

@@ -1,16 +1,26 @@
 "use client";
 
-import * as Sentry from "@sentry/nextjs";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React, { Component, type ErrorInfo, type ReactNode, useState, useEffect } from "react";
-
-import { ToastContainer } from "@/components/shared/ToastContainer";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import * as Sentry from "@sentry/nextjs";
 import { apiClient } from "@/lib/api/client";
-import { LocaleSyncProvider } from "@/lib/providers/LocaleSyncProvider";
 import { useAuthStore } from "@/lib/stores/authStore";
+import { LocaleSyncProvider } from "@/lib/providers/LocaleSyncProvider";
+import { ToastContainer } from "@/components/shared/ToastContainer";
 
-// PostHog: Add when NEXT_PUBLIC_POSTHOG_KEY is set and posthog-js is installed.
-// Example: import("posthog-js").then(({ default: posthog }) => posthog.init(...))
+// PostHog analytics — optional, requires NEXT_PUBLIC_POSTHOG_KEY
+if (typeof window !== "undefined" && process.env.NEXT_PUBLIC_POSTHOG_KEY) {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const posthog = require("posthog-js").default;
+    posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY, {
+      api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://app.posthog.com",
+      capture_pageview: false,
+    });
+  } catch {
+    // posthog-js not installed
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Error boundary (class component, as required by React)

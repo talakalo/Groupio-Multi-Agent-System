@@ -6,13 +6,12 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.security import OAuth2PasswordRequestForm
-from pydantic import BaseModel, EmailStr, Field, model_validator
+from pydantic import BaseModel, EmailStr, Field
 
 from src.api.middleware.auth import (
     create_access_token,
     create_refresh_token,
     get_current_user,
-    get_token_jti,
     hash_password,
     verify_password,
     verify_refresh_token,
@@ -41,27 +40,15 @@ router = APIRouter(tags=["auth"])
 
 async def check_auth_rate_limit(request: Request) -> None:
     """Enforce IP-based rate limit on auth endpoints (20 req/min)."""
-    try:
-        redis = get_redis_client()
-        client_ip = request.client.host if request.client else "unknown"
-        allowed = await redis.check_ip_rate_limit(client_ip, limit=20, window=60)
-        if not allowed:
-            raise HTTPException(
-                status_code=429,
-                detail="Too many authentication attempts. Try again in a minute.",
-                headers={"Retry-After": "60"},
-            )
-    except HTTPException:
-        raise  # Re-raise 429
-    except Exception as e:
-        logger.warning(
-            "Redis unavailable for rate limiting — allowing request (degraded mode): %s: %s",
-            type(e).__name__,
-            e,
+    redis = get_redis_client()
+    client_ip = request.client.host if request.client else "unknown"
+    allowed = await redis.check_ip_rate_limit(client_ip, limit=20, window=60)
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many authentication attempts. Try again in a minute.",
+            headers={"Retry-After": "60"},
         )
-
-
-_SELF_REGISTERABLE_ROLES = frozenset({UserRole.RESIDENT, UserRole.CONTRACTOR})
 
 
 class SignupRequest(BaseModel):
@@ -75,15 +62,6 @@ class SignupRequest(BaseModel):
     building_id: str | None = Field(None, alias="buildingId")
 
     model_config = {"populate_by_name": True}
-
-    @model_validator(mode="after")
-    def _block_privileged_roles(self) -> "SignupRequest":
-        if self.role not in _SELF_REGISTERABLE_ROLES:
-            raise ValueError(
-                f"Cannot self-register with role '{self.role}'. "
-                f"Allowed roles: {', '.join(sorted(_SELF_REGISTERABLE_ROLES))}"
-            )
-        return self
 
 
 class RefreshRequest(BaseModel):
@@ -133,25 +111,20 @@ async def signup(request: SignupRequest, _: None = Depends(check_auth_rate_limit
 
     # Send verification email (if SMTP configured)
     verify_token = str(uuid4())
+    redis = get_redis_client()
+    await redis.set(
+        f"email_verify:{verify_token}",
+        user.id,
+        ex=24 * 60 * 60,  # 24 hour expiry
+    )
+    email_service = get_email_service()
     settings = get_settings()
-    try:
-        redis = get_redis_client()
-        await redis.set(
-            f"email_verify:{verify_token}",
-            user.id,
-            ex=24 * 60 * 60,  # 24 hour expiry
-        )
-    except Exception as e:
-        logger.warning("Redis unavailable for verify token; skipping verification email: %s", e)
-        verify_token = ""  # Skip email if we cannot store token
-    if verify_token:
-        email_service = get_email_service()
-        await email_service.send_verification_email(
-            to_email=user.email,
-            user_name=user.full_name or user.email.split("@")[0],
-            verification_token=verify_token,
-            base_url=settings.FRONTEND_URL,
-        )
+    await email_service.send_verification_email(
+        to_email=user.email,
+        user_name=user.full_name or user.email.split("@")[0],
+        verification_token=verify_token,
+        base_url=settings.FRONTEND_URL,
+    )
 
     # Auto-login: create token
     access_token = create_access_token(
@@ -161,15 +134,12 @@ async def signup(request: SignupRequest, _: None = Depends(check_auth_rate_limit
     )
     refresh_token = create_refresh_token(user_id=user.id)
 
-    try:
-        redis = get_redis_client()
-        await redis.set(
-            f"refresh_token:{user.id}",
-            refresh_token,
-            ex=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
-        )
-    except Exception as e:
-        logger.warning("Redis unavailable for refresh token; login works but refresh may fail: %s", e)
+    redis = get_redis_client()
+    await redis.set(
+        f"refresh_token:{user.id}",
+        refresh_token,
+        ex=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+    )
 
     return SignupResponse(
         token=access_token,
@@ -178,7 +148,7 @@ async def signup(request: SignupRequest, _: None = Depends(check_auth_rate_limit
 
 
 @router.post("/register", response_model=UserResponse)
-async def register(request: UserCreate, _: None = Depends(check_auth_rate_limit)) -> UserResponse:
+async def register(request: UserCreate) -> UserResponse:
     """Register a new user."""
     db = get_postgres_client()
 
@@ -207,25 +177,21 @@ async def register(request: UserCreate, _: None = Depends(check_auth_rate_limit)
 
     # Send verification email
     verify_token = str(uuid4())
+    redis = get_redis_client()
+    await redis.set(
+        f"email_verify:{verify_token}",
+        user.id,
+        ex=24 * 60 * 60,  # 24 hour expiry
+    )
+
+    email_service = get_email_service()
     settings = get_settings()
-    try:
-        redis = get_redis_client()
-        await redis.set(
-            f"email_verify:{verify_token}",
-            user.id,
-            ex=24 * 60 * 60,  # 24 hour expiry
-        )
-    except Exception as e:
-        logger.warning("Redis unavailable for verify token: %s", e)
-        verify_token = ""
-    if verify_token:
-        email_service = get_email_service()
-        await email_service.send_verification_email(
-            to_email=user.email,
-            user_name=user.full_name or user.email.split("@")[0],
-            verification_token=verify_token,
-            base_url=settings.FRONTEND_URL,
-        )
+    await email_service.send_verification_email(
+        to_email=user.email,
+        user_name=user.full_name or user.email.split("@")[0],
+        verification_token=verify_token,
+        base_url=settings.FRONTEND_URL,
+    )
 
     return user
 
@@ -245,33 +211,19 @@ async def login(
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    # Check temporary lockout (auto-expires after 15 minutes)
-    lockout_ttl = await redis.is_temporarily_locked(user.id)
-    if lockout_ttl:
-        raise HTTPException(
-            status_code=423,
-            detail=f"Account temporarily locked. Try again in {lockout_ttl} seconds.",
-            headers={"Retry-After": str(lockout_ttl)},
-        )
-
-    if not user.is_active:
-        raise HTTPException(status_code=423, detail="Account is locked")
-
     # Verify password
     hashed = await db.get_user_password_hash(user.id)
     if not hashed or not verify_password(form_data.password, hashed):
-        # Brute-force protection: increment failure counter, trigger temp lockout at threshold
+        # Brute-force lockout: increment failure counter
         fail_count = await redis.increment_login_failures(user.id)
         if fail_count >= 5:
-            await redis.set_temporary_lockout(user.id, seconds=900)  # 15-minute lockout
-            await redis.clear_login_failures(user.id)
-            logger.warning("Temporary lockout triggered for: %s (%d failures)", user.email, fail_count)
-            raise HTTPException(
-                status_code=423,
-                detail="Account temporarily locked for 15 minutes due to too many failed attempts.",
-                headers={"Retry-After": "900"},
-            )
+            await db.update_user(user.id, {"is_active": False})
+            logger.warning("Account locked due to too many failed logins: %s", user.email)
+            raise HTTPException(status_code=423, detail="Account locked due to too many failed attempts")
         raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    if not user.is_active:
+        raise HTTPException(status_code=423, detail="Account is locked")
 
     settings = get_settings()
     if settings.ENFORCE_EMAIL_VERIFICATION and not user.is_verified:
@@ -288,14 +240,13 @@ async def login(
     )
     refresh_token = create_refresh_token(user_id=user.id)
 
-    # Store refresh token in Redis and clear failure tracking
+    # Store refresh token in Redis and clear failure counter
     await redis.set(
         f"refresh_token:{user.id}",
         refresh_token,
         ex=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
     )
     await redis.clear_login_failures(user.id)
-    await redis.clear_temporary_lockout(user.id)
 
     # Update last login
     await db.update_user(user.id, {"last_login": datetime.now(UTC)})
@@ -342,54 +293,25 @@ async def login_json(
     db = get_postgres_client()
     redis = get_redis_client()
 
-    identifier = request.email or (request.phone if request.phone else "")
     if request.email:
         user = await db.get_user_by_email(request.email)
     else:
         assert request.phone is not None  # validated by LoginRequest
         user = await db.get_user_by_phone(request.phone)
     if not user:
-        logger.info("Login 401: user not found for identifier=%s", identifier[:3] + "***" if len(identifier) > 3 else "***")
         raise HTTPException(status_code=401, detail="Invalid credentials")
-
-    # Check temporary lockout (auto-expires after 15 minutes)
-    try:
-        lockout_ttl = await redis.is_temporarily_locked(user.id)
-        if lockout_ttl:
-            raise HTTPException(
-                status_code=423,
-                detail=f"Account temporarily locked. Try again in {lockout_ttl} seconds.",
-                headers={"Retry-After": str(lockout_ttl)},
-            )
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.warning("Redis unavailable for lockout check: %s", e)
-
-    if not user.is_active:
-        raise HTTPException(status_code=423, detail="Account is locked")
 
     hashed = await db.get_user_password_hash(user.id)
     if not hashed or not verify_password(request.password, hashed):
-        logger.info("Login 401: invalid password for user_id=%s", user.id)
-        try:
-            fail_count = await redis.increment_login_failures(user.id)
-        except Exception as e:
-            logger.warning("Redis unavailable for login failure tracking: %s", e)
-            fail_count = 0
+        fail_count = await redis.increment_login_failures(user.id)
         if fail_count >= 5:
-            try:
-                await redis.set_temporary_lockout(user.id, seconds=900)
-                await redis.clear_login_failures(user.id)
-            except Exception as e:
-                logger.warning("Redis unavailable for lockout set: %s", e)
-            logger.warning("Temporary lockout triggered for: %s (%d failures)", user.email, fail_count)
-            raise HTTPException(
-                status_code=423,
-                detail="Account temporarily locked for 15 minutes due to too many failed attempts.",
-                headers={"Retry-After": "900"},
-            )
+            await db.update_user(user.id, {"is_active": False})
+            logger.warning("Account locked due to too many failed logins: %s", user.email)
+            raise HTTPException(status_code=423, detail="Account locked due to too many failed attempts")
         raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    if not user.is_active:
+        raise HTTPException(status_code=423, detail="Account is locked")
 
     settings = get_settings()
     if settings.ENFORCE_EMAIL_VERIFICATION and not user.is_verified:
@@ -405,16 +327,12 @@ async def login_json(
     )
     refresh_token = create_refresh_token(user_id=user.id)
 
-    try:
-        await redis.set(
-            f"refresh_token:{user.id}",
-            refresh_token,
-            ex=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
-        )
-        await redis.clear_login_failures(user.id)
-        await redis.clear_temporary_lockout(user.id)
-    except Exception as e:
-        logger.warning("Redis unavailable for token storage; login will work but refresh may fail: %s", e)
+    await redis.set(
+        f"refresh_token:{user.id}",
+        refresh_token,
+        ex=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+    )
+    await redis.clear_login_failures(user.id)
 
     await db.update_user(user.id, {"last_login": datetime.now(UTC)})
 
@@ -465,6 +383,12 @@ async def refresh_token(
     if not user_id or not isinstance(user_id, str):
         raise HTTPException(status_code=401, detail="Invalid refresh token")
 
+    # Verify token in Redis
+    redis = get_redis_client()
+    stored_token = await redis.get(f"refresh_token:{user_id}")
+    if stored_token != token:
+        raise HTTPException(status_code=401, detail="Refresh token revoked")
+
     db = get_postgres_client()
     user = await db.get_user(user_id)
     if not user or not user.is_active:
@@ -472,7 +396,7 @@ async def refresh_token(
 
     settings = get_settings()
 
-    # Create new tokens before the atomic swap
+    # Create new tokens
     new_access_token = create_access_token(
         user_id=user.id,
         email=user.email,
@@ -480,22 +404,12 @@ async def refresh_token(
     )
     new_refresh_token = create_refresh_token(user_id=user.id)
 
-    # Atomically swap the refresh token in Redis.
-    # This eliminates the race condition where two concurrent requests could both
-    # succeed with the same refresh token before the stored value is updated.
-    redis = get_redis_client()
-    swap_result = await redis.atomic_refresh_token_swap(
-        user_id=user.id,
-        old_token=token,
-        new_token=new_refresh_token,
-        ttl=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+    # Update stored refresh token
+    await redis.set(
+        f"refresh_token:{user.id}",
+        new_refresh_token,
+        ex=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
     )
-    if swap_result == -1:
-        # Token mismatch — already rotated or being replayed
-        raise HTTPException(status_code=401, detail="Refresh token already used or revoked")
-    if swap_result == 0:
-        # Key expired (session too old or Redis flushed)
-        raise HTTPException(status_code=401, detail="Refresh token expired")
 
     response.set_cookie(
         key="refresh_token",
@@ -527,22 +441,12 @@ async def refresh_token(
 async def logout(
     response: Response,
     current_user: UserInDB = Depends(get_current_user),
-    token_jti: str | None = Depends(get_token_jti),
 ) -> dict[str, str]:
     """Logout and invalidate tokens.
 
-    Revokes the current access token via JTI denylist and clears the refresh
-    token from Redis and cookies so the session is immediately invalid.
+    Clears refresh_token cookie so middleware no longer treats user as authenticated.
     """
     redis = get_redis_client()
-    settings = get_settings()
-
-    # Revoke the current access token so it cannot be replayed
-    if token_jti:
-        ttl = settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
-        await redis.add_token_to_denylist(token_jti, ttl)
-
-    # Invalidate the refresh token
     await redis.delete(f"refresh_token:{current_user.id}")
 
     response.delete_cookie("refresh_token", path="/")
@@ -585,7 +489,6 @@ async def update_current_user(
 async def change_password(
     request: PasswordChange,
     current_user: UserInDB = Depends(get_current_user),
-    token_jti: str | None = Depends(get_token_jti),
 ) -> dict[str, str]:
     """Change password for authenticated user."""
     db = get_postgres_client()
@@ -599,11 +502,8 @@ async def change_password(
     new_hashed = hash_password(request.new_password)
     await db.update_user_password(current_user.id, new_hashed)
 
-    # Invalidate the current access token and all refresh tokens
+    # Invalidate all refresh tokens
     redis = get_redis_client()
-    settings = get_settings()
-    if token_jti:
-        await redis.add_token_to_denylist(token_jti, settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60)
     await redis.delete(f"refresh_token:{current_user.id}")
 
     logger.info("Password changed for user: %s", current_user.email)

@@ -406,16 +406,16 @@ class TestGetPaymentProvider:
             with pytest.raises(RuntimeError, match="STRIPE_SECRET_KEY"):
                 get_payment_provider()
 
-    def test_mock_blocked_in_production(self):
-        from src.services.payment import get_payment_provider
+    def test_mock_logs_warning_in_production(self):
+        from src.services.payment import MockPaymentProvider, get_payment_provider
 
         with patch("src.config.settings.get_settings") as mock_settings:
             settings = MagicMock()
             settings.PAYMENT_PROVIDER = "mock"
             settings.ENVIRONMENT = "production"
             mock_settings.return_value = settings
-            with pytest.raises(RuntimeError, match="not allowed in production"):
-                get_payment_provider()
+            provider = get_payment_provider()
+        assert isinstance(provider, MockPaymentProvider)
 
 
 # ---------------------------------------------------------------------------

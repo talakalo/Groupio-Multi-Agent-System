@@ -4,6 +4,8 @@
 // Keeping this separate allows app/layout.tsx to remain a Server Component
 // (Next.js requirement: root layouts must be RSC for metadata/SEO to work).
 
+import { useState, useEffect } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import {
@@ -19,53 +21,21 @@ import {
   Shield,
   Users,
   Tag,
-  CreditCard,
-  Building2,
-  FileText,
 } from "lucide-react";
-import { usePathname, useRouter } from "next/navigation";
-import { useState, useEffect, type ReactNode } from "react";
+import type { ReactNode } from "react";
 
 import { useAdminUser } from "@/lib/hooks";
 
-interface NavItem {
-  label: string;
-  href: string;
-  icon: React.ComponentType<{ className?: string }>;
-}
-
-interface NavSection {
-  title: string;
-  items: NavItem[];
-}
-
-const NAV_SECTIONS: NavSection[] = [
-  {
-    title: "Core",
-    items: [
-      { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-      { label: "Agents", href: "/agents", icon: Bot },
-      { label: "Escalations", href: "/escalations", icon: AlertTriangle },
-      { label: "Payments", href: "/payments", icon: CreditCard },
-    ],
-  },
-  {
-    title: "Data",
-    items: [
-      { label: "Offers", href: "/offers", icon: Tag },
-      { label: "Users", href: "/users", icon: Users },
-      { label: "Contractors", href: "/contractors", icon: HardHat },
-      { label: "Analytics", href: "/analytics", icon: BarChart3 },
-    ],
-  },
-  {
-    title: "Config",
-    items: [
-      { label: "Settings", href: "/settings", icon: Settings },
-      { label: "Audit Logs", href: "/settings/audit-logs", icon: FileText },
-    ],
-  },
-];
+const NAV_ITEMS = [
+  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Agents", href: "/agents", icon: Bot },
+  { label: "Escalations", href: "/escalations", icon: AlertTriangle },
+  { label: "Contractors", href: "/contractors", icon: HardHat },
+  { label: "Analytics", href: "/analytics", icon: BarChart3 },
+  { label: "Users", href: "/users", icon: Users },
+  { label: "Offers", href: "/offers", icon: Tag },
+  { label: "Settings", href: "/settings", icon: Settings },
+] as const;
 
 function makeQueryClient() {
   return new QueryClient({
@@ -136,36 +106,26 @@ function Sidebar({
         )}
       </div>
 
-      <nav className="flex-1 overflow-y-auto scrollbar-thin px-3 py-4 space-y-4">
-        {NAV_SECTIONS.map((section) => (
-          <div key={section.title} className="space-y-1">
-            {!collapsed && (
-              <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-widest text-surface-400">
-                {section.title}
-              </p>
-            )}
-            {collapsed && <div className="h-px bg-surface-100 mx-2" />}
-            {section.items.map((item) => {
-              const isActive = pathname.startsWith(item.href);
-              const Icon = item.icon;
-              return (
-                <a
-                  key={item.href}
-                  href={item.href}
-                  title={collapsed ? item.label : undefined}
-                  className={clsx(
-                    "sidebar-link",
-                    isActive && "sidebar-link-active",
-                    collapsed && "justify-center px-0"
-                  )}
-                >
-                  <Icon className="w-5 h-5 flex-shrink-0" />
-                  {!collapsed && <span>{item.label}</span>}
-                </a>
-              );
-            })}
-          </div>
-        ))}
+      <nav className="flex-1 overflow-y-auto scrollbar-thin px-3 py-4 space-y-1">
+        {NAV_ITEMS.map((item) => {
+          const isActive = pathname.startsWith(item.href);
+          const Icon = item.icon;
+          return (
+            <a
+              key={item.href}
+              href={item.href}
+              title={collapsed ? item.label : undefined}
+              className={clsx(
+                "sidebar-link",
+                isActive && "sidebar-link-active",
+                collapsed && "justify-center px-0"
+              )}
+            >
+              <Icon className="w-5 h-5 flex-shrink-0" />
+              {!collapsed && <span>{item.label}</span>}
+            </a>
+          );
+        })}
       </nav>
 
       <div className="border-t border-surface-200 p-3">

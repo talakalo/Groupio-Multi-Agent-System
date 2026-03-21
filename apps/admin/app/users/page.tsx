@@ -1,11 +1,12 @@
 "use client";
 
+import { useState, useMemo, useCallback } from "react";
+import { clsx } from "clsx";
 import {
   useQuery,
   useMutation,
   useQueryClient,
 } from "@tanstack/react-query";
-import { clsx } from "clsx";
 import {
   Search,
   Filter,
@@ -25,13 +26,11 @@ import {
   Phone,
   Lock,
 } from "lucide-react";
-import { useState, useMemo, useCallback, type ReactNode } from "react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 // ---------------------------------------------------------------------------
 // Types
-// TODO: User duplicates admin API response shape; @groupio/types has Resident but not admin User.
 // ---------------------------------------------------------------------------
 
 interface User {
@@ -62,40 +61,6 @@ const ROLE_BADGE_CLASSES: Record<string, string> = {
   admin: "bg-warning-50 text-warning-700",
   super_admin: "bg-danger-50 text-danger-700",
 };
-
-function SortTh({
-  field,
-  sortField,
-  sortDir,
-  onSort,
-  children,
-}: {
-  field: SortField;
-  sortField: SortField;
-  sortDir: SortDir;
-  onSort: (f: SortField) => void;
-  children: ReactNode;
-}) {
-  return (
-    <th
-      className="table-header cursor-pointer select-none"
-      onClick={() => onSort(field)}
-      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onSort(field); }}
-      role="columnheader"
-      tabIndex={0}
-    >
-      <div className="flex items-center gap-1">
-        {children}
-        {sortField === field &&
-          (sortDir === "asc" ? (
-            <ChevronUp className="w-3.5 h-3.5" />
-          ) : (
-            <ChevronDown className="w-3.5 h-3.5" />
-          ))}
-      </div>
-    </th>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // API helpers
@@ -201,9 +166,6 @@ export default function UsersPage() {
     password: "",
   });
 
-  // ---- Detail modal ----
-  const [detailUser, setDetailUser] = useState<User | null>(null);
-
   // ---- Role change dropdown ----
   const [roleDropdownId, setRoleDropdownId] = useState<string | null>(null);
 
@@ -303,6 +265,32 @@ export default function UsersPage() {
     },
     [createForm, createMutation]
   );
+
+  // ---- Sort header helper ----
+  function SortTh({
+    field,
+    children,
+  }: {
+    field: SortField;
+    children: React.ReactNode;
+  }) {
+    return (
+      <th
+        className="table-header cursor-pointer select-none"
+        onClick={() => toggleSort(field)}
+      >
+        <div className="flex items-center gap-1">
+          {children}
+          {sortField === field &&
+            (sortDir === "asc" ? (
+              <ChevronUp className="w-3.5 h-3.5" />
+            ) : (
+              <ChevronDown className="w-3.5 h-3.5" />
+            ))}
+        </div>
+      </th>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -434,12 +422,12 @@ export default function UsersPage() {
           <table className="w-full text-left">
             <thead>
               <tr>
-                <SortTh field="name" sortField={sortField} sortDir={sortDir} onSort={toggleSort}>Name</SortTh>
-                <SortTh field="email" sortField={sortField} sortDir={sortDir} onSort={toggleSort}>Email</SortTh>
+                <SortTh field="name">Name</SortTh>
+                <SortTh field="email">Email</SortTh>
                 <th className="table-header">Phone</th>
-                <SortTh field="role" sortField={sortField} sortDir={sortDir} onSort={toggleSort}>Role</SortTh>
-                <SortTh field="status" sortField={sortField} sortDir={sortDir} onSort={toggleSort}>Status</SortTh>
-                <SortTh field="created_at" sortField={sortField} sortDir={sortDir} onSort={toggleSort}>Created</SortTh>
+                <SortTh field="role">Role</SortTh>
+                <SortTh field="status">Status</SortTh>
+                <SortTh field="created_at">Created</SortTh>
                 <th className="table-header">Actions</th>
               </tr>
             </thead>
@@ -456,11 +444,7 @@ export default function UsersPage() {
               {sorted.map((user) => (
                 <tr key={user.id} className="table-row">
                   <td className="table-cell">
-                    <button
-                      type="button"
-                      className="flex items-center gap-3 hover:opacity-80 transition-opacity text-left"
-                      onClick={() => setDetailUser(user)}
-                    >
+                    <div className="flex items-center gap-3">
                       <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary-100 text-primary-700 font-semibold text-xs flex-shrink-0">
                         {(user.name || "")
                           .split(" ")
@@ -469,10 +453,10 @@ export default function UsersPage() {
                           .toUpperCase()
                           .slice(0, 2) || "?"}
                       </div>
-                      <span className="font-medium text-surface-900 underline-offset-2 hover:underline">
+                      <span className="font-medium text-surface-900">
                         {user.name || user.email || "—"}
                       </span>
-                    </button>
+                    </div>
                   </td>
                   <td className="table-cell text-surface-600">{user.email}</td>
                   <td className="table-cell text-surface-600">
@@ -594,14 +578,14 @@ export default function UsersPage() {
       {/* Create Admin User Modal                                            */}
       {/* ================================================================== */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <button
-            type="button"
-            className="absolute inset-0 cursor-default"
-            onClick={() => setShowCreateModal(false)}
-            aria-label="Close modal"
-          />
-          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md mx-4">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          onClick={() => setShowCreateModal(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
             {/* Modal header */}
             <div className="flex items-center justify-between p-5 border-b border-surface-100">
               <h2 className="text-lg font-bold text-surface-900">
@@ -739,129 +723,6 @@ export default function UsersPage() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-      {/* ================================================================== */}
-      {/* User Detail Modal                                                 */}
-      {/* ================================================================== */}
-      {detailUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <button
-            type="button"
-            className="absolute inset-0 cursor-default"
-            onClick={() => setDetailUser(null)}
-            aria-label="Close modal"
-          />
-          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md mx-4">
-            <div className="flex items-center justify-between p-5 border-b border-surface-100">
-              <h2 className="text-lg font-bold text-surface-900">User Details</h2>
-              <button
-                className="p-2 rounded-lg hover:bg-surface-100 text-surface-400 transition-colors"
-                onClick={() => setDetailUser(null)}
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-5 space-y-4">
-              <div className="flex items-center gap-4">
-                <div className="flex items-center justify-center w-14 h-14 rounded-full bg-primary-100 text-primary-700 font-bold text-lg">
-                  {(detailUser.name || "")
-                    .split(" ")
-                    .map((n) => n[0])
-                    .join("")
-                    .toUpperCase()
-                    .slice(0, 2) || "?"}
-                </div>
-                <div>
-                  <p className="font-semibold text-surface-900">{detailUser.name || "—"}</p>
-                  <span
-                    className={clsx(
-                      "badge",
-                      ROLE_BADGE_CLASSES[detailUser.role] || "badge-normal"
-                    )}
-                  >
-                    {ROLE_LABELS[detailUser.role] || detailUser.role}
-                  </span>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex items-center gap-3 p-3 rounded-lg bg-surface-50">
-                  <Mail className="w-4 h-4 text-surface-400 flex-shrink-0" />
-                  <div>
-                    <p className="text-xs text-surface-400">Email</p>
-                    <p className="text-sm text-surface-700">{detailUser.email}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3 p-3 rounded-lg bg-surface-50">
-                  <Phone className="w-4 h-4 text-surface-400 flex-shrink-0" />
-                  <div>
-                    <p className="text-xs text-surface-400">Phone</p>
-                    <p className="text-sm text-surface-700">{detailUser.phone || "—"}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between p-3 rounded-lg bg-surface-50">
-                  <div>
-                    <p className="text-xs text-surface-400">Status</p>
-                    <span
-                      className={clsx(
-                        "inline-flex items-center gap-1.5 text-xs font-medium mt-0.5",
-                        detailUser.status === "active"
-                          ? "text-success-600"
-                          : "text-danger-600"
-                      )}
-                    >
-                      <span
-                        className={clsx(
-                          "w-2 h-2 rounded-full",
-                          detailUser.status === "active" ? "bg-success-500" : "bg-danger-500"
-                        )}
-                      />
-                      {detailUser.status === "active" ? "Active" : "Suspended"}
-                    </span>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-surface-400">Created</p>
-                    <p className="text-sm text-surface-700">
-                      {new Date(detailUser.created_at).toLocaleDateString("en-IL", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                      })}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 pt-2">
-                <button
-                  type="button"
-                  className="btn-secondary flex-1"
-                  onClick={() => setDetailUser(null)}
-                >
-                  Close
-                </button>
-                <button
-                  type="button"
-                  className={clsx(
-                    "flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                    detailUser.status === "active"
-                      ? "bg-danger-50 text-danger-700 hover:bg-danger-100"
-                      : "bg-success-50 text-success-700 hover:bg-success-100"
-                  )}
-                  onClick={() => {
-                    handleToggleStatus(detailUser);
-                    setDetailUser(null);
-                  }}
-                >
-                  {detailUser.status === "active" ? "Suspend User" : "Activate User"}
-                </button>
-              </div>
-            </div>
           </div>
         </div>
       )}
