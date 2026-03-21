@@ -81,6 +81,7 @@ class Settings(BaseSettings):
     PRICING_AGENT_MODE: str = "recommend"
     VETTING_AGENT_MODE: str = "recommend"
     OUTREACH_AGENT_MODE: str = "gated"
+    PAYMENT_AGENT_MODE: str = "gated"
 
     # Feature Flags
     ENABLE_WEB_SEARCH: bool = True
@@ -195,6 +196,14 @@ class Settings(BaseSettings):
                     "Set JWT_SECRET_KEY in .env to persist sessions across restarts."
                 )
             # Production case is already handled by the raise above.
+
+        # --- Email verification enforcement ---
+        if not self.ENFORCE_EMAIL_VERIFICATION and self.ENVIRONMENT not in ("development", "test"):
+            logger.warning(
+                "ENFORCE_EMAIL_VERIFICATION is disabled in %s. "
+                "Unverified users can log in. Enable it to protect the platform.",
+                self.ENVIRONMENT,
+            )
 
         # --- Required secrets in production ---
         if is_prod:
