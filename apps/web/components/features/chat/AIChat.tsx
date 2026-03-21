@@ -2,23 +2,18 @@
 
 import type { MessageResponse, ServiceCategory } from '@groupio/types';
 import { useQuery } from '@tanstack/react-query';
-import { Send, Bot, User, Loader2, Sparkles, Headphones } from 'lucide-react';
-import { useTranslations } from 'next-intl';
+import { Send, Bot, User, Loader2, Sparkles } from 'lucide-react';
 import { useState, useRef, useEffect, useCallback, type FormEvent } from 'react';
 
-import { useAccessToken } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
+import { useAccessToken } from '@/lib/stores/authStore';
 
-const THINKING_KEYS = [
-  'searchingContractors',
-  'checkingPrices',
-  'analyzingHistory',
-  'preparingRecommendations',
-  'searchingOffers',
-  'checkingStatus',
-] as const;
-
-const DEFAULT_SUGGESTION_KEYS = ['findOffers', 'orderStatus', 'talkToAgent'] as const;
+const AI_THINKING_MESSAGES = [
+  'מחפש קבלנים...',
+  'בודק מחירים...',
+  'מנתח היסטוריה...',
+  'מכין המלצות...',
+];
 
 // ---------------------------------------------------------------------------
 // Types
@@ -77,10 +72,11 @@ export function AIChat({
 }: AIChatProps) {
   const baseUrl = apiUrl ?? API_BASE;
   const accessToken = useAccessToken();
-  const t = useTranslations('chat');
 
   // ---- State ----
-  const welcomeContent = t('welcome');
+  // Welcome message: passed as a prop so callers can provide a translated string.
+  // Defaults to an English string; Hebrew callers should pass the translated version.
+  const welcomeContent = placeholder ?? "Hello! I'm the Groupio assistant. How can I help?";
   const [thinkingMsgIdx, setThinkingMsgIdx] = useState(0);
   const [isSlowResponse, setIsSlowResponse] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -93,10 +89,6 @@ export function AIChat({
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isEscalated, setIsEscalated] = useState(false);
-
-  const effectiveSuggestions =
-    suggestions.length > 0 ? suggestions : DEFAULT_SUGGESTION_KEYS.map((k) => t(`defaultSuggestions.${k}`));
 
   // ---- Chat history: load from backend on mount, with pagination ----
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -170,7 +162,7 @@ export function AIChat({
   useEffect(() => {
     if (!isLoading) return;
     const interval = setInterval(
-      () => setThinkingMsgIdx((i) => (i + 1) % THINKING_KEYS.length),
+      () => setThinkingMsgIdx((i) => (i + 1) % AI_THINKING_MESSAGES.length),
       2000,
     );
     return () => clearInterval(interval);
@@ -245,16 +237,11 @@ export function AIChat({
         }
 
         const data: MessageResponse = await response.json();
-        const responseText = data.response?.message ?? '';
-
-        if (responseText.toLowerCase().includes('escalat')) {
-          setIsEscalated(true);
-        }
 
         setMessages((prev) =>
           prev.map((m) =>
             m.id === assistantId
-              ? { ...m, content: responseText, isStreaming: false }
+              ? { ...m, content: data.response.message, isStreaming: false }
               : m,
           ),
         );
@@ -264,7 +251,7 @@ export function AIChat({
             m.id === assistantId
               ? {
                   ...m,
-                  content: t('errorGeneric'),
+                  content: 'מצטער, משהו השתבש. נסה שוב.',
                   isStreaming: false,
                 }
               : m,
@@ -276,7 +263,7 @@ export function AIChat({
         setIsSlowResponse(false);
       }
     },
-    [accessToken, baseUrl, buildingId, isLoading, userId, t],
+    [accessToken, baseUrl, buildingId, isLoading, userId],
   );
 
   const handleSubmit = (e: FormEvent) => {
@@ -291,11 +278,6 @@ export function AIChat({
     sendMessage(suggestion).catch(() => {});
   };
 
-  const handleEscalate = useCallback(() => {
-    setIsEscalated(true);
-    sendMessage(t('escalateMessage')).catch(() => {});
-  }, [sendMessage, t]);
-
   // ---- Render ----
   return (
     <div
@@ -307,38 +289,18 @@ export function AIChat({
       )}
     >
       {/* ---- Header ---- */}
-      <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-5 py-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary-100">
-            <Bot className="h-5 w-5 text-primary-600" />
-          </div>
-          <div>
-            <h3 className="flex items-center gap-2 text-sm font-semibold text-gray-900">
-              {t('assistantTitle')}
-              <span className="rounded px-1.5 py-0.5 text-xs font-medium bg-primary-100 text-primary-700">
-                AI
-              </span>
-            </h3>
-            <p className="text-xs text-gray-500">
-              {isLoading ? t('thinking') : t('readyToHelp')}
-            </p>
-          </div>
+      <div className="flex items-center gap-3 border-b border-gray-100 px-5 py-4">
+        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary-100">
+          <Bot className="h-5 w-5 text-primary-600" />
         </div>
-        <button
-          type="button"
-          onClick={handleEscalate}
-          disabled={isLoading}
-          aria-label={t('talkToAgent')}
-          className={cn(
-            'flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2',
-            'text-sm font-medium text-gray-700',
-            'transition-colors hover:bg-gray-50 hover:border-gray-300',
-            'disabled:cursor-not-allowed disabled:opacity-50',
-          )}
-        >
-          <Headphones className="h-4 w-4" />
-          <span>{t('talkToAgent')}</span>
-        </button>
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900">
+            העוזר של גרופיו
+          </h3>
+          <p className="text-xs text-gray-500">
+            {isLoading ? 'חושב...' : 'מוכן לעזור'}
+          </p>
+        </div>
       </div>
 
       {/* ---- Messages ---- */}
@@ -351,7 +313,7 @@ export function AIChat({
               disabled={isLoadingHistory}
               className="text-sm text-primary-600 hover:text-primary-700 disabled:opacity-50"
             >
-              {isLoadingHistory ? t('loading') : t('loadingHistory')}
+              {isLoadingHistory ? 'טוען...' : 'טוען הודעות ישנות יותר'}
             </button>
           </div>
         )}
@@ -390,7 +352,7 @@ export function AIChat({
               )}
             >
               {msg.isStreaming && !msg.content ? (
-                <TypingIndicator thinkingMsg={t(`thinkingMessages.${THINKING_KEYS[thinkingMsgIdx]}`)} ariaLabel={t('thinking')} />
+                <TypingIndicator thinkingMsg={AI_THINKING_MESSAGES[thinkingMsgIdx]} />
               ) : (
                 <p className="whitespace-pre-wrap">{msg.content}</p>
               )}
@@ -402,9 +364,9 @@ export function AIChat({
       </div>
 
       {/* ---- Suggestions ---- */}
-      {effectiveSuggestions.length > 0 && messages.length <= 1 && (
+      {suggestions.length > 0 && messages.length <= 1 && (
         <div className="flex flex-wrap gap-2 px-4 pb-2">
-          {effectiveSuggestions.map((s) => (
+          {suggestions.map((s) => (
             <button
               key={s}
               type="button"
@@ -425,21 +387,13 @@ export function AIChat({
 
       {/* ---- AI disclosure banner ---- */}
       <div className="px-4 py-2 bg-amber-50 border-t border-amber-200 text-xs text-amber-800">
-        {t('aiDisclaimer')}
+        תוצאות מחיפוש זה מופקות על ידי בינה מלאכותית ועשויות לדרוש בדיקה אנושית.
       </div>
 
       {/* ---- Slow-response notice ---- */}
       {isSlowResponse && (
         <div className="px-4 py-1.5 text-xs text-center text-gray-400">
-          {t('slowResponse')}
-        </div>
-      )}
-
-      {/* ---- Escalation banner ---- */}
-      {isEscalated && (
-        <div className="flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-100 border-t border-amber-200 text-amber-900 text-sm">
-          <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-          <span>{t('transferringToAgent')}</span>
+          This is taking longer than expected...
         </div>
       )}
 
@@ -454,7 +408,7 @@ export function AIChat({
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder={placeholder ?? t('placeholder')}
+          placeholder={placeholder ?? "הקלד הודעה..."}
           disabled={isLoading}
           className={cn(
             'flex-1 rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5',
@@ -467,7 +421,7 @@ export function AIChat({
         <button
           type="submit"
           disabled={isLoading || !input.trim()}
-          aria-label={t('send')}
+          aria-label="שלח"
           className={cn(
             'flex h-10 w-10 items-center justify-center rounded-xl',
             'bg-primary-500 text-white',
@@ -491,12 +445,12 @@ export function AIChat({
 // Typing indicator sub-component
 // ---------------------------------------------------------------------------
 
-function TypingIndicator({ thinkingMsg, ariaLabel }: { thinkingMsg?: string; ariaLabel?: string }) {
+function TypingIndicator({ thinkingMsg }: { thinkingMsg?: string }) {
   return (
     <div
       data-testid="typing-indicator"
       className="flex items-center gap-2 py-1"
-      aria-label={ariaLabel}
+      aria-label="חושב..."
     >
       <div className="flex gap-1">
         {[0, 1, 2].map((i) => (

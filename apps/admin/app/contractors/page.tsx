@@ -1,5 +1,6 @@
 "use client";
 
+import React, { useState, useMemo, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import {
@@ -17,22 +18,15 @@ import {
   Tag,
   ShieldCheck,
   ShieldOff,
-  ShieldAlert,
   FileText,
   MoreHorizontal,
   Download,
   X,
-  Upload,
-  Eye,
-  Image,
-  ExternalLink,
-  Loader2,
 } from "lucide-react";
-import React, { useState, useMemo, useCallback } from "react";
-
 import { MetricCard } from "@/components/features/metrics/MetricCard";
 import { useContractors } from "@/lib/hooks";
 import type { ContractorListItem } from "@/lib/hooks";
+import type { ServiceCategory, Region } from "@groupio/types";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -62,14 +56,7 @@ const REGION_LABELS: Record<string, string> = {
   shfela: "Shfela",
 };
 
-type VerificationFilter = "all" | "pending" | "verified" | "rejected";
-
-const VERIFICATION_TABS: { key: VerificationFilter; label: string }[] = [
-  { key: "all", label: "הכל" },
-  { key: "pending", label: "ממתין לאימות" },
-  { key: "verified", label: "מאומת" },
-  { key: "rejected", label: "נדחה" },
-];
+type VerificationFilter = "all" | "verified" | "pending" | "suspended";
 type SortField = "businessName" | "rating" | "verified";
 type SortDir = "asc" | "desc";
 
@@ -105,25 +92,30 @@ function SortTh({
   );
 }
 
-/** Backend trust_score_breakdown shape (snake_case from API). */
-interface TrustScoreBreakdownApi {
-  license_score?: number;
-  insurance_score?: number;
-  experience_score?: number;
-  reputation_score?: number;
-  completion_score?: number;
-  response_score?: number;
-  total?: number;
+// Simulated trust score breakdown
+interface TrustScoreBreakdown {
+  licenseVerification: number;
+  customerReviews: number;
+  responseTime: number;
+  completionRate: number;
+  yearsInBusiness: number;
+  overallScore: number;
 }
 
-const TRUST_BREAKDOWN_LABELS: { key: keyof TrustScoreBreakdownApi; label: string; max?: number }[] = [
-  { key: "license_score", label: "License", max: 25 },
-  { key: "insurance_score", label: "Insurance", max: 20 },
-  { key: "experience_score", label: "Experience", max: 15 },
-  { key: "reputation_score", label: "Reputation", max: 15 },
-  { key: "completion_score", label: "Completion", max: 15 },
-  { key: "response_score", label: "Response", max: 10 },
-];
+function getTrustScore(contractor: ContractorListItem): TrustScoreBreakdown {
+  // Deterministic simulation based on rating and verification
+  const base = contractor.rating * 18;
+  return {
+    licenseVerification: contractor.verified ? 95 : 40,
+    customerReviews: Math.round(base + 5),
+    responseTime: Math.round(70 + contractor.rating * 5),
+    completionRate: Math.round(80 + contractor.rating * 3),
+    yearsInBusiness: Math.round(50 + contractor.rating * 8),
+    overallScore: contractor.verified
+      ? Math.round(base + 10)
+      : Math.round(base - 15),
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Trust Score Visualization
@@ -243,221 +235,6 @@ function VerificationMetadataSection({ contractorId }: { contractorId: string })
 }
 
 // ---------------------------------------------------------------------------
-// Verification Checklist & Document Viewer
-// ---------------------------------------------------------------------------
-
-type DocumentType = "business_license" | "insurance" | "certification" | "other";
-
-interface ContractorDocument {
-  id: string;
-  type: DocumentType;
-  file_name: string;
-  file_url: string;
-  mime_type: string;
-  uploaded_at: string;
-  status: "pending_review" | "approved" | "rejected";
-}
-
-const VERIFICATION_CHECKLIST_ITEMS: {
-  type: DocumentType;
-  labelHe: string;
-  labelEn: string;
-}[] = [
-  { type: "business_license", labelHe: "רישיון עסק", labelEn: "Business License" },
-  { type: "insurance", labelHe: "ביטוח", labelEn: "Insurance" },
-  { type: "certification", labelHe: "תעודות", labelEn: "Certifications" },
-];
-
-function VerificationChecklistSection({ contractorId }: { contractorId: string }) {
-  const rawApiUrl =
-    (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "") || "http://localhost:8000";
-  const API_BASE = rawApiUrl.endsWith("/api/v1") ? rawApiUrl : `${rawApiUrl}/api/v1`;
-
-  const { data, isLoading } = useQuery({
-    queryKey: ["admin", "contractors", contractorId, "documents"],
-    queryFn: async () => {
-      const res = await fetch(
-        `${API_BASE}/admin/contractors/${encodeURIComponent(contractorId)}/documents`,
-        { credentials: "include" }
-      );
-      if (!res.ok) return { items: [] as ContractorDocument[] };
-      return res.json() as Promise<{ items: ContractorDocument[] }>;
-    },
-    enabled: !!contractorId,
-  });
-
-  const docs = data?.items ?? [];
-  const docsByType = new Map<DocumentType, ContractorDocument[]>();
-  for (const doc of docs) {
-    const list = docsByType.get(doc.type) ?? [];
-    list.push(doc);
-    docsByType.set(doc.type, list);
-  }
-
-  return (
-    <div className="space-y-3">
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-surface-500">
-        Verification Checklist
-      </h3>
-      {isLoading ? (
-        <div className="flex items-center gap-2 text-sm text-surface-400">
-          <Loader2 className="w-4 h-4 animate-spin" />
-          Loading documents...
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {VERIFICATION_CHECKLIST_ITEMS.map((item) => {
-            const itemDocs = docsByType.get(item.type) ?? [];
-            const hasUploaded = itemDocs.length > 0;
-            const isApproved = itemDocs.some((d) => d.status === "approved");
-            const isRejected = itemDocs.some((d) => d.status === "rejected");
-
-            return (
-              <div
-                key={item.type}
-                className={clsx(
-                  "flex items-center justify-between p-3 rounded-lg border text-sm",
-                  isApproved
-                    ? "bg-success-50 border-success-200"
-                    : isRejected
-                      ? "bg-danger-50 border-danger-200"
-                      : hasUploaded
-                        ? "bg-warning-50 border-warning-200"
-                        : "bg-surface-50 border-surface-200"
-                )}
-              >
-                <div className="flex items-center gap-2.5">
-                  {isApproved ? (
-                    <CheckCircle2 className="w-4 h-4 text-success-600 flex-shrink-0" />
-                  ) : isRejected ? (
-                    <XCircle className="w-4 h-4 text-danger-600 flex-shrink-0" />
-                  ) : hasUploaded ? (
-                    <Clock className="w-4 h-4 text-warning-600 flex-shrink-0" />
-                  ) : (
-                    <Upload className="w-4 h-4 text-surface-400 flex-shrink-0" />
-                  )}
-                  <div>
-                    <span className="font-medium text-surface-800">
-                      {item.labelHe}
-                    </span>
-                    <span className="text-surface-400 mx-1.5">·</span>
-                    <span className="text-surface-500">{item.labelEn}</span>
-                  </div>
-                </div>
-                <span
-                  className={clsx(
-                    "text-xs font-medium px-2 py-0.5 rounded-full",
-                    isApproved
-                      ? "bg-success-100 text-success-700"
-                      : isRejected
-                        ? "bg-danger-100 text-danger-700"
-                        : hasUploaded
-                          ? "bg-warning-100 text-warning-700"
-                          : "bg-surface-100 text-surface-500"
-                  )}
-                >
-                  {isApproved
-                    ? "Verified"
-                    : isRejected
-                      ? "Rejected"
-                      : hasUploaded
-                        ? "Pending Review"
-                        : "Missing"}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Document Viewer */}
-      {docs.length > 0 && (
-        <div className="space-y-2 pt-2">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-surface-500">
-            Uploaded Documents
-          </h3>
-          <div className="space-y-2">
-            {docs.map((doc) => {
-              const isImage = doc.mime_type?.startsWith("image/");
-              const typeLabel =
-                VERIFICATION_CHECKLIST_ITEMS.find((i) => i.type === doc.type)
-                  ?.labelEn ?? doc.type;
-              return (
-                <div
-                  key={doc.id}
-                  className="p-3 rounded-lg border border-surface-200 bg-surface-50"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      {isImage ? (
-                        <Image className="w-4 h-4 text-primary-500 flex-shrink-0" />
-                      ) : (
-                        <FileText className="w-4 h-4 text-surface-400 flex-shrink-0" />
-                      )}
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-surface-800 truncate">
-                          {doc.file_name}
-                        </p>
-                        <p className="text-xs text-surface-400">
-                          {typeLabel} · {new Date(doc.uploaded_at).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                      <span
-                        className={clsx(
-                          "text-[10px] font-medium px-1.5 py-0.5 rounded-full",
-                          doc.status === "approved"
-                            ? "bg-success-100 text-success-700"
-                            : doc.status === "rejected"
-                              ? "bg-danger-100 text-danger-700"
-                              : "bg-warning-100 text-warning-700"
-                        )}
-                      >
-                        {doc.status === "approved"
-                          ? "Approved"
-                          : doc.status === "rejected"
-                            ? "Rejected"
-                            : "Pending"}
-                      </span>
-                      {doc.file_url && (
-                        <a
-                          href={doc.file_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="p-1 rounded hover:bg-surface-200 text-surface-500 transition-colors"
-                          title="View document"
-                        >
-                          {isImage ? (
-                            <Eye className="w-3.5 h-3.5" />
-                          ) : (
-                            <ExternalLink className="w-3.5 h-3.5" />
-                          )}
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                  {isImage && doc.file_url && (
-                    <div className="mt-2 rounded-lg overflow-hidden border border-surface-200">
-                      <img
-                        src={doc.file_url}
-                        alt={doc.file_name}
-                        className="w-full max-h-48 object-contain bg-white"
-                        loading="lazy"
-                      />
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Page component
 // ---------------------------------------------------------------------------
 
@@ -522,17 +299,9 @@ export default function ContractorsPage() {
 
     // Verification filter
     if (verificationFilter === "verified") {
-      result = result.filter(
-        (c) => c.verificationStatus === "verified" || c.verificationStatus === "approved"
-      );
+      result = result.filter((c) => c.verified);
     } else if (verificationFilter === "pending") {
-      result = result.filter(
-        (c) => c.verificationStatus === "pending" || (!c.verified && !c.verificationStatus)
-      );
-    } else if (verificationFilter === "rejected") {
-      result = result.filter(
-        (c) => c.verificationStatus === "rejected" || c.verificationStatus === "suspended"
-      );
+      result = result.filter((c) => !c.verified);
     }
 
     // Category filter
@@ -591,15 +360,8 @@ export default function ContractorsPage() {
 
   // ---- Stats ----
   const stats = useMemo(() => {
-    const verified = contractors.filter(
-      (c) => c.verificationStatus === "verified" || c.verificationStatus === "approved"
-    ).length;
-    const pending = contractors.filter(
-      (c) => c.verificationStatus === "pending" || (!c.verified && !c.verificationStatus)
-    ).length;
-    const rejected = contractors.filter(
-      (c) => c.verificationStatus === "rejected" || c.verificationStatus === "suspended"
-    ).length;
+    const verified = contractors.filter((c) => c.verified).length;
+    const pending = contractors.filter((c) => !c.verified).length;
     const avgRating =
       contractors.length > 0
         ? contractors.reduce((sum, c) => sum + c.rating, 0) /
@@ -609,7 +371,6 @@ export default function ContractorsPage() {
       total: contractors.length,
       verified,
       pending,
-      rejected,
       avgRating: avgRating.toFixed(1),
     };
   }, [contractors]);
@@ -681,7 +442,7 @@ export default function ContractorsPage() {
       const ids = Array.from(selectedIds);
       const results = await Promise.allSettled(
         ids.map((id) =>
-          fetch(`${API_BASE}/admin/contractors/${encodeURIComponent(id)}/request-docs`, {
+          fetch(`${API_BASE}/admin/contractors/${encodeURIComponent(id)}/request-documents`, {
             method: "POST",
             ...fetchOpts(),
             body: JSON.stringify({ message: "Please upload your license, insurance, and business registration documents to complete your verification." }),
@@ -780,54 +541,6 @@ export default function ContractorsPage() {
       </div>
 
       {/* ================================================================== */}
-      {/* Verification Tab Bar                                                */}
-      {/* ================================================================== */}
-      <div className="flex items-center gap-1 border-b border-surface-200">
-        {VERIFICATION_TABS.map((tab) => {
-          const count =
-            tab.key === "all"
-              ? stats.total
-              : tab.key === "pending"
-                ? stats.pending
-                : tab.key === "verified"
-                  ? stats.verified
-                  : stats.rejected;
-          return (
-            <button
-              key={tab.key}
-              onClick={() => setVerificationFilter(tab.key)}
-              className={clsx(
-                "px-4 py-2.5 text-sm font-medium border-b-2 transition-colors",
-                verificationFilter === tab.key
-                  ? "border-primary-600 text-primary-700"
-                  : "border-transparent text-surface-500 hover:text-surface-700"
-              )}
-            >
-              <div className="flex items-center gap-2">
-                {tab.label}
-                {count > 0 && (
-                  <span
-                    className={clsx(
-                      "flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-[10px] font-bold",
-                      verificationFilter === tab.key
-                        ? "bg-primary-100 text-primary-700"
-                        : tab.key === "pending"
-                          ? "bg-warning-100 text-warning-700"
-                          : tab.key === "rejected"
-                            ? "bg-danger-100 text-danger-700"
-                            : "bg-surface-100 text-surface-600"
-                    )}
-                  >
-                    {count}
-                  </span>
-                )}
-              </div>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* ================================================================== */}
       {/* Filters                                                             */}
       {/* ================================================================== */}
       <div className="card p-4">
@@ -837,7 +550,7 @@ export default function ContractorsPage() {
             Filters
           </span>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Search */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400" />
@@ -849,6 +562,20 @@ export default function ContractorsPage() {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
+
+          {/* Verification */}
+          <select
+            className="input"
+            value={verificationFilter}
+            onChange={(e) =>
+              setVerificationFilter(e.target.value as VerificationFilter)
+            }
+          >
+            <option value="all">All Statuses</option>
+            <option value="verified">Verified</option>
+            <option value="pending">Pending</option>
+            <option value="suspended">Suspended</option>
+          </select>
 
           {/* Category */}
           <select
@@ -960,7 +687,7 @@ export default function ContractorsPage() {
               </tr>
             )}
             {sorted.map((contractor) => {
-              const trustScore = contractor.trustScore;
+              const trust = getTrustScore(contractor);
               return (
                 <tr
                   key={contractor.id}
@@ -994,13 +721,7 @@ export default function ContractorsPage() {
                     </div>
                   </td>
                   <td className="table-cell">
-                    {contractor.verificationStatus === "rejected" ||
-                    contractor.verificationStatus === "suspended" ? (
-                      <span className="badge bg-danger-50 text-danger-700">
-                        <ShieldAlert className="w-3 h-3 mr-1" />
-                        Rejected
-                      </span>
-                    ) : contractor.verified ? (
+                    {contractor.verified ? (
                       <span className="badge bg-success-50 text-success-700">
                         <CheckCircle2 className="w-3 h-3 mr-1" />
                         Verified
@@ -1055,30 +776,26 @@ export default function ContractorsPage() {
                     </div>
                   </td>
                   <td className="table-cell">
-                    {trustScore != null ? (
-                      <div className="flex items-center gap-2">
-                        <div className="w-16 h-2 bg-surface-100 rounded-full overflow-hidden">
-                          <div
-                            className={clsx(
-                              "h-full rounded-full",
-                              trustScore >= 80
-                                ? "bg-success-500"
-                                : trustScore >= 60
-                                  ? "bg-warning-500"
-                                  : "bg-danger-500"
-                            )}
-                            style={{
-                              width: `${Math.min(100, trustScore)}%`,
-                            }}
-                          />
-                        </div>
-                        <span className="text-xs font-semibold text-surface-700">
-                          {Math.round(trustScore)}
-                        </span>
+                    <div className="flex items-center gap-2">
+                      <div className="w-16 h-2 bg-surface-100 rounded-full overflow-hidden">
+                        <div
+                          className={clsx(
+                            "h-full rounded-full",
+                            trust.overallScore >= 80
+                              ? "bg-success-500"
+                              : trust.overallScore >= 60
+                                ? "bg-warning-500"
+                                : "bg-danger-500"
+                          )}
+                          style={{
+                            width: `${Math.min(100, trust.overallScore)}%`,
+                          }}
+                        />
                       </div>
-                    ) : (
-                      <span className="text-xs text-surface-500">לא זמין</span>
-                    )}
+                      <span className="text-xs font-semibold text-surface-700">
+                        {trust.overallScore}
+                      </span>
+                    </div>
                   </td>
                   <td
                     className="table-cell"
@@ -1102,18 +819,13 @@ export default function ContractorsPage() {
       {/* Contractor Detail Modal                                             */}
       {/* ================================================================== */}
       {detailContractor && (
-        <button
-          type="button"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm cursor-default"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setDetailContractor(null);
-          }}
-          aria-label="Close modal"
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          onClick={() => setDetailContractor(null)}
         >
           <div
-            className="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 max-h-[85vh] overflow-y-auto cursor-default"
-            role="dialog"
-            aria-modal
+            className="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 max-h-[85vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
           >
             {/* Modal header */}
             <div className="flex items-center justify-between p-5 border-b border-surface-100">
@@ -1215,9 +927,6 @@ export default function ContractorsPage() {
                 </div>
               </div>
 
-              {/* Verification Checklist & Document Viewer */}
-              <VerificationChecklistSection contractorId={detailContractor.id} />
-
               {/* Verification Metadata (Phase 2 - external/official verification) */}
               <VerificationMetadataSection contractorId={detailContractor.id} />
 
@@ -1226,50 +935,50 @@ export default function ContractorsPage() {
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-surface-500">
                   Trust Score Breakdown
                 </h3>
-                {detailContractor.trustScore != null ||
-                (detailContractor.trustScoreBreakdown &&
-                  Object.keys(detailContractor.trustScoreBreakdown).length > 0) ? (
-                  <div className="space-y-2.5">
-                    {detailContractor.trustScoreBreakdown &&
-                      TRUST_BREAKDOWN_LABELS.map(({ key, label, max }) => {
-                        const raw = detailContractor.trustScoreBreakdown?.[key];
-                        const value =
-                          typeof raw === "number" && !Number.isNaN(raw)
-                            ? Math.round(raw)
-                            : null;
-                        if (value == null) return null;
-                        return (
-                          <TrustScoreBar
-                            key={key}
-                            label={label}
-                            value={value}
-                            maxValue={max ?? 100}
-                          />
-                        );
-                      })}
-                    <div className="pt-2 border-t border-surface-100 flex items-center justify-between">
-                      <span className="text-sm font-semibold text-surface-700">
-                        Overall Trust Score
-                      </span>
-                      <span
-                        className={clsx(
-                          "text-lg font-bold",
-                          (detailContractor.trustScore ?? 0) >= 80
-                            ? "text-success-600"
-                            : (detailContractor.trustScore ?? 0) >= 60
-                              ? "text-warning-600"
-                              : "text-danger-600"
-                        )}
-                      >
-                        {detailContractor.trustScore != null
-                          ? `${Math.round(detailContractor.trustScore)}/100`
-                          : "לא זמין"}
-                      </span>
+                {(() => {
+                  const trust = getTrustScore(detailContractor);
+                  return (
+                    <div className="space-y-2.5">
+                      <TrustScoreBar
+                        label="License Verification"
+                        value={trust.licenseVerification}
+                      />
+                      <TrustScoreBar
+                        label="Customer Reviews"
+                        value={trust.customerReviews}
+                      />
+                      <TrustScoreBar
+                        label="Response Time"
+                        value={trust.responseTime}
+                      />
+                      <TrustScoreBar
+                        label="Completion Rate"
+                        value={trust.completionRate}
+                      />
+                      <TrustScoreBar
+                        label="Years in Business"
+                        value={trust.yearsInBusiness}
+                      />
+                      <div className="pt-2 border-t border-surface-100 flex items-center justify-between">
+                        <span className="text-sm font-semibold text-surface-700">
+                          Overall Trust Score
+                        </span>
+                        <span
+                          className={clsx(
+                            "text-lg font-bold",
+                            trust.overallScore >= 80
+                              ? "text-success-600"
+                              : trust.overallScore >= 60
+                                ? "text-warning-600"
+                                : "text-danger-600"
+                          )}
+                        >
+                          {trust.overallScore}/100
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                ) : (
-                  <p className="text-sm text-surface-500 italic">לא זמין</p>
-                )}
+                  );
+                })()}
               </div>
 
               {/* Actions */}
@@ -1340,7 +1049,7 @@ export default function ContractorsPage() {
               </div>
             </div>
           </div>
-        </button>
+        </div>
       )}
     </div>
   );

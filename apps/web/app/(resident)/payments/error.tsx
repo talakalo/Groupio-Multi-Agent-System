@@ -1,7 +1,7 @@
 "use client";
 
-import * as Sentry from "@sentry/nextjs";
 import React from "react";
+import * as Sentry from "@sentry/nextjs";
 
 interface ErrorPageProps {
   error: Error & { digest?: string };

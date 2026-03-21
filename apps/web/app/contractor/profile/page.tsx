@@ -2,17 +2,12 @@
 
 import type { Contractor, ServiceCategory, Region } from '@groupio/types';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Upload, FileText, CheckCircle, Clock, XCircle, Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
-import { TrustScoreProgress } from '@/components/features/contractor/TrustScoreProgress';
-import { VettingStatusTimeline } from '@/components/features/contractor/VettingStatusTimeline';
-import { Badge } from '@/components/ui/Badge';
 import { useAuthStore } from '@/lib/stores/authStore';
-import { unwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
 
 const profileSchema = z.object({
   businessName: z.string().min(2, 'Business name is required'),
@@ -31,8 +26,7 @@ const profileSchema = z.object({
 
 type ProfileForm = z.infer<typeof profileSchema>;
 
-export default function ContractorProfilePage(props: PageParamsProps) {
-  unwrapPageParams(props);
+export default function ContractorProfilePage() {
   const t = useTranslations('contractor.profile');
   const accessToken = useAuthStore((s) => s.accessToken);
   const [contractor, setContractor] = useState<Contractor | null>(null);
@@ -52,35 +46,6 @@ export default function ContractorProfilePage(props: PageParamsProps) {
   const [contractorId, setContractorId] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState<string | null>(null);
   const [docRequest, setDocRequest] = useState<{ message: string; requested_at: string } | null>(null);
-  const [uploadedFiles, setUploadedFiles] = useState<Record<string, { name: string; uploadedAt: Date }>>({});
-
-  const refetchContractorData = useCallback(
-    async (cid: string) => {
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      const token = accessToken;
-      const headers: Record<string, string> = {};
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-
-      const [contractorRes, docReqRes] = await Promise.all([
-        fetch(`${apiBase}/api/v1/contractors/${cid}`, { headers, credentials: 'include' }),
-        fetch(`${apiBase}/api/v1/contractors/me/doc-requests`, { headers, credentials: 'include' }),
-      ]);
-      if (contractorRes.ok) {
-        const data = await contractorRes.json();
-        setContractor(data);
-        reset(data);
-      }
-      if (docReqRes.ok) {
-        const dr = await docReqRes.json();
-        if (dr.pending && dr.items?.[0]) {
-          setDocRequest({ message: dr.items[0].message ?? '', requested_at: dr.items[0].requested_at ?? '' });
-        } else {
-          setDocRequest(null);
-        }
-      }
-    },
-    [accessToken, reset]
-  );
 
   async function handleDocumentUpload(docType: 'license' | 'insurance' | 'certifications') {
     const input = document.createElement('input');
@@ -107,11 +72,9 @@ export default function ContractorProfilePage(props: PageParamsProps) {
         });
 
         if (res.ok) {
-          setUploadedFiles((prev) => ({
-            ...prev,
-            [docType]: { name: file.name, uploadedAt: new Date() },
-          }));
-          if (contractorId) refetchContractorData(contractorId);
+          alert(t('documents.uploadSuccess'));
+          // Refresh profile to show updated documents
+          window.location.reload();
         } else {
           alert(t('documents.uploadError'));
         }
@@ -123,55 +86,6 @@ export default function ContractorProfilePage(props: PageParamsProps) {
       }
     };
     input.click();
-  }
-
-  type DocStatus = 'uploaded' | 'pending_review' | 'approved' | 'rejected' | 'not_uploaded';
-
-  function getDocStatus(docType: 'license' | 'insurance' | 'certifications'): DocStatus {
-    if (docType === 'license' && contractor?.licenseNumber) return 'approved';
-    if (docType === 'insurance' && contractor?.insuranceExpiry) return 'approved';
-    if (docType === 'certifications' && contractor?.certifications?.length) return 'approved';
-    if (uploadedFiles[docType]) return 'pending_review';
-    return 'not_uploaded';
-  }
-
-  function getDocBadge(status: DocStatus) {
-    switch (status) {
-      case 'approved':
-        return (
-          <Badge variant="success" size="sm">
-            <CheckCircle className="h-3 w-3 me-1" />
-            {t('documents.approved')}
-          </Badge>
-        );
-      case 'pending_review':
-        return (
-          <Badge variant="warning" size="sm">
-            <Clock className="h-3 w-3 me-1" />
-            {t('documents.pendingReview')}
-          </Badge>
-        );
-      case 'rejected':
-        return (
-          <Badge variant="error" size="sm">
-            <XCircle className="h-3 w-3 me-1" />
-            {t('documents.rejected')}
-          </Badge>
-        );
-      case 'uploaded':
-        return (
-          <Badge variant="info" size="sm">
-            <Upload className="h-3 w-3 me-1" />
-            {t('documents.statusUploaded')}
-          </Badge>
-        );
-      default:
-        return (
-          <Badge variant="default" size="sm">
-            {t('documents.notUploaded')}
-          </Badge>
-        );
-    }
   }
 
   useEffect(() => {
@@ -189,7 +103,21 @@ export default function ContractorProfilePage(props: PageParamsProps) {
         setContractorId(cid);
 
         if (cid) {
-          await refetchContractorData(cid);
+          const [contractorRes, docReqRes] = await Promise.all([
+            fetch(`${apiBase}/api/v1/contractors/${cid}`, { headers, credentials: 'include' }),
+            fetch(`${apiBase}/api/v1/contractors/me/doc-requests`, { headers, credentials: 'include' }),
+          ]);
+          if (contractorRes.ok) {
+            const data = await contractorRes.json();
+            setContractor(data);
+            reset(data);
+          }
+          if (docReqRes.ok) {
+            const dr = await docReqRes.json();
+            if (dr.pending && dr.items?.[0]) {
+              setDocRequest({ message: dr.items[0].message ?? '', requested_at: dr.items[0].requested_at ?? '' });
+            }
+          }
         }
       } catch (error) {
         console.error('Failed to fetch profile:', error);
@@ -199,7 +127,7 @@ export default function ContractorProfilePage(props: PageParamsProps) {
     }
 
     fetchProfile();
-  }, [accessToken, refetchContractorData, reset]);
+  }, [reset, accessToken]);
 
   async function onSubmit(data: ProfileForm) {
     if (!contractorId) return;
@@ -497,134 +425,64 @@ export default function ContractorProfilePage(props: PageParamsProps) {
           <h2 className="text-xl font-semibold mb-4">{t('sections.documents')}</h2>
 
           <div className="space-y-4">
-            {([
-              {
-                type: 'license' as const,
-                title: t('documents.license'),
-                detail: contractor?.licenseNumber
-                  ? `${t('documents.licenseNumber')}: ${contractor.licenseNumber}`
-                  : null,
-              },
-              {
-                type: 'insurance' as const,
-                title: t('documents.insurance'),
-                detail: contractor?.insuranceExpiry
-                  ? `${t('documents.expiresAt')}: ${new Date(contractor.insuranceExpiry).toLocaleDateString('he-IL')}`
-                  : null,
-              },
-              {
-                type: 'certifications' as const,
-                title: t('documents.certifications'),
-                detail: contractor?.certifications?.length
-                  ? `${contractor.certifications.length} ${t('documents.uploaded')}`
-                  : null,
-              },
-            ]).map((doc) => {
-              const status = getDocStatus(doc.type);
-              const uploaded = uploadedFiles[doc.type];
+            {/* Business License */}
+            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div>
+                <h3 className="font-medium">{t('documents.license')}</h3>
+                <p className="text-sm text-gray-500">
+                  {contractor?.licenseNumber
+                    ? `${t('documents.licenseNumber')}: ${contractor.licenseNumber}`
+                    : t('documents.notUploaded')}
+                </p>
+              </div>
+              <button
+                onClick={() => handleDocumentUpload('license')}
+                disabled={isUploading === 'license'}
+                className="text-sky-600 hover:text-sky-700 font-medium disabled:opacity-50"
+              >
+                {isUploading === 'license' ? t('documents.uploading') : t('documents.upload')}
+              </button>
+            </div>
 
-              return (
-                <div
-                  key={doc.type}
-                  className="border border-gray-200 rounded-xl p-4 hover:border-gray-300 transition-colors"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3 flex-1">
-                      <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
-                        <FileText className="h-5 w-5 text-gray-500" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="font-medium text-gray-900">{doc.title}</h3>
-                          {getDocBadge(status)}
-                        </div>
-                        <p className="text-sm text-gray-500 mt-0.5">
-                          {doc.detail ?? t('documents.notUploaded')}
-                        </p>
-                        {uploaded && (
-                          <div className="mt-2 flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2 text-sm">
-                            <FileText className="h-4 w-4 text-sky-500 shrink-0" />
-                            <span className="text-gray-700 truncate">{uploaded.name}</span>
-                            <span className="text-gray-400 text-xs shrink-0">
-                              {uploaded.uploadedAt.toLocaleTimeString('he-IL', {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleDocumentUpload(doc.type)}
-                      disabled={isUploading === doc.type}
-                      className="flex items-center gap-2 px-4 py-2 rounded-lg border border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 font-medium text-sm disabled:opacity-50 transition-colors shrink-0"
-                    >
-                      {isUploading === doc.type ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          {t('documents.uploading')}
-                        </>
-                      ) : (
-                        <>
-                          <Upload className="h-4 w-4" />
-                          {status === 'not_uploaded' ? t('documents.upload') : t('update')}
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+            {/* Insurance */}
+            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div>
+                <h3 className="font-medium">{t('documents.insurance')}</h3>
+                <p className="text-sm text-gray-500">
+                  {contractor?.insuranceExpiry
+                    ? `${t('documents.expiresAt')}: ${new Date(
+                        contractor.insuranceExpiry
+                      ).toLocaleDateString('he-IL')}`
+                    : t('documents.notUploaded')}
+                </p>
+              </div>
+              <button
+                onClick={() => handleDocumentUpload('insurance')}
+                disabled={isUploading === 'insurance'}
+                className="text-sky-600 hover:text-sky-700 font-medium disabled:opacity-50"
+              >
+                {isUploading === 'insurance' ? t('documents.uploading') : t('documents.upload')}
+              </button>
+            </div>
 
-          {/* Vetting Timeline */}
-          <div className="mt-6 pt-6 border-t border-gray-100">
-            <h3 className="text-lg font-semibold mb-4">{t('documents.vettingTimeline')}</h3>
-            <VettingStatusTimeline
-              steps={[
-                {
-                  id: 'document_submission',
-                  label: t('vetting.documentSubmission'),
-                  status: Object.keys(uploadedFiles).length > 0 || contractor?.licenseNumber ? 'complete' : 'pending',
-                  description: t('vetting.documentSubmissionDesc'),
-                  date: Object.values(uploadedFiles)[0]?.uploadedAt?.toISOString(),
-                },
-                {
-                  id: 'license_check',
-                  label: t('vetting.licenseCheck'),
-                  status: contractor?.licenseNumber ? 'complete' : 'pending',
-                  description: t('vetting.licenseCheckDesc'),
-                },
-                {
-                  id: 'insurance_check',
-                  label: t('vetting.insuranceCheck'),
-                  status: contractor?.insuranceExpiry ? 'complete' : 'pending',
-                  description: t('vetting.insuranceCheckDesc'),
-                },
-                {
-                  id: 'final_verification',
-                  label: t('vetting.finalVerification'),
-                  status: contractor?.licenseNumber && contractor?.insuranceExpiry ? 'complete' : 'pending',
-                  description: t('vetting.finalVerificationDesc'),
-                },
-              ]}
-            />
-          </div>
-
-          {/* Trust Score Breakdown */}
-          <div className="mt-6 pt-6 border-t border-gray-100">
-            <h3 className="text-lg font-semibold mb-4">{t('trustScore.breakdown')}</h3>
-            <TrustScoreProgress
-              score={contractor?.trustScore ?? 0}
-              categories={[
-                { label: t('trustScore.categories.documents'), score: contractor?.licenseNumber ? 25 : 0, maxScore: 30, icon: Upload },
-                { label: t('trustScore.categories.insurance'), score: contractor?.insuranceExpiry ? 20 : 0, maxScore: 25, icon: FileText },
-                { label: t('trustScore.categories.rating'), score: Math.min(Math.round((contractor?.trustScore ?? 0) * 0.25), 25), maxScore: 25, icon: CheckCircle },
-                { label: t('trustScore.categories.responseTime'), score: Math.min(Math.round((contractor?.trustScore ?? 0) * 0.2), 20), maxScore: 20, icon: Clock },
-              ]}
-            />
+            {/* Certifications */}
+            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div>
+                <h3 className="font-medium">{t('documents.certifications')}</h3>
+                <p className="text-sm text-gray-500">
+                  {contractor?.certifications?.length
+                    ? `${contractor.certifications.length} ${t('documents.uploaded')}`
+                    : t('documents.notUploaded')}
+                </p>
+              </div>
+              <button
+                onClick={() => handleDocumentUpload('certifications')}
+                disabled={isUploading === 'certifications'}
+                className="text-sky-600 hover:text-sky-700 font-medium disabled:opacity-50"
+              >
+                {isUploading === 'certifications' ? t('documents.uploading') : t('documents.upload')}
+              </button>
+            </div>
           </div>
         </section>
       )}
@@ -681,11 +539,7 @@ export default function ContractorProfilePage(props: PageParamsProps) {
             {/* Danger Zone */}
             <div className="pt-6 border-t">
               <h3 className="font-medium text-red-600 mb-3">{t('settings.dangerZone')}</h3>
-              <button
-                disabled
-                title={t('comingSoon')}
-                className="text-red-600 hover:text-red-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              >
+              <button className="text-red-600 hover:text-red-700 font-medium">
                 {t('settings.deactivate')}
               </button>
             </div>

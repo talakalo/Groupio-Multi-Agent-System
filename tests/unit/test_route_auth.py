@@ -282,8 +282,6 @@ class TestLoginJson:
 
         redis = AsyncMock()
         redis.check_ip_rate_limit = AsyncMock(return_value=True)
-        redis.is_temporarily_locked = AsyncMock(return_value=0)  # not locked
-        redis.clear_temporary_lockout = AsyncMock()
         redis.set = AsyncMock()
         redis.clear_login_failures = AsyncMock()
 
@@ -346,7 +344,6 @@ class TestLoginJson:
 
         redis = AsyncMock()
         redis.check_ip_rate_limit = AsyncMock(return_value=True)
-        redis.is_temporarily_locked = AsyncMock(return_value=0)  # not locked
         redis.increment_login_failures = AsyncMock(return_value=1)
 
         from src.api.main import app
@@ -426,7 +423,6 @@ class TestLoginJson:
 
         redis = AsyncMock()
         redis.check_ip_rate_limit = AsyncMock(return_value=True)
-        redis.is_temporarily_locked = AsyncMock(return_value=0)  # not locked
 
         mock_settings = AsyncMock()
         mock_settings.ENFORCE_EMAIL_VERIFICATION = True
@@ -461,8 +457,6 @@ class TestLoginJson:
 
         redis = AsyncMock()
         redis.check_ip_rate_limit = AsyncMock(return_value=True)
-        redis.is_temporarily_locked = AsyncMock(return_value=0)  # not locked
-        redis.clear_temporary_lockout = AsyncMock()
         redis.set = AsyncMock()
         redis.clear_login_failures = AsyncMock()
 
@@ -561,29 +555,23 @@ class TestRefreshToken:
             app.dependency_overrides.clear()
 
     def test_refresh_token_revoked(self):
-        user = _make_user()
-        db = AsyncMock()
-        db.get_user = AsyncMock(return_value=user)
-
         redis = AsyncMock()
-        # atomic_refresh_token_swap returns -1 → token mismatch / already rotated
-        redis.atomic_refresh_token_swap = AsyncMock(return_value=-1)
+        redis.get = AsyncMock(return_value="different-token")  # stored ≠ provided
 
         from src.api.main import app
 
         app.dependency_overrides.clear()
         try:
             with patch("src.api.routes.auth.get_redis_client", return_value=redis):
-                with patch("src.api.routes.auth.get_postgres_client", return_value=db):
-                    with patch(
-                        "src.api.routes.auth.verify_refresh_token",
-                        return_value={"sub": "user-1"},
-                    ):
-                        client = TestClient(app, raise_server_exceptions=False)
-                        resp = client.post(
-                            "/api/v1/auth/refresh",
-                            json={"refresh_token": "my-token"},
-                        )
+                with patch(
+                    "src.api.routes.auth.verify_refresh_token",
+                    return_value={"sub": "user-1"},
+                ):
+                    client = TestClient(app, raise_server_exceptions=False)
+                    resp = client.post(
+                        "/api/v1/auth/refresh",
+                        json={"refresh_token": "my-token"},
+                    )
             assert resp.status_code == 401
         finally:
             app.dependency_overrides.clear()
@@ -632,23 +620,6 @@ class TestGetMe:
             resp = client.get("/api/v1/auth/me")
             assert resp.status_code == 200
             assert resp.json()["email"] == "user@example.com"
-        finally:
-            app.dependency_overrides.clear()
-
-    def test_get_me_returns_notification_settings(self):
-        """GET /auth/me returns notification_settings when present."""
-        user = _make_user()
-        user.notification_settings = {"email_offers": True, "push_enabled": False}
-
-        from src.api.main import app
-        from src.api.middleware.auth import get_current_user
-
-        app.dependency_overrides[get_current_user] = lambda: user
-        try:
-            client = TestClient(app, raise_server_exceptions=False)
-            resp = client.get("/api/v1/auth/me")
-            assert resp.status_code == 200
-            assert resp.json().get("notification_settings") == {"email_offers": True, "push_enabled": False}
         finally:
             app.dependency_overrides.clear()
 
@@ -702,32 +673,6 @@ class TestUpdateMe:
                 client = TestClient(app, raise_server_exceptions=False)
                 resp = client.put("/api/v1/auth/me", json={"phone": "0509999999"})
             assert resp.status_code == 400
-        finally:
-            app.dependency_overrides.clear()
-
-    def test_update_me_notification_settings(self):
-        """PUT /auth/me with notification_settings persists and returns them."""
-        user = _make_user()
-        updated_user = _make_user()
-        updated_user.notification_settings = {"email_offers": True, "push_enabled": False}
-
-        db = AsyncMock()
-        db.get_user_by_phone = AsyncMock(return_value=None)
-        db.update_user = AsyncMock(return_value=updated_user)
-
-        from src.api.main import app
-        from src.api.middleware.auth import get_current_user
-
-        app.dependency_overrides[get_current_user] = lambda: user
-        try:
-            with patch("src.api.routes.auth.get_postgres_client", return_value=db):
-                client = TestClient(app, raise_server_exceptions=False)
-                resp = client.put(
-                    "/api/v1/auth/me",
-                    json={"notification_settings": {"email_offers": True, "push_enabled": False}},
-                )
-            assert resp.status_code == 200
-            assert resp.json().get("notification_settings") == {"email_offers": True, "push_enabled": False}
         finally:
             app.dependency_overrides.clear()
 
@@ -1147,8 +1092,6 @@ class TestLoginForm:
 
         redis = AsyncMock()
         redis.check_ip_rate_limit = AsyncMock(return_value=True)
-        redis.is_temporarily_locked = AsyncMock(return_value=0)  # not locked
-        redis.clear_temporary_lockout = AsyncMock()
         redis.set = AsyncMock()
         redis.clear_login_failures = AsyncMock()
 
@@ -1211,7 +1154,6 @@ class TestLoginForm:
 
         redis = AsyncMock()
         redis.check_ip_rate_limit = AsyncMock(return_value=True)
-        redis.is_temporarily_locked = AsyncMock(return_value=0)  # not locked
         redis.increment_login_failures = AsyncMock(return_value=1)
 
         from src.api.main import app

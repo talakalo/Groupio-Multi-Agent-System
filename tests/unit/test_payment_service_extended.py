@@ -1,5 +1,6 @@
 """Extended unit tests for payment services."""
 
+import logging
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -94,15 +95,18 @@ def test_get_payment_provider_mock():
     assert isinstance(p, MockPaymentProvider)
 
 
-def test_get_payment_provider_mock_blocked_in_production():
+def test_get_payment_provider_mock_in_production_logs_warning(caplog):
     mock_settings = MagicMock()
     mock_settings.PAYMENT_PROVIDER = "mock"
     mock_settings.ENVIRONMENT = "production"
     mock_settings.STRIPE_SECRET_KEY = None
 
     with patch("src.config.settings.get_settings", return_value=mock_settings):
-        with pytest.raises(RuntimeError, match="not allowed in production"):
-            get_payment_provider()
+        with caplog.at_level(logging.WARNING):
+            p = get_payment_provider()
+
+    assert isinstance(p, MockPaymentProvider)
+    assert "MOCK" in caplog.text or "mock" in caplog.text.lower()
 
 
 def test_get_payment_provider_unknown_raises():

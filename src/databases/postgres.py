@@ -37,17 +37,6 @@ def _compute_avg_resolution_hours(rows: list[dict]) -> float:
     return (total_seconds / count / 3600) if count else 0.0
 
 
-def _parse_notification_settings(val: Any) -> dict[str, bool] | None:
-    """Parse notification_settings from DB (can be dict, JSON str, or None)."""
-    if val is None:
-        return None
-    if isinstance(val, dict):
-        return val
-    if isinstance(val, str):
-        return json.loads(val)
-    return None
-
-
 def _row_to_user(row: dict) -> dict:
     """Convert DB row to user dict (exclude hashed_password)."""
     return {
@@ -63,7 +52,6 @@ def _row_to_user(row: dict) -> dict:
         "building_id": row.get("building_id"),
         "contractor_id": row.get("contractor_id"),
         "last_login": row.get("last_login"),
-        "notification_settings": _parse_notification_settings(row.get("notification_settings")),
         "created_at": row.get("created_at") or datetime.now(UTC),
         "updated_at": row.get("updated_at") or datetime.now(UTC),
     }
@@ -114,34 +102,11 @@ class PostgresClient:
         # Local PostgreSQL via asyncpg
         if self._asyncpg_pool is None:
             import asyncpg
-            from urllib.parse import quote_plus
-
-            import os as _os
 
             settings = get_settings()
-            # DOCKER_POSTGRES_HOST set → in Docker container → use postgres:5432
-            # USE_LOCAL_POSTGRES=1 and no DOCKER_POSTGRES_HOST → from host → use 127.0.0.1 (Docker port-mapped)
-            force_local = (settings.USE_LOCAL_POSTGRES or "").lower() in ("1", "true", "yes")
-            use_localhost = (
-                (getattr(settings, "DOCKER_POSTGRES_LOCALHOST", "") or "").lower() in ("1", "true", "yes")
-                or (force_local and not settings.DOCKER_POSTGRES_HOST)
-            )
-            _user = settings.DOCKER_POSTGRES_USER or _os.getenv("POSTGRES_USER", "postgres")
-            _pw = settings.DOCKER_POSTGRES_PASSWORD or _os.getenv("POSTGRES_PASSWORD", "")
-            _db = settings.DOCKER_POSTGRES_DB or _os.getenv("POSTGRES_DB", "groupio")
-            _host = settings.DOCKER_POSTGRES_HOST or ("127.0.0.1" if use_localhost else None)
-            if _host and _user and _db:
-                pw = quote_plus(_pw)
-                db_url = f"postgresql://{_user}:{pw}@{_host}:5432/{_db}"
-            elif settings.DOCKER_DATABASE_URL and not use_localhost:
-                db_url = settings.DOCKER_DATABASE_URL
-            else:
-                db_url = settings.DATABASE_URL
+            db_url = settings.DATABASE_URL
             if db_url.startswith("postgres://"):
                 db_url = db_url.replace("postgres://", "postgresql://", 1)
-            # Avoid IPv6 localhost resolution issues (errno 99 on macOS)
-            if "localhost" in db_url:
-                db_url = db_url.replace("localhost", "127.0.0.1")
             self._asyncpg_pool = await asyncpg.create_pool(
                 db_url,
                 min_size=5,
@@ -194,21 +159,6 @@ class PostgresClient:
         if self._asyncpg_pool is not None:
             await self._asyncpg_pool.close()
             self._asyncpg_pool = None
-
-    async def auth_tables_exist(self) -> bool:
-        """Check if auth-critical tables (e.g. users) exist. Used for startup readiness."""
-        if self._use_supabase_client():
-            return True  # Supabase manages schema
-        try:
-            pool = await self._get_client()
-            async with pool.acquire() as conn:
-                row = await conn.fetchrow(
-                    "SELECT 1 FROM information_schema.tables "
-                    "WHERE table_schema = 'public' AND table_name = 'users'"
-                )
-                return row is not None
-        except Exception:
-            return False
 
     async def _pg_execute(self, query: str, *args: Any) -> None:
         """Execute query via asyncpg."""
@@ -360,8 +310,6 @@ class PostgresClient:
             "last_login",
             "role",
             "onboarded_at",
-            "notification_settings",
-            "push_token",
         }
         filtered = {k: v for k, v in update_data.items() if k in allowed}
         if not filtered:
@@ -1038,6 +986,21 @@ class PostgresClient:
             )
             or []
         )
+
+    async def get_user_orders(self, user_id: str, limit: int = 5) -> list[dict[str, Any]]:
+        """Get recent orders for a user."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            result = (
+                await client.table("orders")
+                .select("*, contractors(business_name), buildings(address)")
+                .eq("resident_id", user_id)
+                .order("created_at", desc=True)
+                .limit(limit)
+                .execute()
+            )
+            return result.data or []
+        return []
 
     async def get_market_data(self, category: str, region: str, months: int = 6) -> dict[str, Any]:
         """Get market pricing data for a category and region."""
@@ -2821,35 +2784,6 @@ class PostgresClient:
             if isinstance(val, dict) and "v" in val:
                 return str(val["v"])
         return None
-
-    async def get_user_orders(self, user_id: str, limit: int = 50, offset: int = 0) -> list[dict[str, Any]]:
-        """Fetch orders for a user from the user_orders view."""
-        if self._use_supabase_client():
-            client = await self._get_client()
-            result = (
-                await client.table("user_orders")
-                .select("*")
-                .eq("user_id", user_id)
-                .order("joined_at", desc=True)
-                .range(offset, offset + limit - 1)
-                .execute()
-            )
-            return result.data or []
-        try:
-            return await self._pg_fetch_all(
-                "SELECT * FROM user_orders WHERE user_id = $1 ORDER BY joined_at DESC LIMIT $2 OFFSET $3",
-                user_id,
-                limit,
-                offset,
-            )
-        except Exception as e:
-            err_str = str(e).lower()
-            err_type = type(e).__name__.lower()
-            if "user_orders" in err_str and "does not exist" in err_str:
-                return []
-            if "undefinedtableerror" in err_type:
-                return []
-            raise
 
     async def health_check(self) -> bool:
         """Check if PostgreSQL is accessible."""

@@ -7,7 +7,6 @@ import { useTranslations } from 'next-intl';
 
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
-import { unwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
 
 interface BuildingSummary {
   id: string;
@@ -66,8 +65,7 @@ function StatCard({
   return card;
 }
 
-export default function BuildingsManagerDashboardPage(props: PageParamsProps) {
-  unwrapPageParams(props);
+export default function BuildingsManagerDashboardPage() {
   const t = useTranslations('buildingsManager.dashboard');
   const accessToken = useAuthStore((s) => s.accessToken);
   const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';

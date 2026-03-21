@@ -9,7 +9,6 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { apiClient, ApiError } from "@/lib/api/client";
-import { unwrapPageParams, PageParamsProps } from "@/lib/utils/unwrapPageParams";
 
 const schema = z
   .object({
@@ -192,8 +191,7 @@ function ResetPasswordForm() {
   );
 }
 
-export default function ResetPasswordPage(props: PageParamsProps) {
-  unwrapPageParams(props);
+export default function ResetPasswordPage() {
   return (
     <div className="w-full max-w-md space-y-6">
       <div className="text-center">
