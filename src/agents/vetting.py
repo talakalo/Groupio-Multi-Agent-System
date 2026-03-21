@@ -5,10 +5,10 @@ from typing import Any
 
 from src.agents.base import AgentConfig, BaseAgent
 from src.config.prompts.vetting import VETTING_SYSTEM_PROMPT
-from src.config.settings import get_settings
 from src.databases.graph_store import get_graph_store
 from src.databases.postgres import get_postgres_client
 from src.models.agent_state import AgentState
+from src.services.agent_config import get_agent_mode
 from src.utils.monitoring import track_agent_execution
 
 logger = logging.getLogger(__name__)
@@ -157,9 +157,9 @@ class VettingAgent(BaseAgent):
             await self._notify_admin_vetting(contractor_id, trust_score, doc_analysis)
 
         # Task 3.1 — Autonomy mode: in recommend/gated mode, flag for human confirmation
-        settings = get_settings()
-        if settings.VETTING_AGENT_MODE in ("recommend", "gated"):
-            reason = f"Vetting result requires admin confirmation (mode={settings.VETTING_AGENT_MODE})"
+        mode = await get_agent_mode("vetting")
+        if mode in ("recommend", "gated"):
+            reason = f"Vetting result requires admin confirmation (mode={mode})"
             state["needs_human"] = True
             state.setdefault("escalation_reason", reason)
             if state["actions_taken"]:
@@ -172,7 +172,7 @@ class VettingAgent(BaseAgent):
                     "contractor_id": last_action.get("contractor_id", ""),
                     "decision": last_action.get("decision", ""),
                     "trust_score": last_action.get("trust_score"),
-                    "mode": settings.VETTING_AGENT_MODE,
+                    "mode": mode,
                 },
                 escalation_reason=state.get("escalation_reason", reason),
             )
