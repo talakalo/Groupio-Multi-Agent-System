@@ -962,6 +962,7 @@ async def get_agent_autonomy_modes(
         "pricing": settings.PRICING_AGENT_MODE,
         "vetting": settings.VETTING_AGENT_MODE,
         "outreach": settings.OUTREACH_AGENT_MODE,
+        "payment": settings.PAYMENT_AGENT_MODE,
     }
 
 

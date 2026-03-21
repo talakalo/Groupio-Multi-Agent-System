@@ -93,6 +93,7 @@ class Settings(BaseSettings):
     PRICING_AGENT_MODE: str = "recommend"
     VETTING_AGENT_MODE: str = "recommend"
     OUTREACH_AGENT_MODE: str = "gated"
+    PAYMENT_AGENT_MODE: str = "gated"
 
     # Feature Flags
     ENABLE_WEB_SEARCH: bool = True
@@ -141,8 +142,9 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     SMTP_FROM_EMAIL: str = "noreply@groupio.co.il"
     SMTP_FROM_NAME: str = "Groupio"
-    # When True, login rejects unverified users with 403. Set for broader launch.
-    ENFORCE_EMAIL_VERIFICATION: bool = False
+    # When True, login rejects unverified users with 403.
+    # Default is True for security; set to False only in development/test environments.
+    ENFORCE_EMAIL_VERIFICATION: bool = True
     # Base URL for verification links in emails (default for production)
     FRONTEND_URL: str = "https://groupio.co.il"
     # Admin inbox for system alerts (vetting escalations, expiry errors, etc.)
@@ -199,6 +201,14 @@ class Settings(BaseSettings):
                     "Set JWT_SECRET_KEY in .env to persist sessions across restarts."
                 )
             # Production case is already handled by the raise above.
+
+        # --- Email verification enforcement ---
+        if not self.ENFORCE_EMAIL_VERIFICATION and self.ENVIRONMENT not in ("development", "test"):
+            logger.warning(
+                "ENFORCE_EMAIL_VERIFICATION is disabled in %s. "
+                "Unverified users can log in. Enable it to protect the platform.",
+                self.ENVIRONMENT,
+            )
 
         # --- Required secrets in production ---
         if is_prod:

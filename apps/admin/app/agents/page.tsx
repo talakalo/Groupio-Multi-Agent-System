@@ -18,7 +18,7 @@ import {
   CreditCard,
   Bell,
 } from "lucide-react";
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 
 import { AgentActivityLog, type AgentActivityEntry, type ActivityActionType } from "@/components/features/agents/AgentActivityLog";
 import { AgentConfigPanel, type AgentConfig } from "@/components/features/agents/AgentConfigPanel";
@@ -32,8 +32,12 @@ import {
   useSystemStatus,
   useAgentMetrics,
   useReloadAgent,
-  useEscalations,
   useActivityLog,
+  usePendingDecisions,
+  useApprovePendingDecision,
+  useRejectPendingDecision,
+  useAgentAutonomy,
+  useUpdateAgentMode,
 } from "@/lib/hooks";
 
 // ---------------------------------------------------------------------------
@@ -78,19 +82,38 @@ const CHART_COLORS = [
 export default function AgentsPage() {
   const { data: systemStatus } = useSystemStatus();
   const reloadMutation = useReloadAgent();
-  const { data: escalationsData } = useEscalations();
+  const { data: pendingDecisionsData } = usePendingDecisions();
+  const approveMutation = useApprovePendingDecision();
+  const rejectMutation = useRejectPendingDecision();
+  const { data: autonomyData } = useAgentAutonomy();
+  const updateModeMutation = useUpdateAgentMode();
   const { data: auditActivity = [] } = useActivityLog();
 
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
   const [configPanel, setConfigPanel] = useState<AgentConfig | null>(null);
 
-  // Agent modes & toggles — client state until backend supports persistence
+  // Agent modes: initialized from backend autonomy endpoint; falls back to "auto"
   const [agentModes, setAgentModes] = useState<Record<string, AgentMode>>(
     () => Object.fromEntries(AGENT_DEFS.map((a) => [a.key, "auto" as AgentMode])),
   );
   const [agentToggles, setAgentToggles] = useState<Record<string, boolean>>(
     () => Object.fromEntries(AGENT_DEFS.map((a) => [a.key, true])),
   );
+
+  // Sync backend autonomy modes into local state once loaded
+  useEffect(() => {
+    if (!autonomyData) return;
+    const validModes = new Set<AgentMode>(["auto", "recommend", "gated"]);
+    setAgentModes((prev) => {
+      const next = { ...prev };
+      for (const [key, value] of Object.entries(autonomyData)) {
+        if (validModes.has(value as AgentMode)) {
+          next[key] = value as AgentMode;
+        }
+      }
+      return next;
+    });
+  }, [autonomyData]);
 
   const { data: agentDetail } = useAgentMetrics(selectedAgent ?? "router");
 
@@ -133,27 +156,22 @@ export default function AgentsPage() {
   // ---------------------------------------------------------------------------
 
   const pendingDecisions: PendingDecision[] = useMemo(() => {
-    const escalations = escalationsData?.escalations ?? [];
+    const items = pendingDecisionsData?.items ?? [];
     const typeMap: Record<string, DecisionType> = {
       vetting: "vetting", outreach: "outreach", credit: "credit",
-      payment: "payment", matching: "matching",
+      payment: "payment", matching: "matching", refund_request: "payment",
+      contractor_match: "matching", vetting_decision: "vetting",
+      pricing_recommendation: "matching",
     };
-
-    return escalations
-      .filter((e) => e.status === "open")
-      .slice(0, 5)
-      .map((esc) => {
-        const agentHint = esc.context?.actionsTaken?.[0]?.agent ?? "support";
-        return {
-          id: esc.id,
-          agentName: agentHint.replace(/^\w/, (c: string) => c.toUpperCase()) + " Agent",
-          type: typeMap[agentHint.toLowerCase()] ?? "matching",
-          summary: esc.reason,
-          reasoning: esc.context?.actionsTaken?.map((a: { action: string }) => a.action).join(". ") ?? "",
-          createdAt: esc.createdAt ?? new Date().toISOString(),
-        };
-      });
-  }, [escalationsData]);
+    return items.slice(0, 5).map((item) => ({
+      id: item.id,
+      agentName: item.agent_name.replace(/^\w/, (c) => c.toUpperCase()) + " Agent",
+      type: typeMap[item.action_type] ?? "matching",
+      summary: item.escalation_reason ?? item.action_type,
+      reasoning: JSON.stringify(item.payload),
+      createdAt: item.created_at,
+    }));
+  }, [pendingDecisionsData]);
 
   // ---------------------------------------------------------------------------
   // Activity log mapping
@@ -238,16 +256,17 @@ export default function AgentsPage() {
   const handleSaveConfig = useCallback((config: AgentConfig) => {
     setAgentModes((prev) => ({ ...prev, [config.id]: config.mode }));
     setAgentToggles((prev) => ({ ...prev, [config.id]: config.enabled }));
+    updateModeMutation.mutate({ [config.id]: config.mode });
     setConfigPanel(null);
-  }, []);
+  }, [updateModeMutation]);
 
-  const handleApproveDecision = useCallback((_id: string) => {
-    // TODO: wire to escalation resolve API
-  }, []);
+  const handleApproveDecision = useCallback((id: string) => {
+    approveMutation.mutate({ decisionId: id });
+  }, [approveMutation]);
 
-  const handleRejectDecision = useCallback((_id: string) => {
-    // TODO: wire to escalation reject API
-  }, []);
+  const handleRejectDecision = useCallback((id: string) => {
+    rejectMutation.mutate({ decisionId: id });
+  }, [rejectMutation]);
 
   return (
     <div className="space-y-6">
