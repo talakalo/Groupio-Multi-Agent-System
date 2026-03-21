@@ -1116,6 +1116,21 @@ async def approve_pending_decision(
                 admin.id,
                 decision_id,
             )
+            await db.create_audit_log(
+                {
+                    "user_id": admin.id,
+                    "action": "refund_skipped_no_payment_id",
+                    "resource_type": "pending_decisions",
+                    "resource_id": decision_id,
+                    "details": {
+                        "decision_id": decision_id,
+                        "reason": "payload missing payment_id; refund not executed",
+                        "payload": payload,
+                    },
+                }
+            )
+            updated["refund_skipped"] = True
+            updated["refund_skip_reason"] = "payload missing payment_id"
 
     return updated
 

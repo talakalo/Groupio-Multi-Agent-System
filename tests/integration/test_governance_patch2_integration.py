@@ -570,3 +570,101 @@ class TestRefundGatedMode:
         mock_db.create_pending_decision.assert_awaited_once()
         # State must signal human review needed
         assert result_state.get("needs_human") is True
+
+
+# ===========================================================================
+# G. Approve refund with missing payment_id — graceful degradation
+# ===========================================================================
+
+
+class TestApproveMissingPaymentId:
+    """Approving a refund_request whose payload has no payment_id must not crash.
+
+    Expected behaviour:
+    - Route returns HTTP 200 (decision was approved)
+    - provider.refund() is NOT called (no payment to refund)
+    - An audit_log entry with action='refund_skipped_no_payment_id' is written
+    - Response body includes refund_skipped=True and a skip_reason
+    """
+
+    def setup_method(self):
+        admin = _make_admin()
+        app.dependency_overrides[get_admin_user] = lambda: admin
+        app.dependency_overrides[get_current_user] = lambda: admin
+
+    def teardown_method(self):
+        app.dependency_overrides.clear()
+
+    def _make_entry_no_payment_id(self, decision_id: str = "decision-no-pay") -> dict:
+        return {
+            "id": decision_id,
+            "agent_name": "payment",
+            "action_type": "refund_request",
+            "status": "pending",
+            "payload": {"transaction_id": "txn-orphan", "amount": 200.0},
+            # NOTE: no 'payment_id' key
+        }
+
+    def test_returns_200_when_payment_id_missing(self):
+        """Approve returns HTTP 200 even when payload has no payment_id."""
+        entry = self._make_entry_no_payment_id()
+        db = _build_admin_db(entry, update_decision_result={**entry, "status": "approved"})
+        provider = _build_provider()
+
+        with (
+            patch("src.api.routes.admin.get_postgres_client", return_value=db),
+            patch("src.services.payment.get_payment_provider", return_value=provider),
+        ):
+            c = TestClient(app)
+            resp = c.post("/api/v1/admin/agents/pending-decisions/decision-no-pay/approve")
+
+        assert resp.status_code == 200
+
+    def test_provider_not_called_when_payment_id_missing(self):
+        """provider.refund() must NOT be called when payload has no payment_id."""
+        entry = self._make_entry_no_payment_id()
+        db = _build_admin_db(entry, update_decision_result={**entry, "status": "approved"})
+        provider = _build_provider()
+
+        with (
+            patch("src.api.routes.admin.get_postgres_client", return_value=db),
+            patch("src.services.payment.get_payment_provider", return_value=provider),
+        ):
+            c = TestClient(app)
+            c.post("/api/v1/admin/agents/pending-decisions/decision-no-pay/approve")
+
+        provider.refund.assert_not_awaited()
+
+    def test_audit_log_written_for_skipped_refund(self):
+        """An audit_log entry with action='refund_skipped_no_payment_id' is written."""
+        entry = self._make_entry_no_payment_id()
+        db = _build_admin_db(entry, update_decision_result={**entry, "status": "approved"})
+        provider = _build_provider()
+
+        with (
+            patch("src.api.routes.admin.get_postgres_client", return_value=db),
+            patch("src.services.payment.get_payment_provider", return_value=provider),
+        ):
+            c = TestClient(app)
+            c.post("/api/v1/admin/agents/pending-decisions/decision-no-pay/approve")
+
+        audit_calls = db.create_audit_log.await_args_list
+        actions = [c.args[0]["action"] for c in audit_calls]
+        assert "refund_skipped_no_payment_id" in actions
+
+    def test_response_body_flags_refund_skipped(self):
+        """Response JSON includes refund_skipped=True and a skip reason."""
+        entry = self._make_entry_no_payment_id()
+        db = _build_admin_db(entry, update_decision_result={**entry, "status": "approved"})
+        provider = _build_provider()
+
+        with (
+            patch("src.api.routes.admin.get_postgres_client", return_value=db),
+            patch("src.services.payment.get_payment_provider", return_value=provider),
+        ):
+            c = TestClient(app)
+            resp = c.post("/api/v1/admin/agents/pending-decisions/decision-no-pay/approve")
+
+        body = resp.json()
+        assert body.get("refund_skipped") is True
+        assert body.get("refund_skip_reason")
