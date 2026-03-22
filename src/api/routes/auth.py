@@ -20,6 +20,7 @@ from src.config.settings import get_settings
 from src.databases.postgres import get_postgres_client
 from src.databases.redis_client import get_redis_client
 from src.models.user import (
+    SELF_REGISTERABLE_ROLES,
     LoginRequest,
     PasswordChange,
     PasswordReset,
@@ -30,7 +31,6 @@ from src.models.user import (
     UserResponse,
     UserRole,
     UserUpdate,
-    SELF_REGISTERABLE_ROLES,
 )
 from src.services.email import get_email_service
 
@@ -74,8 +74,7 @@ class SignupRequest(BaseModel):
     def _block_privileged_roles(cls, v: UserRole) -> UserRole:
         if v not in SELF_REGISTERABLE_ROLES:
             raise ValueError(
-                f"Cannot self-register with role '{v}'. "
-                f"Allowed: {', '.join(sorted(SELF_REGISTERABLE_ROLES))}"
+                f"Cannot self-register with role '{v}'. Allowed: {', '.join(sorted(SELF_REGISTERABLE_ROLES))}"
             )
         return v
 
