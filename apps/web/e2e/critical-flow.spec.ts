@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./api/test";
 
 test.describe("Critical user flow", () => {
   test("landing page loads correctly", async ({ page }) => {

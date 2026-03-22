@@ -7,7 +7,8 @@
  * All backend calls are intercepted with page.route() mocks.
  */
 
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect } from "./api/test";
+import type { Page } from "@playwright/test";
 
 // ---------------------------------------------------------------------------
 // Shared mock data

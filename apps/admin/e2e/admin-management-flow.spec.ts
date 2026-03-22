@@ -1,18 +1,16 @@
-import { test, expect, Page } from '@playwright/test';
+import { test, expect } from './api/test';
+import type { Page } from '@playwright/test';
+import { loginAsAdmin } from './api/actions';
+import { createAdminCredentials } from './helpers/user.factory';
 
 const MOCK_ADMIN_USER = {
   id: 'admin-1',
-  email: 'admin@groupio.co.il',
+  email: createAdminCredentials().email,
   role: 'admin',
 };
 
 async function setupAdminAuth(page: Page) {
-  // Admin uses cookie-based auth: refresh_token + admin_role_verified (no sessionStorage)
-  const baseUrl = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3001';
-  await page.context().addCookies([
-    { name: 'refresh_token', value: 'e2e-admin-refresh', url: baseUrl },
-    { name: 'admin_role_verified', value: '1', url: baseUrl },
-  ]);
+  await loginAsAdmin(page);
 }
 
 test.describe('Admin Management Flows', () => {

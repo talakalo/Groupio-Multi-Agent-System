@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './api/test';
 
 test.describe('Architecture Upload Flow', () => {
   test.beforeEach(async ({ page }) => {
