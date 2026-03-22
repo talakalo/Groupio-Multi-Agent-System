@@ -1,0 +1,23 @@
+# Flow: Contractor Login
+# Tests the full login flow for a contractor user.
+#
+# Run: maestro test .maestro/flows/01-auth/login-contractor.yaml
+
+appId: ${APP_ID}
+tags:
+  - auth
+  - contractor
+  - smoke
+---
+
+- runFlow: ../../subflows/launch-fresh.yaml
+
+- assertVisible:
+    text: "Groupio"
+    timeout: 8000
+
+- runFlow: ../../subflows/login-contractor.yaml
+
+# Contractor home shows contractor-specific content
+- assertVisible: "Home"
+- assertVisible: "Offers"

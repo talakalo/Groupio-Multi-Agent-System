@@ -1,0 +1,29 @@
+# Flow: Contractor — Home Dashboard
+# Verifies the contractor home screen loads correctly.
+#
+# Run: maestro test .maestro/flows/03-contractor/home-dashboard.yaml
+
+appId: ${APP_ID}
+tags:
+  - contractor
+  - dashboard
+  - smoke
+---
+
+- runFlow: ../../subflows/launch-fresh.yaml
+- runFlow: ../../subflows/login-contractor.yaml
+
+# Contractor dashboard should show contractor-specific sections
+- assertVisible:
+    text: "Home"
+    timeout: 10000
+
+# Quick actions
+- assertVisible: "Quick Actions"
+- assertVisible: "Create Offer"
+- assertVisible: "My Offers"
+- assertVisible: "Projects"
+
+# Stats section
+- scroll
+- assertVisible: "Active Offers"

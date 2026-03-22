@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./api/test";
 
 test.describe("RTL / Hebrew layout", () => {
   test("Homepage has dir=rtl and lang=he", async ({ page }) => {

@@ -1,0 +1,31 @@
+# Maestro Workspace Configuration
+# ─────────────────────────────────────────────────────────────────────────────
+# Run all flows:           maestro test .maestro/flows
+# Run a suite:             maestro test .maestro/flows/01-auth
+# Run one flow:            maestro test .maestro/flows/01-auth/login-resident.yaml
+# Run with env override:   maestro test --env TEST_RESIDENT_EMAIL=x@y.com .maestro/flows
+# Launch Maestro Studio:   maestro studio
+# ─────────────────────────────────────────────────────────────────────────────
+
+# App bundle identifiers
+# iOS:     com.groupio.app
+# Android: com.groupio.app
+
+# Default environment (override via .maestro/.env or --env CLI flag)
+env:
+  APP_ID: com.groupio.app
+
+  # Resident test account (pre-seeded in staging/e2e environment)
+  TEST_RESIDENT_EMAIL: e2e.resident@test.groupio.co.il
+  TEST_RESIDENT_PASSWORD: E2eResident123!
+  TEST_RESIDENT_NAME: E2E Resident
+
+  # Contractor test account
+  TEST_CONTRACTOR_EMAIL: e2e.contractor@test.groupio.co.il
+  TEST_CONTRACTOR_PASSWORD: E2eContractor123!
+  TEST_CONTRACTOR_NAME: E2E Contractor
+
+  # API base URL
+  # Android emulator: 10.0.2.2 maps to host machine's localhost
+  # iOS simulator:    localhost works directly
+  API_BASE_URL: http://localhost:8000

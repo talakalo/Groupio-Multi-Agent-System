@@ -1,4 +1,5 @@
-import { test, expect, Page } from "@playwright/test";
+import { test, expect } from "./api/test";
+import type { Page } from "@playwright/test";
 
 /**
  * E2E tests for Contractor user flows

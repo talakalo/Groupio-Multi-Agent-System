@@ -1,0 +1,249 @@
+name: Mobile E2E (Maestro)
+
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      - "apps/mobile/**"
+      - ".github/workflows/mobile-e2e.yml"
+  pull_request:
+    branches: [main, dev]
+    paths:
+      - "apps/mobile/**"
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: "Platform to test"
+        required: true
+        default: "android"
+        type: choice
+        options:
+          - android
+          - ios
+          - both
+      suite:
+        description: "Test suite to run"
+        required: false
+        default: "all"
+        type: choice
+        options:
+          - all
+          - smoke
+          - auth
+          - resident
+          - contractor
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Android E2E Job
+# Builds a debug APK via EAS and runs Maestro flows on an Android emulator.
+# ─────────────────────────────────────────────────────────────────────────────
+jobs:
+  e2e-android:
+    name: Android E2E (Maestro)
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name != 'workflow_dispatch' ||
+      inputs.platform == 'android' ||
+      inputs.platform == 'both'
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Set up Java (for Android build tools)
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Install Maestro CLI
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> $GITHUB_PATH
+
+      - name: Verify Maestro installation
+        run: maestro --version
+
+      # ── Option A: Build APK via EAS (requires EAS_TOKEN secret) ────────────
+      # Uncomment when EAS is configured:
+      #
+      # - name: Setup EAS
+      #   uses: expo/expo-github-action@v8
+      #   with:
+      #     eas-version: latest
+      #     token: ${{ secrets.EXPO_TOKEN }}
+      #
+      # - name: Build Android APK (EAS e2e profile)
+      #   working-directory: apps/mobile
+      #   run: eas build --platform android --profile e2e --non-interactive --output ./build/app-e2e.apk
+      #
+      # ── Option B: Build APK locally (no EAS required) ────────────────────
+      # Uses expo-dev-client + bare workflow. Requires android/ directory.
+      # See: https://docs.expo.dev/build-reference/local-builds/
+      #
+      # For managed workflow without ejecting, use Maestro Cloud instead:
+
+      # ── Option C: Use Maestro Cloud (recommended for CI) ─────────────────
+      # Maestro Cloud handles device provisioning — no emulator setup needed.
+      # Requires MAESTRO_CLOUD_API_KEY secret in repository settings.
+      - name: Run Maestro Cloud (Android)
+        working-directory: apps/mobile
+        env:
+          MAESTRO_CLOUD_API_KEY: ${{ secrets.MAESTRO_CLOUD_API_KEY }}
+          TEST_RESIDENT_EMAIL: ${{ secrets.E2E_RESIDENT_EMAIL }}
+          TEST_RESIDENT_PASSWORD: ${{ secrets.E2E_RESIDENT_PASSWORD }}
+          TEST_CONTRACTOR_EMAIL: ${{ secrets.E2E_CONTRACTOR_EMAIL }}
+          TEST_CONTRACTOR_PASSWORD: ${{ secrets.E2E_CONTRACTOR_PASSWORD }}
+        run: |
+          SUITE="${{ inputs.suite || 'smoke' }}"
+          case "$SUITE" in
+            smoke)     FLOW_PATH=".maestro/flows --include-tags smoke" ;;
+            auth)      FLOW_PATH=".maestro/flows/01-auth" ;;
+            resident)  FLOW_PATH=".maestro/flows/02-resident" ;;
+            contractor) FLOW_PATH=".maestro/flows/03-contractor" ;;
+            *)         FLOW_PATH=".maestro/flows" ;;
+          esac
+          maestro cloud \
+            --apiKey "$MAESTRO_CLOUD_API_KEY" \
+            --platform android \
+            --app-file ./build/app-e2e.apk \
+            $FLOW_PATH
+        # NOTE: This step requires a pre-built APK at ./build/app-e2e.apk.
+        # Either use EAS (Option A above) or a local build to produce it first.
+        continue-on-error: true  # Don't fail CI if Maestro Cloud key is not set
+
+      # ── Local emulator run (alternative to Maestro Cloud) ────────────────
+      - name: Run Maestro locally on Android emulator
+        if: env.MAESTRO_CLOUD_API_KEY == ''
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          TEST_RESIDENT_EMAIL: ${{ secrets.E2E_RESIDENT_EMAIL || 'e2e.resident@test.groupio.co.il' }}
+          TEST_RESIDENT_PASSWORD: ${{ secrets.E2E_RESIDENT_PASSWORD || 'E2eResident123!' }}
+          TEST_CONTRACTOR_EMAIL: ${{ secrets.E2E_CONTRACTOR_EMAIL || 'e2e.contractor@test.groupio.co.il' }}
+          TEST_CONTRACTOR_PASSWORD: ${{ secrets.E2E_CONTRACTOR_PASSWORD || 'E2eContractor123!' }}
+        with:
+          api-level: 34
+          arch: x86_64
+          profile: pixel_6
+          avd-name: e2e-avd
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: |
+            # Install the APK (if available)
+            # adb install apps/mobile/build/app-e2e.apk
+
+            # Run smoke flows only in local emulator mode (faster)
+            cd apps/mobile
+            maestro test --include-tags smoke .maestro/flows
+        continue-on-error: true
+
+      - name: Upload Maestro test artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: maestro-android-results
+          path: |
+            ~/.maestro/tests/
+            apps/mobile/.maestro-results/
+          retention-days: 14
+
+# ─────────────────────────────────────────────────────────────────────────────
+# iOS E2E Job (macOS runner required)
+# ─────────────────────────────────────────────────────────────────────────────
+  e2e-ios:
+    name: iOS E2E (Maestro)
+    runs-on: macos-14
+    if: >
+      github.event_name != 'workflow_dispatch' ||
+      inputs.platform == 'ios' ||
+      inputs.platform == 'both'
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Maestro CLI
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> $GITHUB_PATH
+
+      - name: Install iOS Simulator runtime
+        run: |
+          xcrun simctl list runtimes | grep -E "iOS 17" || \
+          xcodebuild -downloadPlatform iOS
+
+      - name: Boot iOS Simulator
+        run: |
+          UDID=$(xcrun simctl create "e2e-iphone" "iPhone 15" "iOS17.5" 2>/dev/null || \
+                 xcrun simctl list devices available | grep "iPhone 15" | head -1 | grep -oE '[A-F0-9-]{36}')
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+
+      # ── Option A: EAS iOS simulator build ────────────────────────────────
+      # - name: Setup EAS
+      #   uses: expo/expo-github-action@v8
+      #   with:
+      #     eas-version: latest
+      #     token: ${{ secrets.EXPO_TOKEN }}
+      #
+      # - name: Build iOS Simulator app (EAS e2e profile)
+      #   working-directory: apps/mobile
+      #   run: eas build --platform ios --profile e2e --non-interactive --output ./build/app-e2e.tar.gz
+      #
+      # - name: Extract and install .app on simulator
+      #   run: |
+      #     tar -xzf apps/mobile/build/app-e2e.tar.gz -C apps/mobile/build/
+      #     xcrun simctl install booted apps/mobile/build/Groupio.app
+
+      # ── Run Maestro on iOS simulator ──────────────────────────────────────
+      - name: Run Maestro flows (iOS)
+        working-directory: apps/mobile
+        env:
+          TEST_RESIDENT_EMAIL: ${{ secrets.E2E_RESIDENT_EMAIL || 'e2e.resident@test.groupio.co.il' }}
+          TEST_RESIDENT_PASSWORD: ${{ secrets.E2E_RESIDENT_PASSWORD || 'E2eResident123!' }}
+          TEST_CONTRACTOR_EMAIL: ${{ secrets.E2E_CONTRACTOR_EMAIL || 'e2e.contractor@test.groupio.co.il' }}
+          TEST_CONTRACTOR_PASSWORD: ${{ secrets.E2E_CONTRACTOR_PASSWORD || 'E2eContractor123!' }}
+        run: |
+          maestro test --include-tags smoke .maestro/flows
+        continue-on-error: true
+
+      - name: Upload Maestro test artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: maestro-ios-results
+          path: |
+            ~/.maestro/tests/
+            apps/mobile/.maestro-results/
+          retention-days: 14

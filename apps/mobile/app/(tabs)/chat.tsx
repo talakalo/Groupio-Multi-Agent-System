@@ -310,6 +310,7 @@ export default function ChatScreen() {
               returnKeyType="send"
               onSubmitEditing={handleSend}
               editable={!isLoading}
+              testID="chat-input"
               textAlign={I18nManager.isRTL ? "right" : "left"}
             />
           </View>
