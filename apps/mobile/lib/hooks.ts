@@ -1,11 +1,3 @@
-import { useCallback, useRef, useState } from "react";
-import {
-  useQuery,
-  useMutation,
-  useQueryClient,
-  type UseQueryOptions,
-  type UseMutationOptions,
-} from "@tanstack/react-query";
 import type {
   Offer,
   Contractor,
@@ -14,7 +6,18 @@ import type {
   MessageResponse,
   Message,
   ContractorMatch,
+  ContractorStats,
+  ProjectWithStats,
 } from "@groupio/types";
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  type UseQueryOptions,
+  type UseMutationOptions,
+} from "@tanstack/react-query";
+import { useCallback, useRef, useState } from "react";
+
 import {
   getOffers,
   getOffer,
@@ -28,8 +31,17 @@ import {
   sendMessageStream,
   getActivityFeed,
   getBuildingNews,
+  getOrders,
+  getOrder,
+  getPayments,
+  getBuildingDetail,
+  getContractorStats,
+  getContractorOffers,
+  getContractorProjects,
   type OffersFilters,
   type ContractorsFilters,
+  type ContractorOffersFilters,
+  type ContractorProjectsFilters,
   type CreateOfferPayload,
   type UpdateProfilePayload,
   type PaginatedResponse,
@@ -37,6 +49,9 @@ import {
   type ActivityItem,
   type NewsItem,
   type ChatStreamEvent,
+  type Order,
+  type PaymentRecord,
+  type BuildingDetail,
 } from "./api";
 
 // ---------------------------------------------------------------------------
@@ -59,6 +74,11 @@ export const queryKeys = {
   profile: ["profile"] as const,
   activity: (buildingId: string) => ["activity", buildingId] as const,
   news: (buildingId: string) => ["news", buildingId] as const,
+  contractorStats: ["contractor", "stats"] as const,
+  contractorOffers: (filters?: ContractorOffersFilters) =>
+    ["contractor", "offers", filters] as const,
+  contractorProjects: (filters?: ContractorProjectsFilters) =>
+    ["contractor", "projects", filters] as const,
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -231,6 +251,83 @@ export function useBuildingNews(
   return useQuery<NewsItem[]>({
     queryKey: queryKeys.news(buildingId),
     queryFn: ({ signal }) => getBuildingNews(buildingId, signal),
+    enabled: !!buildingId,
+    ...options,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Orders
+// ---------------------------------------------------------------------------
+
+export const orderKeys = {
+  all: ["orders"] as const,
+  list: () => ["orders", "list"] as const,
+  detail: (id: string) => ["orders", "detail", id] as const,
+} as const;
+
+export function useOrders(
+  options?: Omit<
+    UseQueryOptions<PaginatedResponse<Order>>,
+    "queryKey" | "queryFn"
+  >,
+) {
+  return useQuery<PaginatedResponse<Order>>({
+    queryKey: orderKeys.list(),
+    queryFn: ({ signal }) => getOrders(signal),
+    ...options,
+  });
+}
+
+export function useOrder(
+  id: string,
+  options?: Omit<UseQueryOptions<Order>, "queryKey" | "queryFn">,
+) {
+  return useQuery<Order>({
+    queryKey: orderKeys.detail(id),
+    queryFn: ({ signal }) => getOrder(id, signal),
+    enabled: !!id,
+    ...options,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Payments
+// ---------------------------------------------------------------------------
+
+export const paymentKeys = {
+  all: ["payments"] as const,
+  list: () => ["payments", "list"] as const,
+} as const;
+
+export function usePayments(
+  options?: Omit<
+    UseQueryOptions<PaginatedResponse<PaymentRecord>>,
+    "queryKey" | "queryFn"
+  >,
+) {
+  return useQuery<PaginatedResponse<PaymentRecord>>({
+    queryKey: paymentKeys.list(),
+    queryFn: ({ signal }) => getPayments(signal),
+    ...options,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Building detail
+// ---------------------------------------------------------------------------
+
+export const buildingKeys = {
+  detail: (id: string) => ["building", id] as const,
+} as const;
+
+export function useBuildingDetail(
+  buildingId: string,
+  options?: Omit<UseQueryOptions<BuildingDetail>, "queryKey" | "queryFn">,
+) {
+  return useQuery<BuildingDetail>({
+    queryKey: buildingKeys.detail(buildingId),
+    queryFn: ({ signal }) => getBuildingDetail(buildingId, signal),
     enabled: !!buildingId,
     ...options,
   });
@@ -411,3 +508,48 @@ const streamPlaceholder: Message = {
   content: "",
   timestamp: new Date(),
 };
+
+// ---------------------------------------------------------------------------
+// Contractor
+// ---------------------------------------------------------------------------
+
+/** Fetch dashboard stats for the authenticated contractor. */
+export function useContractorStats(
+  options?: Omit<UseQueryOptions<ContractorStats>, "queryKey" | "queryFn">,
+) {
+  return useQuery<ContractorStats>({
+    queryKey: queryKeys.contractorStats,
+    queryFn: ({ signal }) => getContractorStats(signal),
+    ...options,
+  });
+}
+
+/** Fetch the contractor's own offers. */
+export function useContractorOffers(
+  filters?: ContractorOffersFilters,
+  options?: Omit<
+    UseQueryOptions<PaginatedResponse<Offer>>,
+    "queryKey" | "queryFn"
+  >,
+) {
+  return useQuery<PaginatedResponse<Offer>>({
+    queryKey: queryKeys.contractorOffers(filters),
+    queryFn: ({ signal }) => getContractorOffers(filters, signal),
+    ...options,
+  });
+}
+
+/** Fetch the contractor's projects. */
+export function useContractorProjects(
+  filters?: ContractorProjectsFilters,
+  options?: Omit<
+    UseQueryOptions<PaginatedResponse<ProjectWithStats>>,
+    "queryKey" | "queryFn"
+  >,
+) {
+  return useQuery<PaginatedResponse<ProjectWithStats>>({
+    queryKey: queryKeys.contractorProjects(filters),
+    queryFn: ({ signal }) => getContractorProjects(filters, signal),
+    ...options,
+  });
+}

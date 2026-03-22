@@ -1,8 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { clsx } from "clsx";
 import {
   AlertTriangle,
   Clock,
@@ -12,7 +10,8 @@ import {
   Search,
   Download,
 } from "lucide-react";
-import type { Escalation } from "@groupio/types";
+import { useState, useMemo, useCallback } from "react";
+
 import { EscalationsTable } from "@/components/features/escalations/EscalationsTable";
 import { MetricCard } from "@/components/features/metrics/MetricCard";
 import { useEscalations, useResolveEscalation } from "@/lib/hooks";
@@ -23,6 +22,13 @@ import { useEscalations, useResolveEscalation } from "@/lib/hooks";
 
 type PriorityFilter = "all" | "urgent" | "high" | "normal" | "low";
 type StatusFilter = "all" | "open" | "assigned" | "resolved";
+
+const PRIORITY_ESCALATION_MAP: Record<string, string> = {
+  low: "normal",
+  normal: "high",
+  high: "urgent",
+  urgent: "urgent",
+};
 
 // ---------------------------------------------------------------------------
 // Page component
@@ -54,14 +60,10 @@ export default function EscalationsPage() {
     headers: { "Content-Type": "application/json" },
   });
 
-  const PRIORITY_ESCALATION_MAP: Record<string, string> = {
-    low: "normal",
-    normal: "high",
-    high: "urgent",
-    urgent: "urgent", // already max
-  };
-
-  const allEscalations = escalationsData?.escalations ?? [];
+  const allEscalations = useMemo(
+    () => escalationsData?.escalations ?? [],
+    [escalationsData?.escalations]
+  );
 
   // ---- Client-side filtering ----
   const filteredEscalations = useMemo(() => {
@@ -289,6 +291,21 @@ export default function EscalationsPage() {
           icon={<Clock className="w-4 h-4" />}
         />
       </div>
+
+      {/* SLA Indicators */}
+      {stats.urgent > 0 && (
+        <div className="flex items-start gap-3 p-3 rounded-lg bg-danger-50 border border-danger-200">
+          <Clock className="w-5 h-5 text-danger-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-danger-700">
+              SLA Alert: {stats.urgent} urgent escalation{stats.urgent > 1 ? "s" : ""} pending
+            </p>
+            <p className="text-xs text-danger-600 mt-0.5">
+              Urgent escalations require resolution within 2 hours. Open escalations beyond SLA are highlighted.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* ================================================================== */}
       {/* Filters                                                             */}

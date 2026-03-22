@@ -237,7 +237,7 @@ See [Deployment Guide](docs/deployment.md) for production setup.
 
 ## Documentation
 
-- [Architecture](docs/architecture.md) - System design
+- [Architecture](docs/architecture.md) - System design (includes Design System reference)
 - [Agent Behaviors](docs/agent_behaviors.md) - Agent specifications
 - [API Reference](docs/api_reference.md) - Endpoint documentation
 - [RAG Guide](docs/rag_guide.md) - Retrieval pipeline

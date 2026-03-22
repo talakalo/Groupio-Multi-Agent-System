@@ -1,8 +1,7 @@
 "use client";
 
-import { Fragment, useState, useMemo, useCallback } from "react";
-import { clsx } from "clsx";
 import type { Escalation } from "@groupio/types";
+import { clsx } from "clsx";
 import {
   ChevronDown,
   ChevronUp,
@@ -16,6 +15,7 @@ import {
   Clock,
   Bot,
 } from "lucide-react";
+import { Fragment, useState, useMemo, useCallback } from "react";
 
 // ---------------------------------------------------------------------------
 // Types

@@ -1,3 +1,5 @@
+import type { ServiceCategory } from "@groupio/types";
+import { useRouter } from "expo-router";
 import React, { useState, useCallback, useMemo } from "react";
 import {
   View,
@@ -18,9 +20,7 @@ import {
   Snackbar,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
-import type { ServiceCategory } from "@groupio/types";
 
 import { useCreateOffer, useProfile } from "../lib/hooks";
 

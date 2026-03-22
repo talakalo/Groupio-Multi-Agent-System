@@ -22,6 +22,19 @@ const config: Config = {
           900: "#312e81",
           950: "#1e1b4b",
         },
+        accent: {
+          50: "#fffbeb",
+          100: "#fef3c7",
+          200: "#fde68a",
+          300: "#fcd34d",
+          400: "#fbbf24",
+          500: "#f59e0b",
+          600: "#d97706",
+          700: "#b45309",
+          800: "#92400e",
+          900: "#78350f",
+          950: "#451a03",
+        },
         success: {
           50: "#f0fdf4",
           100: "#dcfce7",
@@ -44,6 +57,13 @@ const config: Config = {
           700: "#b91c1c",
           800: "#991b1b",
         },
+        info: {
+          50: "#eff6ff",
+          100: "#dbeafe",
+          500: "#3b82f6",
+          600: "#2563eb",
+          700: "#1d4ed8",
+        },
         surface: {
           50: "#f8fafc",
           100: "#f1f5f9",
@@ -58,19 +78,13 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: [
-          "Inter",
-          "ui-sans-serif",
-          "system-ui",
-          "-apple-system",
-          "sans-serif",
-        ],
+        sans: ["Inter", "ui-sans-serif", "system-ui", "-apple-system", "sans-serif"],
         mono: ["JetBrains Mono", "ui-monospace", "monospace"],
       },
       boxShadow: {
+        xs: "0 1px 2px 0 rgb(0 0 0 / 0.05)",
         card: "0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.06)",
-        "card-hover":
-          "0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05)",
+        "card-hover": "0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05)",
       },
       borderRadius: {
         xl: "0.875rem",

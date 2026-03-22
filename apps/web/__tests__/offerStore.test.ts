@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { useOfferStore } from '../lib/stores/offerStore';
-import { useAuthStore } from '../lib/stores/authStore';
 import type { Offer } from '@groupio/types';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+import { useAuthStore } from '../lib/stores/authStore';
+import { useOfferStore } from '../lib/stores/offerStore';
 
 // Mock fetch
 global.fetch = vi.fn();

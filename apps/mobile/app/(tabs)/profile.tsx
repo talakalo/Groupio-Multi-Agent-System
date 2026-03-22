@@ -1,3 +1,4 @@
+import * as ImagePicker from "expo-image-picker";
 import React, { useCallback, useMemo, useState } from "react";
 import {
   View,
@@ -21,11 +22,13 @@ import {
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
-import * as ImagePicker from "expo-image-picker";
 
-import { useProfile, useUpdateProfile } from "../../lib/hooks";
 import { uploadAvatar, setAuthToken } from "../../lib/api";
 import type { ProfileResponse } from "../../lib/api";
+import { useProfile, useUpdateProfile, useContractorStats } from "../../lib/hooks";
+import i18n from "../../lib/i18n";
+import { storage } from "../../lib/storage";
+import { useAuth } from "../_layout";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -34,9 +37,13 @@ import type { ProfileResponse } from "../../lib/api";
 type Language = "he" | "en";
 
 const LANGUAGES: { key: Language; label: string; flag: string }[] = [
-  { key: "he", label: "\u05E2\u05D1\u05E8\u05D9\u05EA", flag: "\uD83C\uDDEE\uD83C\uDDF1" },
-  { key: "en", label: "English", flag: "\uD83C\uDDFA\uD83C\uDDF8" },
+  { key: "he", label: "עברית", flag: "🇮🇱" },
+  { key: "en", label: "English", flag: "🇺🇸" },
 ];
+
+function getTrustLabel(key: string): string {
+  return i18n.t(`trust.${key}`, { defaultValue: key });
+}
 
 // ---------------------------------------------------------------------------
 // Section wrapper
@@ -166,10 +173,23 @@ function SettingToggle({
 
 export default function ProfileScreen() {
   const theme = useTheme();
+  const { logout } = useAuth();
+
+  // Determine user role
+  const [userRole, setUserRole] = React.useState<string>("resident");
+  React.useEffect(() => {
+    storage.getUser().then((u) => {
+      if (u?.role) setUserRole(u.role);
+    });
+  }, []);
+  const isContractor = userRole === "contractor";
 
   // Data
   const { data: profile, isLoading: profileLoading } = useProfile();
   const updateProfile = useUpdateProfile();
+  const { data: contractorStats } = useContractorStats({
+    enabled: isContractor,
+  });
 
   // Local state for toggling (optimistic UI)
   const [localNotifications, setLocalNotifications] = useState<boolean | null>(
@@ -203,17 +223,14 @@ export default function ProfileScreen() {
       setSelectedLanguage(lang);
       updateProfile.mutate({ language: lang });
 
-      if (lang === "en" && I18nManager.isRTL) {
+      if (
+        (lang === "en" && I18nManager.isRTL) ||
+        (lang === "he" && !I18nManager.isRTL)
+      ) {
         Alert.alert(
-          "Language Changed",
-          "The app will restart to apply the new language direction.",
-          [{ text: "OK" }],
-        );
-      } else if (lang === "he" && !I18nManager.isRTL) {
-        Alert.alert(
-          "\u05E9\u05E4\u05D4 \u05E9\u05D5\u05E0\u05EA\u05D4",
-          "\u05D4\u05D0\u05E4\u05DC\u05D9\u05E7\u05E6\u05D9\u05D4 \u05EA\u05D5\u05E4\u05E2\u05DC \u05DE\u05D7\u05D3\u05E9 \u05DC\u05D4\u05D7\u05DC\u05EA \u05DB\u05D9\u05D5\u05D5\u05DF \u05D4\u05E9\u05E4\u05D4.",
-          [{ text: "\u05D0\u05D9\u05E9\u05D5\u05E8" }],
+          i18n.t("profile.languageChanged"),
+          i18n.t("profile.appWillRestart"),
+          [{ text: i18n.t("profile.confirm") }],
         );
       }
     },
@@ -235,8 +252,8 @@ export default function ProfileScreen() {
           await uploadAvatar(result.assets[0].uri);
         } catch {
           Alert.alert(
-            "\u05E9\u05D2\u05D9\u05D0\u05D4",
-            "\u05DC\u05D0 \u05D4\u05E6\u05DC\u05D7\u05E0\u05D5 \u05DC\u05D4\u05E2\u05DC\u05D5\u05EA \u05D0\u05EA \u05D4\u05EA\u05DE\u05D5\u05E0\u05D4. \u05E0\u05E1\u05D4 \u05E9\u05D5\u05D1.",
+            i18n.t("profile.avatarUploadError"),
+            i18n.t("profile.avatarUploadErrorMsg"),
           );
         } finally {
           setAvatarUploading(false);
@@ -249,21 +266,18 @@ export default function ProfileScreen() {
 
   const handleLogout = useCallback(() => {
     Alert.alert(
-      "\u05D4\u05EA\u05E0\u05EA\u05E7\u05D5\u05EA",
-      "\u05D4\u05D0\u05DD \u05D0\u05EA\u05D4 \u05D1\u05D8\u05D5\u05D7 \u05E9\u05D1\u05E8\u05E6\u05D5\u05E0\u05DA \u05DC\u05D4\u05EA\u05E0\u05EA\u05E7?",
+      i18n.t("profile.logoutTitle"),
+      i18n.t("profile.logoutConfirm"),
       [
-        { text: "\u05D1\u05D9\u05D8\u05D5\u05DC", style: "cancel" },
+        { text: i18n.t("profile.cancel"), style: "cancel" },
         {
-          text: "\u05D4\u05EA\u05E0\u05EA\u05E7",
+          text: i18n.t("profile.logout"),
           style: "destructive",
-          onPress: () => {
-            setAuthToken(null);
-            // Navigate to login screen via router
-          },
+          onPress: () => void logout(),
         },
       ],
     );
-  }, []);
+  }, [logout]);
 
   // Loading
   if (profileLoading) {
@@ -279,7 +293,7 @@ export default function ProfileScreen() {
     );
   }
 
-  const userName = profile?.name ?? "\u05DE\u05E9\u05EA\u05DE\u05E9";
+  const userName = profile?.name ?? i18n.t("profile.user") ?? "";
   const userInitials = userName
     .split(" ")
     .map((n) => n[0])
@@ -345,25 +359,25 @@ export default function ProfileScreen() {
 
         {/* ---- Personal Info ---- */}
         <Section
-          title={"\u05DE\u05D9\u05D3\u05E2 \u05D0\u05D9\u05E9\u05D9"}
+          title={i18n.t("profile.personalInfo")}
           icon="account-outline"
         >
           <View style={styles.infoList}>
             <InfoRow
               icon="account"
-              label={"\u05E9\u05DD \u05DE\u05DC\u05D0"}
+              label={i18n.t("profile.fullName")}
               value={profile?.name ?? "-"}
             />
             <Divider style={styles.infoDivider} />
             <InfoRow
               icon="email-outline"
-              label={"\u05D0\u05D9\u05DE\u05D9\u05D9\u05DC"}
+              label={i18n.t("profile.email")}
               value={profile?.email ?? "-"}
             />
             <Divider style={styles.infoDivider} />
             <InfoRow
               icon="phone-outline"
-              label={"\u05D8\u05DC\u05E4\u05D5\u05DF"}
+              label={i18n.t("profile.phone")}
               value={profile?.phone ?? "-"}
             />
           </View>
@@ -371,27 +385,27 @@ export default function ProfileScreen() {
 
         {/* ---- Building Info ---- */}
         <Section
-          title={"\u05DE\u05D9\u05D3\u05E2 \u05D4\u05D1\u05E0\u05D9\u05D9\u05DF"}
+          title={i18n.t("profile.buildingInfo")}
           icon="office-building"
         >
           <View style={styles.infoList}>
             <InfoRow
               icon="map-marker-outline"
-              label={"\u05DB\u05EA\u05D5\u05D1\u05EA"}
+              label={i18n.t("profile.address")}
               value={profile?.building?.address ?? "-"}
               iconColor={theme.colors.secondary}
             />
             <Divider style={styles.infoDivider} />
             <InfoRow
               icon="city-variant-outline"
-              label={"\u05E2\u05D9\u05E8"}
+              label={i18n.t("profile.city")}
               value={profile?.building?.city ?? "-"}
               iconColor={theme.colors.secondary}
             />
             <Divider style={styles.infoDivider} />
             <InfoRow
               icon="door"
-              label={"\u05DE\u05E1\u05E4\u05E8 \u05D3\u05D9\u05E8\u05D5\u05EA"}
+              label={i18n.t("profile.units")}
               value={
                 profile?.building?.units
                   ? String(profile.building.units)
@@ -402,10 +416,10 @@ export default function ProfileScreen() {
             <Divider style={styles.infoDivider} />
             <InfoRow
               icon="calendar-outline"
-              label={"\u05D2\u05D9\u05DC \u05D4\u05D1\u05E0\u05D9\u05D9\u05DF"}
+              label={i18n.t("profile.buildingAge")}
               value={
                 profile?.building?.age
-                  ? `${profile.building.age} \u05E9\u05E0\u05D9\u05DD`
+                  ? `${profile.building.age} ${i18n.t("profile.years")}`
                   : "-"
               }
               iconColor={theme.colors.secondary}
@@ -413,48 +427,144 @@ export default function ProfileScreen() {
           </View>
         </Section>
 
+        {/* ---- Contractor Info (only for contractors) ---- */}
+        {isContractor && (
+          <>
+            <Section title={i18n.t("contractor.trustScore")} icon="shield-check">
+              <View style={styles.trustScoreSection}>
+                <View style={styles.trustScoreRow}>
+                  <View
+                    style={[
+                      styles.trustScoreCircle,
+                      { borderColor: theme.colors.primary },
+                    ]}
+                  >
+                    <Text
+                      variant="headlineMedium"
+                      style={[
+                        styles.trustScoreValue,
+                        { color: theme.colors.primary },
+                      ]}
+                    >
+                      {contractorStats?.trustScore ?? 0}
+                    </Text>
+                    <Text
+                      variant="labelSmall"
+                      style={{ color: theme.colors.onSurfaceVariant }}
+                    >
+                      {i18n.t("contractor.outOf100")}
+                    </Text>
+                  </View>
+                  <View style={styles.trustBreakdown}>
+                    {contractorStats?.trustBreakdown ? (
+                      Object.entries(contractorStats.trustBreakdown).map(
+                        ([key, value]) => (
+                          <View key={key} style={styles.trustItem}>
+                            <Text
+                              variant="bodySmall"
+                              style={{ color: theme.colors.onSurfaceVariant, flex: 1 }}
+                            >
+                              {getTrustLabel(key)}
+                            </Text>
+                            <View
+                              style={[
+                                styles.trustBar,
+                                { backgroundColor: theme.colors.surfaceVariant },
+                              ]}
+                            >
+                              <View
+                                style={[
+                                  styles.trustBarFill,
+                                  {
+                                    backgroundColor: theme.colors.primary,
+                                    width: `${Math.min(value, 100)}%`,
+                                  },
+                                ]}
+                              />
+                            </View>
+                            <Text
+                              variant="labelSmall"
+                              style={{ color: theme.colors.onSurfaceVariant, width: 28, textAlign: "center" }}
+                            >
+                              {value}
+                            </Text>
+                          </View>
+                        ),
+                      )
+                    ) : (
+                      <Text
+                        variant="bodySmall"
+                        style={{ color: theme.colors.onSurfaceVariant }}
+                      >
+                        {i18n.t("contractor.noTrustData")}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              </View>
+            </Section>
+
+            <Section title={i18n.t("contractor.verificationStatus")} icon="check-decagram">
+              <View style={styles.infoList}>
+                <InfoRow
+                  icon="file-document-outline"
+                  label={i18n.t("contractor.businessLicense")}
+                  value={i18n.t("contractor.verified")}
+                  iconColor={theme.colors.tertiary}
+                />
+                <Divider style={styles.infoDivider} />
+                <InfoRow
+                  icon="shield-outline"
+                  label={i18n.t("contractor.insurance")}
+                  value={i18n.t("contractor.valid")}
+                  iconColor={theme.colors.tertiary}
+                />
+                <Divider style={styles.infoDivider} />
+                <InfoRow
+                  icon="upload-outline"
+                  label={i18n.t("contractor.documents")}
+                  value={i18n.t("contractor.uploaded")}
+                  iconColor={theme.colors.tertiary}
+                />
+              </View>
+            </Section>
+          </>
+        )}
+
         {/* ---- Notification Settings ---- */}
         <Section
-          title={"\u05D4\u05EA\u05E8\u05D0\u05D5\u05EA"}
+          title={i18n.t("profile.notifications")}
           icon="bell-outline"
         >
           <View style={styles.settingsList}>
             <SettingToggle
               icon="bell-ring-outline"
-              label={"\u05D4\u05EA\u05E8\u05D0\u05D5\u05EA \u05E4\u05D5\u05E9"}
-              description={
-                "\u05E7\u05D1\u05DC \u05D4\u05EA\u05E8\u05D0\u05D5\u05EA \u05D1\u05DE\u05DB\u05E9\u05D9\u05E8"
-              }
+              label={i18n.t("profile.pushNotifications")}
+              description={i18n.t("profile.pushDescription")}
               value={notificationsEnabled}
               onToggle={handleToggleNotifications}
             />
             <Divider style={styles.settingDivider} />
             <SettingToggle
               icon="tag-outline"
-              label={"\u05D4\u05E6\u05E2\u05D5\u05EA \u05D7\u05D3\u05E9\u05D5\u05EA"}
-              description={
-                "\u05D4\u05EA\u05E8\u05D0\u05D4 \u05DB\u05E9\u05E0\u05E4\u05EA\u05D7\u05EA \u05D4\u05E6\u05E2\u05D4 \u05D7\u05D3\u05E9\u05D4 \u05D1\u05D1\u05E0\u05D9\u05D9\u05DF"
-              }
+              label={i18n.t("profile.newOffers")}
+              description={i18n.t("profile.newOffersDescription")}
               value={localNewOfferAlerts}
               onToggle={setLocalNewOfferAlerts}
             />
             <Divider style={styles.settingDivider} />
             <SettingToggle
               icon="arrow-down-bold-outline"
-              label={"\u05D9\u05E8\u05D9\u05D3\u05D5\u05EA \u05DE\u05D7\u05D9\u05E8"}
-              description={
-                "\u05D4\u05EA\u05E8\u05D0\u05D4 \u05DB\u05E9\u05DE\u05D7\u05D9\u05E8 \u05D9\u05D5\u05E8\u05D3 \u05D1\u05D4\u05E6\u05E2\u05D5\u05EA \u05E9\u05DC\u05DA"
-              }
+              label={i18n.t("profile.priceDrops")}
+              description={i18n.t("profile.priceDropsDescription")}
               value={localPriceDropAlerts}
               onToggle={setLocalPriceDropAlerts}
             />
             <Divider style={styles.settingDivider} />
             <SettingToggle
               icon="chat-outline"
-              label={"\u05D4\u05D5\u05D3\u05E2\u05D5\u05EA \u05E6'\u05D0\u05D8"}
-              description={
-                "\u05D4\u05EA\u05E8\u05D0\u05D5\u05EA \u05E2\u05DC \u05D4\u05D5\u05D3\u05E2\u05D5\u05EA \u05D7\u05D3\u05E9\u05D5\u05EA \u05D1\u05E6'\u05D0\u05D8"
-              }
+              label={i18n.t("profile.chatMessages")}
+              description={i18n.t("profile.chatMessagesDescription")}
               value={localChatNotifications}
               onToggle={setLocalChatNotifications}
             />
@@ -463,7 +573,7 @@ export default function ProfileScreen() {
 
         {/* ---- Language Selector ---- */}
         <Section
-          title={"\u05E9\u05E4\u05D4"}
+          title={i18n.t("profile.language")}
           icon="translate"
         >
           <View style={styles.languageRow}>
@@ -532,7 +642,7 @@ export default function ProfileScreen() {
                 marginTop: 4,
               }}
             >
-              {"\u05EA\u05E0\u05D0\u05D9 \u05E9\u05D9\u05DE\u05D5\u05E9 \u05D5\u05DE\u05D3\u05D9\u05E0\u05D9\u05D5\u05EA \u05E4\u05E8\u05D8\u05D9\u05D5\u05EA"}
+              {i18n.t("profile.termsAndPrivacy")}
             </Text>
           </Pressable>
         </View>
@@ -547,7 +657,7 @@ export default function ProfileScreen() {
           contentStyle={styles.logoutButtonContent}
           labelStyle={styles.logoutButtonLabel}
         >
-          {"\u05D4\u05EA\u05E0\u05EA\u05E7\u05D5\u05EA"}
+          {i18n.t("profile.logout")}
         </Button>
 
         <View style={styles.bottomSpacer} />
@@ -715,5 +825,47 @@ const styles = StyleSheet.create({
 
   bottomSpacer: {
     height: 32,
+  },
+
+  // Contractor trust score
+  trustScoreSection: {
+    gap: 12,
+  },
+  trustScoreRow: {
+    flexDirection: "row",
+    gap: 16,
+    alignItems: "flex-start",
+  },
+  trustScoreCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 3,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  trustScoreValue: {
+    fontWeight: "800",
+    fontSize: 24,
+    lineHeight: 28,
+  },
+  trustBreakdown: {
+    flex: 1,
+    gap: 6,
+  },
+  trustItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  trustBar: {
+    flex: 1,
+    height: 6,
+    borderRadius: 3,
+    overflow: "hidden" as const,
+  },
+  trustBarFill: {
+    height: "100%" as const,
+    borderRadius: 3,
   },
 });

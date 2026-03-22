@@ -7,24 +7,27 @@ import {
   Building2,
   Users,
   MapPin,
-  Calendar,
   Tag,
   ChevronLeft,
   UserCircle,
   Crown,
-  Phone,
   Copy,
   Check,
   Share2,
-  Home,
   Settings,
+  TrendingUp,
+  Sparkles,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 
+import { EmptyState } from '@/components/shared/EmptyState';
+import { Badge } from '@/components/ui/Badge';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
+import { unwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
 
 
 // ---------------------------------------------------------------------------
@@ -116,7 +119,8 @@ function GroupOfferCard({ offer }: { offer: Offer }) {
 // Main page
 // ---------------------------------------------------------------------------
 
-export default function BuildingPage() {
+export default function BuildingPage(props: PageParamsProps) {
+  unwrapPageParams(props);
   const t = useTranslations('building');
   const tCommon = useTranslations('common');
   const [copiedCode, setCopiedCode] = useState(false);
@@ -125,14 +129,14 @@ export default function BuildingPage() {
   const accessToken = useAuthStore((s) => s.accessToken);
   const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-  const buildingQuery = useQuery<BuildingProfile>({
+  const buildingQuery = useQuery<BuildingProfile | null>({
     queryKey: ['building', 'profile'],
     queryFn: async () => {
       const res = await fetch(`${apiBase}/api/v1/buildings/me`, {
         headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
       });
       if (!res.ok) {
-        if (res.status === 404) throw new Error('No building associated with your account');
+        if (res.status === 404) return null;
         throw new Error('Failed to fetch building');
       }
       const data = await res.json();
@@ -160,19 +164,55 @@ export default function BuildingPage() {
     }
   };
 
+  const handleShare = async () => {
+    if (!building?.inviteCode) return;
+    const shareText = `הצטרפו לבניין שלנו ב-Groupio! קוד הזמנה: ${building.inviteCode}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'הזמנה ל-Groupio', text: shareText });
+      } catch {
+        // User cancelled
+      }
+    } else {
+      await navigator.clipboard.writeText(shareText);
+      setCopiedCode(true);
+      setTimeout(() => setCopiedCode(false), 2000);
+    }
+  };
+
+  if (!buildingQuery.isLoading && buildingQuery.data === null) {
+    return (
+      <div className="max-w-4xl mx-auto">
+        <EmptyState
+          icon={Building2}
+          title={t('noBuilding') ?? 'אין בניין משויך'}
+          description="הצטרפו לבניין שלכם כדי לראות שכנים והצעות קבוצתיות."
+          action={{ label: 'הצטרפו לבניין', href: '/building/join' }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Building profile header */}
       <div className="card">
         {buildingQuery.isLoading ? (
-          <div className="animate-pulse">
-            <div className="h-6 bg-gray-200 rounded w-48 mb-3" />
-            <div className="h-4 bg-gray-200 rounded w-64 mb-6" />
-            <div className="grid grid-cols-3 gap-4">
-              <div className="h-16 bg-gray-200 rounded-xl" />
-              <div className="h-16 bg-gray-200 rounded-xl" />
-              <div className="h-16 bg-gray-200 rounded-xl" />
+          <div className="space-y-6">
+            <div className="flex items-start gap-4">
+              <Skeleton variant="avatar" className="w-16 h-16 rounded-xl" />
+              <div className="flex-1 space-y-2">
+                <Skeleton variant="text" className="h-6 w-48" />
+                <Skeleton variant="text" className="h-4 w-32" />
+              </div>
             </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <Skeleton variant="stat" className="h-24" />
+              <Skeleton variant="stat" className="h-24" />
+              <Skeleton variant="stat" className="h-24" />
+              <Skeleton variant="stat" className="h-24" />
+            </div>
+            <Skeleton variant="card" className="h-40" />
           </div>
         ) : building ? (
           <>
@@ -187,65 +227,90 @@ export default function BuildingPage() {
                   {building.city}
                 </p>
               </div>
-              <button
-                type="button"
-                className="p-2 rounded-xl hover:bg-gray-100 text-gray-500 transition-colors"
-                title={tCommon('share')}
-              >
-                <Share2 className="h-5 w-5" />
-              </button>
+              <Badge variant="primary" size="sm">
+                {building.residents?.length ?? 0} דיירים
+              </Badge>
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-              <div className="text-center p-3 bg-gray-50 rounded-xl">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+              <div className="text-center p-4 bg-gray-50 rounded-xl border border-gray-100">
+                <div className="w-8 h-8 mx-auto mb-2 rounded-lg bg-primary-100 flex items-center justify-center">
+                  <Building2 className="h-4 w-4 text-primary-600" />
+                </div>
                 <p className="text-lg font-bold text-gray-900">{building.units}</p>
                 <p className="text-xs text-gray-500">{t('totalUnits')}</p>
               </div>
-              <div className="text-center p-3 bg-gray-50 rounded-xl">
+              <div className="text-center p-4 bg-gray-50 rounded-xl border border-gray-100">
+                <div className="w-8 h-8 mx-auto mb-2 rounded-lg bg-blue-100 flex items-center justify-center">
+                  <Users className="h-4 w-4 text-blue-600" />
+                </div>
                 <p className="text-lg font-bold text-gray-900">{building.residents?.length ?? 0}</p>
                 <p className="text-xs text-gray-500">{t('activeResidents')}</p>
               </div>
-              <div className="text-center p-3 bg-gray-50 rounded-xl">
+              <div className="text-center p-4 bg-gray-50 rounded-xl border border-gray-100">
+                <div className="w-8 h-8 mx-auto mb-2 rounded-lg bg-amber-100 flex items-center justify-center">
+                  <Tag className="h-4 w-4 text-amber-600" />
+                </div>
                 <p className="text-lg font-bold text-gray-900">{building.activeOffers?.length ?? 0}</p>
                 <p className="text-xs text-gray-500">{t('activeOffers')}</p>
               </div>
-              <div className="text-center p-3 bg-gray-50 rounded-xl">
+              <div className="text-center p-4 bg-gray-50 rounded-xl border border-gray-100">
+                <div className="w-8 h-8 mx-auto mb-2 rounded-lg bg-emerald-100 flex items-center justify-center">
+                  <TrendingUp className="h-4 w-4 text-emerald-600" />
+                </div>
                 <p className="text-lg font-bold text-emerald-600">{formatPrice(building.totalSavings ?? 0)}</p>
                 <p className="text-xs text-gray-500">{t('totalSavings')}</p>
               </div>
             </div>
 
-            {/* Invite code */}
-            <div className="bg-primary-50 rounded-xl p-4 flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-primary-800">{t('inviteCode')}</p>
-                <p className="text-lg font-bold text-primary-600 font-mono mt-0.5">
+            {/* Invite code — prominent */}
+            <div className="bg-gradient-to-br from-primary-50 to-primary-100/50 rounded-xl border border-primary-200 p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <Sparkles className="h-5 w-5 text-primary-500" />
+                <h3 className="font-semibold text-primary-800">{t('inviteCode')}</h3>
+              </div>
+              <div className="bg-white rounded-lg border border-primary-200 p-4 flex items-center justify-between mb-4">
+                <p className="text-2xl font-bold text-primary-600 font-mono tracking-widest select-all">
                   {building.inviteCode}
                 </p>
+                <Badge variant="primary" size="sm">קוד הזמנה</Badge>
               </div>
-              <button
-                type="button"
-                onClick={handleCopyCode}
-                className={cn(
-                  'flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all',
-                  copiedCode
-                    ? 'bg-emerald-500 text-white'
-                    : 'bg-primary-500 text-white hover:bg-primary-600'
-                )}
-              >
-                {copiedCode ? (
-                  <>
-                    <Check className="h-4 w-4" />
-                    {t('copied')}
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-4 w-4" />
-                    {t('copyCode')}
-                  </>
-                )}
-              </button>
+              <p className="text-sm text-primary-700 mb-4">
+                שתפו את הקוד עם שכנים כדי שיוכלו להצטרף לבניין ולקבל הצעות קבוצתיות
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleCopyCode}
+                  className={cn(
+                    'flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all',
+                    copiedCode
+                      ? 'bg-emerald-500 text-white'
+                      : 'bg-primary-500 text-white hover:bg-primary-600'
+                  )}
+                >
+                  {copiedCode ? (
+                    <>
+                      <Check className="h-4 w-4" />
+                      {t('copied')}
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-4 w-4" />
+                      {t('copyCode')}
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleShare}
+                  className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium border border-primary-300 text-primary-700 hover:bg-primary-50 transition-colors"
+                >
+                  <Share2 className="h-4 w-4" />
+                  {t('share') ?? 'שתף'}
+                </button>
+              </div>
             </div>
           </>
         ) : null}
@@ -332,10 +397,12 @@ export default function BuildingPage() {
               ))}
             </div>
           ) : (
-            <div className="text-center py-8">
-              <Tag className="h-12 w-12 text-gray-200 mx-auto mb-3" />
-              <p className="text-gray-500">{t('noGroupOffers')}</p>
-            </div>
+            <EmptyState
+              icon={Tag}
+              title={t('noGroupOffers')}
+              description="הצעות קבוצתיות בבניין יופיעו כאן. שתפו את קוד ההזמנה עם שכנים."
+              action={{ label: t('viewAll'), href: '/offers' }}
+            />
           )}
         </div>
       )}

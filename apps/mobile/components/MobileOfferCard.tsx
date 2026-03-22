@@ -1,3 +1,4 @@
+import type { Offer, ServiceCategory } from "@groupio/types";
 import React from "react";
 import { StyleSheet, View } from "react-native";
 import {
@@ -10,7 +11,6 @@ import {
   ProgressBar,
 } from "react-native-paper";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
-import type { Offer, ServiceCategory } from "@groupio/types";
 
 // Hebrew labels for service categories
 const CATEGORY_LABELS: Record<ServiceCategory, string> = {

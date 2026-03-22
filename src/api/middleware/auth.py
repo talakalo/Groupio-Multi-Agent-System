@@ -1,7 +1,9 @@
 """Authentication middleware for the API."""
 
+import hmac
 import logging
 from datetime import UTC, datetime, timedelta
+from uuid import uuid4
 
 import bcrypt
 import jwt
@@ -49,7 +51,12 @@ def create_access_token(
     role: UserRole,
     expires_delta: timedelta | None = None,
 ) -> str:
-    """Create a JWT access token."""
+    """Create a JWT access token.
+
+    Each token includes a unique *jti* (JWT ID) claim so it can be added to a
+    denylist (Redis) on logout or password change, enabling individual revocation
+    before the token's natural expiry.
+    """
     settings = get_settings()
 
     now = _utcnow()
@@ -65,6 +72,7 @@ def create_access_token(
         "exp": expire,
         "iat": now,
         "type": "access",
+        "jti": str(uuid4()),  # Unique token ID for revocation support
     }
 
     return jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
@@ -107,6 +115,7 @@ def verify_access_token(token: str) -> TokenPayload | None:
             role=UserRole(payload["role"]),
             exp=datetime.fromtimestamp(payload["exp"], tz=UTC),
             iat=datetime.fromtimestamp(payload["iat"], tz=UTC),
+            jti=payload.get("jti"),
         )
     except jwt.ExpiredSignatureError:
         logger.debug("Token expired")
@@ -158,6 +167,22 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    # Check token denylist (for revoked tokens — logout, password change)
+    if payload.jti:
+        try:
+            from src.databases.redis_client import get_redis_client
+            redis = get_redis_client()
+            if await redis.is_token_denylisted(payload.jti):
+                raise HTTPException(
+                    status_code=401,
+                    detail="Token has been revoked",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+        except HTTPException:
+            raise
+        except Exception as exc:
+            logger.warning("Redis unavailable for denylist check — allowing token: %s", exc)
+
     # Fetch user from database
     from src.databases.postgres import get_postgres_client
 
@@ -170,7 +195,25 @@ async def get_current_user(
     if not user.is_active:
         raise HTTPException(status_code=403, detail="User is disabled")
 
+    settings = get_settings()
+    if settings.ENFORCE_EMAIL_VERIFICATION and not user.is_verified:
+        raise HTTPException(status_code=403, detail="Email not verified. Please verify your email before continuing.")
+
     return user
+
+
+async def get_token_jti(
+    token: str | None = Depends(_get_token_from_header_or_cookie),
+) -> str | None:
+    """Extract JTI from the current access token (no DB lookup).
+
+    Used by logout and password-change to add the current token to the
+    denylist so it cannot be replayed after revocation.
+    """
+    if not token:
+        return None
+    payload = verify_access_token(token)
+    return payload.jti if payload else None
 
 
 async def get_current_active_user(
@@ -185,9 +228,40 @@ async def get_current_active_user(
 async def get_admin_user(
     current_user: UserInDB = Depends(get_current_user),
 ) -> UserInDB:
-    """Get current user and verify they have admin privileges."""
+    """Get current user and verify they have admin privileges.
+
+    Allows: admin, super_admin, buildings_manager.
+    Use ``get_buildings_manager_user`` for buildings-specific endpoints.
+    Use ``require_admin_only`` for sensitive admin ops (user mgmt, system settings, agents).
+    """
     if current_user.role not in (UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.BUILDINGS_MANAGER):
         raise HTTPException(status_code=403, detail="Admin access required")
+    return current_user
+
+
+async def get_buildings_manager_user(
+    current_user: UserInDB = Depends(get_current_user),
+) -> UserInDB:
+    """Get current user for buildings-specific endpoints.
+
+    Allows: buildings_manager, admin, super_admin.
+    Use for building management, building-scoped offers, etc.
+    """
+    if current_user.role not in (UserRole.BUILDINGS_MANAGER, UserRole.ADMIN, UserRole.SUPER_ADMIN):
+        raise HTTPException(status_code=403, detail="Buildings manager or admin access required")
+    return current_user
+
+
+async def require_admin_only(
+    current_user: UserInDB = Depends(get_current_user),
+) -> UserInDB:
+    """Get current user for admin-only endpoints (excludes buildings_manager).
+
+    Allows: admin, super_admin only.
+    Use for sensitive operations: user management, system settings, agent management.
+    """
+    if current_user.role not in (UserRole.ADMIN, UserRole.SUPER_ADMIN):
+        raise HTTPException(status_code=403, detail="Admin-only access required")
     return current_user
 
 
@@ -204,12 +278,14 @@ async def verify_api_key(
 
     settings = get_settings()
 
-    # Validate against configured API keys
+    # Validate against configured API keys using timing-safe comparison.
+    # The `in` operator short-circuits and leaks timing information; using
+    # hmac.compare_digest for each key prevents timing-oracle attacks.
     if not settings.API_KEYS:
         logger.warning("No API keys configured - rejecting request")
         raise HTTPException(status_code=401, detail="API key validation not configured")
 
-    if api_key not in settings.API_KEYS:
+    if not any(hmac.compare_digest(api_key, k) for k in settings.API_KEYS):
         logger.warning("Invalid API key attempted")
         raise HTTPException(status_code=401, detail="Invalid API key")
 

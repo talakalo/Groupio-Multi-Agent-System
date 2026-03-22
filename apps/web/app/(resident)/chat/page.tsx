@@ -4,8 +4,10 @@ import { useTranslations } from 'next-intl';
 
 import { AIChat } from '@/components/features/chat/AIChat';
 import { useAuthStore } from '@/lib/stores/authStore';
+import { unwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
 
-export default function ChatPage() {
+export default function ChatPage(props: PageParamsProps) {
+  unwrapPageParams(props);
   const t = useTranslations('chat');
   const user = useAuthStore((s) => s.user);
 

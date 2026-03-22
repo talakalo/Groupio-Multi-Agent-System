@@ -6,10 +6,11 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import create_engine, pool
 
-# Load environment variables
+# Load environment variables (matches Settings: .env, docker/.env)
 from dotenv import load_dotenv
 
 load_dotenv()
+load_dotenv("docker/.env")
 
 # Alembic Config object
 config = context.config
@@ -19,10 +20,25 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Database URL from environment
-database_url = os.getenv(
-    "DATABASE_URL",
-    os.getenv("SUPABASE_URL", "postgresql://postgres:postgres@localhost:5432/groupio"),
-)
+# Priority 1: DOCKER_POSTGRES_HOST set (e.g. running inside api container) — use postgres:5432
+# Priority 2: alembic.docker.ini (running from host) — use 127.0.0.1
+# Priority 3: DATABASE_URL
+_docker_host = os.getenv("DOCKER_POSTGRES_HOST", "")
+if _docker_host:
+    _user = os.getenv("DOCKER_POSTGRES_USER") or os.getenv("POSTGRES_USER", "postgres")
+    _pw = os.getenv("DOCKER_POSTGRES_PASSWORD") or os.getenv("POSTGRES_PASSWORD", "postgres")
+    _db = os.getenv("DOCKER_POSTGRES_DB") or os.getenv("POSTGRES_DB", "groupio")
+    database_url = f"postgresql://{_user}:{_pw}@{_docker_host}:5432/{_db}"
+elif "alembic.docker.ini" in (config.config_file_name or ""):
+    _user = os.getenv("POSTGRES_USER", "postgres")
+    _pw = os.getenv("POSTGRES_PASSWORD", "postgres")
+    _db = os.getenv("POSTGRES_DB", "groupio")
+    database_url = f"postgresql://{_user}:{_pw}@127.0.0.1:5432/{_db}"
+else:
+    database_url = os.getenv(
+        "DATABASE_URL",
+        os.getenv("SUPABASE_URL", "postgresql://postgres:postgres@localhost:5432/groupio"),
+    )
 
 # For Supabase, convert the URL format if needed
 if database_url.startswith("postgres://"):

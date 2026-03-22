@@ -1,3 +1,5 @@
+import type { Offer, OfferStatus, ServiceCategory } from "@groupio/types";
+import { useRouter } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
 import {
   View,
@@ -19,13 +21,12 @@ import {
   Snackbar,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
-import type { Offer, OfferStatus, ServiceCategory } from "@groupio/types";
 
-import { MobileOfferCard } from "../../components/MobileOfferCard";
 import { CategoryChip } from "../../components/CategoryChip";
+import { MobileOfferCard } from "../../components/MobileOfferCard";
 import { useOffers, useJoinOffer, useProfile } from "../../lib/hooks";
+import i18n from "../../lib/i18n";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -33,10 +34,10 @@ import { useOffers, useJoinOffer, useProfile } from "../../lib/hooks";
 
 type TabKey = "my" | "available" | "completed";
 
-const TABS: { value: TabKey; label: string }[] = [
-  { value: "my", label: "\u05D4\u05D4\u05E6\u05E2\u05D5\u05EA \u05E9\u05DC\u05D9" },
-  { value: "available", label: "\u05D6\u05DE\u05D9\u05E0\u05D5\u05EA" },
-  { value: "completed", label: "\u05D4\u05D5\u05E9\u05DC\u05DE\u05D5" },
+const TABS: { value: TabKey; labelKey: string }[] = [
+  { value: "my", labelKey: "offers.myOffers" },
+  { value: "available", labelKey: "offers.available" },
+  { value: "completed", labelKey: "offers.completed" },
 ];
 
 const ALL_CATEGORIES: (ServiceCategory | "all")[] = [
@@ -105,14 +106,10 @@ export default function OffersScreen() {
 
   const joinMutation = useJoinOffer({
     onSuccess: () => {
-      setJoinSnackbar(
-        "\u05D4\u05E6\u05D8\u05E8\u05E4\u05EA \u05DC\u05D4\u05E6\u05E2\u05D4 \u05D1\u05D4\u05E6\u05DC\u05D7\u05D4!",
-      );
+      setJoinSnackbar(i18n.t("offers.joinSuccess"));
     },
     onError: () => {
-      setJoinSnackbar(
-        "\u05DC\u05D0 \u05D4\u05E6\u05DC\u05D7\u05E0\u05D5 \u05DC\u05D4\u05E6\u05D8\u05E8\u05E3. \u05E0\u05E1\u05D4 \u05E9\u05D5\u05D1.",
-      );
+      setJoinSnackbar(i18n.t("offers.joinError"));
     },
   });
 
@@ -192,16 +189,16 @@ export default function OffersScreen() {
           style={[styles.emptyTitle, { color: theme.colors.onSurface }]}
         >
           {activeTab === "completed"
-            ? "\u05D0\u05D9\u05DF \u05D4\u05E6\u05E2\u05D5\u05EA \u05E9\u05D4\u05D5\u05E9\u05DC\u05DE\u05D5"
-            : "\u05D0\u05D9\u05DF \u05D4\u05E6\u05E2\u05D5\u05EA \u05D6\u05DE\u05D9\u05E0\u05D5\u05EA"}
+            ? i18n.t("offers.noCompleted")
+            : i18n.t("offers.noAvailable")}
         </Text>
         <Text
           variant="bodyMedium"
           style={[styles.emptySubtitle, { color: theme.colors.onSurfaceVariant }]}
         >
           {activeTab === "completed"
-            ? "\u05D4\u05E6\u05E2\u05D5\u05EA \u05E9\u05D4\u05D5\u05E9\u05DC\u05DE\u05D5 \u05D9\u05D5\u05E4\u05D9\u05E2\u05D5 \u05DB\u05D0\u05DF"
-            : "\u05E6\u05D5\u05E8 \u05D4\u05E6\u05E2\u05D4 \u05D7\u05D3\u05E9\u05D4 \u05DC\u05D1\u05E0\u05D9\u05D9\u05DF \u05E9\u05DC\u05DA"}
+            ? i18n.t("offers.completedWillAppear")
+            : i18n.t("offers.createNewForBuilding")}
         </Text>
       </View>
     ),
@@ -244,7 +241,7 @@ export default function OffersScreen() {
                   },
                 ]}
               >
-                {tab.label}
+                {i18n.t(tab.labelKey)}
               </Text>
             </Pressable>
           );
@@ -289,7 +286,7 @@ export default function OffersScreen() {
       {/* ---- FAB ---- */}
       <FAB
         icon="plus"
-        label={"\u05D4\u05E6\u05E2\u05D4 \u05D7\u05D3\u05E9\u05D4"}
+        label={i18n.t("offers.newOffer")}
         style={[
           styles.fab,
           { backgroundColor: theme.colors.primary },
@@ -306,7 +303,7 @@ export default function OffersScreen() {
         onDismiss={() => setJoinSnackbar(null)}
         duration={3000}
         action={{
-          label: "\u05E1\u05D2\u05D5\u05E8",
+          label: i18n.t("offers.close"),
           onPress: () => setJoinSnackbar(null),
         }}
       >

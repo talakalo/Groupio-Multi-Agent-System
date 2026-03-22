@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import React from 'react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ---- next/navigation mock ----
 const mockPush = vi.fn();
@@ -27,8 +27,9 @@ const mockLogout = vi.fn(() => Promise.resolve());
 
 vi.mock('@/lib/stores/authStore', () => ({
   useAuthStore: vi.fn((selector: (s: Record<string, unknown>) => unknown) =>
-    selector({ accessToken: mockAccessToken, logout: mockLogout })
+    selector({ accessToken: mockAccessToken, logout: mockLogout, isAuthenticated: !!mockAccessToken, user: { role: 'resident', isVerified: true } })
   ),
+  useAuthHasHydrated: vi.fn(() => true),
 }));
 
 import ResidentLayout from '../app/(resident)/layout';
@@ -42,9 +43,9 @@ describe('ResidentLayout — sidebar navigation links', () => {
   const EXPECTED_HREFS = [
     '/dashboard',
     '/offers',
-    '/contractors',
-    '/architecture',
+    '/orders',
     '/building',
+    '/contractors',
     '/profile',
     '/payments',
     '/chat',

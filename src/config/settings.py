@@ -81,6 +81,7 @@ class Settings(BaseSettings):
     PRICING_AGENT_MODE: str = "recommend"
     VETTING_AGENT_MODE: str = "recommend"
     OUTREACH_AGENT_MODE: str = "gated"
+    PAYMENT_AGENT_MODE: str = "gated"
 
     # Feature Flags
     ENABLE_WEB_SEARCH: bool = True
@@ -144,18 +145,43 @@ class Settings(BaseSettings):
     # FCM endpoint (override only for testing)
     FCM_ENDPOINT: str = "https://fcm.googleapis.com/fcm/send"
 
-    # Payment provider ("mock" for dev/demos, "stripe" or "payplus" for production)
+    # Payment provider ("mock" for dev/demos, "stripe" for production)
+    # Supported values: "mock" | "stripe" | "bit" | "paybox"
+    # "bit" and "paybox" require external merchant onboarding before use.
+    # See docs/PAYMENT_PROVIDER_ONBOARDING.md for instructions.
     PAYMENT_PROVIDER: str = "mock"
+
     # Stripe credentials (required when PAYMENT_PROVIDER=stripe)
     STRIPE_SECRET_KEY: str = ""
     STRIPE_PUBLISHABLE_KEY: str = ""
     # Stripe webhook signing secret (from Stripe Dashboard → Webhooks → Signing secret)
     # Used by POST /payments/webhook/stripe to verify authentic Stripe events.
     STRIPE_WEBHOOK_SECRET: str = ""
+
     # Shared HMAC webhook signing secret — must be set in non-dev environments
     # to prevent fraudulent webhook forgery. Generate with:
     #   python -c "import secrets; print(secrets.token_hex(32))"
     PAYMENT_WEBHOOK_SECRET: str = ""
+
+    # ── bit payment integration ──────────────────────────────────────────────
+    # NOT YET LIVE — requires onboarding with bit Israel (bit.co.il).
+    # Set ENABLE_BIT_PAYMENT=true only after completing merchant onboarding.
+    # See docs/PAYMENT_PROVIDER_ONBOARDING.md — section: "bit Integration".
+    ENABLE_BIT_PAYMENT: bool = False
+    BIT_API_KEY: str = ""
+    BIT_MERCHANT_ID: str = ""
+    # "sandbox" or "production"
+    BIT_ENVIRONMENT: str = "sandbox"
+
+    # ── PayBox payment integration ───────────────────────────────────────────
+    # NOT YET LIVE — requires onboarding with PayBox (payboxpayments.com / paybox.co.il).
+    # Set ENABLE_PAYBOX_PAYMENT=true only after completing merchant onboarding.
+    # See docs/PAYMENT_PROVIDER_ONBOARDING.md — section: "PayBox Integration".
+    ENABLE_PAYBOX_PAYMENT: bool = False
+    PAYBOX_TERMINAL: str = ""
+    PAYBOX_API_KEY: str = ""
+    # "sandbox" or "production"
+    PAYBOX_ENVIRONMENT: str = "sandbox"
 
     # Environment
     ENVIRONMENT: str = "development"
@@ -195,6 +221,14 @@ class Settings(BaseSettings):
                     "Set JWT_SECRET_KEY in .env to persist sessions across restarts."
                 )
             # Production case is already handled by the raise above.
+
+        # --- Email verification enforcement ---
+        if not self.ENFORCE_EMAIL_VERIFICATION and self.ENVIRONMENT not in ("development", "test"):
+            logger.warning(
+                "ENFORCE_EMAIL_VERIFICATION is disabled in %s. "
+                "Unverified users can log in. Enable it to protect the platform.",
+                self.ENVIRONMENT,
+            )
 
         # --- Required secrets in production ---
         if is_prod:

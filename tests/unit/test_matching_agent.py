@@ -13,9 +13,11 @@ def matching_agent():
     with (
         patch("src.agents.base.get_llm_client") as mock_llm,
         patch("src.agents.base.get_rag_pipeline") as mock_rag,
+        patch("src.agents.matching.get_graph_store") as mock_graph,
     ):
         mock_llm.return_value = AsyncMock()
         mock_rag.return_value = AsyncMock()
+        mock_graph.return_value = AsyncMock()
 
         agent = MatchingAgent()
         agent.llm_client = AsyncMock()

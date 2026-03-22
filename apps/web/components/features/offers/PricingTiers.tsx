@@ -116,6 +116,26 @@ export function PricingTiers({
         </div>
       </div>
 
+      {/* ---- Overall tier progression bar ---- */}
+      <div className="flex items-center gap-1">
+        {tiers.map((tier, idx) => {
+          const status = getTierStatus(tier, currentParticipants);
+          return (
+            <div
+              key={`prog-${idx}`}
+              className={cn(
+                'h-1.5 flex-1 rounded-full transition-all',
+                status === 'reached'
+                  ? 'bg-emerald-400'
+                  : status === 'current'
+                    ? 'bg-primary-500'
+                    : 'bg-gray-200',
+              )}
+            />
+          );
+        })}
+      </div>
+
       {/* ---- Tier cards ---- */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {tiers.map((tier, idx) => {
@@ -138,11 +158,14 @@ export function PricingTiers({
                     : 'border-gray-200 bg-white',
               )}
             >
-              {/* Current badge */}
+              {/* Current badge with pulse */}
               {isCurrent && (
-                <div className="absolute -top-3 start-1/2 -translate-x-1/2 rounded-full bg-primary-500 px-3 py-0.5 text-[11px] font-bold text-white">
-                  שלב נוכחי
-                </div>
+                <>
+                  <div className="absolute -inset-px rounded-2xl border-2 border-primary-400 animate-pulse pointer-events-none" />
+                  <div className="absolute -top-3 start-1/2 -translate-x-1/2 rounded-full bg-primary-500 px-3 py-0.5 text-[11px] font-bold text-white shadow-md shadow-primary-200">
+                    שלב נוכחי
+                  </div>
+                </>
               )}
 
               {/* Reached checkmark */}
@@ -198,16 +221,24 @@ export function PricingTiers({
 
       {/* ---- Progress to next tier ---- */}
       {nextTier && (
-        <div className="rounded-xl bg-gray-50 p-4">
+        <div className="rounded-xl border border-primary-200 bg-gradient-to-l from-primary-50 to-white p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary-100">
+              <Users className="h-4 w-4 text-primary-600" />
+            </div>
+            <p className="text-sm font-bold text-primary-700">
+              עוד {nextTier.min - currentParticipants} שכנים לרמה הבאה!
+            </p>
+          </div>
           <div className="flex items-center justify-between text-sm mb-2">
             <span className="font-medium text-gray-700">
-              עוד {nextTier.min - currentParticipants} {unitLabel} ל-{nextTier.discount}% הנחה
+              {nextTier.discount}% הנחה — {formatCurrency(nextTier.price)} ליחידה
             </span>
-            <span className="text-gray-500">
-              {formatCurrency(nextTier.price)} ליחידה
+            <span className="text-xs font-semibold text-primary-600">
+              {Math.round(progressToNext)}%
             </span>
           </div>
-          <div className="h-2.5 w-full overflow-hidden rounded-full bg-gray-200">
+          <div className="h-3 w-full overflow-hidden rounded-full bg-gray-200">
             <div
               className="h-full rounded-full bg-gradient-to-l from-primary-400 to-primary-600 transition-all duration-700 ease-out"
               style={{ width: `${progressToNext}%` }}
@@ -217,6 +248,15 @@ export function PricingTiers({
             <span>{currentParticipants} {unitLabel}</span>
             <span>{nextTier.min} {unitLabel}</span>
           </div>
+        </div>
+      )}
+
+      {/* All tiers reached */}
+      {!nextTier && activeTierIdx >= 0 && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-center">
+          <p className="text-sm font-bold text-emerald-700">
+            הגעתם לרמת ההנחה הגבוהה ביותר! 🎉
+          </p>
         </div>
       )}
 

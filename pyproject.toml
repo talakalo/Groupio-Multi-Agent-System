@@ -43,6 +43,7 @@ dependencies = [
     "structlog>=23.2.0",
     "bcrypt>=4.0.0",
     "stripe>=7.0.0",
+    "typing-extensions>=4.15.0",
 ]
 
 [project.optional-dependencies]
@@ -107,3 +108,11 @@ module = [
     "src.orchestration.graph",
 ]
 disable_error_code = ["return-value", "assignment", "arg-type", "attr-defined", "index", "union-attr", "dict-item", "typeddict-item", "misc"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+    "pytest-asyncio>=1.3.0",
+    "pytest-cov>=7.0.0",
+    "pytest-timeout>=2.4.0",
+]

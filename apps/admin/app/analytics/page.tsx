@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import { MetricCard } from '@/components/features/metrics/MetricCard';
+import { useState, useMemo } from 'react';
+
 import { AgentMetricsChart } from '@/components/features/metrics/AgentMetricsChart';
+import { MetricCard } from '@/components/features/metrics/MetricCard';
 import { useAdminAnalyticsDashboard } from '@/lib/hooks';
 
 interface AnalyticsData {

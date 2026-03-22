@@ -3,7 +3,7 @@
 from datetime import datetime
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 
 class UserRole(StrEnum):
@@ -25,11 +25,29 @@ class UserBase(BaseModel):
     preferred_language: str = Field(default="he", pattern=r"^(he|en)$")
 
 
+#: Roles that any member of the public may claim during self-registration.
+#: Privileged roles (admin, super_admin, buildings_manager) must be assigned
+#: through protected admin-only flows or internal seeding — never via public signup.
+SELF_REGISTERABLE_ROLES: frozenset[UserRole] = frozenset({UserRole.RESIDENT, UserRole.CONTRACTOR})
+
+# Keep the private alias for backwards compatibility inside this module.
+_SELF_REGISTERABLE_ROLES = SELF_REGISTERABLE_ROLES
+
+
 class UserCreate(UserBase):
     """Create user request."""
 
     password: str = Field(..., min_length=8)
     role: UserRole = UserRole.RESIDENT
+
+    @field_validator("role")
+    @classmethod
+    def _block_privileged_roles(cls, v: UserRole) -> UserRole:
+        if v not in SELF_REGISTERABLE_ROLES:
+            raise ValueError(
+                f"Cannot self-register with role '{v}'. Allowed: {', '.join(sorted(SELF_REGISTERABLE_ROLES))}"
+            )
+        return v
 
 
 class UserUpdate(BaseModel):
@@ -39,6 +57,7 @@ class UserUpdate(BaseModel):
     phone: str | None = Field(None, pattern=r"^0\d{8,9}$")
     preferred_language: str | None = Field(None, pattern=r"^(he|en)$")
     avatar_url: str | None = None
+    notification_settings: dict[str, bool] | None = None
 
 
 class UserInDB(UserBase):
@@ -54,6 +73,7 @@ class UserInDB(UserBase):
     building_id: str | None = None
     contractor_id: str | None = None
     last_login: datetime | None = None
+    notification_settings: dict[str, bool] | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -104,6 +124,7 @@ class TokenPayload(BaseModel):
     role: UserRole
     exp: datetime
     iat: datetime
+    jti: str | None = None  # JWT ID — used for token denylist (revocation)
 
 
 class PasswordReset(BaseModel):

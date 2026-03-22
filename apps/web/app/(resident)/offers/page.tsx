@@ -14,21 +14,28 @@ import {
   X,
   AlertCircle,
   Star,
+  ArrowUpDown,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useState, useMemo } from 'react';
 
+import { CategoryChips } from '@/components/shared/CategoryChips';
+import { EmptyState } from '@/components/shared/EmptyState';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
+import { unwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
+type SortOption = 'popularity' | 'new' | 'savings' | 'price';
+
 interface OffersFilters {
   search: string;
-  category: ServiceCategory | 'all';
+  category: string;
   status: OfferStatus | 'all';
   priceMin: number | null;
   priceMax: number | null;
@@ -69,6 +76,25 @@ const STATUS_COLORS: Record<OfferStatus, string> = {
   cancelled: 'bg-red-100 text-red-700',
   expired: 'bg-gray-100 text-gray-500',
 };
+
+const QUICK_CATEGORIES = [
+  { id: 'all', label: 'הכל' },
+  { id: 'renovations', label: 'שיפוצים' },
+  { id: 'plumbing', label: 'אינסטלציה' },
+  { id: 'electrical', label: 'חשמל' },
+  { id: 'waterproofing', label: 'איטום' },
+  { id: 'elevators', label: 'מעליות' },
+  { id: 'cleaning', label: 'ניקיון' },
+  { id: 'gardening', label: 'גינון' },
+  { id: 'ac_installation', label: 'מיזוג אוויר' },
+];
+
+const SORT_OPTIONS: { value: SortOption; label: string }[] = [
+  { value: 'popularity', label: 'פופולריות' },
+  { value: 'new', label: 'חדש' },
+  { value: 'savings', label: 'חיסכון' },
+  { value: 'price', label: 'מחיר' },
+];
 
 // ---------------------------------------------------------------------------
 // Offer Card
@@ -182,12 +208,14 @@ function OfferCard({ offer }: { offer: Offer }) {
 // Main page
 // ---------------------------------------------------------------------------
 
-export default function OffersListPage() {
+export default function OffersListPage(props: PageParamsProps) {
+  unwrapPageParams(props);
   const t = useTranslations('offers');
   const tCat = useTranslations('categories');
   const tCommon = useTranslations('common');
 
   const [showFilters, setShowFilters] = useState(false);
+  const [sortBy, setSortBy] = useState<SortOption>('popularity');
   const [filters, setFilters] = useState<OffersFilters>({
     search: '',
     category: 'all',
@@ -238,8 +266,27 @@ export default function OffersListPage() {
       });
     }
 
-    return results;
-  }, [offersQuery.data, filters.search, filters.priceMin, filters.priceMax]);
+    return [...results].sort((a, b) => {
+      switch (sortBy) {
+        case 'popularity':
+          return b.participants - a.participants;
+        case 'new':
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        case 'savings': {
+          const discA = a.tiers[a.currentTier]?.discount ?? 0;
+          const discB = b.tiers[b.currentTier]?.discount ?? 0;
+          return discB - discA;
+        }
+        case 'price': {
+          const priceA = a.tiers[a.currentTier]?.price ?? a.basePrice;
+          const priceB = b.tiers[b.currentTier]?.price ?? b.basePrice;
+          return priceA - priceB;
+        }
+        default:
+          return 0;
+      }
+    });
+  }, [offersQuery.data, filters.search, filters.priceMin, filters.priceMax, sortBy]);
 
   const activeFilterCount = [
     filters.category !== 'all',
@@ -264,7 +311,15 @@ export default function OffersListPage() {
         </div>
       </div>
 
-      {/* Search + filter bar */}
+      {/* Category chips */}
+      <CategoryChips
+        categories={QUICK_CATEGORIES}
+        selected={filters.category}
+        onSelect={(id) => setFilters((prev) => ({ ...prev, category: id }))}
+        className="mb-6"
+      />
+
+      {/* Search + sort + filter bar */}
       <div className="flex items-center gap-3 mb-6">
         <div className="relative flex-1">
           <Search className="absolute top-3 end-3 h-5 w-5 text-gray-400" />
@@ -275,6 +330,18 @@ export default function OffersListPage() {
             placeholder={tCommon('search')}
             className="input-field pe-11"
           />
+        </div>
+        <div className="relative">
+          <ArrowUpDown className="absolute top-3 start-3 h-4 w-4 text-gray-400 pointer-events-none" />
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as SortOption)}
+            className="appearance-none ps-9 pe-4 py-3 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 bg-white hover:border-gray-300 transition-colors cursor-pointer"
+          >
+            {SORT_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
         </div>
         <button
           type="button"
@@ -323,7 +390,7 @@ export default function OffersListPage() {
                 onChange={(e) =>
                   setFilters((prev) => ({
                     ...prev,
-                    category: e.target.value as ServiceCategory | 'all',
+                    category: e.target.value,
                   }))
                 }
                 className="input-field"
@@ -426,16 +493,9 @@ export default function OffersListPage() {
 
       {/* Offers grid */}
       {offersQuery.isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="card animate-pulse">
-              <div className="flex gap-2 mb-3">
-                <div className="h-5 bg-gray-200 rounded-full w-20" />
-                <div className="h-5 bg-gray-200 rounded-full w-16" />
-              </div>
-              <div className="h-6 bg-gray-200 rounded w-32 mb-2" />
-              <div className="h-4 bg-gray-200 rounded w-48" />
-            </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} variant="card" />
           ))}
         </div>
       ) : offersQuery.isError ? (
@@ -457,15 +517,30 @@ export default function OffersListPage() {
           ))}
         </div>
       ) : (
-        <div className="card text-center py-16">
-          <Tag className="h-16 w-16 text-gray-200 mx-auto mb-4" />
-          <p className="text-gray-500 text-lg font-medium mb-2">{t('noOffers')}</p>
-          <p className="text-gray-400 text-sm mb-6">{t('noOffersDescription')}</p>
+        <div className="card">
+          <EmptyState
+            icon={Tag}
+            title={t('noOffers')}
+            description={
+              activeFilterCount > 0
+                ? t('noOffersDescription') + ' נסו לנקות את הסינון.'
+                : t('noOffersDescription')
+            }
+            action={
+              activeFilterCount > 0 ? undefined : { label: 'גלו הצעות', href: '/offers' }
+            }
+          />
           {activeFilterCount > 0 && (
-            <button type="button" onClick={clearFilters} className="btn-secondary inline-flex items-center gap-2">
-              <X className="h-4 w-4" />
-              <span>{t('clearFilters')}</span>
-            </button>
+            <div className="flex justify-center -mt-4 pb-4">
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="btn-secondary inline-flex items-center gap-2"
+              >
+                <X className="h-4 w-4" />
+                <span>{t('clearFilters')}</span>
+              </button>
+            </div>
           )}
         </div>
       )}

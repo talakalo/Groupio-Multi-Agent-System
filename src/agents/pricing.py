@@ -6,11 +6,11 @@ from typing import Any
 
 from src.agents.base import AgentConfig, BaseAgent
 from src.config.prompts.pricing import PRICING_SYSTEM_PROMPT
-from src.config.settings import get_settings
 from src.databases.graph_store import get_graph_store
 from src.databases.postgres import get_postgres_client
 from src.models.agent_state import AgentState
 from src.models.offer import SEASONALITY_FACTORS
+from src.services.agent_config import get_agent_mode
 from src.utils.hebrew_utils import translate_category
 from src.utils.monitoring import track_agent_execution
 
@@ -58,7 +58,7 @@ class PricingAgent(BaseAgent):
         )
 
     @track_agent_execution("pricing")
-    async def run(self, state: AgentState) -> AgentState:
+    async def _run_impl(self, state: AgentState) -> AgentState:
         """Analyze pricing and generate tier recommendations."""
         user_message = self._get_last_user_message(state)
         context_next = state.get("context_for_next_agent") or {}
@@ -192,9 +192,9 @@ class PricingAgent(BaseAgent):
                 logger.warning("Failed to generate/store pricing rationale")
 
         # Task 3.1 — Autonomy mode: in recommend mode, flag for human confirmation
-        settings = get_settings()
-        if settings.PRICING_AGENT_MODE in ("recommend", "gated"):
-            reason = f"Pricing results require admin confirmation (mode={settings.PRICING_AGENT_MODE})"
+        mode = await get_agent_mode("pricing")
+        if mode in ("recommend", "gated"):
+            reason = f"Pricing results require admin confirmation (mode={mode})"
             state["needs_human"] = True
             state["escalation_reason"] = reason
             if state["actions_taken"]:
@@ -207,7 +207,7 @@ class PricingAgent(BaseAgent):
                     "offer_id": last_action.get("offer_id", ""),
                     "recommended_price": last_action.get("recommended_price"),
                     "price_range": last_action.get("price_range"),
-                    "mode": settings.PRICING_AGENT_MODE,
+                    "mode": mode,
                 },
                 escalation_reason=reason,
             )

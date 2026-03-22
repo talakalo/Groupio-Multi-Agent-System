@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import React from 'react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ---- next/navigation mock ----
 const mockPush = vi.fn();
@@ -26,8 +26,9 @@ const mockLogout = vi.fn(() => Promise.resolve());
 
 vi.mock('@/lib/stores/authStore', () => ({
   useAuthStore: vi.fn((selector: (s: Record<string, unknown>) => unknown) =>
-    selector({ accessToken: mockAccessToken, logout: mockLogout })
+    selector({ accessToken: mockAccessToken, logout: mockLogout, user: { role: 'contractor' } })
   ),
+  useAuthHasHydrated: vi.fn(() => true),
 }));
 
 import ContractorLayout from '../app/contractor/layout';

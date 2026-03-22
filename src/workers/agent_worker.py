@@ -16,6 +16,7 @@ import structlog
 
 from src.agents.router import RouterAgent
 from src.config.settings import get_settings
+from src.models.agent_state import AgentState
 
 logger = structlog.get_logger(__name__)
 
@@ -84,12 +85,18 @@ class AgentWorker:
             if self.router_agent is None:
                 raise RuntimeError("Router agent not initialized")
 
-            result = await self.router_agent.run(
-                message=message,
-                user_id=user_id,
-                session_id=session_id,
-                context=context,
-            )
+            state: AgentState = {  # type: ignore[typeddict-item]
+                "messages": [{"role": "user", "content": message}] if message else [],
+                "user_id": user_id or "",
+                "building_id": None,
+                "conversation_id": session_id or "",
+                "current_agent": "router",
+                "intent": None,
+                "confidence": 0.0,
+                "context": context,
+                "actions_taken": [],
+            }
+            result = await self.router_agent.run(state)
 
             return {
                 "task_id": task_id,

@@ -1,6 +1,21 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+// Mock next-intl (AIChat uses useTranslations)
+vi.mock("next-intl", () => ({
+  useTranslations: () => (key: string) => {
+    const chat: Record<string, string> = {
+      placeholder: "הקלד הודעה...",
+      welcome: "היי! 👋 אני העוזר הדיגיטלי של גרופיו. איך אוכל לעזור?",
+      "defaultSuggestions.findOffers": "מצא לי הצעות",
+      "defaultSuggestions.orderStatus": "מה סטטוס ההזמנה שלי",
+      "defaultSuggestions.talkToAgent": "דבר עם נציג",
+    };
+    return chat[key] ?? key;
+  },
+}));
+
 import { AIChat } from "../components/features/chat/AIChat";
 
 // Mock fetch

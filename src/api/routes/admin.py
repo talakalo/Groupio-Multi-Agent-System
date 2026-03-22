@@ -10,7 +10,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, model_validator
 
 from src.api.middleware.auth import get_admin_user, hash_password
 from src.databases.postgres import get_postgres_client
@@ -26,9 +26,20 @@ logger = logging.getLogger(__name__)
 # --------------- Pydantic request models ---------------
 
 
+_VALID_USER_ROLES = {"resident", "contractor", "admin", "buildings_manager", "super_admin"}
+# Roles that can be assigned by a regular admin (not super_admin)
+_ADMIN_ASSIGNABLE_ROLES = {"resident", "contractor", "admin", "buildings_manager"}
+
+
 class AdminUserUpdate(BaseModel):
     role: str | None = None
     is_active: bool | None = None
+
+    @model_validator(mode="after")
+    def _validate_role(self) -> "AdminUserUpdate":
+        if self.role is not None and self.role not in _VALID_USER_ROLES:
+            raise ValueError(f"Invalid role '{self.role}'. Valid roles: {sorted(_VALID_USER_ROLES)}")
+        return self
 
 
 class AdminUserCreate(BaseModel):
@@ -37,6 +48,12 @@ class AdminUserCreate(BaseModel):
     phone: str
     password: str
     role: str = "admin"
+
+    @model_validator(mode="after")
+    def _validate_role(self) -> "AdminUserCreate":
+        if self.role not in _VALID_USER_ROLES:
+            raise ValueError(f"Invalid role '{self.role}'. Valid roles: {sorted(_VALID_USER_ROLES)}")
+        return self
 
 
 class ForceCancelRequest(BaseModel):
@@ -235,6 +252,12 @@ async def update_user(
     db = get_postgres_client()
     update_data: dict[str, Any] = {}
     if body.role is not None:
+        # Only super_admin can assign the super_admin role (privilege escalation guard)
+        if body.role == "super_admin" and admin.role not in ("super_admin",):
+            raise HTTPException(
+                status_code=403,
+                detail="Only super_admin can assign the super_admin role.",
+            )
         update_data["role"] = body.role
     if body.is_active is not None:
         update_data["is_active"] = body.is_active
@@ -262,6 +285,12 @@ async def create_admin_user(
     admin: UserInDB = Depends(get_admin_user),
 ) -> dict[str, Any]:
     """Create a new admin / staff user."""
+    # Only super_admin can create super_admin users (privilege escalation guard)
+    if body.role == "super_admin" and admin.role not in ("super_admin",):
+        raise HTTPException(
+            status_code=403,
+            detail="Only super_admin can create super_admin users.",
+        )
     db = get_postgres_client()
     user_id = str(uuid4())
     hashed = hash_password(body.password)
@@ -924,15 +953,28 @@ async def list_agent_audit(
 async def get_agent_autonomy_modes(
     admin: UserInDB = Depends(get_admin_user),
 ) -> dict[str, Any]:
-    """Return current autonomy mode for each agent."""
+    """Return current autonomy mode for each agent.
+
+    Reads from system_settings DB first (so admin UI changes take effect
+    immediately without restart), falling back to env-based defaults.
+    """
     from src.config.settings import get_settings
 
-    settings = get_settings()
+    env_settings = get_settings()
+    db = get_postgres_client()
+    rows = await db.get_system_settings()
+    db_map = {row["key"]: row["value"] for row in rows}
+
+    def _mode(key: str, env_default: str) -> str:
+        val = db_map.get(key)
+        return val if isinstance(val, str) and val else env_default
+
     return {
-        "matching": settings.MATCHING_AGENT_MODE,
-        "pricing": settings.PRICING_AGENT_MODE,
-        "vetting": settings.VETTING_AGENT_MODE,
-        "outreach": settings.OUTREACH_AGENT_MODE,
+        "matching": _mode("MATCHING_AGENT_MODE", env_settings.MATCHING_AGENT_MODE),
+        "pricing": _mode("PRICING_AGENT_MODE", env_settings.PRICING_AGENT_MODE),
+        "vetting": _mode("VETTING_AGENT_MODE", env_settings.VETTING_AGENT_MODE),
+        "outreach": _mode("OUTREACH_AGENT_MODE", env_settings.OUTREACH_AGENT_MODE),
+        "payment": _mode("PAYMENT_AGENT_MODE", env_settings.PAYMENT_AGENT_MODE),
     }
 
 
@@ -960,13 +1002,18 @@ async def approve_pending_decision(
     note: str = "",
     admin: UserInDB = Depends(get_admin_user),
 ) -> dict[str, Any]:
-    """Approve a pending agent decision."""
+    """Approve a pending agent decision.
+
+    For action_type='refund_request', executes the refund exactly once (idempotent).
+    Writes a formal audit_log entry for the approval and for any refund execution.
+    """
     db = get_postgres_client()
     entry = await db.get_pending_decision(decision_id)
     if not entry:
         raise HTTPException(status_code=404, detail="Pending decision not found")
     if entry.get("status") != "pending":
         raise HTTPException(status_code=409, detail=f"Decision already resolved: {entry['status']}")
+
     updated = await db.update_pending_decision(
         decision_id,
         {
@@ -977,6 +1024,114 @@ async def approve_pending_decision(
         },
     )
     logger.info("Admin %s approved decision %s (agent=%s)", admin.id, decision_id, entry.get("agent_name"))
+
+    # Formal audit log for the approval decision
+    await db.create_audit_log(
+        {
+            "user_id": admin.id,
+            "action": "approve_pending_decision",
+            "resource_type": "pending_decisions",
+            "resource_id": decision_id,
+            "details": {
+                "agent_name": entry.get("agent_name"),
+                "action_type": entry.get("action_type"),
+                "decision_note": note,
+            },
+        }
+    )
+
+    # Execute the downstream action for refund_request approvals
+    if entry.get("action_type") == "refund_request":
+        payload = entry.get("payload") or {}
+        payment_id = payload.get("payment_id")
+        transaction_id = payload.get("transaction_id")
+        amount = payload.get("amount")
+
+        if payment_id:
+            # Idempotency guard: skip if payment already refunded
+            payment = await db.get_payment(payment_id)
+            if payment and payment.get("status") == "refunded":
+                logger.info(
+                    "Admin %s: decision %s — payment %s already refunded, skipping execution",
+                    admin.id,
+                    decision_id,
+                    payment_id,
+                )
+            else:
+                try:
+                    from src.services.payment import get_payment_provider
+
+                    provider = get_payment_provider()
+                    refund_txn_id = transaction_id or payment_id
+                    refund_result = await provider.refund(transaction_id=refund_txn_id, amount=amount)
+
+                    await db.update_payment(payment_id, {"status": refund_result.get("status", "refunded")})
+                    if payment and payment.get("invoice_id"):
+                        await db.update_invoice(payment["invoice_id"], {"status": "refunded"})
+
+                    await db.create_audit_log(
+                        {
+                            "user_id": admin.id,
+                            "action": "refund_executed",
+                            "resource_type": "payments",
+                            "resource_id": payment_id,
+                            "details": {
+                                "decision_id": decision_id,
+                                "refund_id": refund_result.get("refund_id"),
+                                "amount": amount,
+                                "provider_status": refund_result.get("status"),
+                            },
+                        }
+                    )
+                    logger.info(
+                        "Admin %s: refund executed — decision=%s payment=%s refund_id=%s",
+                        admin.id,
+                        decision_id,
+                        payment_id,
+                        refund_result.get("refund_id"),
+                    )
+                except Exception as exc:
+                    logger.error(
+                        "Admin %s: refund execution failed — decision=%s payment=%s error=%s",
+                        admin.id,
+                        decision_id,
+                        payment_id,
+                        exc,
+                    )
+                    await db.create_audit_log(
+                        {
+                            "user_id": admin.id,
+                            "action": "refund_execution_failed",
+                            "resource_type": "payments",
+                            "resource_id": payment_id,
+                            "details": {
+                                "decision_id": decision_id,
+                                "error": str(exc),
+                            },
+                        }
+                    )
+        else:
+            logger.warning(
+                "Admin %s: approved refund_request decision %s has no payment_id in payload",
+                admin.id,
+                decision_id,
+            )
+            await db.create_audit_log(
+                {
+                    "user_id": admin.id,
+                    "action": "refund_skipped_no_payment_id",
+                    "resource_type": "pending_decisions",
+                    "resource_id": decision_id,
+                    "details": {
+                        "decision_id": decision_id,
+                        "reason": "payload missing payment_id; refund not executed",
+                        "payload": payload,
+                    },
+                }
+            )
+            updated["refund_skipped"] = True
+            updated["refund_skip_reason"] = "payload missing payment_id"
+
     return updated
 
 
@@ -986,7 +1141,10 @@ async def reject_pending_decision(
     note: str = "",
     admin: UserInDB = Depends(get_admin_user),
 ) -> dict[str, Any]:
-    """Reject a pending agent decision."""
+    """Reject a pending agent decision. No downstream action is executed.
+
+    Writes a formal audit_log entry for the rejection.
+    """
     db = get_postgres_client()
     entry = await db.get_pending_decision(decision_id)
     if not entry:
@@ -1003,6 +1161,22 @@ async def reject_pending_decision(
         },
     )
     logger.info("Admin %s rejected decision %s (agent=%s)", admin.id, decision_id, entry.get("agent_name"))
+
+    # Formal audit log for the rejection decision
+    await db.create_audit_log(
+        {
+            "user_id": admin.id,
+            "action": "reject_pending_decision",
+            "resource_type": "pending_decisions",
+            "resource_id": decision_id,
+            "details": {
+                "agent_name": entry.get("agent_name"),
+                "action_type": entry.get("action_type"),
+                "decision_note": note,
+            },
+        }
+    )
+
     return updated
 
 

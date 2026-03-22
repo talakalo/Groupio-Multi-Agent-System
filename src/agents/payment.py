@@ -78,7 +78,7 @@ class PaymentAgent(BaseAgent):
         super().__init__(config)
 
     @track_agent_execution("payment")
-    async def run(self, state: AgentState) -> AgentState:
+    async def _run_impl(self, state: AgentState) -> AgentState:
         """Route to the appropriate sub-handler based on payment sub-intent."""
         user_message = self._get_last_user_message(state)
         sub_intent = _detect_sub_intent(user_message)
@@ -199,7 +199,96 @@ class PaymentAgent(BaseAgent):
         return state
 
     async def _handle_refund_request(self, state: AgentState, user_id: str, user_message: str) -> AgentState:
-        """Handle refund requests — attempt automatic refund, escalate only if unresolvable."""
+        """Handle refund requests — gated by PAYMENT_AGENT_MODE.
+
+        auto:            attempt the refund immediately, escalate to support if it fails.
+        recommend/gated: queue a pending decision for admin review; no money moves yet.
+
+        Mode is read from system_settings DB first (reflects live admin UI changes),
+        falling back to the env-based Settings singleton.
+        """
+        from src.config.settings import get_settings
+
+        env_settings = get_settings()
+        mode = env_settings.PAYMENT_AGENT_MODE
+        try:
+            db = get_postgres_client()
+            rows = await db.get_system_settings()
+            db_map = {row["key"]: row["value"] for row in rows}
+            db_mode = db_map.get("PAYMENT_AGENT_MODE")
+            if isinstance(db_mode, str) and db_mode:
+                mode = db_mode
+        except Exception as exc:
+            logger.warning("PaymentAgent: failed to read PAYMENT_AGENT_MODE from system_settings, using env: %s", exc)
+
+        if mode in ("recommend", "gated"):
+            return await self._handle_refund_gated(state, user_id, user_message, mode)
+        return await self._handle_refund_auto(state, user_id, user_message)
+
+    async def _handle_refund_gated(
+        self, state: AgentState, user_id: str, user_message: str, mode: str
+    ) -> AgentState:
+        """Queue a refund request for admin approval without moving any money."""
+        db = get_postgres_client()
+        payments = await db.list_payments_for_user(user_id)
+        candidate = next((p for p in payments if p.get("status") == "succeeded"), None)
+
+        reason = f"Refund request requires admin approval (mode={mode})"
+        state["needs_human"] = True
+        state["escalation_reason"] = reason
+
+        action_entry: dict[str, Any] = {
+            "agent": "payment",
+            "action": "refund_queued",
+            "details": {
+                "user_id": user_id,
+                "payment_id": candidate["id"] if candidate else None,
+                "amount": candidate.get("amount") if candidate else None,
+                "mode": mode,
+            },
+            "response": {"type": "refund_pending", "message": ""},
+            "requires_followup": True,
+            "requires_human_confirmation": True,
+            "summary_for_next_agent": "Refund queued for admin approval.",
+        }
+        state["actions_taken"] = [action_entry]
+
+        await self._enqueue_pending_decision(
+            state=state,
+            action_type="refund_request",
+            payload={
+                "user_id": user_id,
+                "payment_id": candidate["id"] if candidate else None,
+                "transaction_id": (candidate.get("transaction_id") or candidate.get("id")) if candidate else None,
+                "amount": candidate.get("amount") if candidate else None,
+                "mode": mode,
+            },
+            escalation_reason=reason,
+        )
+        logger.info(
+            "PaymentAgent: refund queued for admin approval user=%s mode=%s payment=%s",
+            user_id,
+            mode,
+            candidate["id"] if candidate else "none",
+        )
+
+        system_prompt = self._build_system_prompt(state)
+        llm_note = (
+            f"{user_message}\n\n--- Note ---\n"
+            "Your refund request has been received and is pending admin review. "
+            "Please inform the user in Hebrew that their refund request is being processed "
+            "and they will be notified once approved."
+        )
+        result_llm = await self._call_llm(
+            messages=[{"role": "user", "content": llm_note}],
+            system=system_prompt,
+        )
+        response_text = self._extract_text(result_llm)
+        state["actions_taken"][0]["response"]["message"] = response_text
+        return state
+
+    async def _handle_refund_auto(self, state: AgentState, user_id: str, user_message: str) -> AgentState:
+        """Attempt automatic refund; escalate to support only if the provider call fails."""
         db = get_postgres_client()
         refund_result: dict[str, Any] | None = None
         refund_error: str | None = None

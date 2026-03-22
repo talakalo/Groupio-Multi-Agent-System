@@ -1,4 +1,14 @@
-"""Abstract payment service with a mock provider for development."""
+"""Payment service — provider abstraction for Stripe, bit, PayBox, and mock.
+
+Provider selection is controlled by the ``PAYMENT_PROVIDER`` environment variable:
+  - ``mock``   — MockPaymentProvider (development / demo only)
+  - ``stripe`` — StripePaymentProvider (credit card via Stripe)
+  - ``bit``    — BitPaymentProvider (Israeli mobile payment — REQUIRES onboarding)
+  - ``paybox`` — PayBoxPaymentProvider (Israeli online payment — REQUIRES onboarding)
+
+See docs/PAYMENT_PROVIDER_ONBOARDING.md for how to obtain credentials and go live
+with bit or PayBox.
+"""
 
 import logging
 from abc import ABC, abstractmethod
@@ -237,6 +247,205 @@ class StripePaymentProvider(PaymentProvider):
 
 
 # ------------------------------------------------------------------
+# BitPaymentProvider — Israeli mobile payment via bit
+# ------------------------------------------------------------------
+# STATUS: NOT YET LIVE — requires onboarding with bit Israel (bit.co.il)
+#
+# bit is a mobile payment platform operated by Bank Hapoalim (Israel).
+# It is widely used for peer-to-peer and merchant payments in Israel.
+#
+# Integration pattern for Groupio:
+#   1. Merchant registers at https://www.bitpay.co.il/merchant
+#   2. Merchant receives BIT_MERCHANT_ID and BIT_API_KEY
+#   3. Payment flow: create_charge() returns a payment_link (deep-link / QR)
+#   4. Resident opens link in bit mobile app to approve payment
+#   5. bit sends a webhook (callback) to /payments/webhook with the result
+#
+# To enable: set ENABLE_BIT_PAYMENT=true + BIT_MERCHANT_ID + BIT_API_KEY in .env
+# See docs/PAYMENT_PROVIDER_ONBOARDING.md for full details.
+# ------------------------------------------------------------------
+
+
+class BitPaymentProvider(PaymentProvider):
+    """bit payment provider (Israeli mobile payment).
+
+    This provider is ARCHITECTURE-READY but NOT YET LIVE.
+    Real API credentials from bit Israel are required before any payment
+    can be processed. Do NOT set PAYMENT_PROVIDER=bit in production until
+    the full onboarding (docs/PAYMENT_PROVIDER_ONBOARDING.md) is complete.
+
+    Expected bit API contract (subject to change upon onboarding):
+      - POST /v1/payments  → creates payment request, returns payment_link + reference
+      - GET  /v1/payments/{reference}  → returns current payment status
+      - Webhook: bit POSTs to your callback_url on payment events
+
+    Pending tasks before going live:
+      [ ] Complete merchant registration at https://www.bitpay.co.il/merchant
+      [ ] Obtain BIT_MERCHANT_ID and BIT_API_KEY credentials
+      [ ] Confirm exact bit REST API endpoint URL and auth scheme
+      [ ] Implement HMAC-SHA256 signature verification on bit webhook callbacks
+      [ ] Test full payment round-trip in bit sandbox environment
+      [ ] Add bit deeplink / QR code display in checkout UI
+      [ ] Register webhook callback URL in bit merchant dashboard
+    """
+
+    def __init__(self, api_key: str, merchant_id: str, environment: str = "sandbox") -> None:
+        self._api_key = api_key
+        self._merchant_id = merchant_id
+        self._base_url = (
+            "https://sandbox.bitpay.co.il/api"
+            if environment == "sandbox"
+            else "https://api.bitpay.co.il/api"
+        )
+        logger.info("BitPaymentProvider initialized (environment=%s)", environment)
+
+    async def create_charge(
+        self,
+        amount: float,
+        currency: str,
+        customer_id: str,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Initiate a bit payment request.
+
+        Returns a dict with ``payment_link`` (deep-link URL the resident opens
+        in the bit app), ``transaction_id`` (provider reference), and ``status``.
+
+        NOTE: This method raises NotImplementedError until real API credentials
+        are obtained and the full integration is implemented.
+        See docs/PAYMENT_PROVIDER_ONBOARDING.md — section "bit Integration".
+        """
+        raise NotImplementedError(
+            "BitPaymentProvider.create_charge is not yet implemented. "
+            "Complete bit merchant onboarding and implement the REST API call. "
+            "See docs/PAYMENT_PROVIDER_ONBOARDING.md."
+        )
+
+    async def refund(self, transaction_id: str, amount: float | None = None) -> dict[str, Any]:
+        """Issue a bit payment refund.
+
+        NOTE: bit refund flow depends on the merchant API contract.
+        Implement after completing onboarding.
+        """
+        raise NotImplementedError(
+            "BitPaymentProvider.refund is not yet implemented. "
+            "See docs/PAYMENT_PROVIDER_ONBOARDING.md."
+        )
+
+    async def get_status(self, transaction_id: str) -> dict[str, Any]:
+        """Retrieve the current status of a bit payment request."""
+        raise NotImplementedError(
+            "BitPaymentProvider.get_status is not yet implemented. "
+            "See docs/PAYMENT_PROVIDER_ONBOARDING.md."
+        )
+
+    async def create_customer(self, user_id: str, email: str) -> str:
+        """bit does not have a customer registration step.
+
+        Returns the user_id directly as the customer identifier.
+        """
+        return user_id
+
+
+# ------------------------------------------------------------------
+# PayBoxPaymentProvider — PayBox online/redirect payment
+# ------------------------------------------------------------------
+# STATUS: NOT YET LIVE — requires onboarding with PayBox (payboxpayments.com)
+#
+# PayBox is an Israeli online payment gateway supporting credit cards,
+# installments, and alternative payment methods.
+#
+# Integration pattern for Groupio:
+#   1. Merchant registers at https://payboxpayments.com or https://paybox.co.il
+#   2. Merchant receives PAYBOX_TERMINAL (terminal ID) and PAYBOX_API_KEY
+#   3. Payment flow: create_charge() creates a hosted payment page URL
+#   4. Resident is redirected to PayBox hosted page to complete payment
+#   5. PayBox redirects back to success_url / cancel_url
+#   6. PayBox sends a webhook to /payments/webhook with confirmation
+#
+# To enable: set ENABLE_PAYBOX_PAYMENT=true + PAYBOX_TERMINAL + PAYBOX_API_KEY in .env
+# See docs/PAYMENT_PROVIDER_ONBOARDING.md for full details.
+# ------------------------------------------------------------------
+
+
+class PayBoxPaymentProvider(PaymentProvider):
+    """PayBox payment provider (Israeli online payment gateway).
+
+    This provider is ARCHITECTURE-READY but NOT YET LIVE.
+    Real API credentials from PayBox are required before any payment
+    can be processed. Do NOT set PAYMENT_PROVIDER=paybox in production until
+    the full onboarding (docs/PAYMENT_PROVIDER_ONBOARDING.md) is complete.
+
+    Expected PayBox API contract (subject to change upon onboarding):
+      - POST /api/Transaction/Payment  → creates hosted payment, returns checkout_url
+      - GET  /api/Transaction/GetTransaction?terminal=X&id=Y  → status check
+      - Webhook: PayBox POSTs to your success_url / notify_url on completion
+
+    Pending tasks before going live:
+      [ ] Complete merchant registration at https://payboxpayments.com
+      [ ] Obtain PAYBOX_TERMINAL (terminal ID) and PAYBOX_API_KEY credentials
+      [ ] Confirm exact PayBox REST API base URL for sandbox vs production
+      [ ] Implement HMAC verification on PayBox callback/webhook
+      [ ] Test full redirect round-trip in PayBox sandbox environment
+      [ ] Add redirect + return handling in checkout page
+      [ ] Register success/cancel/notify URLs in PayBox merchant settings
+    """
+
+    def __init__(self, terminal: str, api_key: str, environment: str = "sandbox") -> None:
+        self._terminal = terminal
+        self._api_key = api_key
+        self._base_url = (
+            "https://sandbox.payboxpayments.com/api"
+            if environment == "sandbox"
+            else "https://api.payboxpayments.com/api"
+        )
+        logger.info("PayBoxPaymentProvider initialized (environment=%s)", environment)
+
+    async def create_charge(
+        self,
+        amount: float,
+        currency: str,
+        customer_id: str,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Create a PayBox hosted payment page.
+
+        Returns a dict with ``checkout_url`` (the URL the resident is redirected to),
+        ``transaction_id`` (PayBox reference), and ``status``.
+
+        NOTE: This method raises NotImplementedError until real API credentials
+        are obtained and the full integration is implemented.
+        See docs/PAYMENT_PROVIDER_ONBOARDING.md — section "PayBox Integration".
+        """
+        raise NotImplementedError(
+            "PayBoxPaymentProvider.create_charge is not yet implemented. "
+            "Complete PayBox merchant onboarding and implement the REST API call. "
+            "See docs/PAYMENT_PROVIDER_ONBOARDING.md."
+        )
+
+    async def refund(self, transaction_id: str, amount: float | None = None) -> dict[str, Any]:
+        """Issue a PayBox refund."""
+        raise NotImplementedError(
+            "PayBoxPaymentProvider.refund is not yet implemented. "
+            "See docs/PAYMENT_PROVIDER_ONBOARDING.md."
+        )
+
+    async def get_status(self, transaction_id: str) -> dict[str, Any]:
+        """Retrieve the current status of a PayBox transaction."""
+        raise NotImplementedError(
+            "PayBoxPaymentProvider.get_status is not yet implemented. "
+            "See docs/PAYMENT_PROVIDER_ONBOARDING.md."
+        )
+
+    async def create_customer(self, user_id: str, email: str) -> str:
+        """PayBox does not require a separate customer registration step.
+
+        Returns the user_id directly as the customer identifier.
+        """
+        return user_id
+
+
+# ------------------------------------------------------------------
 # Singleton factory
 # ------------------------------------------------------------------
 
@@ -249,9 +458,13 @@ def get_payment_provider() -> PaymentProvider:
     Provider is selected by the ``PAYMENT_PROVIDER`` environment variable:
     - ``mock``   — MockPaymentProvider (development / demo only)
     - ``stripe`` — StripePaymentProvider (requires STRIPE_SECRET_KEY)
+    - ``bit``    — BitPaymentProvider (requires ENABLE_BIT_PAYMENT=true + BIT_API_KEY + BIT_MERCHANT_ID)
+    - ``paybox`` — PayBoxPaymentProvider (requires ENABLE_PAYBOX_PAYMENT=true + PAYBOX_TERMINAL + PAYBOX_API_KEY)
 
-    In production, the ``mock`` provider is blocked unless explicitly set to
-    ``PAYMENT_PROVIDER=mock`` (which logs a loud warning).
+    In production, the ``mock`` provider is blocked.
+    ``bit`` and ``paybox`` are architecture-ready but raise NotImplementedError
+    until onboarding is complete and the API integration is implemented.
+    See docs/PAYMENT_PROVIDER_ONBOARDING.md for onboarding instructions.
     """
     global _payment_provider
     if _payment_provider is None:
@@ -270,16 +483,64 @@ def get_payment_provider() -> PaymentProvider:
             _payment_provider = StripePaymentProvider(secret_key=settings.STRIPE_SECRET_KEY)
 
         elif provider_name == "mock":
-            is_prod = settings.ENVIRONMENT == "production"
-            if is_prod:
-                logger.warning(
-                    "MOCK PAYMENT PROVIDER is active in production (PAYMENT_PROVIDER=mock). "
-                    "All charges will succeed without real money movement. "
+            if settings.ENVIRONMENT in ("production", "staging"):
+                raise RuntimeError(
+                    "PAYMENT_PROVIDER=mock is not allowed in production/staging. "
+                    "Real money flows would silently succeed without actual charges. "
                     "Set PAYMENT_PROVIDER=stripe and configure STRIPE_SECRET_KEY."
                 )
             _payment_provider = MockPaymentProvider()
 
+        elif provider_name == "bit":
+            if not settings.ENABLE_BIT_PAYMENT:
+                raise RuntimeError(
+                    "PAYMENT_PROVIDER=bit but ENABLE_BIT_PAYMENT is not set to true. "
+                    "bit integration is not yet live. Complete merchant onboarding first. "
+                    "See docs/PAYMENT_PROVIDER_ONBOARDING.md."
+                )
+            if not settings.BIT_API_KEY or not settings.BIT_MERCHANT_ID:
+                raise RuntimeError(
+                    "PAYMENT_PROVIDER=bit but BIT_API_KEY or BIT_MERCHANT_ID is not set. "
+                    "Obtain credentials by completing bit merchant onboarding. "
+                    "See docs/PAYMENT_PROVIDER_ONBOARDING.md."
+                )
+            logger.info(
+                "Using BitPaymentProvider (environment=%s) — NOTE: API integration not yet complete",
+                settings.BIT_ENVIRONMENT,
+            )
+            _payment_provider = BitPaymentProvider(
+                api_key=settings.BIT_API_KEY,
+                merchant_id=settings.BIT_MERCHANT_ID,
+                environment=settings.BIT_ENVIRONMENT,
+            )
+
+        elif provider_name == "paybox":
+            if not settings.ENABLE_PAYBOX_PAYMENT:
+                raise RuntimeError(
+                    "PAYMENT_PROVIDER=paybox but ENABLE_PAYBOX_PAYMENT is not set to true. "
+                    "PayBox integration is not yet live. Complete merchant onboarding first. "
+                    "See docs/PAYMENT_PROVIDER_ONBOARDING.md."
+                )
+            if not settings.PAYBOX_TERMINAL or not settings.PAYBOX_API_KEY:
+                raise RuntimeError(
+                    "PAYMENT_PROVIDER=paybox but PAYBOX_TERMINAL or PAYBOX_API_KEY is not set. "
+                    "Obtain credentials by completing PayBox merchant onboarding. "
+                    "See docs/PAYMENT_PROVIDER_ONBOARDING.md."
+                )
+            logger.info(
+                "Using PayBoxPaymentProvider (environment=%s) — NOTE: API integration not yet complete",
+                settings.PAYBOX_ENVIRONMENT,
+            )
+            _payment_provider = PayBoxPaymentProvider(
+                terminal=settings.PAYBOX_TERMINAL,
+                api_key=settings.PAYBOX_API_KEY,
+                environment=settings.PAYBOX_ENVIRONMENT,
+            )
+
         else:
-            raise RuntimeError(f"Unknown PAYMENT_PROVIDER={provider_name!r}. Supported values: 'mock', 'stripe'.")
+            raise RuntimeError(
+                f"Unknown PAYMENT_PROVIDER={provider_name!r}. "
+                "Supported values: 'mock', 'stripe', 'bit', 'paybox'."
+            )
 
     return _payment_provider

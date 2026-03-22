@@ -23,8 +23,8 @@ from src.config.constants import (
 def test_tax_rate_is_valid_percentage():
     """TAX_RATE should be between 0 and 1 (exclusive)."""
     assert 0 < TAX_RATE < 1
-    # Israeli VAT is 17%
-    assert TAX_RATE == 0.17
+    # Israeli VAT is 18% (as of 2025)
+    assert TAX_RATE == 0.18
 
 
 def test_platform_fee_rate_is_valid():

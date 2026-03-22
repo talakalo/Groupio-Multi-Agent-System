@@ -1,3 +1,4 @@
+import type { Message } from "@groupio/types";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   View,
@@ -12,10 +13,10 @@ import {
 import { Text, TextInput, useTheme, IconButton, Chip } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
-import type { Message } from "@groupio/types";
 
 import { ChatBubble } from "../../components/ChatBubble";
 import { useChat, useProfile } from "../../lib/hooks";
+import i18n from "../../lib/i18n";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -30,23 +31,23 @@ interface QuickSuggestion {
 const QUICK_SUGGESTIONS: QuickSuggestion[] = [
   {
     key: "find_ac",
-    label: "\u05DE\u05E6\u05D0 \u05D8\u05DB\u05E0\u05D0\u05D9 \u05DE\u05D6\u05D2\u05E0\u05D9\u05DD",
-    message: "\u05D0\u05E0\u05D9 \u05DE\u05D7\u05E4\u05E9 \u05D8\u05DB\u05E0\u05D0\u05D9 \u05DE\u05D6\u05D2\u05E0\u05D9\u05DD \u05DC\u05D1\u05E0\u05D9\u05D9\u05DF \u05E9\u05DC\u05D9",
+    label: i18n.t("chat.suggestion_findAC"),
+    message: i18n.t("chat.suggestion_findAC_msg"),
   },
   {
     key: "active_offers",
-    label: "\u05D4\u05E6\u05E2\u05D5\u05EA \u05E4\u05E2\u05D9\u05DC\u05D5\u05EA",
-    message: "\u05D0\u05D9\u05DC\u05D5 \u05D4\u05E6\u05E2\u05D5\u05EA \u05E7\u05D1\u05D5\u05E6\u05D9\u05D5\u05EA \u05E4\u05E2\u05D9\u05DC\u05D5\u05EA \u05D9\u05E9 \u05DB\u05E8\u05D2\u05E2?",
+    label: i18n.t("chat.suggestion_activeOffers"),
+    message: i18n.t("chat.suggestion_activeOffers_msg"),
   },
   {
     key: "price_check",
-    label: "\u05D1\u05D3\u05D9\u05E7\u05EA \u05DE\u05D7\u05D9\u05E8\u05D9\u05DD",
-    message: "\u05DE\u05D4 \u05D4\u05DE\u05D7\u05D9\u05E8 \u05D4\u05DE\u05DE\u05D5\u05E6\u05E2 \u05DC\u05D4\u05EA\u05E7\u05E0\u05EA \u05DE\u05D6\u05D2\u05DF \u05D1\u05D0\u05D6\u05D5\u05E8 \u05E9\u05DC\u05D9?",
+    label: i18n.t("chat.suggestion_priceCheck"),
+    message: i18n.t("chat.suggestion_priceCheck_msg"),
   },
   {
     key: "how_it_works",
-    label: "\u05D0\u05D9\u05DA \u05D6\u05D4 \u05E2\u05D5\u05D1\u05D3?",
-    message: "\u05D0\u05D9\u05DA \u05E2\u05D5\u05D1\u05D3 \u05DE\u05E2\u05E8\u05DB\u05EA \u05D4\u05D4\u05E6\u05E2\u05D5\u05EA \u05D4\u05E7\u05D1\u05D5\u05E6\u05D9\u05D5\u05EA \u05D1-Groupio?",
+    label: i18n.t("chat.suggestion_howItWorks"),
+    message: i18n.t("chat.suggestion_howItWorks_msg"),
   },
 ];
 
@@ -230,7 +231,7 @@ export default function ChatScreen() {
                       { color: theme.colors.onSurfaceVariant },
                     ]}
                   >
-                    {"\u05D4\u05E6\u05E2\u05D5\u05EA \u05DE\u05D4\u05D9\u05E8\u05D5\u05EA:"}
+                    {i18n.t("chat.quickSuggestions")}
                   </Text>
                   <View style={styles.suggestionsGrid}>
                     {QUICK_SUGGESTIONS.map((suggestion) => (
@@ -295,7 +296,7 @@ export default function ChatScreen() {
             <TextInput
               value={inputText}
               onChangeText={setInputText}
-              placeholder={"\u05DB\u05EA\u05D1\u05D5 \u05D4\u05D5\u05D3\u05E2\u05D4..."}
+              placeholder={i18n.t("chat.placeholder")}
               placeholderTextColor={theme.colors.onSurfaceVariant}
               style={[
                 styles.textInput,

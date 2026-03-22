@@ -302,11 +302,15 @@ class TestOffersAPI:
         mock_db.join_offer = AsyncMock()
         override_auth({"id": "user-123", "role": "resident"})
 
-        response = client.post(
-            "/api/v1/offers/offer-123/join",
-            json={"user_id": "user-123", "unit_count": 1},
-            headers={"Authorization": "Bearer test-token"},
-        )
+        with (
+            patch("src.api.routes.offers.get_email_service", return_value=AsyncMock()),
+            patch("src.api.routes.offers.get_whatsapp_bot", return_value=AsyncMock()),
+        ):
+            response = client.post(
+                "/api/v1/offers/offer-123/join",
+                json={"user_id": "user-123", "unit_count": 1},
+                headers={"Authorization": "Bearer test-token"},
+            )
         assert response.status_code == 200
         assert response.json().get("status") == "joined"
 
@@ -844,3 +848,191 @@ class TestWhatsAppWebhook:
             response = client.post("/api/v1/webhooks/whatsapp", json={})
         assert response.status_code == 200
         assert response.json()["status"] in ("ignored", "error")
+
+
+class TestGlobalExceptionHandler:
+    """Tests for global exception handler — connection errors return 503."""
+
+    def test_connection_error_errno_99_returns_503(self):
+        """OSError errno 99 (EADDRNOTAVAIL) should return 503, not 500."""
+        import errno as errno_module
+
+        err = OSError()
+        err.errno = errno_module.EADDRNOTAVAIL  # portable (49 on macOS, 99 on Linux)
+        redis_mock = AsyncMock()
+        redis_mock.check_ip_rate_limit = AsyncMock(return_value=True)
+        with TestClient(app, raise_server_exceptions=False) as c:
+            with patch("src.api.routes.auth.get_redis_client", return_value=redis_mock):
+                with patch("src.api.routes.auth.get_postgres_client") as mock_get_db:
+                    db_mock = AsyncMock()
+                    db_mock.get_user_by_email = AsyncMock(side_effect=err)
+                    mock_get_db.return_value = db_mock
+                    response = c.post(
+                        "/api/v1/auth/login/json",
+                        json={"email": "test@example.com", "password": "test123"},
+                    )
+        assert response.status_code == 503
+        assert "unavailable" in response.json().get("detail", "").lower()
+
+    def test_connection_error_errno_111_returns_503(self):
+        """OSError errno 111 (ECONNREFUSED) should return 503."""
+        import errno as errno_module
+
+        err = OSError()
+        err.errno = errno_module.ECONNREFUSED  # portable (61 on macOS, 111 on Linux)
+        redis_mock = AsyncMock()
+        redis_mock.check_ip_rate_limit = AsyncMock(return_value=True)
+        with TestClient(app, raise_server_exceptions=False) as c:
+            with patch("src.api.routes.auth.get_redis_client", return_value=redis_mock):
+                with patch("src.api.routes.auth.get_postgres_client") as mock_get_db:
+                    db_mock = AsyncMock()
+                    db_mock.get_user_by_email = AsyncMock(side_effect=err)
+                    mock_get_db.return_value = db_mock
+                    response = c.post(
+                        "/api/v1/auth/login/json",
+                        json={"email": "test@example.com", "password": "test123"},
+                    )
+        assert response.status_code == 503
+
+    def test_gaierror_returns_503(self):
+        """socket.gaierror (DNS resolution failure) should return 503."""
+        import socket as socket_module
+
+        err = socket_module.gaierror(-2, "Name or service not known")
+        redis_mock = AsyncMock()
+        redis_mock.check_ip_rate_limit = AsyncMock(return_value=True)
+        with TestClient(app, raise_server_exceptions=False) as c:
+            with patch("src.api.routes.auth.get_redis_client", return_value=redis_mock):
+                with patch("src.api.routes.auth.get_postgres_client") as mock_get_db:
+                    db_mock = AsyncMock()
+                    db_mock.get_user_by_email = AsyncMock(side_effect=err)
+                    mock_get_db.return_value = db_mock
+                    response = c.post(
+                        "/api/v1/auth/login/json",
+                        json={"email": "test@example.com", "password": "test123"},
+                    )
+        assert response.status_code == 503
+        assert "unavailable" in response.json().get("detail", "").lower()
+
+
+# ---------------------------------------------------------------------------
+# Security regression: public signup must reject privileged roles
+# ---------------------------------------------------------------------------
+
+
+class TestSignupRoleRestriction:
+    """HTTP-level regression tests for the signup privilege-escalation fix.
+
+    A malicious client must NOT be able to supply role=admin,
+    role=super_admin, or role=buildings_manager and get a privileged account.
+    Both /signup and /register endpoints must enforce this.
+    """
+
+    _VALID_BASE = {
+        "name": "New User",
+        "email": "newuser@example.com",
+        "phone": "0501234567",
+        "password": "securepass12",
+    }
+
+    _VALID_REGISTER_BASE = {
+        "email": "newuser@example.com",
+        "full_name": "New User",
+        "phone": "0501234567",
+        "password": "securepass12",
+    }
+
+    # -- /signup allowed roles ------------------------------------------------
+
+    @pytest.mark.parametrize("role", ["resident", "contractor"])
+    def test_signup_allows_resident_and_contractor(self, client, mock_db, mock_redis, role):
+        """Allowed roles must pass validation and reach the DB layer."""
+        mock_db.get_user_by_email = AsyncMock(return_value=None)
+        mock_db.get_user_by_phone = AsyncMock(return_value=None)
+
+        class FakeUser:
+            id = "user-new"
+            email = "newuser@example.com"
+            full_name = "New User"
+            phone = "0501234567"
+            is_active = True
+            is_verified = False
+            preferred_language = "he"
+            avatar_url = None
+            building_id = None
+            contractor_id = None
+            created_at = "2024-01-01T00:00:00Z"
+            updated_at = "2024-01-01T00:00:00Z"
+            last_login = None
+            notification_settings = None
+
+        FakeUser.role = role
+        mock_db.create_user = AsyncMock(return_value=FakeUser())
+        mock_redis.set = AsyncMock()
+
+        response = client.post(
+            "/api/v1/auth/signup",
+            json={**self._VALID_BASE, "role": role},
+        )
+        # Must not be rejected by validation (422 = Unprocessable Entity)
+        assert response.status_code != 422, (
+            f"Allowed role '{role}' was incorrectly rejected: {response.json()}"
+        )
+
+    # -- /signup forbidden roles ----------------------------------------------
+
+    @pytest.mark.parametrize(
+        "privileged_role",
+        ["admin", "super_admin", "buildings_manager"],
+    )
+    def test_signup_rejects_privileged_roles(self, client, mock_db, mock_redis, privileged_role):
+        """Privilege-escalation via /signup must return HTTP 422."""
+        response = client.post(
+            "/api/v1/auth/signup",
+            json={**self._VALID_BASE, "role": privileged_role},
+        )
+        assert response.status_code == 422, (
+            f"Expected 422 for privileged role '{privileged_role}' but got "
+            f"{response.status_code}: {response.json()}"
+        )
+
+    def test_signup_rejects_admin(self, client, mock_db, mock_redis):
+        """Explicit regression: role=admin must be HTTP 422."""
+        response = client.post(
+            "/api/v1/auth/signup",
+            json={**self._VALID_BASE, "role": "admin"},
+        )
+        assert response.status_code == 422
+
+    def test_signup_rejects_super_admin(self, client, mock_db, mock_redis):
+        """Explicit regression: role=super_admin must be HTTP 422."""
+        response = client.post(
+            "/api/v1/auth/signup",
+            json={**self._VALID_BASE, "role": "super_admin"},
+        )
+        assert response.status_code == 422
+
+    def test_signup_rejects_buildings_manager(self, client, mock_db, mock_redis):
+        """Explicit regression: role=buildings_manager must be HTTP 422."""
+        response = client.post(
+            "/api/v1/auth/signup",
+            json={**self._VALID_BASE, "role": "buildings_manager"},
+        )
+        assert response.status_code == 422
+
+    # -- /register forbidden roles --------------------------------------------
+
+    @pytest.mark.parametrize(
+        "privileged_role",
+        ["admin", "super_admin", "buildings_manager"],
+    )
+    def test_register_rejects_privileged_roles(self, client, mock_db, mock_redis, privileged_role):
+        """Privilege-escalation via /register must also return HTTP 422."""
+        response = client.post(
+            "/api/v1/auth/register",
+            json={**self._VALID_REGISTER_BASE, "role": privileged_role},
+        )
+        assert response.status_code == 422, (
+            f"Expected 422 for privileged role '{privileged_role}' on /register but got "
+            f"{response.status_code}: {response.json()}"
+        )

@@ -271,7 +271,11 @@ class TestJoinOffer:
 
         app.dependency_overrides[get_current_user] = lambda: user
         try:
-            with patch("src.api.routes.offers.get_postgres_client", return_value=db):
+            with (
+                patch("src.api.routes.offers.get_postgres_client", return_value=db),
+                patch("src.api.routes.offers.get_email_service", return_value=AsyncMock()),
+                patch("src.api.routes.offers.get_whatsapp_bot", return_value=AsyncMock()),
+            ):
                 client = TestClient(app, raise_server_exceptions=False)
                 resp = client.post(
                     "/api/v1/offers/offer-1/join",
@@ -366,7 +370,11 @@ class TestLeaveOffer:
 
         app.dependency_overrides[get_current_user] = lambda: user
         try:
-            with patch("src.api.routes.offers.get_postgres_client", return_value=db):
+            with (
+                patch("src.api.routes.offers.get_postgres_client", return_value=db),
+                patch("src.api.routes.offers.get_email_service", return_value=AsyncMock()),
+                patch("src.api.routes.offers.get_whatsapp_bot", return_value=AsyncMock()),
+            ):
                 client = TestClient(app, raise_server_exceptions=False)
                 resp = client.post("/api/v1/offers/offer-1/leave")
             assert resp.status_code == 200

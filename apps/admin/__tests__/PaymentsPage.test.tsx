@@ -268,9 +268,7 @@ describe('PaymentsPage', () => {
 
   // ---- Actions ----
 
-  it('release escrow calls confirm dialog', async () => {
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
-
+  it('release escrow opens confirm modal', async () => {
     render(<PaymentsPage />, { wrapper: createWrapper() });
 
     await waitFor(() => {
@@ -282,12 +280,13 @@ describe('PaymentsPage', () => {
       fireEvent.click(releaseButton);
     });
 
-    expect(confirmSpy).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(screen.getByText('Release Escrow Funds')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Release Funds' })).toBeInTheDocument();
+    });
   });
 
   it('release escrow updates status on confirm', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
-
     render(<PaymentsPage />, { wrapper: createWrapper() });
 
     await waitFor(() => {
@@ -295,9 +294,12 @@ describe('PaymentsPage', () => {
     });
 
     const releaseButton = screen.getAllByRole('button', { name: 'Release' })[0];
-    await act(async () => {
-      fireEvent.click(releaseButton);
+    fireEvent.click(releaseButton);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Release Funds' })).toBeInTheDocument();
     });
+    fireEvent.click(screen.getByRole('button', { name: 'Release Funds' }));
 
     // After optimistic update, the released badge count should increase
     await waitFor(() => {
@@ -307,8 +309,6 @@ describe('PaymentsPage', () => {
   });
 
   it('approve payout updates status on confirm', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
-
     render(<PaymentsPage />, { wrapper: createWrapper() });
 
     await waitFor(() => {
@@ -322,9 +322,12 @@ describe('PaymentsPage', () => {
     });
 
     const approveButton = screen.getAllByRole('button', { name: 'Approve' })[0];
-    await act(async () => {
-      fireEvent.click(approveButton);
+    fireEvent.click(approveButton);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Approve Payout' })).toBeInTheDocument();
     });
+    fireEvent.click(screen.getByRole('button', { name: 'Approve Payout' }));
 
     await waitFor(() => {
       const approvedBadges = screen.getAllByText(/Approved/);

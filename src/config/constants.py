@@ -9,7 +9,7 @@ database settings table in the future.
 from __future__ import annotations
 
 # -- Tax & Fees --
-TAX_RATE = 0.17  # Israeli VAT
+TAX_RATE = 0.18  # Israeli VAT — 18% as of 2025
 PLATFORM_FEE_RATE = 0.05  # 5% platform commission
 
 # -- Pricing --

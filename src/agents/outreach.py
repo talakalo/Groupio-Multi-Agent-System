@@ -140,7 +140,7 @@ class OutreachAgent(BaseAgent):
         self._ab_test = ABTestManager()
 
     @track_agent_execution("outreach")
-    async def run(self, state: AgentState) -> AgentState:
+    async def _run_impl(self, state: AgentState) -> AgentState:
         """Execute outreach campaign logic."""
         self._get_last_user_message(state)
 

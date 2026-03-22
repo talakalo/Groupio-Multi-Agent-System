@@ -19,8 +19,12 @@ import {
   useSystemStatus,
   useAgentMetrics,
   useReloadAgent,
-  useEscalations,
   useActivityLog,
+  usePendingDecisions,
+  useApprovePendingDecision,
+  useRejectPendingDecision,
+  useAgentAutonomy,
+  useUpdateAgentMode,
 } from "@/lib/hooks";
 
 // ---------------------------------------------------------------------------

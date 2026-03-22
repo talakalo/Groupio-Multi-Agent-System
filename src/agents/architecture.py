@@ -30,7 +30,7 @@ class ArchitectureAgent(BaseAgent):
         super().__init__(config)
 
     @track_agent_execution("architecture")
-    async def run(self, state: AgentState) -> AgentState:
+    async def _run_impl(self, state: AgentState) -> AgentState:
         """Analyse an architecture upload and produce suggestions."""
         file_id = state.get("architecture_file_id")
         if not file_id:

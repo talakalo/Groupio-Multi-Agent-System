@@ -1,7 +1,9 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
-import { OfferCard } from "../components/features/offers/OfferCard";
 import type { Offer } from "@groupio/types";
+import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+
+import { OfferCard } from "../components/features/offers/OfferCard";
+
 
 const mockOffer: Offer = {
   id: "offer_001",

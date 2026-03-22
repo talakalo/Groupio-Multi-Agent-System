@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import React from 'react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ---- next/navigation mock ----
 const mockPush = vi.fn();
@@ -58,7 +58,7 @@ describe('Web LoginPage — navigation', () => {
     global.fetch = vi.fn();
   });
 
-  it('redirects to /dashboard after a successful login', async () => {
+  it('redirects to /dashboard after a successful login as resident', async () => {
     mockApiLogin.mockResolvedValueOnce({ token: 'auth-token-123' });
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
@@ -75,7 +75,6 @@ describe('Web LoginPage — navigation', () => {
 
     render(<LoginPage />);
 
-    // Labels rendered in Hebrew
     fireEvent.change(screen.getByLabelText('כתובת אימייל'), {
       target: { value: 'test@example.com' },
     });
@@ -86,6 +85,102 @@ describe('Web LoginPage — navigation', () => {
 
     await waitFor(() => {
       expect(mockPush).toHaveBeenCalledWith('/dashboard');
+    });
+  });
+
+  it('redirects to /admin/dashboard after login as admin', async () => {
+    mockApiLogin.mockResolvedValueOnce({ token: 'auth-token-123' });
+    (global.fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          id: 'u2',
+          email: 'admin@example.com',
+          role: 'admin',
+          full_name: 'Admin User',
+          phone: '0501111111',
+          is_verified: true,
+          preferred_language: 'he',
+        }),
+      })
+      .mockResolvedValueOnce({ ok: true });
+
+    render(<LoginPage />);
+
+    fireEvent.change(screen.getByLabelText('כתובת אימייל'), {
+      target: { value: 'admin@example.com' },
+    });
+    fireEvent.change(screen.getByLabelText('סיסמה'), {
+      target: { value: 'Password1' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /התחברות/i }));
+
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith('/admin/dashboard');
+    });
+  });
+
+  it('redirects to /admin/dashboard after login as super_admin', async () => {
+    mockApiLogin.mockResolvedValueOnce({ token: 'auth-token-123' });
+    (global.fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          id: 'u1',
+          email: 'admin@example.com',
+          role: 'super_admin',
+          full_name: 'Super Admin',
+          phone: '0500000000',
+          is_verified: true,
+          preferred_language: 'he',
+        }),
+      })
+      .mockResolvedValueOnce({ ok: true }); // locale API
+
+    render(<LoginPage />);
+
+    fireEvent.change(screen.getByLabelText('כתובת אימייל'), {
+      target: { value: 'admin@example.com' },
+    });
+    fireEvent.change(screen.getByLabelText('סיסמה'), {
+      target: { value: 'Password1' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /התחברות/i }));
+
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith('/admin/dashboard');
+    });
+  });
+
+  it('redirects to /buildings-manager/dashboard after login as buildings_manager', async () => {
+    mockApiLogin.mockResolvedValueOnce({ token: 'auth-token-123' });
+    (global.fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          id: 'u3',
+          email: 'bm@example.com',
+          role: 'buildings_manager',
+          full_name: 'Buildings Manager',
+          phone: '0502222222',
+          is_verified: true,
+          preferred_language: 'he',
+        }),
+      })
+      .mockResolvedValueOnce({ ok: true });
+
+    render(<LoginPage />);
+
+    fireEvent.change(screen.getByLabelText('כתובת אימייל'), {
+      target: { value: 'bm@example.com' },
+    });
+    fireEvent.change(screen.getByLabelText('סיסמה'), {
+      target: { value: 'Password1' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /התחברות/i }));
+
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith('/buildings-manager/dashboard');
     });
   });
 

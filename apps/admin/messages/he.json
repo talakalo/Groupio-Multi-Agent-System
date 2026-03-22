@@ -1,0 +1,42 @@
+{
+  "nav": {
+    "dashboard": "לוח בקרה",
+    "users": "משתמשים",
+    "contractors": "קבלנים",
+    "offers": "הצעות",
+    "payments": "תשלומים",
+    "escalations": "הסלמות",
+    "agents": "סוכני AI",
+    "analytics": "אנליטיקס",
+    "settings": "הגדרות",
+    "auditLogs": "לוג ביקורת",
+    "buildings": "בניינים"
+  },
+  "navSections": {
+    "operations": "פעולות",
+    "management": "ניהול",
+    "system": "מערכת"
+  },
+  "common": {
+    "search": "חיפוש...",
+    "loading": "טוען...",
+    "save": "שמירה",
+    "cancel": "ביטול",
+    "delete": "מחיקה",
+    "edit": "עריכה",
+    "approve": "אישור",
+    "reject": "דחייה",
+    "actions": "פעולות",
+    "noData": "אין נתונים",
+    "total": "סה\"כ",
+    "status": "סטטוס"
+  },
+  "dashboard": {
+    "title": "לוח בקרה ראשי",
+    "pendingVerifications": "ממתינים לאימות",
+    "openEscalations": "הסלמות פתוחות",
+    "pendingPayments": "תשלומים ממתינים",
+    "systemHealth": "תקינות מערכת",
+    "pendingActions": "פעולות ממתינות"
+  }
+}

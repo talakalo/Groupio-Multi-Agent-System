@@ -5,6 +5,7 @@ import hashlib
 import json
 import logging
 import re
+import time
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime
 from typing import Any
@@ -157,12 +158,39 @@ class BaseAgent(ABC):
         self.rag = get_rag_pipeline() if config.rag_enabled else None
         self._metrics: dict[str, int] = {"calls": 0, "errors": 0, "tokens": 0}
 
-    @abstractmethod
     async def run(self, state: AgentState) -> AgentState:
-        """Execute agent logic and return updated state.
+        """Execute agent logic with timing and audit persistence.
 
-        Must be implemented by each concrete agent.
+        Wraps _run_impl with timing and calls _persist_audit on completion.
         """
+        start = time.perf_counter()
+        result = await self._run_impl(state)
+        latency_ms = int((time.perf_counter() - start) * 1000)
+
+        input_summary = self._get_last_user_message(state)
+        actions = result.get("actions_taken", [])
+        last_action = actions[-1] if actions else {}
+        action = last_action.get("action", "run")
+        resp = last_action.get("response") or {}
+        msg = resp.get("message", "") if isinstance(resp.get("message"), str) else ""
+        output_summary = msg or last_action.get("summary_for_next_agent", "") or ""
+        if not output_summary and result.get("intent"):
+            output_summary = f"intent={result.get('intent')}"
+        tokens_used = self._metrics.get("tokens", 0)
+
+        self._persist_audit(
+            state=result,
+            action=action,
+            input_summary=input_summary,
+            output_summary=output_summary,
+            latency_ms=latency_ms,
+            tokens_used=tokens_used,
+        )
+        return result
+
+    @abstractmethod
+    async def _run_impl(self, state: AgentState) -> AgentState:
+        """Execute agent logic. Must be implemented by each concrete agent."""
         ...
 
     async def _retrieve_context(

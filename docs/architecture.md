@@ -93,3 +93,44 @@ The LangGraph state machine manages transitions:
 - SQL injection prevention (parameterized queries)
 - Input validation via Pydantic models
 - Escalation rules for sensitive content
+
+## Design System
+
+The project uses a centralized design system documented in `design-system/`. Key files:
+
+- `MASTER.md` — Core tokens, colors, typography, spacing, components
+- `ROUTES.md` — Route-by-route redesign specifications
+- `COMPONENTS.md` — Component library map
+- `NAVIGATION.md` — Per-role navigation design
+- `BACKEND.md` — Backend architecture reference
+- `AGENTS.md` — AI agent system documentation
+- `DATABASE.md` — Database schema reference
+- `MOBILE.md` — Mobile app specifications
+- `INFRASTRUCTURE.md` — Cross-cutting infrastructure
+
+### New Shared Components (apps/web/components/)
+
+- `ui/Badge` — Semantic badges (7 variants)
+- `ui/Button` — Form buttons (6 variants, 3 sizes, loading state)
+- `ui/Skeleton` — Loading skeletons (5 variants)
+- `shared/Breadcrumb` — RTL-aware breadcrumb navigation
+- `shared/TrustBadgeCluster` — Trust indicator badges
+- `shared/AttentionBanner` — Alert banners (3 variants)
+- `shared/CategoryChips` — Filterable category chips
+- `shared/StepIndicator` — Progress step indicator
+- `features/payments/EscrowBadge` — Escrow protection indicator
+- `features/payments/PriceBreakdown` — Price itemization
+- `features/orders/OrderTimeline` — Order lifecycle timeline
+- `features/building/BuildingSummaryCard` — Building info card
+- `features/contractor/VettingStatusTimeline` — Verification timeline
+- `features/contractor/TrustScoreProgress` — Trust score display
+
+### Admin Shared Components (apps/admin/components/)
+
+- `shared/DataTable` — Generic sortable/filterable table
+- `shared/AdminActionModal` — Action confirmation dialog
+- `features/agents/AgentStatusDot` — Agent health indicator
+- `features/agents/AgentModeLabel` — Autonomy mode badge
+- `features/agents/PendingDecisionCard` — Decision approval card
+- `features/agents/AgentConfigPanel` — Agent configuration panel
+- `features/agents/AgentActivityLog` — Agent activity table

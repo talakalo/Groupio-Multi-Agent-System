@@ -1,19 +1,16 @@
 "use client";
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type {
-  AgentMetrics,
-  Escalation,
-  SystemStatus,
-  Contractor,
-} from "@groupio/types";
 import {
   GroupioApiClient,
   type MetricsResponse,
   type EscalationsResponse,
   type HealthStatus,
-  type ContractorsListResponse,
 } from "@groupio/api-client";
+import type {
+  SystemStatus,
+  Contractor,
+} from "@groupio/types";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 // ---- Client Singleton ----
 
@@ -286,27 +283,59 @@ export function useReloadAgent() {
 
 // ---- Contractors ----
 
+/** API returns snake_case; we normalize for UI. */
+interface ContractorApiShape extends Contractor {
+  trust_score?: number;
+  average_rating?: number;
+  business_name?: string;
+  verification_status?: string;
+  trust_score_breakdown?: {
+    license_score?: number;
+    insurance_score?: number;
+    experience_score?: number;
+    reputation_score?: number;
+    completion_score?: number;
+    response_score?: number;
+    total?: number;
+  };
+}
+
 export interface ContractorListItem {
   id: string;
   businessName: string;
   verified: boolean;
+  /** Raw verification_status from API (pending | verified | approved | rejected | suspended). */
+  verificationStatus: string;
   rating: number;
   categories: string[];
   regions: string[];
   phone?: string;
   email?: string;
+  /** 0–100 from API; null when not yet calculated. */
+  trustScore: number | null;
+  trustScoreBreakdown?: ContractorApiShape["trust_score_breakdown"];
 }
 
-function mapContractorToListItem(c: Contractor): ContractorListItem {
+function mapContractorToListItem(c: ContractorApiShape): ContractorListItem {
+  const raw = c.trustScore ?? c.trust_score;
+  const trustScore =
+    typeof raw === "number" && !Number.isNaN(raw) ? raw : null;
+  const rating = c.rating ?? c.average_rating ?? 0;
+  const verified =
+    c.verified ??
+    (c.verification_status === "verified" || c.verification_status === "approved");
   return {
     id: c.id,
-    businessName: c.businessName ?? "",
-    verified: c.verified ?? false,
-    rating: c.rating ?? 0,
+    businessName: c.businessName ?? c.business_name ?? "",
+    verified: Boolean(verified),
+    verificationStatus: c.verification_status ?? (verified ? "verified" : "pending"),
+    rating,
     categories: Array.isArray(c.categories) ? c.categories : [],
     regions: Array.isArray(c.regions) ? c.regions : [],
     phone: c.phone,
     email: c.email,
+    trustScore,
+    trustScoreBreakdown: c.trust_score_breakdown,
   };
 }
 
@@ -423,6 +452,132 @@ export function useActivityLog() {
       });
     },
     refetchInterval: 30_000,
+  });
+}
+
+// ---- Pending Agent Decisions ----
+
+export interface PendingDecisionItem {
+  id: string;
+  agent_name: string;
+  conversation_id: string | null;
+  user_id: string | null;
+  action_type: string;
+  payload: Record<string, unknown>;
+  escalation_reason: string | null;
+  status: string;
+  created_at: string;
+}
+
+export const pendingDecisionsKey = ["admin", "pending-decisions"] as const;
+
+function getAdminBase(): string {
+  const rawBase = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "") || "http://localhost:8000";
+  return rawBase.endsWith("/api/v1") ? rawBase : `${rawBase}/api/v1`;
+}
+
+export function usePendingDecisions(status = "pending") {
+  return useQuery<{ items: PendingDecisionItem[]; total: number }>({
+    queryKey: [...pendingDecisionsKey, status],
+    queryFn: async () => {
+      const base = getAdminBase();
+      const res = await fetch(
+        `${base}/admin/agents/pending-decisions?status=${encodeURIComponent(status)}&page_size=20`,
+        { credentials: "include" },
+      );
+      if (!res.ok) return { items: [], total: 0 };
+      return res.json();
+    },
+    refetchInterval: 30_000,
+  });
+}
+
+export function useApprovePendingDecision() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ decisionId, note = "" }: { decisionId: string; note?: string }) => {
+      const base = getAdminBase();
+      const res = await fetch(
+        `${base}/admin/agents/pending-decisions/${encodeURIComponent(decisionId)}/approve?note=${encodeURIComponent(note)}`,
+        { method: "POST", credentials: "include" },
+      );
+      if (!res.ok) throw new Error("Failed to approve decision");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: pendingDecisionsKey });
+    },
+  });
+}
+
+export function useRejectPendingDecision() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ decisionId, note = "" }: { decisionId: string; note?: string }) => {
+      const base = getAdminBase();
+      const res = await fetch(
+        `${base}/admin/agents/pending-decisions/${encodeURIComponent(decisionId)}/reject?note=${encodeURIComponent(note)}`,
+        { method: "POST", credentials: "include" },
+      );
+      if (!res.ok) throw new Error("Failed to reject decision");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: pendingDecisionsKey });
+    },
+  });
+}
+
+// ---- Agent Autonomy Modes ----
+
+export type AgentAutonomyMap = Record<string, string>;
+
+export const agentAutonomyKey = ["admin", "agent-autonomy"] as const;
+
+export function useAgentAutonomy() {
+  return useQuery<AgentAutonomyMap>({
+    queryKey: agentAutonomyKey,
+    queryFn: async () => {
+      const base = getAdminBase();
+      const res = await fetch(`${base}/admin/agents/autonomy`, { credentials: "include" });
+      if (!res.ok) return {};
+      return res.json();
+    },
+    staleTime: 60_000,
+  });
+}
+
+export function useUpdateAgentMode() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (modes: Record<string, string>) => {
+      // Map agent keys to env-var-style setting keys expected by PUT /admin/settings
+      const settingsPayload: Record<string, string> = {};
+      const keyMap: Record<string, string> = {
+        matching: "MATCHING_AGENT_MODE",
+        pricing: "PRICING_AGENT_MODE",
+        vetting: "VETTING_AGENT_MODE",
+        outreach: "OUTREACH_AGENT_MODE",
+        payment: "PAYMENT_AGENT_MODE",
+      };
+      for (const [agentKey, mode] of Object.entries(modes)) {
+        const settingKey = keyMap[agentKey];
+        if (settingKey) settingsPayload[settingKey] = mode;
+      }
+      if (Object.keys(settingsPayload).length === 0) return {};
+      const base = getAdminBase();
+      const res = await fetch(`${base}/admin/settings`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(settingsPayload),
+      });
+      if (!res.ok) throw new Error("Failed to persist agent mode");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: agentAutonomyKey });
+    },
   });
 }
 
