@@ -158,6 +158,12 @@ services:
 
   alertmanager:
     image: prom/alertmanager:v0.27.0
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --config.expand-env=true
+    environment:
+      # Valid URL required at parse time; override with a real Slack webhook in prod.
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-https://example.com/alertmanager-noop}
     volumes:
       - ../monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml
     ports:
@@ -166,8 +172,9 @@ services:
 
   grafana:
     image: grafana/grafana:10.4.1
+    # Host 3010 avoids clashing with Next.js Admin (localhost:3001).
     ports:
-      - "3001:3000"
+      - "3010:3000"
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
       - GF_USERS_ALLOW_SIGN_UP=false

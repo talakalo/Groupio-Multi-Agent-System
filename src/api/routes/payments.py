@@ -366,11 +366,10 @@ async def initiate_payment(
 
 @router.post("/webhook/stripe")
 async def stripe_webhook(request: Request) -> dict:
-    """Handle Stripe webhook events with Stripe signature verification.
+    """Handle Stripe webhooks: resident payments (PaymentIntent) + contractor membership (subscriptions).
 
-    Stripe sends this endpoint async events such as ``payment_intent.succeeded``
-    and ``charge.refunded``.  The ``Stripe-Signature`` header is verified using
-    the ``STRIPE_WEBHOOK_SECRET`` (from the Stripe Dashboard → Webhooks).
+    Verified with ``STRIPE_WEBHOOK_SECRET``. Subscription checkout must send ``metadata.contractor_id``.
+    Event ids are de-duplicated via ``stripe_webhook_events`` (migration 031).
     """
     raw_body = await request.body()
     stripe_sig = request.headers.get("stripe-signature", "")
@@ -389,20 +388,48 @@ async def stripe_webhook(request: Request) -> dict:
         except Exception as exc:
             logger.warning("Stripe webhook signature verification failed: %s", exc)
             raise HTTPException(status_code=400, detail="Invalid Stripe signature") from exc
-        event_type = event.get("type", "")
-        event_data = event.get("data", {}).get("object", {})
+        try:
+            event_id = event["id"]
+            event_type = event["type"]
+            event_data = event["data"]["object"]
+        except (KeyError, TypeError):
+            event_id = getattr(event, "id", None)
+            event_type = getattr(event, "type", "") or ""
+            _data = getattr(event, "data", None)
+            event_data = getattr(_data, "object", {}) if _data is not None else {}
     elif settings.ENVIRONMENT != "development":
         raise HTTPException(status_code=503, detail="Stripe webhook secret not configured")
     else:
         import json  # noqa: PLC0415
 
         body = json.loads(raw_body)
+        event_id = body.get("id")
         event_type = body.get("type", "")
         event_data = body.get("data", {}).get("object", {})
 
-    logger.info("Stripe webhook received: %s", event_type)
+    logger.info("Stripe webhook received: %s id=%s", event_type, event_id)
 
-    # Map Stripe event type to transaction_id and internal status
+    db = get_postgres_client()
+    if event_id:
+        claimed = await db.try_claim_stripe_webhook_event(str(event_id))
+        if not claimed:
+            logger.info("Duplicate Stripe event %s — skipping", event_id)
+            return {"status": "duplicate", "event_id": event_id}
+
+    membership_events = {
+        "checkout.session.completed",
+        "customer.subscription.created",
+        "customer.subscription.updated",
+        "customer.subscription.deleted",
+        "invoice.paid",
+        "invoice.payment_failed",
+    }
+    if event_type in membership_events:
+        from src.services.stripe_contractor_webhooks import handle_stripe_subscription_event
+
+        result = await handle_stripe_subscription_event(db, event_type, event_data)
+        return {"status": "processed", **result}
+
     status_map = {
         "payment_intent.succeeded": "succeeded",
         "payment_intent.payment_failed": "failed",
@@ -413,14 +440,12 @@ async def stripe_webhook(request: Request) -> dict:
     }
     new_status = status_map.get(event_type)
     if not new_status:
-        # Unhandled event type — acknowledge receipt so Stripe doesn't retry
         return {"status": "ignored", "event_type": event_type}
 
     transaction_id = event_data.get("id")
     if not transaction_id:
         return {"status": "ignored", "reason": "no_transaction_id"}
 
-    db = get_postgres_client()
     payment = await db.get_payment_by_transaction(transaction_id)
     if not payment:
         logger.warning("Stripe webhook for unknown transaction: %s", transaction_id)
@@ -436,6 +461,27 @@ async def stripe_webhook(request: Request) -> dict:
             await db.update_invoice(invoice_id, {"status": "refunded"})
 
     return {"status": "processed", "payment_id": payment["id"], "new_status": new_status}
+
+
+@router.post("/{payment_id}/approve-work")
+async def resident_approve_work(
+    payment_id: str,
+    current_user: UserInDB = Depends(get_current_user),
+) -> dict[str, str]:
+    """Resident confirms work completion for their payment (audited; ties into escrow ops separately)."""
+    db = get_postgres_client()
+    payment = await db.get_payment(payment_id)
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    if payment.get("user_id") != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to approve for this payment")
+    logger.info(
+        "resident_approve_work payment_id=%s user_id=%s offer_id=%s",
+        payment_id,
+        current_user.id,
+        payment.get("offer_id"),
+    )
+    return {"status": "recorded"}
 
 
 @router.get("/{payment_id}", response_model=PaymentResponse)

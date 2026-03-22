@@ -50,7 +50,7 @@ class RouterAgent(BaseAgent):
         super().__init__(config)
 
     @track_agent_execution("router")
-    async def run(self, state: AgentState) -> AgentState:
+    async def _run_impl(self, state: AgentState) -> AgentState:
         """Classify intent and determine routing."""
         user_message = self._get_last_user_message(state)
 

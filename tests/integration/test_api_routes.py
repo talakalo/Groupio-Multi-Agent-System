@@ -988,9 +988,7 @@ class TestSignupRoleRestriction:
             json={**self._VALID_BASE, "role": role},
         )
         # Must not be rejected by validation (422 = Unprocessable Entity)
-        assert response.status_code != 422, (
-            f"Allowed role '{role}' was incorrectly rejected: {response.json()}"
-        )
+        assert response.status_code != 422, f"Allowed role '{role}' was incorrectly rejected: {response.json()}"
 
     # -- /signup forbidden roles ----------------------------------------------
 
@@ -1005,8 +1003,7 @@ class TestSignupRoleRestriction:
             json={**self._VALID_BASE, "role": privileged_role},
         )
         assert response.status_code == 422, (
-            f"Expected 422 for privileged role '{privileged_role}' but got "
-            f"{response.status_code}: {response.json()}"
+            f"Expected 422 for privileged role '{privileged_role}' but got {response.status_code}: {response.json()}"
         )
 
     def test_signup_rejects_admin(self, client, mock_db, mock_redis):

@@ -15,6 +15,7 @@ import { AgentOrchestrationGraph } from "@/components/features/agents/AgentOrche
 import type { AgentStatus } from "@/components/features/agents/AgentCard";
 import { AgentMetricsChart } from "@/components/features/metrics/AgentMetricsChart";
 import type { AgentChartSeries } from "@/components/features/metrics/AgentMetricsChart";
+import type { Escalation } from "@groupio/types";
 import {
   useSystemStatus,
   useAgentMetrics,
@@ -25,6 +26,7 @@ import {
   useRejectPendingDecision,
   useAgentAutonomy,
   useUpdateAgentMode,
+  useEscalations,
 } from "@/lib/hooks";
 
 // ---------------------------------------------------------------------------
@@ -119,6 +121,14 @@ interface AgentActivity {
   timestamp: string;
 }
 
+interface PendingDecisionRow {
+  id: string;
+  agent: string;
+  action: string;
+  detail: string;
+  priority: "high" | "medium" | "low";
+}
+
 // ---------------------------------------------------------------------------
 // Page component
 // ---------------------------------------------------------------------------
@@ -153,18 +163,28 @@ export default function AgentsPage() {
   }, [auditActivity]);
 
   // Map escalations to decision queue items
-  const pendingDecisions = useMemo(() => {
+  const pendingDecisions = useMemo((): PendingDecisionRow[] => {
     const escalations = escalationsData?.escalations ?? [];
     return escalations
-      .filter((e) => e.status === "open")
+      .filter((e: Escalation) => e.status === "open")
       .slice(0, 5)
-      .map((esc) => ({
-        id: esc.id,
-        agent: (esc.context?.actionsTaken?.[0]?.agent ?? "Support").replace(/^\w/, (c: string) => c.toUpperCase()),
-        action: esc.reason,
-        detail: esc.context?.actionsTaken?.map((a: { action: string }) => a.action).join(", ") ?? "",
-        priority: esc.priority as "high" | "medium" | "low",
-      }));
+      .map((esc: Escalation) => {
+        const priorityUi: PendingDecisionRow["priority"] =
+          esc.priority === "urgent" || esc.priority === "high"
+            ? "high"
+            : esc.priority === "normal"
+              ? "medium"
+              : "low";
+        return {
+          id: esc.id,
+          agent: (esc.context?.actionsTaken?.[0]?.agent ?? "Support").replace(/^\w/, (c: string) =>
+            c.toUpperCase()
+          ),
+          action: esc.reason,
+          detail: esc.context?.actionsTaken?.map((a) => a.action).join(", ") ?? "",
+          priority: priorityUi,
+        };
+      });
   }, [escalationsData]);
 
   // Derive agent card data from system status
@@ -370,7 +390,7 @@ export default function AgentsPage() {
               No pending decisions
             </div>
           )}
-          {pendingDecisions.map((decision) => (
+          {pendingDecisions.map((decision: PendingDecisionRow) => (
             <div key={decision.id} className="flex items-center gap-3 py-3">
               <span
                 className={clsx(

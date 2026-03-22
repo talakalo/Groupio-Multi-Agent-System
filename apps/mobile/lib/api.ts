@@ -299,11 +299,10 @@ export async function createOffer(
 /** Join an existing group offer. */
 export async function joinOffer(
   offerId: string,
-): Promise<{ success: boolean; participants: number }> {
-  return request<{ success: boolean; participants: number }>(
-    "POST",
-    `/offers/${offerId}/join`,
-  );
+): Promise<{ status: string; offer_id: string }> {
+  return request<{ status: string; offer_id: string }>("POST", `/offers/${offerId}/join`, {
+    body: { unit_count: 1 },
+  });
 }
 
 /** Fetch contractors with optional filters. */

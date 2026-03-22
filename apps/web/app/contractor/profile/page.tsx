@@ -223,14 +223,15 @@ export default function ContractorProfilePage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b mb-6">
+      <div className="mb-6 flex flex-wrap gap-1 border-b">
         {(['info', 'documents', 'settings'] as const).map((tab) => (
           <button
             key={tab}
+            type="button"
             onClick={() => setActiveTab(tab)}
-            className={`px-6 py-3 font-medium transition-colors ${
+            className={`whitespace-nowrap px-4 py-3 text-sm font-medium transition-colors sm:px-6 sm:text-base ${
               activeTab === tab
-                ? 'text-sky-600 border-b-2 border-sky-600'
+                ? 'border-b-2 border-sky-600 text-sky-600'
                 : 'text-gray-500 hover:text-gray-700'
             }`}
           >
@@ -366,16 +367,21 @@ export default function ContractorProfilePage() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 {t('fields.categories')} *
               </label>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {categories.map((cat) => (
-                  <label key={cat} className="flex items-center gap-2">
+                  <label
+                    key={cat}
+                    className="flex min-w-0 items-start gap-2 rounded-lg p-1 hover:bg-gray-50"
+                  >
                     <input
                       type="checkbox"
                       value={cat}
                       {...register('categories')}
-                      className="rounded border-gray-300 text-sky-500 focus:ring-sky-500"
+                      className="mt-0.5 shrink-0 rounded border-gray-300 text-sky-500 focus:ring-sky-500"
                     />
-                    <span className="text-sm text-gray-700">{t(`categories.${cat}`)}</span>
+                    <span className="min-w-0 flex-1 break-words text-sm leading-snug text-gray-700">
+                      {t(`categories.${cat}`)}
+                    </span>
                   </label>
                 ))}
               </div>
@@ -388,16 +394,21 @@ export default function ContractorProfilePage() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 {t('fields.regions')} *
               </label>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {regions.map((reg) => (
-                  <label key={reg} className="flex items-center gap-2">
+                  <label
+                    key={reg}
+                    className="flex min-w-0 items-start gap-2 rounded-lg p-1 hover:bg-gray-50"
+                  >
                     <input
                       type="checkbox"
                       value={reg}
                       {...register('regions')}
-                      className="rounded border-gray-300 text-sky-500 focus:ring-sky-500"
+                      className="mt-0.5 shrink-0 rounded border-gray-300 text-sky-500 focus:ring-sky-500"
                     />
-                    <span className="text-sm text-gray-700">{t(`regions.${reg}`)}</span>
+                    <span className="min-w-0 flex-1 break-words text-sm leading-snug text-gray-700">
+                      {t(`regions.${reg}`)}
+                    </span>
                   </label>
                 ))}
               </div>

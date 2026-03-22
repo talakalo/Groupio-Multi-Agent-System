@@ -112,7 +112,7 @@ class OfferListResponse(BaseModel):
 class OfferJoinRequest(BaseModel):
     """Request to join an offer."""
 
-    user_id: str
+    user_id: str | None = None
     unit_count: int = Field(default=1, ge=1)
     invite_token: str | None = None
 

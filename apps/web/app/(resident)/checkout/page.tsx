@@ -175,6 +175,7 @@ function SuccessState({
   amount,
   currency,
   offerId,
+  simulatedPayment,
 }: {
   subtotal?: number;
   taxAmount?: number;
@@ -182,6 +183,8 @@ function SuccessState({
   amount: number;
   currency: string;
   offerId?: string;
+  /** True when checkout completed without Stripe `client_secret` (e.g. mock provider). */
+  simulatedPayment?: boolean;
 }) {
   const vatPct = Math.round((taxRate ?? 0.18) * 100);
   const sub = subtotal ?? Math.round(amount / 1.18 * 100) / 100;
@@ -189,6 +192,18 @@ function SuccessState({
 
   return (
     <div className="space-y-4 py-6">
+      {simulatedPayment && (
+        <div
+          role="status"
+          className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 text-start"
+        >
+          <strong>מצב תשלום לבדיקות:</strong> הושלם ללא חיוב כרטיס חיצוני (למשל ספק mock). אין כסף אמיתי. לייצור יש להגדיר
+          ספק תשלום אמיתי בשרת.
+          <span className="mt-1 block text-xs opacity-90" dir="ltr" lang="en">
+            Test / simulated path: no Stripe PaymentElement — confirm PAYMENT_PROVIDER before real users.
+          </span>
+        </div>
+      )}
       <div className="text-center">
         <CheckCircle2 className="h-14 w-14 text-emerald-500 mx-auto mb-3" aria-hidden="true" />
         <h2 className="text-xl font-bold text-gray-900">התשלום בוצע בהצלחה!</h2>
@@ -256,6 +271,7 @@ function CheckoutContent() {
   const [phase, setPhase] = useState<"loading" | "stripe" | "success" | "error">("loading");
   const [payment, setPayment] = useState<PaymentResult | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [simulatedPayment, setSimulatedPayment] = useState(false);
 
   const initiatePayment = useCallback(async () => {
     if (!offerId) {
@@ -270,13 +286,14 @@ function CheckoutContent() {
       setPayment(result);
 
       if (result.status === "succeeded" || result.status === "paid") {
-        // Mock mode: payment already succeeded
+        // Mock (or non-Stripe) path: no client_secret — show non-production notice
+        setSimulatedPayment(!result.client_secret);
         setPhase("success");
       } else if (result.client_secret) {
-        // Stripe mode: need card capture
+        setSimulatedPayment(false);
         setPhase("stripe");
       } else {
-        // Unexpected state — treat as success (backend processed it)
+        setSimulatedPayment(true);
         setPhase("success");
       }
     } catch (err) {
@@ -336,6 +353,7 @@ function CheckoutContent() {
         amount={payment.amount}
         currency={payment.currency}
         offerId={payment.offer_id || offerId}
+        simulatedPayment={simulatedPayment}
       />
     );
   }
@@ -399,7 +417,9 @@ export default function CheckoutPage() {
       {/* Security footer */}
       <div className="mt-4 text-center text-xs text-gray-400 flex items-center justify-center gap-1">
         <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
-        <span>מאובטח עם Stripe — פרטי כרטיס לא נשמרים בשרתי Groupio</span>
+        <span>
+          כאשר מופעל תשלום בכרטיס (Stripe), פרטי הכרטיס מטופלים ע&quot;י Stripe ואינם נשמרים בשרתי Groupio.
+        </span>
       </div>
     </div>
   );

@@ -49,6 +49,15 @@ class ApiClient {
     return useAuthStore.getState().accessToken;
   }
 
+  /** 401 on these paths is expected (bad credentials / public auth); do not run token refresh. */
+  private isAuthCredentialPath(endpoint: string): boolean {
+    return (
+      endpoint.startsWith("/api/v1/auth/login") ||
+      endpoint.startsWith("/api/v1/auth/signup") ||
+      endpoint.startsWith("/api/v1/auth/refresh")
+    );
+  }
+
   private async request<T>(
     endpoint: string,
     options: RequestOptions = {},
@@ -74,7 +83,12 @@ class ApiClient {
       signal,
     });
 
-    if (response.status === 401 && this._on401Retry && !isRetry) {
+    if (
+      response.status === 401 &&
+      this._on401Retry &&
+      !isRetry &&
+      !this.isAuthCredentialPath(endpoint)
+    ) {
       const newToken = await this.refreshToken();
       if (newToken) {
         return this.request<T>(endpoint, options, true);
@@ -149,13 +163,25 @@ class ApiClient {
     );
   }
 
-  async joinOffer(offerId: string, userId: string) {
-    return this.request<{ success: boolean; participants: number }>(
+  async joinOffer(
+    offerId: string,
+    body: {
+      userId?: string;
+      unitCount?: number;
+      inviteToken?: string | null;
+    } = {},
+  ) {
+    const payload: Record<string, unknown> = {
+      unit_count: body.unitCount ?? 1,
+    };
+    if (body.userId != null) payload.user_id = body.userId;
+    if (body.inviteToken) payload.invite_token = body.inviteToken;
+    return this.request<{ status: string; offer_id: string }>(
       `/api/v1/offers/${offerId}/join`,
       {
         method: "POST",
-        body: { userId },
-      }
+        body: payload,
+      },
     );
   }
 
@@ -292,6 +318,13 @@ class ApiClient {
     });
   }
 
+  async changePassword(currentPassword: string, newPassword: string) {
+    return this.request<{ status: string }>("/api/v1/auth/password/change", {
+      method: "POST",
+      body: { current_password: currentPassword, new_password: newPassword },
+    });
+  }
+
   // ---- Payment endpoints ----
 
   async getMyPayments() {
@@ -308,6 +341,14 @@ class ApiClient {
   async getPayment(paymentId: string) {
     return this.request<import("@groupio/types").Payment>(
       `/api/v1/payments/${paymentId}`
+    );
+  }
+
+  /** Resident acknowledges completed work (audit log; full escrow release is admin-operated today). */
+  async approveWork(paymentId: string) {
+    return this.request<{ status: string }>(
+      `/api/v1/payments/${encodeURIComponent(paymentId)}/approve-work`,
+      { method: "POST" },
     );
   }
 
@@ -343,6 +384,47 @@ class ApiClient {
     return this.request<{ items: unknown[]; total: number; page: number; page_size: number }>(
       `/api/v1/offers/${encodeURIComponent(offerId)}/participants${qs ? `?${qs}` : ""}`
     );
+  }
+
+  // ---- In-app notifications (API-backed; see also Zustand toast store) ----
+
+  async getNotifications(params?: { limit?: number; offset?: number; unread_only?: boolean }) {
+    const search = new URLSearchParams();
+    if (params?.limit != null) search.set("limit", String(params.limit));
+    if (params?.offset != null) search.set("offset", String(params.offset));
+    if (params?.unread_only) search.set("unread_only", "true");
+    const qs = search.toString();
+    return this.request<{
+      items: Array<{
+        id: string;
+        type: string;
+        title: string;
+        body: string | null;
+        data: Record<string, unknown> | null;
+        read: boolean;
+        created_at: string;
+      }>;
+      total: number;
+      limit: number;
+      offset: number;
+    }>(`/api/v1/notifications${qs ? `?${qs}` : ""}`);
+  }
+
+  async getUnreadNotificationCount() {
+    return this.request<{ count: number }>("/api/v1/notifications/unread-count");
+  }
+
+  async markNotificationRead(notificationId: string) {
+    return this.request<{ status: string }>(
+      `/api/v1/notifications/${encodeURIComponent(notificationId)}/read`,
+      { method: "POST" },
+    );
+  }
+
+  async markAllNotificationsRead() {
+    return this.request<{ status: string }>("/api/v1/notifications/read-all", {
+      method: "POST",
+    });
   }
 }
 

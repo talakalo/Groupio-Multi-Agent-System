@@ -10,6 +10,7 @@
 | FastAPI     | 8000        | Yes      | Backend API |
 | Next.js Web | 3000        | Yes      | Resident/contractor frontend |
 | Next.js Admin| 3001       | Yes      | Admin dashboard |
+| Grafana (Docker) | 3010 | No       | Avoids port clash with Admin on 3001 |
 
 ## Health Checks
 - `GET /api/v1/health` — returns service status for DB, Redis, Qdrant, Neo4j

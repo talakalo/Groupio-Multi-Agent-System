@@ -295,7 +295,6 @@ jobs:
           sleep 8
           npx --yes openapi-typescript http://127.0.0.1:8099/openapi.json             -o packages/types/src/generated.ts
           kill $BACKEND_PID || true
-        continue-on-error: true  # non-blocking until types are wired up end-to-end
         env:
           PYTHONPATH: .
 

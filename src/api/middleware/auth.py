@@ -171,6 +171,7 @@ async def get_current_user(
     if payload.jti:
         try:
             from src.databases.redis_client import get_redis_client
+
             redis = get_redis_client()
             if await redis.is_token_denylisted(payload.jti):
                 raise HTTPException(
@@ -280,6 +281,15 @@ async def require_admin_only(
     """
     if current_user.role not in (UserRole.ADMIN, UserRole.SUPER_ADMIN):
         raise HTTPException(status_code=403, detail="Admin-only access required")
+    return current_user
+
+
+async def require_super_admin(
+    current_user: UserInDB = Depends(get_current_user),
+) -> UserInDB:
+    """Strict dependency: only ``super_admin`` (platform operator)."""
+    if current_user.role != UserRole.SUPER_ADMIN:
+        raise HTTPException(status_code=403, detail="Super-admin access required")
     return current_user
 
 

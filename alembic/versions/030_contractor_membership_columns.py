@@ -1,19 +1,21 @@
 """Add contractor marketplace membership / subscription state columns.
 
-Revision ID: 029
-Revises: 028
+Revision ID: 030
+Revises: 029
 Create Date: 2026-03-18
 
 Supports enforcement of contractor marketplace visibility and offer creation.
 Recurring billing webhooks are not included in this revision.
+
+Chains after 029_payment_provider_column (also used revision 029 on 028).
 """
 from typing import Sequence, Union
 
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "029"
-down_revision: Union[str, None] = "028"
+revision: str = "030"
+down_revision: Union[str, None] = "029"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

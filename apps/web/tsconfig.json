@@ -36,6 +36,9 @@
   ],
   "exclude": [
     "node_modules",
-    "__tests__"
+    "__tests__",
+    "**/*.stories.tsx",
+    "**/*.stories.ts",
+    ".next"
   ]
 }

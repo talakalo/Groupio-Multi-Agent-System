@@ -1438,6 +1438,75 @@ class PostgresClient:
             await self._pg_execute(query, *args)
         return await self.get_contractor(contractor_id) or {}
 
+    async def try_claim_stripe_webhook_event(self, event_id: str) -> bool:
+        """Record Stripe event id for idempotency. Returns True if newly claimed, False if duplicate."""
+        if not event_id:
+            return True
+        try:
+            return await self._try_claim_stripe_webhook_event_impl(event_id)
+        except Exception as exc:
+            err = str(exc).lower()
+            if "stripe_webhook_events" in err or "does not exist" in err or "undefinedtable" in err:
+                logger.warning(
+                    "stripe_webhook_events table missing — run alembic upgrade; idempotency skipped: %s",
+                    exc,
+                )
+                return True
+            raise
+
+    async def _try_claim_stripe_webhook_event_impl(self, event_id: str) -> bool:
+        if self._use_supabase_client():
+            client = await self._get_client()
+            try:
+                await client.table("stripe_webhook_events").insert({"id": event_id}).execute()
+                return True
+            except Exception as exc:  # pragma: no cover - supabase error shapes vary
+                err = str(exc).lower()
+                if "duplicate" in err or "unique" in err or "23505" in err:
+                    return False
+                raise
+        row = await self._pg_fetch_one(
+            "INSERT INTO stripe_webhook_events (id) VALUES ($1) ON CONFLICT (id) DO NOTHING RETURNING id",
+            event_id,
+        )
+        return row is not None
+
+    async def get_contractor_by_stripe_customer_id(self, customer_id: str) -> dict[str, Any] | None:
+        """Lookup contractor row by Stripe customer id (provider_customer_id)."""
+        if not customer_id:
+            return None
+        if self._use_supabase_client():
+            client = await self._get_client()
+            result = (
+                await client.table("contractors").select("*").eq("provider_customer_id", customer_id).limit(1).execute()
+            )
+            rows = result.data or []
+            return rows[0] if rows else None
+        return await self._pg_fetch_one(
+            "SELECT * FROM contractors WHERE provider_customer_id = $1 LIMIT 1",
+            customer_id,
+        )
+
+    async def get_contractor_by_stripe_subscription_id(self, subscription_id: str) -> dict[str, Any] | None:
+        """Lookup contractor by Stripe subscription id (provider_subscription_id)."""
+        if not subscription_id:
+            return None
+        if self._use_supabase_client():
+            client = await self._get_client()
+            result = (
+                await client.table("contractors")
+                .select("*")
+                .eq("provider_subscription_id", subscription_id)
+                .limit(1)
+                .execute()
+            )
+            rows = result.data or []
+            return rows[0] if rows else None
+        return await self._pg_fetch_one(
+            "SELECT * FROM contractors WHERE provider_subscription_id = $1 LIMIT 1",
+            subscription_id,
+        )
+
     async def get_contractor_reviews(
         self, contractor_id: str, page: int = 1, page_size: int = 20
     ) -> tuple[list[dict[str, Any]], int]:

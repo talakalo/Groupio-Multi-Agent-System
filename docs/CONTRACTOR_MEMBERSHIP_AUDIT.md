@@ -8,7 +8,7 @@
 - **Resident / order payments** (escrow, `PaymentIntent`, offer checkout) exist in `src/api/routes/payments.py`, `src/services/payment.py` — **separate** from contractor marketplace membership.
 - **Stripe recurring subscriptions** for contractors (Billing, `customer.subscription.*`, `invoice.paid` / `invoice.payment_failed` webhooks) are **not** implemented end-to-end in this codebase.
 - **Before this change:** contractor monthly membership was **MISSING** as a persisted model with enforcement (no membership columns on `contractors`, no offer-creation gate for contractors, no public discovery filter).
-- **After migration `029` + routes:** state is **IMPLEMENTED_BUT_PARTIAL** — DB + backend enforcement + admin override + contractor self read API exist; **no** live recurring charge or Stripe subscription webhooks; **minimal** contractor billing UI (API only unless wired in frontends).
+- **After migration `030` (contractor membership) + routes:** state is **IMPLEMENTED_BUT_PARTIAL** — DB + backend enforcement + admin override + contractor self read API exist; **no** live recurring charge or Stripe subscription webhooks; **minimal** contractor billing UI (API only unless wired in frontends).
 
 ## 2. Classification
 
@@ -24,7 +24,7 @@
 | Capability | Frontend | Backend | DB | Provider | Enforcement | Tests |
 |------------|----------|---------|-----|----------|-------------|-------|
 | Contractor monthly plan purchase (checkout) | No | No | N/A | No recurring | N/A | N/A |
-| Persist membership status / plan / provider IDs | N/A | Admin PATCH + read | **029 columns** | Manual/mock only | N/A | Unit + route |
+| Persist membership status / plan / provider IDs | N/A | Admin PATCH + read | **030 columns** | Manual/mock only | N/A | Unit + route |
 | Auto monthly renewal | No | No | N/A | No | N/A | No |
 | Webhooks (invoice/subscription) | N/A | No (`webhooks.py` = WhatsApp / contractor-update) | N/A | No | N/A | No |
 | Block offer create if unpaid / canceled | Partial (no banner) | **Yes** (`offers.create_offer` + contractor row) | Yes | N/A | **Backend** | Yes |
@@ -45,7 +45,7 @@
 
 ## 5. Files changed (this implementation)
 
-- `alembic/versions/029_contractor_membership_columns.py`
+- `alembic/versions/030_contractor_membership_columns.py`
 - `src/domain/contractor_membership.py`
 - `src/models/contractor.py`, `src/models/__init__.py`
 - `src/api/middleware/auth.py` (`get_current_user_optional`)
@@ -56,10 +56,10 @@
 
 ## 6. Business questions (code evidence)
 
-1. **Monthly membership payment today?** **No** automated product path; admin can set state only after **029**.
+1. **Monthly membership payment today?** **No** automated product path; admin can set state only after **030** (and **029** payment columns on shared DB).
 2. **Auto renewal?** **No** (no subscription engine / webhooks).
 3. **Blocked from creating offers if unpaid?** **Yes** for `UserRole.CONTRACTOR` when `membership_status` is not `active`/`trialing` and not `past_due` inside grace (`offers.py` + `contractor_membership.py`).
-4. **Membership model in DB?** **Yes** after **029** (`membership_status`, plan, provider IDs, periods, grace, etc.).
+4. **Membership model in DB?** **Yes** after **030** (`membership_status`, plan, provider IDs, periods, grace, etc.; apply after **029** payment columns).
 5. **Recurring provider integration?** **No** for contractor membership (resident flows may use Stripe `PaymentIntent` — see `payment.py`).
 6. **Billing UI for contractors?** **Not** in scope of this patch; use API or add pages later.
 7. **Admin manage state?** **Yes** — `PATCH /api/v1/admin/contractors/{id}/membership` (requires `require_admin_only`).

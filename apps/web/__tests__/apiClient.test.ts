@@ -290,19 +290,20 @@ describe('ApiClient', () => {
   });
 
   describe('joinOffer', () => {
-    it('posts to join endpoint', async () => {
+    it('posts to join endpoint with userId in body', async () => {
       (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
         ok: true,
         json: async () => ({ status: 'joined', offer_id: 'offer-123' }),
       });
 
-      const result = await apiClient.joinOffer('offer-123', 2);
+      const result = await apiClient.joinOffer('offer-123', { userId: 'user-456' });
 
       const [url, options] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
       expect(url).toContain('/api/v1/offers/offer-123/join');
       expect(options.method).toBe('POST');
-      const body = JSON.parse(options.body);
-      expect(body.unit_count).toBe(2);
+      const body = JSON.parse(options.body as string);
+      expect(body.user_id).toBe('user-456');
+      expect(body.unit_count).toBe(1);
       expect(result.status).toBe('joined');
     });
   });
@@ -344,6 +345,41 @@ describe('ApiClient', () => {
       const callUrl = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
       expect(callUrl).toContain('/api/v1/offers/offer-42');
       expect(result.id).toBe('offer-42');
+    });
+  });
+
+  describe('notifications', () => {
+    it('getNotifications builds query string', async () => {
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          items: [],
+          total: 0,
+          limit: 50,
+          offset: 0,
+        }),
+      });
+
+      await apiClient.getNotifications({ limit: 10, offset: 5, unread_only: true });
+
+      const callUrl = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+      expect(callUrl).toContain('/api/v1/notifications');
+      expect(callUrl).toContain('limit=10');
+      expect(callUrl).toContain('offset=5');
+      expect(callUrl).toContain('unread_only=true');
+    });
+
+    it('markNotificationRead posts to read endpoint', async () => {
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ status: 'ok' }),
+      });
+
+      await apiClient.markNotificationRead('n1');
+
+      const [url, options] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(url).toContain('/api/v1/notifications/n1/read');
+      expect(options.method).toBe('POST');
     });
   });
 });
