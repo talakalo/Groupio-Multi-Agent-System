@@ -1,0 +1,12 @@
+# Subflow: launch-fresh
+# Launches the app with cleared state (fresh install simulation).
+# Use at the start of any flow that needs a clean slate.
+#
+# Usage:
+#   - runFlow: ../subflows/launch-fresh.yaml
+
+- launchApp:
+    appId: ${APP_ID}
+    clearState: true
+    clearKeychain: true  # iOS: clears Keychain; no-op on Android
+- waitForAnimationToEnd

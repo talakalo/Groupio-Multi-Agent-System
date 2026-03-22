@@ -1,0 +1,40 @@
+# Flow: Resident Home Dashboard
+# Verifies the home screen loads with key sections visible after login.
+#
+# Run: maestro test .maestro/flows/02-resident/home-dashboard.yaml
+
+appId: ${APP_ID}
+tags:
+  - resident
+  - dashboard
+  - smoke
+---
+
+- runFlow: ../../subflows/launch-fresh.yaml
+- runFlow: ../../subflows/login-resident.yaml
+
+# Home tab should be active by default
+- assertVisible:
+    text: "Welcome to Groupio"
+    timeout: 10000
+
+# Quick actions section
+- assertVisible: "Quick Actions"
+- assertVisible: "New Offer"
+- assertVisible: "Find Contractor"
+- assertVisible: "AI Chat"
+
+# Scroll down to see more sections
+- scroll
+
+- assertVisible: "Active Offers"
+
+# Navigate to Offers tab via quick action
+- tapOn: "New Offer"
+- assertVisible:
+    text: "Offers"
+    timeout: 8000
+
+# Go back to Home tab
+- tapOn: "Home"
+- assertVisible: "Welcome to Groupio"

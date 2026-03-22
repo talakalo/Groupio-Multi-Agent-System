@@ -1,0 +1,26 @@
+# Subflow: login-contractor
+# Performs the login steps for a contractor user.
+# Assumes the app is already on the login screen.
+#
+# Usage:
+#   - runFlow: ../subflows/login-contractor.yaml
+
+- assertVisible:
+    text: "Sign in to your account"
+    timeout: 10000
+
+- tapOn:
+    id: "login-email-input"
+- inputText: ${TEST_CONTRACTOR_EMAIL}
+
+- tapOn:
+    id: "login-password-input"
+- inputText: ${TEST_CONTRACTOR_PASSWORD}
+
+- tapOn:
+    id: "login-submit-button"
+
+# Contractor home also shows the "Home" tab
+- assertVisible:
+    text: "Home"
+    timeout: 15000

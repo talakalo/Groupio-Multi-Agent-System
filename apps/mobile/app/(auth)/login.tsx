@@ -91,6 +91,7 @@ export default function LoginScreen() {
               textContentType="emailAddress"
               returnKeyType="next"
               style={styles.input}
+              testID="login-email-input"
               right={<TextInput.Icon icon="email" />}
             />
 
@@ -108,6 +109,7 @@ export default function LoginScreen() {
               returnKeyType="done"
               onSubmitEditing={handleLogin}
               style={styles.input}
+              testID="login-password-input"
               right={
                 <TextInput.Icon
                   icon={showPassword ? "eye-off" : "eye"}
@@ -160,6 +162,7 @@ export default function LoginScreen() {
               style={styles.submitButton}
               contentStyle={styles.submitContent}
               labelStyle={styles.submitLabel}
+              testID="login-submit-button"
             >
               {i18n.t("auth.loginSubmit")}
             </Button>

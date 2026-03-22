@@ -237,6 +237,7 @@ export default function SignupScreen() {
             autoCapitalize="words"
             textContentType="name"
             style={styles.input}
+            testID="signup-name-input"
             right={<TextInput.Icon icon="account" />}
           />
           {errors.fullName && (
@@ -259,6 +260,7 @@ export default function SignupScreen() {
             autoComplete="email"
             textContentType="emailAddress"
             style={styles.input}
+            testID="signup-email-input"
             right={<TextInput.Icon icon="email" />}
           />
           {errors.email && (
@@ -280,6 +282,7 @@ export default function SignupScreen() {
             autoComplete="new-password"
             textContentType="newPassword"
             style={styles.input}
+            testID="signup-password-input"
             right={
               <TextInput.Icon
                 icon={showPassword ? "eye-off" : "eye"}
@@ -305,6 +308,7 @@ export default function SignupScreen() {
             secureTextEntry={!showPassword}
             textContentType="newPassword"
             style={styles.input}
+            testID="signup-confirm-password-input"
             right={<TextInput.Icon icon="lock-check" />}
           />
           {errors.confirmPassword && (
@@ -338,6 +342,7 @@ export default function SignupScreen() {
             style={styles.submitButton}
             contentStyle={styles.submitContent}
             labelStyle={styles.submitLabel}
+            testID="signup-submit-button"
           >
             {i18n.t("auth.signupSubmit")}
           </Button>

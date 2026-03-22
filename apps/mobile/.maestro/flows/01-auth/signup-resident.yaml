@@ -1,0 +1,57 @@
+# Flow: Resident Signup
+# Tests the full signup flow for a new resident user:
+#   fresh launch → signup screen → select role → fill form → verify email screen
+#
+# Run: maestro test .maestro/flows/01-auth/signup-resident.yaml
+
+appId: ${APP_ID}
+tags:
+  - auth
+  - signup
+---
+
+- runFlow: ../../subflows/launch-fresh.yaml
+
+- assertVisible:
+    text: "Groupio"
+    timeout: 8000
+
+# Navigate to signup from the login screen
+- tapOn: "Sign Up"
+
+# Verify signup screen is showing
+- assertVisible:
+    text: "Create a new account"
+    timeout: 8000
+
+# Select "Resident" role
+- tapOn: "Resident"
+
+# Fill in the form
+- tapOn:
+    id: "signup-name-input"
+- inputText: "Test Resident User"
+
+- tapOn:
+    id: "signup-email-input"
+- clearText
+- inputText: "e2e.new.resident@test.groupio.co.il"
+
+- tapOn:
+    id: "signup-password-input"
+- inputText: "E2eTest123!"
+
+- tapOn:
+    id: "signup-confirm-password-input"
+- inputText: "E2eTest123!"
+
+# Submit the form
+- tapOn:
+    id: "signup-submit-button"
+
+# After signup, should redirect to verify-email screen
+- assertVisible:
+    text: "Check your email"
+    timeout: 15000
+- assertVisible: "Resend verification link"
+- assertVisible: "Continue to login"

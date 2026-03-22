@@ -1,0 +1,32 @@
+# Flow: Resident Login
+# Tests the full login flow for a resident user:
+#   fresh launch → login screen → fill credentials → verify home tab renders
+#
+# Run: maestro test .maestro/flows/01-auth/login-resident.yaml
+
+appId: ${APP_ID}
+tags:
+  - auth
+  - resident
+  - smoke
+---
+
+# 1. Launch the app with cleared state
+- runFlow: ../../subflows/launch-fresh.yaml
+
+# 2. The app should redirect to the login screen (unauthenticated)
+- assertVisible:
+    text: "Groupio"
+    timeout: 8000
+
+# 3. Login as resident
+- runFlow: ../../subflows/login-resident.yaml
+
+# 4. Verify the home tab is loaded
+- assertVisible: "Welcome to Groupio"
+- assertVisible: "Offers"
+- assertVisible: "Chat"
+- assertVisible: "Profile"
+
+# 5. Verify the resident is NOT on an admin/contractor route
+- assertNotVisible: "Create Offer"

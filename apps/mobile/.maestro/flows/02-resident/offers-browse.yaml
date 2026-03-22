@@ -1,0 +1,67 @@
+# Flow: Resident — Browse Offers
+# Tests browsing, filtering, and viewing offer details.
+#
+# Run: maestro test .maestro/flows/02-resident/offers-browse.yaml
+
+appId: ${APP_ID}
+tags:
+  - resident
+  - offers
+---
+
+- runFlow: ../../subflows/launch-fresh.yaml
+- runFlow: ../../subflows/login-resident.yaml
+
+# Navigate to Offers tab
+- tapOn: "Offers"
+- assertVisible:
+    text: "Available"
+    timeout: 8000
+
+# Verify tab selector is present
+- assertVisible: "My Offers"
+- assertVisible: "Available"
+- assertVisible: "Completed"
+
+# Switch to "Available" tab (should be default)
+- tapOn: "Available"
+- waitForAnimationToEnd
+
+# Filter by category — tap "AC Installation" chip
+- scrollHorizontallyUntilVisible:
+    element:
+      text: "AC Installation"
+    direction: RIGHT
+    timeout: 5000
+- tapOn: "AC Installation"
+- waitForAnimationToEnd
+
+# Clear filter — tap "All" chip (scroll back)
+- scrollHorizontallyUntilVisible:
+    element:
+      text: "All"
+    direction: LEFT
+    timeout: 5000
+- tapOn: "All"
+- waitForAnimationToEnd
+
+# Switch to "My Offers" tab
+- tapOn: "My Offers"
+- waitForAnimationToEnd
+
+# Switch to "Completed" tab
+- tapOn: "Completed"
+- waitForAnimationToEnd
+
+# Switch back to "Available"
+- tapOn: "Available"
+
+# Pull to refresh
+- swipe:
+    direction: DOWN
+    startElement:
+      text: "Available"
+- waitForAnimationToEnd
+
+# FAB "New Offer" should be visible
+- assertVisible: "New Offer"
