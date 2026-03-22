@@ -30,6 +30,7 @@
     "dashboard": "לוח בקרה",
     "offers": "הצעות",
     "contractors": "קבלנים",
+    "architecture": "תוכנית הדירה",
     "building": "הבניין",
     "profile": "פרופיל",
     "payments": "תשלומים",
@@ -44,7 +45,8 @@
     "profile": "פרופיל",
     "contractorBadge": "קבלן",
     "newOffer": "הצעה חדשה",
-    "myBusiness": "העסק שלי"
+    "myBusiness": "העסק שלי",
+    "logout": "התנתקות"
   },
   "dashboard": {
     "welcome": "שלום, {name}!",
@@ -345,9 +347,31 @@
     "profile": {
       "title": "פרופיל העסק",
       "subtitle": "נהל את פרטי העסק והמסמכים",
+      "tabs": {
+        "info": "פרטי עסק",
+        "documents": "מסמכים",
+        "settings": "הגדרות"
+      },
       "trustScore": {
         "title": "ציון אמינות",
-        "description": "ציון האמינות שלך משפיע על הדירוג בהצעות"
+        "description": "ציון האמינות שלך משפיע על הדירוג בהצעות",
+        "scoreLabels": {
+          "excellent": "מצוין",
+          "good": "טוב",
+          "needsImprovement": "דורש שיפור"
+        },
+        "categories": {
+          "documents": "מסמכים",
+          "insurance": "ביטוח",
+          "rating": "דירוג",
+          "responseTime": "זמן תגובה"
+        },
+        "tips": {
+          "insurance": "שמרו על ביטוח בתוקף",
+          "profile": "השלימו את הפרופיל",
+          "response": "הגיבו במהירות ללקוחות",
+          "reviews": "אספו ביקורות חיוביות"
+        }
       },
       "sections": {
         "business": "פרטי העסק",
@@ -366,6 +390,25 @@
         "website": "אתר",
         "categories": "קטגוריות",
         "regions": "אזורים"
+      },
+      "categories": {
+        "ac_installation": "התקנת מזגנים",
+        "kitchen": "מטבחים",
+        "electrical": "חשמל",
+        "plumbing": "אינסטלציה",
+        "painting": "צביעה",
+        "flooring": "ריצוף",
+        "windows": "חלונות",
+        "security": "אבטחה"
+      },
+      "regions": {
+        "center": "מרכז",
+        "tel_aviv": "תל אביב",
+        "jerusalem": "ירושלים",
+        "north": "צפון",
+        "south": "דרום",
+        "sharon": "שרון",
+        "shfela": "שפלה"
       },
       "documents": {
         "requestBannerTitle": "נדרשו מסמכים נוספים",
@@ -390,6 +433,19 @@
         "acceptingOffers": "מקבל הצעות חדשות",
         "dangerZone": "אזור מסוכן",
         "deactivate": "השבת חשבון"
+      },
+      "vetting": {
+        "documentSubmission": "הגשת מסמכים",
+        "documentSubmissionDesc": "העלאת מסמכי עסק נדרשים.",
+        "licenseCheck": "אימות רישיון",
+        "licenseCheckDesc": "אנו מאמתים את רישיון העסק.",
+        "insuranceCheck": "בדיקת ביטוח",
+        "insuranceCheckDesc": "אנו מאמתים את ביטוח העסק.",
+        "finalVerification": "אימות סופי",
+        "finalVerificationDesc": "בדיקה ידנית לפני אישור מלא.",
+        "statusComplete": "הושלם",
+        "statusFailed": "נכשל",
+        "statusInProgress": "בתהליך"
       },
       "save": "שמור",
       "saving": "שומר...",
@@ -429,6 +485,82 @@
         "completed": "הושלם",
         "cancelled": "בוטל",
         "active": "פעיל"
+      }
+    }
+  },
+  "buildingsManagerNav": {
+    "dashboard": "לוח בקרה",
+    "buildings": "בניינים",
+    "escalations": "אסקלציות",
+    "role": "מנהל בניינים",
+    "roleSuperAdmin": "מנהל-על",
+    "roleAdmin": "מנהל",
+    "myAccount": "החשבון שלי"
+  },
+  "buildingsManager": {
+    "dashboard": {
+      "title": "סקירת בניינים",
+      "subtitle": "מעקב אחר בניינים, דיירים, הצעות ואסקלציות פתוחות",
+      "stats": {
+        "totalBuildings": "סה״כ בניינים",
+        "totalResidents": "סה״כ דיירים",
+        "activeOffers": "הצעות פעילות",
+        "openEscalations": "אסקלציות פתוחות"
+      },
+      "viewAll": "הצג הכל",
+      "recentBuildings": "בניינים אחרונים",
+      "openEscalations": "אסקלציות פתוחות",
+      "noBuildings": "אין בניינים עדיין",
+      "noEscalations": "אין אסקלציות פתוחות",
+      "units": "יח״ד",
+      "open": "פתוח"
+    },
+    "buildings": {
+      "title": "בניינים",
+      "total": "{count, plural, =0 {אין בניינים} one {בניין אחד} other {# בניינים}}",
+      "searchPlaceholder": "חיפוש לפי שם או עיר…",
+      "noResults": "לא נמצאו בניינים",
+      "empty": "אין בניינים להצגה",
+      "units": "{count, plural, one {יחידת דיור אחת} other {# יח״ד}}",
+      "activeOffers": "{count, plural, =0 {אין הצעות פעילות} one {הצעה פעילה אחת} other {# הצעות פעילות}}"
+    },
+    "escalations": {
+      "title": "אסקלציות",
+      "total": "{count, plural, =0 {אין אסקלציות} one {אסקלציה אחת} other {# אסקלציות}}",
+      "filters": {
+        "allStatuses": "כל הסטטוסים",
+        "open": "פתוח",
+        "inProgress": "בטיפול",
+        "resolved": "טופל",
+        "allPriorities": "כל העדיפויות",
+        "critical": "קריטי",
+        "high": "גבוה",
+        "medium": "בינוני",
+        "low": "נמוך"
+      },
+      "empty": "אין אסקלציות התואמות למסננים",
+      "resolve": "סגור פנייה",
+      "resolving": "סוגר…"
+    }
+  },
+  "adminNav": {
+    "dashboard": "לוח בקרה",
+    "buildingsManager": "מנהל בניינים",
+    "roleSuperAdmin": "מנהל-על",
+    "roleAdmin": "מנהל",
+    "myAccount": "החשבון שלי"
+  },
+  "admin": {
+    "dashboard": {
+      "title": "ניהול מערכת",
+      "subtitle": "קיצורי דרך לכלי תפעול",
+      "buildingsManagerCard": {
+        "title": "מנהל בניינים",
+        "description": "פתיחת מסוף מנהל הבניינים — בניינים, דיירים ואסקלציות."
+      },
+      "systemSettingsCard": {
+        "title": "הגדרות מערכת",
+        "description": "הגדרות פלטפורמה (בקרוב)."
       }
     }
   },
@@ -548,27 +680,6 @@
       "failed": "נכשל",
       "refunded": "הוחזר"
     }
-  },
-  "contractorNav": {
-    "dashboard": "לוח בקרה",
-    "activeOffers": "הצעות פעילות",
-    "createOffer": "צור הצעה",
-    "projects": "פרויקטים",
-    "profile": "פרופיל",
-    "contractorBadge": "קבלן",
-    "newOffer": "הצעה חדשה",
-    "myBusiness": "העסק שלי",
-    "logout": "התנתקות"
-  },
-  "residentNav": {
-    "dashboard": "לוח בקרה",
-    "offers": "הצעות",
-    "contractors": "קבלנים",
-    "architecture": "תוכנית הדירה",
-    "building": "בניין",
-    "profile": "פרופיל",
-    "aiAssistant": "עוזר AI",
-    "myAccount": "החשבון שלי"
   },
   "architecture": {
     "title": "תוכנית הדירה שלי",

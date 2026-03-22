@@ -25,8 +25,8 @@ python -m venv venv
 source venv/bin/activate   # On Windows: venv\Scripts\activate
 pip install -e ".[dev]"    # Backend + alembic
 
-# 3. Start infrastructure services
-docker compose up -d
+# 3. Start infrastructure services (from repo root; compose file is under docker/)
+docker compose -f docker/docker-compose.yml up -d
 
 # 4. Configure environment
 cp docker/.env.example .env
@@ -76,20 +76,26 @@ pip install -e ".[dev]"
 The system requires several services. Use Docker Compose to start them:
 
 ```bash
-docker compose up -d
+# Always run from the repository root (not from docker/)
+docker compose -f docker/docker-compose.yml up -d
 ```
 
-This starts:
+If your shell is already in `docker/`, use: `docker compose -f docker-compose.yml up -d`
+
+This starts (typical dev stack):
 | Service | Port | Description |
 |---------|------|-------------|
 | Redis | 6379 | Caching, rate limiting, session storage |
 | Qdrant | 6333 | Vector database for RAG |
 | Neo4j | 7474 (HTTP), 7687 (Bolt) | Graph database |
-| PostgreSQL | 5432 | Main database (via Supabase) |
+| PostgreSQL | 5432 | Main database |
+| Prometheus | 9090 | Metrics |
+| Alertmanager | 9093 | Alerts |
+| Grafana | **3010** | Dashboards (admin UI stays on **3001**) |
 
 **Verify services are running:**
 ```bash
-docker compose ps
+docker compose -f docker/docker-compose.yml ps
 ```
 
 ### 3. Configure Environment Variables
@@ -134,8 +140,8 @@ ENVIRONMENT=development
 Ensure PostgreSQL is running. If Homebrew’s service fails (e.g. launchctl bootstrap error), use Docker instead:
 
 ```bash
-cd docker
-docker compose up -d postgres
+# From repo root:
+docker compose -f docker/docker-compose.yml up -d postgres
 ```
 
 Then **from the project root** (not from `docker/`) run migrations. The Docker Postgres container creates the `groupio` database automatically.
@@ -299,10 +305,10 @@ pnpm build                # Build all apps
 pnpm test                 # Run all tests
 pnpm lint                 # Run ESLint
 
-# Docker
-docker compose up -d      # Start services
-docker compose down       # Stop services
-docker compose logs -f    # View logs
+# Docker (repo root)
+docker compose -f docker/docker-compose.yml up -d
+docker compose -f docker/docker-compose.yml down
+docker compose -f docker/docker-compose.yml logs -f
 ```
 
 ### Hot Reload
@@ -319,23 +325,34 @@ docker compose logs -f    # View logs
 
 #### Port already in use
 ```bash
-# Find process using port
+# Find process using port (e.g. 8000 API, 3001 Admin)
 lsof -i :8000
+lsof -i :3001
 # Kill it
 kill -9 <PID>
 ```
+Admin uses **3001**; Grafana in Docker is on **3010** so they no longer fight for the same port.
+
+#### `docker compose` “no such file” (`docker/docker/docker-compose.yml`)
+You ran compose from inside `docker/` with `-f docker/docker-compose.yml`. Either stay in **repo root** and use `-f docker/docker-compose.yml`, or from `docker/` use `-f docker-compose.yml`.
+
+#### “Cannot connect to the Docker daemon”
+Start **Docker Desktop** (or the daemon), then retry.
+
+#### Uvicorn: `Invalid value for '--port': '8000export'` or `Address already in use`
+Paste **one command per line**. If `8000` is taken, stop the other API (`lsof -i :8000`) or use another port.
 
 #### Docker services not starting
 ```bash
 # Check logs
-docker compose logs <service-name>
+docker compose -f docker/docker-compose.yml logs <service-name>
 
 # Restart services
-docker compose down && docker compose up -d
+docker compose -f docker/docker-compose.yml down && docker compose -f docker/docker-compose.yml up -d
 ```
 
 #### Database connection errors
-1. Ensure Docker services are running: `docker compose ps`
+1. Ensure Docker services are running: `docker compose -f docker/docker-compose.yml ps`
 2. Check environment variables in `.env`
 3. Verify network connectivity to services
 
@@ -353,7 +370,7 @@ nvm use 20
 ### Logs
 
 - **API logs**: Console output or `LOG_LEVEL=DEBUG` for verbose
-- **Docker logs**: `docker compose logs -f <service>`
+- **Docker logs**: `docker compose -f docker/docker-compose.yml logs -f <service>`
 - **Next.js logs**: Console output in terminal
 
 ---

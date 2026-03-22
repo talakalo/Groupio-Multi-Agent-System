@@ -143,6 +143,7 @@
     "viewAll": "צפה בהכל",
     "recentProjects": "פרויקטים אחרונים",
     "earnings": "הכנסות",
+    "revenue": "הכנסות",
     "participants": "משתתפים",
     "searchOffers": "חיפוש הצעות...",
     "noOffers": "אין הצעות",
@@ -191,15 +192,6 @@
     "security": "אבטחה"
   },
   "orders": {
-    "noOrders": "אין הזמנות",
-    "ordersWillAppear": "ההזמנות שלכם יופיעו כאן",
-    "statusPending": "ממתין",
-    "statusConfirmed": "אושר",
-    "statusInProgress": "בביצוע",
-    "statusCompleted": "הושלם",
-    "statusCancelled": "בוטל"
-  },
-  "orders": {
     "title": "הזמנות",
     "noOrders": "אין הזמנות",
     "ordersWillAppear": "ההזמנות שלכם יופיעו כאן",
@@ -218,7 +210,12 @@
     "paymentPending": "ממתין לתשלום",
     "paymentEscrow": "בנאמנות",
     "paymentReleased": "שוחרר",
-    "paymentRefunded": "הוחזר"
+    "paymentRefunded": "הוחזר",
+    "statusPending": "ממתין",
+    "statusConfirmed": "אושר",
+    "statusInProgress": "בביצוע",
+    "statusCompleted": "הושלם",
+    "statusCancelled": "בוטל"
   },
   "checkout": {
     "title": "תשלום",
@@ -270,27 +267,6 @@
     "next": "הבא",
     "done": "סיום",
     "comingSoon": "בקרוב"
-  },
-  "contractor": {
-    "createOffer": "צור הצעה",
-    "myOffers": "ההצעות שלי",
-    "projects": "פרויקטים",
-    "messages": "הודעות",
-    "activeOffers": "הצעות פעילות",
-    "recentProjects": "פרויקטים אחרונים",
-    "revenue": "הכנסות",
-    "quickActions": "פעולות מהירות",
-    "participants": "משתתפים",
-    "trustScore": "ציון אמון",
-    "outOf100": "מתוך 100",
-    "noTrustData": "אין נתוני אמון זמינים",
-    "verificationStatus": "סטטוס אימות",
-    "businessLicense": "רישיון עסק",
-    "verified": "מאומת",
-    "insurance": "ביטוח",
-    "valid": "בתוקף",
-    "documents": "מסמכים",
-    "uploaded": "הועלו"
   },
   "status": {
     "active": "פעילה",

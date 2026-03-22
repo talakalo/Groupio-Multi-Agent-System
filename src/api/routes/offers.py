@@ -333,6 +333,12 @@ async def join_offer(
     """Join an offer as a participant."""
     db = get_postgres_client()
 
+    if request.user_id is not None and request.user_id != current_user.id:
+        raise HTTPException(
+            status_code=403,
+            detail="Cannot join on behalf of another user",
+        )
+
     offer = await db.get_offer(offer_id)
     if not offer:
         raise HTTPException(status_code=404, detail="Offer not found")

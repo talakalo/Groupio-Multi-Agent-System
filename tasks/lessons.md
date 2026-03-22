@@ -32,6 +32,7 @@ Transcribed from screenshot:
 - **RTL requires logical CSS properties** — Use `start`/`end` (and `margin-inline-start`, `padding-inline-end`, etc.) not `left`/`right`.
 - **Hebrew typography needs line-height >= 1.4** — Improves readability for Hebrew text.
 - **Skeleton loading is better UX than spinners** — Use skeleton placeholders for content-heavy loading states.
+- **Duplicate top-level keys in `messages/*.json` silently overwrite** — JSON parsers keep the last value; e.g. two `residentNav` blocks dropped `payments` while keeping `architecture`. Merge into one namespace and add a test that scans the raw file for duplicate keys.
 - **Trust badges above the fold increase checkout conversion** — Position trust indicators prominently in checkout flows.
 - **window.prompt() and window.location.reload() are anti-patterns** — Use modals and state invalidation instead.
 
@@ -43,10 +44,12 @@ Transcribed from screenshot:
 - **Docker must run migrations** — A fresh Postgres volume has no schema. Docker Compose must run `alembic upgrade head` before uvicorn. API command now does: `alembic upgrade head && uvicorn ...`. See `tasks/RUNTIME_CONFIG_AUDIT_REPORT.md`.
 - **Startup readiness ≠ schema readiness** — "Database connection verified" (pool creation) does not prove auth tables exist. Add `auth_tables_exist()` check and log clearly if `users` is missing. Return 503 (not 500) for `UndefinedTableError`.
 - **Runtime failure audit** — Login/signup: duplicate-submit guard (useRef), 423 (Locked) mapping, gaierror→503 in backend. See `tasks/runtime_failure_audit_report.md`.
+- **Local compose + ports** — Compose file is `docker/docker-compose.yml`; run from repo root with `-f docker/docker-compose.yml`, or from `docker/` with `-f docker-compose.yml` only. Grafana was published on host 3001 and blocked Admin; Grafana is now **3010**. Shell pastes: one command per line or `uvicorn` merges with `export` and breaks `--port`.
 
 ### API contracts
 - **Profile password change vs forgot password** — `POST /auth/password/reset` expects `{email}` (unauthenticated). For changing password when logged in, use `POST /auth/password/change` with `{current_password, new_password}` and auth header. Profile page was incorrectly using password-reset.
 - **Payments list** — Backend has `GET /payments/my`, not `GET /payments?status=...`. Dashboard was requesting wrong path (404).
 - **Building join in dev** — Relative `/api/v1/...` hits Next.js in dev (no rewrite). Use full `apiBase` URL so requests reach the backend.
+- **Publish-readiness audits can drift from code** — Before filing a gap (e.g. “ApiClient missing X”), grep/read `client.ts` and align the written audit or add an “as-of” errata block. Stale G1-style claims undermine trust.
 
 <!-- Add entries below as corrections and patterns emerge -->

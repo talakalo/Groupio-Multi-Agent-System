@@ -136,14 +136,14 @@ export function useCreateOffer(
 /** Join an existing group offer (mutation). */
 export function useJoinOffer(
   options?: Omit<UseMutationOptions<
-    { success: boolean; participants: number },
+    { status: string; offer_id: string },
     Error,
     string
   >, 'mutationFn'>,
 ) {
   const queryClient = useQueryClient();
 
-  return useMutation<{ success: boolean; participants: number }, Error, string>({
+  return useMutation<{ status: string; offer_id: string }, Error, string>({
     mutationFn: joinOffer,
     onSettled: (_data, _error, offerId) => {
       // Refetch the specific offer and all lists after mutation settles

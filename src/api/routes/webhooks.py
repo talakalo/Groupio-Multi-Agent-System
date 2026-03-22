@@ -9,13 +9,13 @@ from typing import Any
 import httpx
 from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Query, Request
 
-# E.164 phone number format (e.g. "972501234567" — digits only, 7-15 digits)
-_E164_PATTERN = re.compile(r"^\d{7,15}$")
-
 from src.config.settings import get_settings
 from src.databases.postgres import get_postgres_client
 from src.orchestration.graph import get_orchestrator
 from src.orchestration.state import create_initial_state
+
+# E.164 phone number format (e.g. "972501234567" — digits only, 7-15 digits)
+_E164_PATTERN = re.compile(r"^\d{7,15}$")
 
 logger = logging.getLogger(__name__)
 

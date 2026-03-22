@@ -1,5 +1,6 @@
 global:
   resolve_timeout: 5m
+  # Substituted at runtime; docker compose sets SLACK_WEBHOOK_URL + --config.expand-env.
   slack_api_url: '${SLACK_WEBHOOK_URL}'
 
 route:

@@ -3,6 +3,7 @@
 import logging
 import secrets
 from functools import lru_cache
+from urllib.parse import quote
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings
@@ -42,6 +43,12 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/groupio"
     # Set to "1" or "true" to force local PostgreSQL (useful when Supabase has connection issues)
     USE_LOCAL_POSTGRES: str = ""
+    # Docker Compose passes these so DATABASE_URL can target the `postgres` service instead of
+    # a Supabase URL from .env (avoids asyncpg SSL / routing errors inside the container).
+    DOCKER_POSTGRES_HOST: str = ""
+    DOCKER_POSTGRES_USER: str = ""
+    DOCKER_POSTGRES_PASSWORD: str = ""
+    DOCKER_POSTGRES_DB: str = ""
 
     # Redis
     # In production, set REDIS_URL to include credentials, e.g.:
@@ -197,6 +204,17 @@ class Settings(BaseSettings):
         """Prevent insecure defaults in production/staging."""
         is_prod = self.ENVIRONMENT in ("production", "staging")
 
+        # --- Docker: local Postgres service (overrides DATABASE_URL from .env) ---
+        force_local_pg = (self.USE_LOCAL_POSTGRES or "").lower() in ("1", "true", "yes")
+        if force_local_pg and (self.DOCKER_POSTGRES_HOST or "").strip():
+            user = (self.DOCKER_POSTGRES_USER or "postgres").strip()
+            password = self.DOCKER_POSTGRES_PASSWORD or ""
+            db = (self.DOCKER_POSTGRES_DB or "groupio").strip()
+            host = self.DOCKER_POSTGRES_HOST.strip()
+            self.DATABASE_URL = (
+                f"postgresql://{quote(user, safe='')}:{quote(password, safe='')}@{host}:5432/{quote(db, safe='')}"
+            )
+
         # --- JWT secret ---
         if self.ENVIRONMENT not in ("development", "test") and self.JWT_SECRET_KEY in _INSECURE_JWT_DEFAULTS:
             raise ValueError(
@@ -229,6 +247,32 @@ class Settings(BaseSettings):
                 "Unverified users can log in. Enable it to protect the platform.",
                 self.ENVIRONMENT,
             )
+
+        # --- Payments: publishable environments (staging + production) ---
+        if self.ENVIRONMENT in ("production", "staging"):
+            prov = (self.PAYMENT_PROVIDER or "").lower()
+            if prov == "mock":
+                raise ValueError(
+                    f"PAYMENT_PROVIDER=mock is not allowed when ENVIRONMENT={self.ENVIRONMENT!r}. "
+                    "Use PAYMENT_PROVIDER=stripe with real Stripe credentials for any publishable deploy."
+                )
+            if prov in ("bit", "paybox"):
+                raise ValueError(
+                    f"PAYMENT_PROVIDER={prov!r} is not launch-ready (integration incomplete). "
+                    f"Set PAYMENT_PROVIDER=stripe when ENVIRONMENT={self.ENVIRONMENT!r}."
+                )
+            if prov == "stripe":
+                if not self.STRIPE_SECRET_KEY or not self.STRIPE_SECRET_KEY.strip():
+                    raise ValueError(
+                        "STRIPE_SECRET_KEY must be set when PAYMENT_PROVIDER=stripe "
+                        f"and ENVIRONMENT={self.ENVIRONMENT!r}."
+                    )
+                if not self.STRIPE_WEBHOOK_SECRET or not self.STRIPE_WEBHOOK_SECRET.strip():
+                    raise ValueError(
+                        "STRIPE_WEBHOOK_SECRET must be set when PAYMENT_PROVIDER=stripe "
+                        f"and ENVIRONMENT={self.ENVIRONMENT!r} "
+                        "(required for payment + subscription webhook verification)."
+                    )
 
         # --- Required secrets in production ---
         if is_prod:

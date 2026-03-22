@@ -225,9 +225,7 @@ class PaymentAgent(BaseAgent):
             return await self._handle_refund_gated(state, user_id, user_message, mode)
         return await self._handle_refund_auto(state, user_id, user_message)
 
-    async def _handle_refund_gated(
-        self, state: AgentState, user_id: str, user_message: str, mode: str
-    ) -> AgentState:
+    async def _handle_refund_gated(self, state: AgentState, user_id: str, user_message: str, mode: str) -> AgentState:
         """Queue a refund request for admin approval without moving any money."""
         db = get_postgres_client()
         payments = await db.list_payments_for_user(user_id)
