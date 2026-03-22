@@ -6,7 +6,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.security import OAuth2PasswordRequestForm
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from src.api.middleware.auth import (
     create_access_token,
@@ -30,6 +30,7 @@ from src.models.user import (
     UserResponse,
     UserRole,
     UserUpdate,
+    SELF_REGISTERABLE_ROLES,
 )
 from src.services.email import get_email_service
 
@@ -52,7 +53,12 @@ async def check_auth_rate_limit(request: Request) -> None:
 
 
 class SignupRequest(BaseModel):
-    """Signup request (frontend format: name, buildingId)."""
+    """Signup request (frontend format: name, buildingId).
+
+    Only self-registerable roles (resident, contractor) are accepted.
+    Attempting to claim admin, super_admin, or buildings_manager via public
+    signup is rejected with HTTP 422 to prevent privilege escalation.
+    """
 
     name: str = Field(..., min_length=2, max_length=100)
     email: EmailStr
@@ -62,6 +68,16 @@ class SignupRequest(BaseModel):
     building_id: str | None = Field(None, alias="buildingId")
 
     model_config = {"populate_by_name": True}
+
+    @field_validator("role")
+    @classmethod
+    def _block_privileged_roles(cls, v: UserRole) -> UserRole:
+        if v not in SELF_REGISTERABLE_ROLES:
+            raise ValueError(
+                f"Cannot self-register with role '{v}'. "
+                f"Allowed: {', '.join(sorted(SELF_REGISTERABLE_ROLES))}"
+            )
+        return v
 
 
 class RefreshRequest(BaseModel):
