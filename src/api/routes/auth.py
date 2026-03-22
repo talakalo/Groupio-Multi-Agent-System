@@ -315,6 +315,9 @@ async def login_json(
         assert request.phone is not None  # validated by LoginRequest
         user = await db.get_user_by_phone(request.phone)
     if not user:
+        ident = (request.email or request.phone or "") or ""
+        masked = ident[:3] + "***" if len(ident) > 3 else "***"
+        logger.info("Login 401: user not found for identifier=%s", masked)
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     hashed = await db.get_user_password_hash(user.id)

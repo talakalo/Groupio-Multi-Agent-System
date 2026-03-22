@@ -6,11 +6,15 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from src.api.middleware.auth import get_current_user, is_admin
+from src.api.middleware.auth import get_current_user, get_current_user_optional, is_admin
 from src.databases.graph_store import get_graph_store
 from src.databases.postgres import get_postgres_client
 from src.databases.redis_client import get_redis_client
 from src.databases.vector_store import get_vector_store
+from src.domain.contractor_membership import (
+    contractor_may_view_contractor_profile,
+    contractor_visible_in_marketplace,
+)
 from src.models.contractor import (
     ContractorCreate,
     ContractorListResponse,
@@ -23,7 +27,7 @@ from src.models.contractor import (
     VerificationStatus,
 )
 from src.models.offer import ServiceCategory
-from src.models.user import UserInDB
+from src.models.user import UserInDB, UserRole
 from src.rag.embeddings import get_embedding_client
 
 logger = logging.getLogger(__name__)
@@ -109,6 +113,8 @@ async def list_contractors(
     if verification_status:
         filters["verification_status"] = verification_status.value
 
+    filters["marketplace_visible_only"] = True
+
     contractors, total = await db.list_contractors(
         filters=filters,
         page=page,
@@ -154,6 +160,7 @@ async def search_contractors(
 
         contractor_ids = [r["id"] for r in results]
         contractors = await db.get_contractors_by_ids(contractor_ids)
+        contractors = [c for c in contractors if contractor_visible_in_marketplace(c)]
         total = len(contractors)
     else:
         # Regular filter search
@@ -168,6 +175,8 @@ async def search_contractors(
             filters["min_rating"] = request.min_rating
         if request.verification_status:
             filters["verification_status"] = request.verification_status.value
+
+        filters["marketplace_visible_only"] = True
 
         contractors, total = await db.list_contractors(
             filters=filters,
@@ -209,13 +218,50 @@ async def get_my_doc_requests(
         return {"items": [], "pending": False}
 
 
+_MEMBERSHIP_KEYS = (
+    "membership_status",
+    "membership_plan",
+    "membership_provider",
+    "provider_customer_id",
+    "provider_subscription_id",
+    "current_period_start",
+    "current_period_end",
+    "next_billing_at",
+    "cancel_at_period_end",
+    "canceled_at",
+    "billing_failure_count",
+    "membership_grace_until",
+    "trial_ends_at",
+    "last_payment_at",
+)
+
+
+@router.get("/me/membership")
+async def get_my_contractor_membership(
+    current_user: UserInDB = Depends(get_current_user),
+) -> dict:
+    """Current contractor marketplace membership state (no payment-provider side effects)."""
+    if current_user.role != UserRole.CONTRACTOR or not current_user.contractor_id:
+        raise HTTPException(status_code=403, detail="Contractor only")
+    db = get_postgres_client()
+    contractor = await db.get_contractor(current_user.contractor_id)
+    if not contractor:
+        raise HTTPException(status_code=404, detail="Contractor not found")
+    return {k: contractor.get(k) for k in _MEMBERSHIP_KEYS}
+
+
 @router.get("/{contractor_id}", response_model=ContractorResponse)
-async def get_contractor(contractor_id: str) -> ContractorResponse:
+async def get_contractor(
+    contractor_id: str,
+    current_user: UserInDB | None = Depends(get_current_user_optional),
+) -> ContractorResponse:
     """Get contractor by ID."""
     db = get_postgres_client()
     contractor = await db.get_contractor(contractor_id)
 
     if not contractor:
+        raise HTTPException(status_code=404, detail="Contractor not found")
+    if not contractor_may_view_contractor_profile(current_user, contractor):
         raise HTTPException(status_code=404, detail="Contractor not found")
 
     return contractor

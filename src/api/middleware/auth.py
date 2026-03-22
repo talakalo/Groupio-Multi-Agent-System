@@ -216,6 +216,24 @@ async def get_token_jti(
     return payload.jti if payload else None
 
 
+async def get_current_user_optional(
+    token: str | None = Depends(_get_token_from_header_or_cookie),
+) -> UserInDB | None:
+    """Return the current user when a valid token is present; otherwise None."""
+    if not token:
+        return None
+    payload = verify_access_token(token)
+    if not payload:
+        return None
+    from src.databases.postgres import get_postgres_client
+
+    db = get_postgres_client()
+    user = await db.get_user(payload.sub)
+    if not user or not user.is_active:
+        return None
+    return user
+
+
 async def get_current_active_user(
     current_user: UserInDB = Depends(get_current_user),
 ) -> UserInDB:
@@ -319,3 +337,11 @@ def is_admin(user: UserInDB) -> bool:
     inline checks where a dependency isn't convenient.
     """
     return user.role in ADMIN_ROLES
+
+
+def is_platform_admin(user: UserInDB) -> bool:
+    """True only for system operators (admin, super_admin).
+
+    Use for destructive or global operations. Excludes buildings_manager.
+    """
+    return user.role in (UserRole.ADMIN, UserRole.SUPER_ADMIN)

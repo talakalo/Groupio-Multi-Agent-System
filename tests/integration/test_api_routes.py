@@ -434,6 +434,10 @@ class TestContractorsAPI:
         assert response.status_code == 200
         data = response.json()
         assert data["total"] == 1
+        mock_db.list_contractors.assert_called_once()
+        call = mock_db.list_contractors.call_args
+        filters = (call.kwargs or {}).get("filters") or (call.args[0] if call.args else {})
+        assert filters.get("marketplace_visible_only") is True
 
     def test_get_contractor(self, client, mock_db, mock_contractor):
         """Test getting contractor details."""
@@ -444,6 +448,15 @@ class TestContractorsAPI:
         assert response.status_code == 200
         data = response.json()
         assert data["business_name"] == "AC Pro"
+
+    def test_get_contractor_hidden_membership_returns_404_for_anonymous(self, client, mock_db, mock_contractor):
+        """Non-marketplace-visible contractors are not exposed on the public profile route."""
+        hidden = {**mock_contractor, "membership_status": "canceled"}
+        mock_db.get_contractor = AsyncMock(return_value=hidden)
+
+        response = client.get("/api/v1/contractors/contractor-123")
+
+        assert response.status_code == 404
 
     def test_get_contractor_not_found(self, client, mock_db):
         """Test getting non-existent contractor."""

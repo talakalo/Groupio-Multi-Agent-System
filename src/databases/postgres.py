@@ -160,6 +160,20 @@ class PostgresClient:
             await self._asyncpg_pool.close()
             self._asyncpg_pool = None
 
+    async def auth_tables_exist(self) -> bool:
+        """Check if auth-critical tables (e.g. users) exist. Used for startup readiness."""
+        if self._use_supabase_client():
+            return True  # Supabase manages schema
+        try:
+            pool = await self._get_client()
+            async with pool.acquire() as conn:
+                row = await conn.fetchrow(
+                    "SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'users'"
+                )
+                return row is not None
+        except Exception:
+            return False
+
     async def _pg_execute(self, query: str, *args: Any) -> None:
         """Execute query via asyncpg."""
         pool = await self._get_client()
@@ -401,6 +415,43 @@ class PostgresClient:
             building_id,
         )
         return row is not None
+
+    async def get_building_ids_for_user(self, user_id: str) -> list[str]:
+        """Building IDs the user belongs to (users.building_id + building_residents)."""
+        ids: set[str] = set()
+        if self._use_supabase_client():
+            client = await self._get_client()
+            u = await client.table("users").select("building_id").eq("id", user_id).limit(1).execute()
+            if u.data and u.data[0].get("building_id"):
+                ids.add(str(u.data[0]["building_id"]))
+            br = await client.table("building_residents").select("building_id").eq("user_id", user_id).execute()
+            for row in br.data or []:
+                if row.get("building_id"):
+                    ids.add(str(row["building_id"]))
+            return sorted(ids)
+        row = await self._pg_fetch_one("SELECT building_id FROM users WHERE id = $1", user_id)
+        if row and row.get("building_id"):
+            ids.add(str(row["building_id"]))
+        rows = await self._pg_fetch_all(
+            "SELECT DISTINCT building_id FROM building_residents WHERE user_id = $1",
+            user_id,
+        )
+        for r in rows or []:
+            if r.get("building_id"):
+                ids.add(str(r["building_id"]))
+        return sorted(ids)
+
+    async def get_building_ids_where_user_is_admin(self, user_id: str) -> list[str]:
+        """Building IDs where the user is buildings.admin_user_id."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            result = await client.table("buildings").select("id").eq("admin_user_id", user_id).execute()
+            return [str(r["id"]) for r in (result.data or []) if r.get("id")]
+        rows = await self._pg_fetch_all(
+            "SELECT id FROM buildings WHERE admin_user_id = $1",
+            user_id,
+        )
+        return [str(r["id"]) for r in (rows or []) if r.get("id")]
 
     async def create_building(self, building_data: dict[str, Any]) -> dict[str, Any]:
         """Create a new building."""
@@ -804,7 +855,12 @@ class PostgresClient:
         if self._use_supabase_client():
             client = await self._get_client()
             q = client.table("offers").select("*", count="exact")
-            if filters.get("building_id"):
+            if filters.get("building_ids"):
+                bid_list = filters["building_ids"]
+                if not bid_list:
+                    return ([], 0)
+                q = q.in_("building_id", bid_list)
+            elif filters.get("building_id"):
                 q = q.eq("building_id", filters["building_id"])
             if filters.get("category"):
                 q = q.eq("category", filters["category"])
@@ -817,7 +873,16 @@ class PostgresClient:
             return (result.data or [], total)
         where_parts = []
         args: list[Any] = []
-        if filters.get("building_id"):
+        if filters.get("building_ids"):
+            bid_list = filters["building_ids"]
+            if not bid_list:
+                return ([], 0)
+            ph: list[str] = []
+            for bid in bid_list:
+                args.append(bid)
+                ph.append("$%d" % len(args))
+            where_parts.append("building_id IN (" + ",".join(ph) + ")")
+        elif filters.get("building_id"):
             args.append(filters["building_id"])
             where_parts.append("building_id = $%d" % len(args))
         if filters.get("category"):
@@ -1179,7 +1244,12 @@ class PostgresClient:
     async def list_contractors(
         self, filters: dict[str, Any], page: int = 1, page_size: int = 20
     ) -> tuple[list[dict[str, Any]], int]:
-        """List contractors with optional filters. Returns (items, total)."""
+        """List contractors with optional filters. Returns (items, total).
+
+        ``marketplace_visible_only`` (default False): when True, restrict to contractors that
+        should appear in public discovery (active/trialing, or past_due within grace).
+        """
+        marketplace_only = bool(filters.get("marketplace_visible_only"))
         if self._use_supabase_client():
             client = await self._get_client()
             q = client.table("contractors").select("*", count="exact")
@@ -1195,6 +1265,12 @@ class PostgresClient:
                 q = q.gte("trust_score", filters["min_trust_score"])
             if filters.get("verification_status"):
                 q = q.eq("verification_status", filters["verification_status"])
+            if marketplace_only:
+                now_iso = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+                q = q.or_(
+                    "membership_status.eq.active,membership_status.eq.trialing,"
+                    f"and(membership_status.eq.past_due,membership_grace_until.gt.{now_iso})",
+                )
             result = (
                 await q.order("trust_score", desc=True).range((page - 1) * page_size, page * page_size - 1).execute()
             )
@@ -1218,6 +1294,14 @@ class PostgresClient:
         if filters.get("verification_status"):
             args.append(filters["verification_status"])
             where_parts.append("verification_status = $%d" % len(args))
+        if marketplace_only:
+            where_parts.append(
+                "("
+                "COALESCE(membership_status, 'active') IN ('active', 'trialing') OR "
+                "(COALESCE(membership_status, 'active') = 'past_due' AND membership_grace_until IS NOT NULL "
+                "AND membership_grace_until > NOW())"
+                ")"
+            )
         where_sql = " AND ".join(where_parts) if where_parts else "1=1"
         count_row = await self._pg_fetch_one("SELECT COUNT(*) AS c FROM contractors WHERE " + where_sql, *args)
         total = count_row["c"] if count_row else 0
@@ -1238,6 +1322,16 @@ class PostgresClient:
             result = await client.table("contractors").select("*").eq("id", contractor_id).limit(1).execute()
             return result.data[0] if result.data else None
         return await self._pg_fetch_one("SELECT * FROM contractors WHERE id = $1", contractor_id)
+
+    async def get_user_id_by_contractor_id(self, contractor_id: str) -> str | None:
+        """Get the user ID linked to a contractor (users.contractor_id)."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            result = await client.table("users").select("id").eq("contractor_id", contractor_id).limit(1).execute()
+            row = result.data[0] if result.data else None
+            return row["id"] if row else None
+        row = await self._pg_fetch_one("SELECT id FROM users WHERE contractor_id = $1 LIMIT 1", contractor_id)
+        return row["id"] if row else None
 
     async def get_contractor_verification_metadata(self, contractor_id: str) -> list[dict[str, Any]]:
         """Get verification metadata for a contractor (Phase 2)."""
@@ -1301,6 +1395,37 @@ class PostgresClient:
             "completed_projects",
             "response_rate",
             "average_response_time_hours",
+        }
+        filtered = {k: v for k, v in update_data.items() if k in allowed}
+        if not filtered:
+            return await self.get_contractor(contractor_id) or {}
+        if self._use_supabase_client():
+            client = await self._get_client()
+            await client.table("contractors").update(filtered).eq("id", contractor_id).execute()
+        else:
+            query, args = self._build_safe_update("contractors", filtered, "id", contractor_id)
+            await self._pg_execute(query, *args)
+        return await self.get_contractor(contractor_id) or {}
+
+    async def admin_update_contractor_membership(
+        self, contractor_id: str, update_data: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Update marketplace membership columns (admin / system only)."""
+        allowed = {
+            "membership_status",
+            "membership_plan",
+            "membership_provider",
+            "provider_customer_id",
+            "provider_subscription_id",
+            "current_period_start",
+            "current_period_end",
+            "next_billing_at",
+            "cancel_at_period_end",
+            "canceled_at",
+            "billing_failure_count",
+            "membership_grace_until",
+            "trial_ends_at",
+            "last_payment_at",
         }
         filtered = {k: v for k, v in update_data.items() if k in allowed}
         if not filtered:
@@ -1870,6 +1995,122 @@ class PostgresClient:
             *args,
         )
         return (rows or [], total)
+
+    # ------------------------------------------------------------------
+    # Notifications (in-app bell)
+    # ------------------------------------------------------------------
+
+    async def list_notifications(
+        self,
+        user_id: str,
+        limit: int = 50,
+        offset: int = 0,
+        unread_only: bool = False,
+    ) -> tuple[list[dict[str, Any]], int]:
+        """List notifications for a user. Returns (items, total)."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            q = client.table("notifications").select("*").eq("user_id", user_id)
+            if unread_only:
+                q = q.eq("read", False)
+            count_q = client.table("notifications").select("id", count="exact").eq("user_id", user_id)
+            if unread_only:
+                count_q = count_q.eq("read", False)
+            count_res = await count_q.execute()
+            total = count_res.count if hasattr(count_res, "count") else len(count_res.data or [])
+            result = await q.order("created_at", desc=True).range(offset, offset + limit - 1).execute()
+            return (result.data or [], total)
+        where = "user_id = $1" + (" AND read = false" if unread_only else "")
+        count_row = await self._pg_fetch_one("SELECT COUNT(*) AS c FROM notifications WHERE " + where, user_id)
+        total = count_row["c"] if count_row else 0
+        rows = await self._pg_fetch_all(
+            "SELECT * FROM notifications WHERE " + where + " ORDER BY created_at DESC LIMIT $2 OFFSET $3",
+            user_id,
+            limit,
+            offset,
+        )
+        return (rows or [], total)
+
+    async def get_unread_notification_count(self, user_id: str) -> int:
+        """Get count of unread notifications for a user."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            result = (
+                await client.table("notifications")
+                .select("id", count="exact")
+                .eq("user_id", user_id)
+                .eq("read", False)
+                .execute()
+            )
+            return result.count if hasattr(result, "count") else 0
+        row = await self._pg_fetch_one(
+            "SELECT COUNT(*) AS c FROM notifications WHERE user_id = $1 AND read = false",
+            user_id,
+        )
+        return row["c"] if row else 0
+
+    async def create_notification(
+        self,
+        user_id: str,
+        type: str,
+        title: str,
+        body: str | None = None,
+        data: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Create a notification for a user."""
+        notif_id = str(uuid4())
+        record = {
+            "id": notif_id,
+            "user_id": user_id,
+            "type": type,
+            "title": title,
+            "body": body,
+            "data": data or {},
+            "read": False,
+        }
+        if self._use_supabase_client():
+            client = await self._get_client()
+            await client.table("notifications").insert(record).execute()
+        else:
+            await self._pg_execute(
+                """INSERT INTO notifications (id, user_id, type, title, body, data, read)
+                   VALUES ($1, $2, $3, $4, $5, $6::jsonb, false)""",
+                notif_id,
+                user_id,
+                type,
+                title,
+                body,
+                json.dumps(data or {}),
+            )
+        return {**record, "created_at": datetime.now(UTC).isoformat()}
+
+    async def mark_notification_read(self, notification_id: str, user_id: str) -> bool:
+        """Mark a notification as read. Returns True if updated."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            result = (
+                await client.table("notifications")
+                .update({"read": True})
+                .eq("id", notification_id)
+                .eq("user_id", user_id)
+                .execute()
+            )
+            return bool(result.data)
+        await self._pg_execute(
+            "UPDATE notifications SET read = true WHERE id = $1 AND user_id = $2",
+            notification_id,
+            user_id,
+        )
+        return True
+
+    async def mark_all_notifications_read(self, user_id: str) -> int:
+        """Mark all notifications for a user as read. Returns count updated."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            result = await client.table("notifications").update({"read": True}).eq("user_id", user_id).execute()
+            return len(result.data or [])
+        await self._pg_execute("UPDATE notifications SET read = true WHERE user_id = $1", user_id)
+        return 0  # asyncpg execute doesn't return rowcount easily; 0 is acceptable
 
     async def get_system_settings(self) -> list[dict[str, Any]]:
         """Return all system settings rows."""

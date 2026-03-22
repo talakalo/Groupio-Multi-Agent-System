@@ -12,6 +12,7 @@ from src.api.routes.conversations import router as conversations_router
 from src.api.routes.enrichment import router as enrichment_router
 from src.api.routes.escalations import router as escalations_router
 from src.api.routes.graph_features import router as graph_features_router
+from src.api.routes.notifications import router as notifications_router
 from src.api.routes.offers import router as offers_router
 from src.api.routes.onboarding import router as onboarding_router
 from src.api.routes.payments import admin_router as payments_admin_router
@@ -98,6 +99,12 @@ api_router.include_router(
     activity_router,
     prefix="/activity",
     tags=["Activity"],
+)
+
+api_router.include_router(
+    notifications_router,
+    prefix="/notifications",
+    tags=["Notifications"],
 )
 
 api_router.include_router(

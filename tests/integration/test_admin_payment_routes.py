@@ -6,7 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src.api.main import app
-from src.api.middleware.auth import get_admin_user, get_current_user
+from src.api.middleware.auth import get_current_user, require_admin_only
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -27,7 +27,7 @@ def mock_admin():
 @pytest.fixture
 def admin_client(mock_admin):
     """Create test client with admin auth dependency overridden."""
-    app.dependency_overrides[get_admin_user] = lambda: mock_admin
+    app.dependency_overrides[require_admin_only] = lambda: mock_admin
     app.dependency_overrides[get_current_user] = lambda: mock_admin
     yield TestClient(app)
     app.dependency_overrides.clear()
