@@ -59,9 +59,9 @@ def _make_offer(**kwargs) -> dict:
 
 def _client(admin, mock_db, **patches):
     from src.api.main import app
-    from src.api.middleware.auth import get_admin_user
+    from src.api.middleware.auth import require_admin_only
 
-    app.dependency_overrides[get_admin_user] = lambda: admin
+    app.dependency_overrides[require_admin_only] = lambda: admin
     try:
         with patch("src.api.routes.admin.get_postgres_client", return_value=mock_db):
             yield TestClient(app, raise_server_exceptions=False)
@@ -85,10 +85,10 @@ class TestGetMetrics:
         mock_rag.get_metrics = AsyncMock(return_value={})
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import require_admin_only
 
         db = AsyncMock()
-        app.dependency_overrides[get_admin_user] = lambda: admin
+        app.dependency_overrides[require_admin_only] = lambda: admin
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 with patch("src.api.routes.admin.get_orchestrator", return_value=mock_orch):
@@ -113,10 +113,10 @@ class TestListCollections:
         vs.get_collection_info = AsyncMock(return_value={"count": 10})
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import require_admin_only
 
         db = AsyncMock()
-        app.dependency_overrides[get_admin_user] = lambda: admin
+        app.dependency_overrides[require_admin_only] = lambda: admin
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 with patch("src.api.routes.admin.get_vector_store", return_value=vs):
@@ -134,10 +134,10 @@ class TestListCollections:
         vs.get_collection_info = AsyncMock(side_effect=RuntimeError("unavailable"))
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import require_admin_only
 
         db = AsyncMock()
-        app.dependency_overrides[get_admin_user] = lambda: admin
+        app.dependency_overrides[require_admin_only] = lambda: admin
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 with patch("src.api.routes.admin.get_vector_store", return_value=vs):
@@ -165,9 +165,9 @@ class TestGetAnalytics:
         db.list_contractors = AsyncMock(return_value=([], 10))
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import require_admin_only
 
-        app.dependency_overrides[get_admin_user] = lambda: admin
+        app.dependency_overrides[require_admin_only] = lambda: admin
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 client = TestClient(app, raise_server_exceptions=False)
@@ -186,9 +186,9 @@ class TestGetAnalytics:
         db.list_contractors = AsyncMock(side_effect=RuntimeError("db error"))
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import require_admin_only
 
-        app.dependency_overrides[get_admin_user] = lambda: admin
+        app.dependency_overrides[require_admin_only] = lambda: admin
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 client = TestClient(app, raise_server_exceptions=False)
@@ -210,9 +210,9 @@ class TestAdminUsers:
         db.get_admin_users = AsyncMock(return_value=([_make_user_dict()], 1))
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import require_admin_only
 
-        app.dependency_overrides[get_admin_user] = lambda: admin
+        app.dependency_overrides[require_admin_only] = lambda: admin
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 client = TestClient(app, raise_server_exceptions=False)
@@ -228,9 +228,9 @@ class TestAdminUsers:
         db.get_user_profile = AsyncMock(return_value=_make_user_dict())
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import require_admin_only
 
-        app.dependency_overrides[get_admin_user] = lambda: admin
+        app.dependency_overrides[require_admin_only] = lambda: admin
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 client = TestClient(app, raise_server_exceptions=False)
@@ -245,9 +245,9 @@ class TestAdminUsers:
         db.get_user_profile = AsyncMock(return_value=None)
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import require_admin_only
 
-        app.dependency_overrides[get_admin_user] = lambda: admin
+        app.dependency_overrides[require_admin_only] = lambda: admin
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 client = TestClient(app, raise_server_exceptions=False)
@@ -268,9 +268,9 @@ class TestAdminUsers:
         db.create_audit_log = AsyncMock()
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import require_admin_only
 
-        app.dependency_overrides[get_admin_user] = lambda: admin
+        app.dependency_overrides[require_admin_only] = lambda: admin
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 client = TestClient(app, raise_server_exceptions=False)
@@ -284,9 +284,9 @@ class TestAdminUsers:
         db = AsyncMock()
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import require_admin_only
 
-        app.dependency_overrides[get_admin_user] = lambda: admin
+        app.dependency_overrides[require_admin_only] = lambda: admin
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 client = TestClient(app, raise_server_exceptions=False)
@@ -307,9 +307,9 @@ class TestAdminUsers:
         db.create_audit_log = AsyncMock()
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import require_admin_only
 
-        app.dependency_overrides[get_admin_user] = lambda: admin
+        app.dependency_overrides[require_admin_only] = lambda: admin
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 client = TestClient(app, raise_server_exceptions=False)
@@ -340,9 +340,9 @@ class TestAdminOffers:
         db.get_all_offers_admin = AsyncMock(return_value=([_make_offer()], 1))
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import require_admin_only
 
-        app.dependency_overrides[get_admin_user] = lambda: admin
+        app.dependency_overrides[require_admin_only] = lambda: admin
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 client = TestClient(app, raise_server_exceptions=False)
@@ -360,9 +360,9 @@ class TestAdminOffers:
         db.create_audit_log = AsyncMock()
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import require_admin_only
 
-        app.dependency_overrides[get_admin_user] = lambda: admin
+        app.dependency_overrides[require_admin_only] = lambda: admin
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 client = TestClient(app, raise_server_exceptions=False)
@@ -377,9 +377,9 @@ class TestAdminOffers:
         db.get_offer = AsyncMock(return_value=None)
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import require_admin_only
 
-        app.dependency_overrides[get_admin_user] = lambda: admin
+        app.dependency_overrides[require_admin_only] = lambda: admin
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 client = TestClient(app, raise_server_exceptions=False)
@@ -401,9 +401,9 @@ class TestAdminOffers:
         email_svc.send_offer_approved = AsyncMock()
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import require_admin_only
 
-        app.dependency_overrides[get_admin_user] = lambda: admin
+        app.dependency_overrides[require_admin_only] = lambda: admin
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 with patch("src.api.routes.admin.get_email_service", return_value=email_svc):
@@ -419,9 +419,9 @@ class TestAdminOffers:
         db.get_offer = AsyncMock(return_value=None)
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import require_admin_only
 
-        app.dependency_overrides[get_admin_user] = lambda: admin
+        app.dependency_overrides[require_admin_only] = lambda: admin
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 client = TestClient(app, raise_server_exceptions=False)
@@ -443,9 +443,9 @@ class TestAdminOffers:
         email_svc.send_offer_cancelled = AsyncMock()
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import require_admin_only
 
-        app.dependency_overrides[get_admin_user] = lambda: admin
+        app.dependency_overrides[require_admin_only] = lambda: admin
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 with patch("src.api.routes.admin.get_email_service", return_value=email_svc):
@@ -468,9 +468,9 @@ class TestAdminSettings:
         db.get_system_settings = AsyncMock(return_value=[{"key": "max_offers", "value": "100"}])
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import require_admin_only
 
-        app.dependency_overrides[get_admin_user] = lambda: admin
+        app.dependency_overrides[require_admin_only] = lambda: admin
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 client = TestClient(app, raise_server_exceptions=False)
@@ -487,9 +487,9 @@ class TestAdminSettings:
         db.create_audit_log = AsyncMock()
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import require_admin_only
 
-        app.dependency_overrides[get_admin_user] = lambda: admin
+        app.dependency_overrides[require_admin_only] = lambda: admin
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 client = TestClient(app, raise_server_exceptions=False)
@@ -519,10 +519,10 @@ class TestSystemStatus:
         vs.get_collection_info = AsyncMock(return_value={"count": 5})
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import require_admin_only
 
         db = AsyncMock()
-        app.dependency_overrides[get_admin_user] = lambda: admin
+        app.dependency_overrides[require_admin_only] = lambda: admin
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 with patch("src.api.routes.admin.get_orchestrator", return_value=mock_orch):
@@ -550,10 +550,10 @@ class TestReloadAgent:
         mock_orch.agents = {"support": mock_agent}
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import require_admin_only
 
         db = AsyncMock()
-        app.dependency_overrides[get_admin_user] = lambda: admin
+        app.dependency_overrides[require_admin_only] = lambda: admin
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 with patch("src.api.routes.admin.get_orchestrator", return_value=mock_orch):
@@ -570,10 +570,10 @@ class TestReloadAgent:
         mock_orch.agents = {}
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import require_admin_only
 
         db = AsyncMock()
-        app.dependency_overrides[get_admin_user] = lambda: admin
+        app.dependency_overrides[require_admin_only] = lambda: admin
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 with patch("src.api.routes.admin.get_orchestrator", return_value=mock_orch):
@@ -596,9 +596,9 @@ class TestExportOffersCsv:
         db.get_all_offers_admin = AsyncMock(return_value=([], 0))
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import require_admin_only
 
-        app.dependency_overrides[get_admin_user] = lambda: admin
+        app.dependency_overrides[require_admin_only] = lambda: admin
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 client = TestClient(app, raise_server_exceptions=False)
@@ -614,9 +614,9 @@ class TestExportOffersCsv:
         db.get_all_offers_admin = AsyncMock(return_value=([{"id": "o1", "title": "Test", "status": "pending"}], 1))
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import require_admin_only
 
-        app.dependency_overrides[get_admin_user] = lambda: admin
+        app.dependency_overrides[require_admin_only] = lambda: admin
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 client = TestClient(app, raise_server_exceptions=False)
@@ -639,9 +639,9 @@ class TestExportParticipantsCsv:
         db.get_offer_participants = AsyncMock(return_value=[{"user_id": "u1", "email": "a@b.com", "full_name": "A"}])
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import require_admin_only
 
-        app.dependency_overrides[get_admin_user] = lambda: admin
+        app.dependency_overrides[require_admin_only] = lambda: admin
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 client = TestClient(app, raise_server_exceptions=False)
@@ -657,9 +657,9 @@ class TestExportParticipantsCsv:
         db.get_offer_participants = AsyncMock(return_value=[])
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import require_admin_only
 
-        app.dependency_overrides[get_admin_user] = lambda: admin
+        app.dependency_overrides[require_admin_only] = lambda: admin
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 client = TestClient(app, raise_server_exceptions=False)
@@ -681,9 +681,9 @@ class TestExportPaymentsCsv:
         db.execute_query = AsyncMock(return_value=[{"id": "p1", "amount": 100, "status": "completed"}])
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import require_admin_only
 
-        app.dependency_overrides[get_admin_user] = lambda: admin
+        app.dependency_overrides[require_admin_only] = lambda: admin
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 client = TestClient(app, raise_server_exceptions=False)
@@ -698,9 +698,9 @@ class TestExportPaymentsCsv:
         db.execute_query = AsyncMock(side_effect=AttributeError("no execute_query"))
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import require_admin_only
 
-        app.dependency_overrides[get_admin_user] = lambda: admin
+        app.dependency_overrides[require_admin_only] = lambda: admin
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 client = TestClient(app, raise_server_exceptions=False)
@@ -722,9 +722,9 @@ class TestVettingStatus:
         db.list_contractors = AsyncMock(return_value=([], 0))
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import require_admin_only
 
-        app.dependency_overrides[get_admin_user] = lambda: admin
+        app.dependency_overrides[require_admin_only] = lambda: admin
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 client = TestClient(app, raise_server_exceptions=False)
@@ -750,9 +750,9 @@ class TestForceCancelOffer:
         db.get_offer_participants = AsyncMock(return_value=[])
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import require_admin_only
 
-        app.dependency_overrides[get_admin_user] = lambda: admin
+        app.dependency_overrides[require_admin_only] = lambda: admin
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 with patch("src.api.routes.admin.get_email_service", return_value=AsyncMock()):
@@ -772,9 +772,9 @@ class TestForceCancelOffer:
         db.get_offer = AsyncMock(return_value=None)
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import require_admin_only
 
-        app.dependency_overrides[get_admin_user] = lambda: admin
+        app.dependency_overrides[require_admin_only] = lambda: admin
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 client = TestClient(app, raise_server_exceptions=False)
@@ -792,9 +792,9 @@ class TestForceCancelOffer:
         db.get_offer = AsyncMock(return_value={"id": "o1", "status": "cancelled"})
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import require_admin_only
 
-        app.dependency_overrides[get_admin_user] = lambda: admin
+        app.dependency_overrides[require_admin_only] = lambda: admin
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 client = TestClient(app, raise_server_exceptions=False)
@@ -820,9 +820,9 @@ class TestOverridePaymentStatus:
         db.update_payment = AsyncMock()
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import require_admin_only
 
-        app.dependency_overrides[get_admin_user] = lambda: admin
+        app.dependency_overrides[require_admin_only] = lambda: admin
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 client = TestClient(app, raise_server_exceptions=False)
@@ -838,9 +838,9 @@ class TestOverridePaymentStatus:
         admin = _make_admin()
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import require_admin_only
 
-        app.dependency_overrides[get_admin_user] = lambda: admin
+        app.dependency_overrides[require_admin_only] = lambda: admin
         try:
             client = TestClient(app, raise_server_exceptions=False)
             resp = client.patch(
@@ -857,9 +857,9 @@ class TestOverridePaymentStatus:
         db.get_payment = AsyncMock(return_value=None)
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import require_admin_only
 
-        app.dependency_overrides[get_admin_user] = lambda: admin
+        app.dependency_overrides[require_admin_only] = lambda: admin
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 client = TestClient(app, raise_server_exceptions=False)
@@ -884,14 +884,43 @@ class TestOutreachQueue:
         db.list_outreach_queue = AsyncMock(return_value=[{"id": "oq-1", "status": "pending_approval"}])
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import require_admin_only
 
-        app.dependency_overrides[get_admin_user] = lambda: admin
+        app.dependency_overrides[require_admin_only] = lambda: admin
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 client = TestClient(app, raise_server_exceptions=False)
                 resp = client.get("/api/v1/admin/outreach/queue")
             assert resp.status_code == 200
             assert resp.json()["total"] == 1
+        finally:
+            app.dependency_overrides.clear()
+
+
+class TestContractorMembershipAdminPatch:
+    def test_patch_contractor_membership_ok(self):
+        admin = _make_admin()
+        db = AsyncMock()
+        db.get_contractor = AsyncMock(return_value={"id": "c1", "membership_status": "canceled"})
+        db.admin_update_contractor_membership = AsyncMock(
+            return_value={"id": "c1", "membership_status": "active"},
+        )
+        db.create_audit_log = AsyncMock()
+
+        from src.api.main import app
+        from src.api.middleware.auth import require_admin_only
+
+        app.dependency_overrides[require_admin_only] = lambda: admin
+        try:
+            with patch("src.api.routes.admin.get_postgres_client", return_value=db):
+                client = TestClient(app, raise_server_exceptions=False)
+                resp = client.patch(
+                    "/api/v1/admin/contractors/c1/membership",
+                    json={"membership_status": "active"},
+                )
+            assert resp.status_code == 200
+            assert resp.json()["membership_status"] == "active"
+            db.admin_update_contractor_membership.assert_awaited_once()
+            db.create_audit_log.assert_awaited_once()
         finally:
             app.dependency_overrides.clear()

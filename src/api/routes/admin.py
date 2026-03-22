@@ -12,14 +12,16 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, R
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, EmailStr, model_validator
 
-from src.api.middleware.auth import get_admin_user, hash_password
+from src.api.middleware.auth import hash_password, require_admin_only
 from src.databases.postgres import get_postgres_client
 from src.databases.redis_client import get_redis_client
 from src.databases.vector_store import get_vector_store
+from src.models.contractor import ContractorMembershipAdminUpdate
 from src.models.user import UserInDB
 from src.orchestration.graph import get_orchestrator
 from src.rag.pipeline import get_rag_pipeline
 from src.services.email import get_email_service
+from src.services.storage import get_storage_service
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +72,7 @@ _ALLOWED_PAYMENT_STATUSES = {"pending", "completed", "failed", "refunded", "on_h
 
 router = APIRouter(
     tags=["admin"],
-    dependencies=[Depends(get_admin_user)],  # Require admin auth for all routes
+    dependencies=[Depends(require_admin_only)],  # admin + super_admin only (not buildings_manager)
 )
 
 
@@ -195,7 +197,9 @@ async def get_analytics() -> dict[str, Any]:
 
     # --- Contractor count ---
     try:
-        _, total_contractors = await db.list_contractors(filters={}, page=1, page_size=1)
+        _, total_contractors = await db.list_contractors(
+            filters={"marketplace_visible_only": False}, page=1, page_size=1
+        )
     except Exception:
         logger.debug("Could not fetch contractor count for analytics")
 
@@ -220,7 +224,7 @@ async def list_users(
     page_size: int = Query(20, ge=1, le=100),
     role: str | None = None,
     is_active: bool | None = None,
-    admin: UserInDB = Depends(get_admin_user),
+    admin: UserInDB = Depends(require_admin_only),
 ) -> dict[str, Any]:
     """List users with pagination and optional filters."""
     db = get_postgres_client()
@@ -231,7 +235,7 @@ async def list_users(
 @router.get("/users/{user_id}")
 async def get_user(
     user_id: str,
-    admin: UserInDB = Depends(get_admin_user),
+    admin: UserInDB = Depends(require_admin_only),
 ) -> dict[str, Any]:
     """Get a single user by ID."""
     db = get_postgres_client()
@@ -246,7 +250,7 @@ async def update_user(
     user_id: str,
     body: AdminUserUpdate,
     request: Request,
-    admin: UserInDB = Depends(get_admin_user),
+    admin: UserInDB = Depends(require_admin_only),
 ) -> dict[str, Any]:
     """Update user role / is_active status."""
     db = get_postgres_client()
@@ -282,7 +286,7 @@ async def update_user(
 async def create_admin_user(
     body: AdminUserCreate,
     request: Request,
-    admin: UserInDB = Depends(get_admin_user),
+    admin: UserInDB = Depends(require_admin_only),
 ) -> dict[str, Any]:
     """Create a new admin / staff user."""
     # Only super_admin can create super_admin users (privilege escalation guard)
@@ -328,7 +332,7 @@ async def list_offers_admin(
     status: str | None = None,
     category: str | None = None,
     flagged: bool | None = None,
-    admin: UserInDB = Depends(get_admin_user),
+    admin: UserInDB = Depends(require_admin_only),
 ) -> dict[str, Any]:
     """List all offers (admin view) with pagination and filters."""
     db = get_postgres_client()
@@ -342,7 +346,7 @@ async def list_offers_admin(
 async def flag_offer(
     offer_id: str,
     request: Request,
-    admin: UserInDB = Depends(get_admin_user),
+    admin: UserInDB = Depends(require_admin_only),
 ) -> dict[str, Any]:
     """Flag an offer for review."""
     db = get_postgres_client()
@@ -367,7 +371,7 @@ async def approve_offer(
     offer_id: str,
     request: Request,
     background_tasks: BackgroundTasks,
-    admin: UserInDB = Depends(get_admin_user),
+    admin: UserInDB = Depends(require_admin_only),
 ) -> dict[str, Any]:
     """Approve a flagged offer."""
     db = get_postgres_client()
@@ -407,7 +411,7 @@ async def cancel_offer(
     offer_id: str,
     request: Request,
     background_tasks: BackgroundTasks,
-    admin: UserInDB = Depends(get_admin_user),
+    admin: UserInDB = Depends(require_admin_only),
 ) -> dict[str, Any]:
     """Cancel an offer."""
     db = get_postgres_client()
@@ -450,7 +454,7 @@ async def cancel_offer(
 
 @router.get("/settings")
 async def get_settings(
-    admin: UserInDB = Depends(get_admin_user),
+    admin: UserInDB = Depends(require_admin_only),
 ) -> dict[str, Any]:
     """Get all system settings as key-value pairs."""
     db = get_postgres_client()
@@ -462,7 +466,7 @@ async def get_settings(
 async def update_settings(
     body: dict[str, Any],
     request: Request,
-    admin: UserInDB = Depends(get_admin_user),
+    admin: UserInDB = Depends(require_admin_only),
 ) -> dict[str, Any]:
     """Update system settings (body: dict of key-value pairs)."""
     db = get_postgres_client()
@@ -491,7 +495,7 @@ async def list_audit_logs(
     page_size: int = Query(20, ge=1, le=100),
     action: str | None = None,
     resource_type: str | None = None,
-    admin: UserInDB = Depends(get_admin_user),
+    admin: UserInDB = Depends(require_admin_only),
 ) -> dict[str, Any]:
     """List audit logs with pagination and optional filters."""
     db = get_postgres_client()
@@ -506,7 +510,7 @@ async def list_audit_logs(
 async def export_offers_csv(
     status: str | None = None,
     category: str | None = None,
-    admin: UserInDB = Depends(get_admin_user),
+    admin: UserInDB = Depends(require_admin_only),
 ) -> StreamingResponse:
     """Export all offers to CSV. Supports optional status/category filters."""
     db = get_postgres_client()
@@ -551,7 +555,7 @@ async def export_offers_csv(
 @router.get("/export/participants")
 async def export_participants_csv(
     offer_id: str | None = None,
-    admin: UserInDB = Depends(get_admin_user),
+    admin: UserInDB = Depends(require_admin_only),
 ) -> StreamingResponse:
     """Export offer participants to CSV. Filter by offer_id if provided."""
     db = get_postgres_client()
@@ -627,7 +631,7 @@ async def export_participants_csv(
 
 @router.get("/export/payments")
 async def export_payments_csv(
-    admin: UserInDB = Depends(get_admin_user),
+    admin: UserInDB = Depends(require_admin_only),
 ) -> StreamingResponse:
     """Export all payment records to CSV."""
     db = get_postgres_client()
@@ -675,7 +679,7 @@ async def export_payments_csv(
 
 @router.get("/vetting/status")
 async def vetting_pipeline_status(
-    admin: UserInDB = Depends(get_admin_user),
+    admin: UserInDB = Depends(require_admin_only),
 ) -> dict[str, Any]:
     """Return current vetting pipeline stats: counts by decision bucket and contractors needing review."""
     db = get_postgres_client()
@@ -683,20 +687,30 @@ async def vetting_pipeline_status(
     # Contractors pending vetting (submitted but not yet verified/rejected)
     try:
         pending_items, pending_total = await db.list_contractors(
-            filters={"verification_status": "pending"}, page=1, page_size=100
+            filters={"verification_status": "pending", "marketplace_visible_only": False},
+            page=1,
+            page_size=100,
         )
     except Exception:
         pending_items, pending_total = [], 0
 
     # Contractors that have been through vetting and were approved
     try:
-        _, approved_total = await db.list_contractors(filters={"verification_status": "verified"}, page=1, page_size=1)
+        _, approved_total = await db.list_contractors(
+            filters={"verification_status": "verified", "marketplace_visible_only": False},
+            page=1,
+            page_size=1,
+        )
     except Exception:
         approved_total = 0
 
     # Contractors that were rejected
     try:
-        _, rejected_total = await db.list_contractors(filters={"verification_status": "rejected"}, page=1, page_size=1)
+        _, rejected_total = await db.list_contractors(
+            filters={"verification_status": "rejected", "marketplace_visible_only": False},
+            page=1,
+            page_size=1,
+        )
     except Exception:
         rejected_total = 0
 
@@ -727,7 +741,7 @@ async def force_cancel_offer(
     offer_id: str,
     body: ForceCancelRequest,
     background_tasks: BackgroundTasks,
-    admin: UserInDB = Depends(get_admin_user),
+    admin: UserInDB = Depends(require_admin_only),
 ) -> dict[str, Any]:
     """Force-cancel an offer in any non-terminal status and notify all participants."""
     db = get_postgres_client()
@@ -772,7 +786,7 @@ async def force_cancel_offer(
 async def override_payment_status(
     payment_id: str,
     body: PaymentStatusOverride,
-    admin: UserInDB = Depends(get_admin_user),
+    admin: UserInDB = Depends(require_admin_only),
 ) -> dict[str, Any]:
     """Manually override a payment record's status (admin only)."""
     if body.status not in _ALLOWED_PAYMENT_STATUSES:
@@ -804,7 +818,7 @@ async def override_payment_status(
 @router.get("/outreach/queue")
 async def list_outreach_queue(
     status: str = "pending_approval",
-    admin: UserInDB = Depends(get_admin_user),
+    admin: UserInDB = Depends(require_admin_only),
 ) -> dict[str, Any]:
     """List pending outreach messages awaiting admin approval."""
     db = get_postgres_client()
@@ -815,7 +829,7 @@ async def list_outreach_queue(
 @router.post("/outreach/{pending_id}/approve")
 async def approve_outreach(
     pending_id: str,
-    admin: UserInDB = Depends(get_admin_user),
+    admin: UserInDB = Depends(require_admin_only),
 ) -> dict[str, Any]:
     """Approve and dispatch a pending outreach message."""
     db = get_postgres_client()
@@ -837,7 +851,7 @@ async def approve_outreach(
 @router.post("/outreach/{pending_id}/reject")
 async def reject_outreach(
     pending_id: str,
-    admin: UserInDB = Depends(get_admin_user),
+    admin: UserInDB = Depends(require_admin_only),
 ) -> dict[str, Any]:
     """Reject a pending outreach message."""
     db = get_postgres_client()
@@ -862,7 +876,7 @@ async def suspend_user(
     user_id: str,
     request: Request,
     body: dict = None,
-    admin: UserInDB = Depends(get_admin_user),
+    admin: UserInDB = Depends(require_admin_only),
 ) -> dict[str, Any]:
     """Suspend a user account and invalidate their refresh token."""
     if body is None:
@@ -896,7 +910,7 @@ async def suspend_user(
 async def activate_user(
     user_id: str,
     request: Request,
-    admin: UserInDB = Depends(get_admin_user),
+    admin: UserInDB = Depends(require_admin_only),
 ) -> dict[str, Any]:
     """Reactivate a suspended user account."""
     db = get_postgres_client()
@@ -927,7 +941,7 @@ async def list_agent_audit(
     page_size: int = Query(20, ge=1, le=100),
     agent_name: str | None = None,
     requires_human_review: bool | None = None,
-    admin: UserInDB = Depends(get_admin_user),
+    admin: UserInDB = Depends(require_admin_only),
 ) -> dict[str, Any]:
     """List paginated AI agent audit log entries."""
     db = get_postgres_client()
@@ -951,7 +965,7 @@ async def list_agent_audit(
 
 @router.get("/agents/autonomy")
 async def get_agent_autonomy_modes(
-    admin: UserInDB = Depends(get_admin_user),
+    admin: UserInDB = Depends(require_admin_only),
 ) -> dict[str, Any]:
     """Return current autonomy mode for each agent.
 
@@ -987,7 +1001,7 @@ async def list_pending_decisions(
     agent_name: str | None = None,
     page: int = 1,
     page_size: int = 20,
-    admin: UserInDB = Depends(get_admin_user),
+    admin: UserInDB = Depends(require_admin_only),
 ) -> dict[str, Any]:
     """List agent decisions queued for admin review (matching, pricing, vetting in gated/recommend mode)."""
     db = get_postgres_client()
@@ -1000,7 +1014,7 @@ async def list_pending_decisions(
 async def approve_pending_decision(
     decision_id: str,
     note: str = "",
-    admin: UserInDB = Depends(get_admin_user),
+    admin: UserInDB = Depends(require_admin_only),
 ) -> dict[str, Any]:
     """Approve a pending agent decision.
 
@@ -1139,7 +1153,7 @@ async def approve_pending_decision(
 async def reject_pending_decision(
     decision_id: str,
     note: str = "",
-    admin: UserInDB = Depends(get_admin_user),
+    admin: UserInDB = Depends(require_admin_only),
 ) -> dict[str, Any]:
     """Reject a pending agent decision. No downstream action is executed.
 
@@ -1183,7 +1197,7 @@ async def reject_pending_decision(
 @router.get("/agents/audit/{audit_id}")
 async def get_agent_audit_entry(
     audit_id: str,
-    admin: UserInDB = Depends(get_admin_user),
+    admin: UserInDB = Depends(require_admin_only),
 ) -> dict[str, Any]:
     """Get a single agent audit log entry including reasoning_chain (Task 3.6)."""
     db = get_postgres_client()
@@ -1196,10 +1210,40 @@ async def get_agent_audit_entry(
 # --------------- Contractor verification metadata (Phase 2) ---------------
 
 
+@router.patch("/contractors/{contractor_id}/membership")
+async def admin_patch_contractor_membership(
+    contractor_id: str,
+    body: ContractorMembershipAdminUpdate,
+    request: Request,
+    admin: UserInDB = Depends(require_admin_only),
+) -> dict[str, Any]:
+    """Override contractor marketplace membership fields (manual comp, suspension, provider IDs)."""
+    db = get_postgres_client()
+    existing = await db.get_contractor(contractor_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Contractor not found")
+    patch = body.model_dump(exclude_unset=True, mode="python")
+    if not patch:
+        return existing
+    updated = await db.admin_update_contractor_membership(contractor_id, patch)
+    await db.create_audit_log(
+        {
+            "user_id": admin.id,
+            "action": "contractor_membership_update",
+            "resource_type": "contractor",
+            "resource_id": contractor_id,
+            "details": {"patch": patch, "previous_status": existing.get("membership_status")},
+            "ip_address": request.client.host if request.client else None,
+        }
+    )
+    logger.info("Admin %s updated membership for contractor %s", admin.id, contractor_id)
+    return updated
+
+
 @router.get("/contractors/{contractor_id}/verification-metadata")
 async def get_contractor_verification_metadata(
     contractor_id: str,
-    admin: UserInDB = Depends(get_admin_user),
+    admin: UserInDB = Depends(require_admin_only),
 ) -> dict[str, Any]:
     """Get verification metadata for a contractor (external/official verification records).
 
@@ -1234,6 +1278,43 @@ async def get_contractor_verification_metadata(
     return {"items": items, "contractor_id": contractor_id}
 
 
+@router.get("/contractors/{contractor_id}/documents")
+async def get_contractor_documents(
+    contractor_id: str,
+    admin: UserInDB = Depends(require_admin_only),
+) -> dict[str, Any]:
+    """List contractor documents (license, insurance, etc.) from file_uploads."""
+    db = get_postgres_client()
+    contractor = await db.get_contractor(contractor_id)
+    if not contractor:
+        raise HTTPException(status_code=404, detail="Contractor not found")
+
+    user_id = await db.get_user_id_by_contractor_id(contractor_id)
+    if not user_id:
+        return {"items": [], "total": 0}
+
+    uploads = await db.list_file_uploads(user_id=user_id, bucket="contractor-docs")
+    storage = get_storage_service()
+    items = []
+    for u in uploads:
+        try:
+            download_url = await storage.get_signed_url(u["bucket"], u["storage_path"], expires_in=3600)
+        except Exception:
+            download_url = ""
+        items.append(
+            {
+                "id": u["id"],
+                "type": (u.get("metadata") or {}).get("doc_type", "document"),
+                "file_name": u.get("file_name", "unknown"),
+                "file_url": download_url,
+                "mime_type": u.get("file_type", "application/octet-stream"),
+                "uploaded_at": u.get("created_at"),
+                "status": u.get("analysis_status", "pending"),
+            }
+        )
+    return {"items": items, "total": len(items)}
+
+
 # --------------- Request contractor documents ---------------
 
 
@@ -1248,7 +1329,7 @@ async def request_contractor_docs(
     contractor_id: str,
     request: Request,
     body: RequestDocsBody | None = None,
-    admin: UserInDB = Depends(get_admin_user),
+    admin: UserInDB = Depends(require_admin_only),
 ) -> dict[str, str]:
     """Request docs from contractor. Stored in Redis; contractor sees via GET /contractors/me/doc-requests."""
     db = get_postgres_client()
@@ -1295,7 +1376,7 @@ async def request_contractor_docs(
 async def list_credit_awards(
     resident_id: str | None = None,
     status: str | None = None,
-    admin: UserInDB = Depends(get_admin_user),
+    admin: UserInDB = Depends(require_admin_only),
 ) -> dict[str, Any]:
     """List credit awards, optionally filtered by resident or status."""
     db = get_postgres_client()
@@ -1306,7 +1387,7 @@ async def list_credit_awards(
 @router.post("/credit-awards/{award_id}/approve")
 async def approve_credit_award(
     award_id: str,
-    admin: UserInDB = Depends(get_admin_user),
+    admin: UserInDB = Depends(require_admin_only),
 ) -> dict[str, Any]:
     """Approve a pending credit award and mark it for application."""
     db = get_postgres_client()
@@ -1325,7 +1406,7 @@ async def approve_credit_award(
 @router.post("/credit-awards/{award_id}/reject")
 async def reject_credit_award(
     award_id: str,
-    admin: UserInDB = Depends(get_admin_user),
+    admin: UserInDB = Depends(require_admin_only),
 ) -> dict[str, Any]:
     """Reject a pending credit award."""
     db = get_postgres_client()

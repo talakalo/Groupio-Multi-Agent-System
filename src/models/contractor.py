@@ -30,6 +30,16 @@ class VerificationStatus(StrEnum):
     REJECTED = "rejected"
 
 
+class MembershipStatus(StrEnum):
+    """Marketplace membership billing state (contractor subscription)."""
+
+    ACTIVE = "active"
+    TRIALING = "trialing"
+    PAST_DUE = "past_due"
+    CANCELED = "canceled"
+    INACTIVE = "inactive"
+
+
 class ContractorBase(BaseModel):
     """Base contractor model."""
 
@@ -97,8 +107,41 @@ class ContractorInDB(ContractorBase):
     completed_projects: int = 0
     response_rate: float = 0
     average_response_time_hours: float = 0
+    membership_status: MembershipStatus = MembershipStatus.ACTIVE
+    membership_plan: str | None = None
+    membership_provider: str | None = None
+    provider_customer_id: str | None = None
+    provider_subscription_id: str | None = None
+    current_period_start: datetime | None = None
+    current_period_end: datetime | None = None
+    next_billing_at: datetime | None = None
+    cancel_at_period_end: bool = False
+    canceled_at: datetime | None = None
+    billing_failure_count: int = 0
+    membership_grace_until: datetime | None = None
+    trial_ends_at: datetime | None = None
+    last_payment_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
+
+
+class ContractorMembershipAdminUpdate(BaseModel):
+    """Admin-only update payload for contractor marketplace membership (no payment provider calls)."""
+
+    membership_status: MembershipStatus | None = None
+    membership_plan: str | None = Field(None, max_length=64)
+    membership_provider: str | None = Field(None, max_length=32)
+    provider_customer_id: str | None = Field(None, max_length=255)
+    provider_subscription_id: str | None = Field(None, max_length=255)
+    current_period_start: datetime | None = None
+    current_period_end: datetime | None = None
+    next_billing_at: datetime | None = None
+    cancel_at_period_end: bool | None = None
+    canceled_at: datetime | None = None
+    billing_failure_count: int | None = Field(None, ge=0)
+    membership_grace_until: datetime | None = None
+    trial_ends_at: datetime | None = None
+    last_payment_at: datetime | None = None
 
 
 class ContractorResponse(ContractorInDB):

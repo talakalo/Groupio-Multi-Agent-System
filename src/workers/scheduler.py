@@ -159,7 +159,11 @@ async def check_expired_offers():
 async def recalculate_trust_scores():
     """Recalculate trust scores for all active contractors."""
     db = get_postgres_client()
-    contractors, _ = await db.list_contractors(filters={"verification_status": "verified"}, page=1, page_size=1000)
+    contractors, _ = await db.list_contractors(
+        filters={"verification_status": "verified", "marketplace_visible_only": False},
+        page=1,
+        page_size=1000,
+    )
     for contractor in contractors:
         try:
             await db.update_contractor_rating(contractor["id"])
@@ -188,7 +192,9 @@ async def generate_daily_analytics():
 
         # Count active contractors
         contractors, total_contractors = await db.list_contractors(
-            {"verification_status": "verified"}, page=1, page_size=1
+            {"verification_status": "verified", "marketplace_visible_only": False},
+            page=1,
+            page_size=1,
         )
 
         summary = {
