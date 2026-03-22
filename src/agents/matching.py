@@ -5,6 +5,7 @@ from typing import Any
 
 from src.agents.base import AgentConfig, BaseAgent
 from src.config.prompts.matching import MATCHING_SYSTEM_PROMPT
+from src.config.settings import get_settings
 from src.databases.graph_store import get_graph_store
 from src.models.agent_state import AgentState
 from src.services.agent_config import get_agent_mode
