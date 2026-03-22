@@ -80,6 +80,15 @@ class SignupResponse(BaseModel):
 @router.post("/signup", response_model=SignupResponse)
 async def signup(request: SignupRequest, _: None = Depends(check_auth_rate_limit)) -> SignupResponse:
     """Register a new user and return token (auto-login)."""
+    # Privileged roles must be assigned by an existing admin via POST /admin/users.
+    # Reject any attempt to self-escalate via the public signup endpoint.
+    _PRIVILEGED_ROLES = {UserRole.ADMIN, UserRole.SUPER_ADMIN}
+    if request.role in _PRIVILEGED_ROLES:
+        raise HTTPException(
+            status_code=400,
+            detail="Admin roles cannot be assigned at signup. Contact a system administrator.",
+        )
+
     db = get_postgres_client()
 
     existing = await db.get_user_by_email(request.email)

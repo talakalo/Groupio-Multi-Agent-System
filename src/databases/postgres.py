@@ -988,14 +988,16 @@ class PostgresClient:
         )
 
     async def get_user_orders(self, user_id: str, limit: int = 5) -> list[dict[str, Any]]:
-        """Get recent orders for a user."""
+        """Get recent orders for a user via the user_orders view."""
         if self._use_supabase_client():
             client = await self._get_client()
+            # Use the user_orders view (created in migration 025) which aggregates
+            # offer_participants + offers + invoices + payments per user.
             result = (
-                await client.table("orders")
-                .select("*, contractors(business_name), buildings(address)")
-                .eq("resident_id", user_id)
-                .order("created_at", desc=True)
+                await client.table("user_orders")
+                .select("*")
+                .eq("user_id", user_id)
+                .order("joined_at", desc=True)
                 .limit(limit)
                 .execute()
             )

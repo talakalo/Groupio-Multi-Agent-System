@@ -205,6 +205,22 @@ class Settings(BaseSettings):
                 self.ENVIRONMENT,
             )
 
+        # --- Payment provider in production ---
+        # Default is "mock" for developer convenience. Shipping mock to real users
+        # means no real transactions are processed (orders appear to succeed but no
+        # money moves). Raise an error in production/staging if not overridden.
+        if is_prod and self.PAYMENT_PROVIDER == "mock":
+            raise ValueError(
+                f"PAYMENT_PROVIDER is set to 'mock' in {self.ENVIRONMENT}. "
+                "Real-money environments must use 'stripe' or 'payplus'. "
+                "Set PAYMENT_PROVIDER=stripe and configure STRIPE_SECRET_KEY, "
+                "or set PAYMENT_PROVIDER=payplus with appropriate credentials."
+            )
+        if is_prod and self.PAYMENT_PROVIDER == "stripe" and not self.STRIPE_SECRET_KEY:
+            raise ValueError(
+                f"STRIPE_SECRET_KEY must be set when PAYMENT_PROVIDER=stripe in {self.ENVIRONMENT}."
+            )
+
         # --- Required secrets in production ---
         if is_prod:
             if not self.PAYMENT_WEBHOOK_SECRET:
