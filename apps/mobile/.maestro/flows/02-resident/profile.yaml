@@ -1,0 +1,49 @@
+# Flow: Resident — Profile Screen
+# Verifies the profile screen shows user info and settings.
+#
+# Run: maestro test .maestro/flows/02-resident/profile.yaml
+
+appId: ${APP_ID}
+tags:
+  - resident
+  - profile
+---
+
+- runFlow: ../../subflows/launch-fresh.yaml
+- runFlow: ../../subflows/login-resident.yaml
+
+# Navigate to Profile tab
+- tapOn: "Profile"
+- assertVisible:
+    text: "Profile"
+    timeout: 8000
+
+# Profile sections
+- assertVisible: "Personal Info"
+- assertVisible: "Building Info"
+
+# Settings section
+- scroll
+- assertVisible: "Language"
+- assertVisible: "Notifications"
+- assertVisible: "Push Notifications"
+
+# Verify notification toggles visible
+- assertVisible: "New Offers"
+- assertVisible: "Price Drops"
+- assertVisible: "Chat Messages"
+
+# Terms link
+- scroll
+- assertVisible: "Terms of Use & Privacy Policy"
+
+# Logout option present
+- assertVisible: "Logout"
+
+# Cancel logout flow (don't actually log out)
+- tapOn: "Logout"
+- assertVisible: "Are you sure you want to log out?"
+- tapOn: "Cancel"
+
+# Should remain on profile
+- assertVisible: "Profile"

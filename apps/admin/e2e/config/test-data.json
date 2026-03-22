@@ -1,0 +1,93 @@
+{
+  "users": {
+    "admin": {
+      "email": "admin@groupio.co.il",
+      "password": "AdminSecure123!",
+      "name": "אדמין ראשי"
+    }
+  },
+  "systemHealth": {
+    "status": "healthy",
+    "services": {
+      "vector_db": { "status": "healthy", "latency": 15 },
+      "graph_db": { "status": "healthy", "latency": 22 },
+      "redis": { "status": "healthy", "latency": 5 },
+      "postgres": { "status": "healthy", "latency": 12 },
+      "llm_api": { "status": "healthy", "latency": 450 }
+    },
+    "agents": {
+      "router": { "calls": 1500, "errors": 12, "avgLatency": 0.3 },
+      "matching": { "calls": 800, "errors": 5, "avgLatency": 1.1 },
+      "pricing": { "calls": 600, "errors": 3, "avgLatency": 0.8 },
+      "vetting": { "calls": 200, "errors": 2, "avgLatency": 1.5 },
+      "support": { "calls": 2000, "errors": 25, "avgLatency": 0.6 },
+      "outreach": { "calls": 300, "errors": 1, "avgLatency": 2.0 },
+      "analytics": { "calls": 150, "errors": 0, "avgLatency": 1.8 }
+    },
+    "uptime": 99.95,
+    "lastRestart": "2026-01-01T00:00:00Z"
+  },
+  "dashboardStats": {
+    "users": { "total": 5000, "active": 3500, "newThisMonth": 250 },
+    "contractors": { "total": 200, "verified": 180, "pending": 15, "rejected": 5 },
+    "offers": { "total": 500, "active": 85, "completed": 400, "cancelled": 15 },
+    "revenue": { "total": 2500000, "thisMonth": 180000, "growth": 12.5 },
+    "escalations": { "open": 8, "resolved": 150, "avgResolutionTime": 4.2 }
+  },
+  "pendingContractors": [
+    {
+      "id": "con_pending_001",
+      "businessName": "New AC Company",
+      "email": "newac@example.com",
+      "licenseNumber": "87654321",
+      "submittedAt": "2026-01-25T10:00:00Z",
+      "documents": [
+        { "type": "license", "status": "pending_review" },
+        { "type": "insurance", "status": "pending_review" }
+      ],
+      "categories": ["ac_installation"],
+      "regions": ["center"]
+    },
+    {
+      "id": "con_pending_002",
+      "businessName": "Kitchen Experts",
+      "email": "kitchen@example.com",
+      "licenseNumber": "12348765",
+      "submittedAt": "2026-01-24T14:00:00Z",
+      "documents": [
+        { "type": "license", "status": "approved" },
+        { "type": "insurance", "status": "pending_review" }
+      ],
+      "categories": ["kitchen_renovation"],
+      "regions": ["tel_aviv", "center"]
+    }
+  ],
+  "escalations": [
+    {
+      "id": "esc_001",
+      "conversationId": "conv_123",
+      "userId": "user_456",
+      "userName": "יעל כהן",
+      "reason": "legal_keywords",
+      "priority": "high",
+      "status": "open",
+      "createdAt": "2026-01-26T09:00:00Z",
+      "summary": "הלקוח ציין שהוא רוצה לפנות לעורך דין",
+      "messages": [
+        { "role": "user", "content": "השירות היה גרוע, אני הולך לעורך דין" },
+        { "role": "assistant", "content": "אני מצטער לשמוע. מעביר אותך לנציג." }
+      ]
+    },
+    {
+      "id": "esc_002",
+      "conversationId": "conv_124",
+      "userId": "user_789",
+      "userName": "דני לוי",
+      "reason": "negative_sentiment",
+      "priority": "medium",
+      "status": "open",
+      "createdAt": "2026-01-26T08:30:00Z",
+      "summary": "לקוח מתלונן על איכות העבודה"
+    }
+  ]
+}

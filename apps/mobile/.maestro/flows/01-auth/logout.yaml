@@ -1,0 +1,31 @@
+# Flow: Logout
+# Verifies that a logged-in resident can log out and return to the login screen.
+#
+# Run: maestro test .maestro/flows/01-auth/logout.yaml
+
+appId: ${APP_ID}
+tags:
+  - auth
+  - resident
+---
+
+- runFlow: ../../subflows/launch-fresh.yaml
+- runFlow: ../../subflows/login-resident.yaml
+
+# Navigate to Profile tab
+- tapOn: "Profile"
+- assertVisible:
+    text: "Profile"
+    timeout: 5000
+
+# Tap Logout
+- tapOn: "Logout"
+
+# Confirm logout in the dialog
+- assertVisible: "Are you sure you want to log out?"
+- tapOn: "Logout"
+
+# Should be back on the login screen
+- assertVisible:
+    text: "Sign in to your account"
+    timeout: 10000

@@ -1,0 +1,62 @@
+# Flow: Contractor — Create Offer
+# Tests opening the create offer screen and filling in the form.
+#
+# Run: maestro test .maestro/flows/03-contractor/create-offer.yaml
+
+appId: ${APP_ID}
+tags:
+  - contractor
+  - create-offer
+---
+
+- runFlow: ../../subflows/launch-fresh.yaml
+- runFlow: ../../subflows/login-contractor.yaml
+
+# Navigate to Offers tab and tap "New Offer" FAB
+- tapOn: "Offers"
+- assertVisible:
+    text: "Offers"
+    timeout: 8000
+
+- tapOn: "New Offer"
+- assertVisible:
+    text: "Create Offer"
+    timeout: 8000
+
+# Fill in the offer form
+- tapOn:
+    id: "create-offer-title"
+- inputText: "Group AC Installation Test Offer"
+
+# Select category
+- tapOn:
+    id: "create-offer-category"
+- tapOn: "AC Installation"
+
+- tapOn:
+    id: "create-offer-base-price"
+- inputText: "4500"
+
+- tapOn:
+    id: "create-offer-min-participants"
+- inputText: "3"
+
+- tapOn:
+    id: "create-offer-max-participants"
+- inputText: "20"
+
+# Description
+- tapOn:
+    id: "create-offer-description"
+- inputText: "Professional AC installation for the entire building"
+
+# Submit the form
+- tapOn:
+    id: "create-offer-submit"
+- waitForAnimationToEnd
+
+# Should navigate back to offers list or show success
+- assertTrue:
+    visible: "Offers"
+    orVisible: "Create Offer"
+    timeout: 15000

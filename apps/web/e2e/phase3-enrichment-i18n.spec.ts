@@ -3,7 +3,7 @@
  * Reuses existing Playwright config, mocks, and auth patterns.
  */
 
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./api/test";
 
 test.describe("Phase 3: Address suggestion flow", () => {
   test.beforeEach(async ({ page }) => {
