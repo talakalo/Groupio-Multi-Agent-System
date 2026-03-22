@@ -25,7 +25,13 @@ class UserBase(BaseModel):
     preferred_language: str = Field(default="he", pattern=r"^(he|en)$")
 
 
-_SELF_REGISTERABLE_ROLES = frozenset({UserRole.RESIDENT, UserRole.CONTRACTOR})
+#: Roles that any member of the public may claim during self-registration.
+#: Privileged roles (admin, super_admin, buildings_manager) must be assigned
+#: through protected admin-only flows or internal seeding — never via public signup.
+SELF_REGISTERABLE_ROLES: frozenset[UserRole] = frozenset({UserRole.RESIDENT, UserRole.CONTRACTOR})
+
+# Keep the private alias for backwards compatibility inside this module.
+_SELF_REGISTERABLE_ROLES = SELF_REGISTERABLE_ROLES
 
 
 class UserCreate(UserBase):
@@ -37,9 +43,9 @@ class UserCreate(UserBase):
     @field_validator("role")
     @classmethod
     def _block_privileged_roles(cls, v: UserRole) -> UserRole:
-        if v not in _SELF_REGISTERABLE_ROLES:
+        if v not in SELF_REGISTERABLE_ROLES:
             raise ValueError(
-                f"Cannot self-register with role '{v}'. Allowed: {', '.join(sorted(_SELF_REGISTERABLE_ROLES))}"
+                f"Cannot self-register with role '{v}'. Allowed: {', '.join(sorted(SELF_REGISTERABLE_ROLES))}"
             )
         return v
 

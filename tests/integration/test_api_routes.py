@@ -913,3 +913,126 @@ class TestGlobalExceptionHandler:
                     )
         assert response.status_code == 503
         assert "unavailable" in response.json().get("detail", "").lower()
+
+
+# ---------------------------------------------------------------------------
+# Security regression: public signup must reject privileged roles
+# ---------------------------------------------------------------------------
+
+
+class TestSignupRoleRestriction:
+    """HTTP-level regression tests for the signup privilege-escalation fix.
+
+    A malicious client must NOT be able to supply role=admin,
+    role=super_admin, or role=buildings_manager and get a privileged account.
+    Both /signup and /register endpoints must enforce this.
+    """
+
+    _VALID_BASE = {
+        "name": "New User",
+        "email": "newuser@example.com",
+        "phone": "0501234567",
+        "password": "securepass12",
+    }
+
+    _VALID_REGISTER_BASE = {
+        "email": "newuser@example.com",
+        "full_name": "New User",
+        "phone": "0501234567",
+        "password": "securepass12",
+    }
+
+    # -- /signup allowed roles ------------------------------------------------
+
+    @pytest.mark.parametrize("role", ["resident", "contractor"])
+    def test_signup_allows_resident_and_contractor(self, client, mock_db, mock_redis, role):
+        """Allowed roles must pass validation and reach the DB layer."""
+        mock_db.get_user_by_email = AsyncMock(return_value=None)
+        mock_db.get_user_by_phone = AsyncMock(return_value=None)
+
+        class FakeUser:
+            id = "user-new"
+            email = "newuser@example.com"
+            full_name = "New User"
+            phone = "0501234567"
+            is_active = True
+            is_verified = False
+            preferred_language = "he"
+            avatar_url = None
+            building_id = None
+            contractor_id = None
+            created_at = "2024-01-01T00:00:00Z"
+            updated_at = "2024-01-01T00:00:00Z"
+            last_login = None
+            notification_settings = None
+
+        FakeUser.role = role
+        mock_db.create_user = AsyncMock(return_value=FakeUser())
+        mock_redis.set = AsyncMock()
+
+        response = client.post(
+            "/api/v1/auth/signup",
+            json={**self._VALID_BASE, "role": role},
+        )
+        # Must not be rejected by validation (422 = Unprocessable Entity)
+        assert response.status_code != 422, (
+            f"Allowed role '{role}' was incorrectly rejected: {response.json()}"
+        )
+
+    # -- /signup forbidden roles ----------------------------------------------
+
+    @pytest.mark.parametrize(
+        "privileged_role",
+        ["admin", "super_admin", "buildings_manager"],
+    )
+    def test_signup_rejects_privileged_roles(self, client, mock_db, mock_redis, privileged_role):
+        """Privilege-escalation via /signup must return HTTP 422."""
+        response = client.post(
+            "/api/v1/auth/signup",
+            json={**self._VALID_BASE, "role": privileged_role},
+        )
+        assert response.status_code == 422, (
+            f"Expected 422 for privileged role '{privileged_role}' but got "
+            f"{response.status_code}: {response.json()}"
+        )
+
+    def test_signup_rejects_admin(self, client, mock_db, mock_redis):
+        """Explicit regression: role=admin must be HTTP 422."""
+        response = client.post(
+            "/api/v1/auth/signup",
+            json={**self._VALID_BASE, "role": "admin"},
+        )
+        assert response.status_code == 422
+
+    def test_signup_rejects_super_admin(self, client, mock_db, mock_redis):
+        """Explicit regression: role=super_admin must be HTTP 422."""
+        response = client.post(
+            "/api/v1/auth/signup",
+            json={**self._VALID_BASE, "role": "super_admin"},
+        )
+        assert response.status_code == 422
+
+    def test_signup_rejects_buildings_manager(self, client, mock_db, mock_redis):
+        """Explicit regression: role=buildings_manager must be HTTP 422."""
+        response = client.post(
+            "/api/v1/auth/signup",
+            json={**self._VALID_BASE, "role": "buildings_manager"},
+        )
+        assert response.status_code == 422
+
+    # -- /register forbidden roles --------------------------------------------
+
+    @pytest.mark.parametrize(
+        "privileged_role",
+        ["admin", "super_admin", "buildings_manager"],
+    )
+    def test_register_rejects_privileged_roles(self, client, mock_db, mock_redis, privileged_role):
+        """Privilege-escalation via /register must also return HTTP 422."""
+        response = client.post(
+            "/api/v1/auth/register",
+            json={**self._VALID_REGISTER_BASE, "role": privileged_role},
+        )
+        assert response.status_code == 422, (
+            f"Expected 422 for privileged role '{privileged_role}' on /register but got "
+            f"{response.status_code}: {response.json()}"
+        )
