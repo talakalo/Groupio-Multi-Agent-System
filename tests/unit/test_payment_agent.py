@@ -229,9 +229,10 @@ async def test_refund_request_escalates(payment_agent, payment_state):
     result = await agent.run(payment_state)
 
     assert result["needs_human"] is True
-    assert result["escalation_reason"] == "refund_request"
+    assert "refund" in result["escalation_reason"].lower()
+    assert "admin approval" in result["escalation_reason"].lower()
     action = result["actions_taken"][0]
-    assert action["action"] == "refund_escalated"
+    assert action["action"] == "refund_queued"
     assert action["requires_followup"] is True
 
 

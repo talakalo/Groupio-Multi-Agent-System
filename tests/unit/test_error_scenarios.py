@@ -7,6 +7,7 @@ edge cases, and circuit breaker behavior.
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from fastapi.testclient import TestClient
 
 
 class TestLLMErrorScenarios:
@@ -188,10 +189,11 @@ class TestSchemaNotReady:
             side_effect=asyncpg.exceptions.UndefinedTableError('relation "users" does not exist')
         )
 
+        redis = AsyncMock()
+        redis.is_temporarily_locked = AsyncMock(return_value=0)
+        redis.increment_login_failures = AsyncMock(return_value=1)
         with patch("src.api.routes.auth.get_postgres_client", return_value=db):
-            with patch("src.api.routes.auth.get_redis_client"):
-                from fastapi.testclient import TestClient
-
+            with patch("src.api.routes.auth.get_redis_client", return_value=redis):
                 client = TestClient(app, raise_server_exceptions=False)
                 resp = client.post(
                     "/api/v1/auth/login/json",

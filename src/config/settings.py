@@ -164,6 +164,9 @@ class Settings(BaseSettings):
     # Stripe webhook signing secret (from Stripe Dashboard → Webhooks → Signing secret)
     # Used by POST /payments/webhook/stripe to verify authentic Stripe events.
     STRIPE_WEBHOOK_SECRET: str = ""
+    # Stripe Price ID for recurring contractor marketplace membership (subscription mode checkout).
+    # Required to call POST /contractors/me/membership/checkout-session when PAYMENT_PROVIDER=stripe.
+    STRIPE_CONTRACTOR_MEMBERSHIP_PRICE_ID: str = ""
 
     # Shared HMAC webhook signing secret — must be set in non-dev environments
     # to prevent fraudulent webhook forgery. Generate with:

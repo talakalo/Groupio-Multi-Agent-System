@@ -23,7 +23,7 @@ import { CategoryChips } from '@/components/shared/CategoryChips';
 import { StepIndicator } from '@/components/shared/StepIndicator';
 import { apiClient, ApiError } from '@/lib/api/client';
 import { cn } from '@/lib/utils/cn';
-import { unwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
+import { useUnwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
 
 const pricingTierSchema = z.object({
   minResidents: z.number().min(1, 'מינימום 1 דייר'),
@@ -63,7 +63,7 @@ const STEP_FIELDS: Record<number, (keyof CreateOfferForm)[]> = {
 };
 
 export default function CreateOfferPage(props: PageParamsProps) {
-  unwrapPageParams(props);
+  useUnwrapPageParams(props);
   const t = useTranslations('contractor.offers.create');
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(0);

@@ -222,9 +222,12 @@ class TestHigh02AdminEscalation:
         db.create_user = AsyncMock(return_value=new_user)
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import require_admin_only
 
-        app.dependency_overrides[get_admin_user] = lambda: admin
+        async def _admin_dep():
+            return admin
+
+        app.dependency_overrides[require_admin_only] = _admin_dep
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 client = TestClient(app, raise_server_exceptions=False)
@@ -252,9 +255,12 @@ class TestHigh02AdminEscalation:
         db.create_audit_log = AsyncMock()
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import require_admin_only
 
-        app.dependency_overrides[get_admin_user] = lambda: admin
+        async def _admin_dep():
+            return admin
+
+        app.dependency_overrides[require_admin_only] = _admin_dep
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 client = TestClient(app, raise_server_exceptions=False)
@@ -277,9 +283,12 @@ class TestHigh02AdminEscalation:
         db.create_audit_log = AsyncMock()
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import require_admin_only
 
-        app.dependency_overrides[get_admin_user] = lambda: super_admin
+        async def _super_dep():
+            return super_admin
+
+        app.dependency_overrides[require_admin_only] = _super_dep
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 client = TestClient(app, raise_server_exceptions=False)
@@ -605,7 +614,7 @@ class TestLow02TemporaryBruteForce:
         redis = AsyncMock()
         redis.check_ip_rate_limit = AsyncMock(return_value=True)
         redis.is_temporarily_locked = AsyncMock(return_value=0)
-        # 5th failure triggers lockout
+        # Single request: failed password with counter already at 5 triggers lockout
         redis.increment_login_failures = AsyncMock(return_value=5)
         redis.set_temporary_lockout = AsyncMock()
         redis.clear_login_failures = AsyncMock()

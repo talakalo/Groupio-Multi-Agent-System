@@ -248,10 +248,10 @@ class TestEscalationsRBAC:
 
 
 class TestAdminEndpointsRBAC:
-    """buildings_manager must pass the get_admin_user dependency."""
+    """Admin API uses require_admin_only (admin + super_admin); buildings_manager is excluded."""
 
-    def test_buildings_manager_can_access_admin_status(self, client):
-        """GET /api/v1/admin/status should return 200 for buildings_manager."""
+    def test_buildings_manager_cannot_access_admin_status(self, client):
+        """GET /api/v1/admin/status must return 403 for buildings_manager."""
         _override_auth(_make_user(UserRole.BUILDINGS_MANAGER))
 
         with (
@@ -268,8 +268,7 @@ class TestAdminEndpointsRBAC:
                 headers={"Authorization": "Bearer test-token"},
             )
 
-        # 200 or 500 (if downstream mock is incomplete) – either way NOT 403
-        assert response.status_code != 403
+        assert response.status_code == 403
 
     def test_resident_cannot_access_admin_status(self, client):
         """GET /api/v1/admin/status should return 403 for resident."""

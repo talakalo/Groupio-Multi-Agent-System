@@ -5,7 +5,12 @@
 
 import testData from "../config/test-data.json";
 
-export type UserRole = "resident" | "contractor" | "admin";
+export type UserRole =
+  | "resident"
+  | "contractor"
+  | "admin"
+  | "buildings_manager"
+  | "super_admin";
 
 export interface MockUser {
   id: string;
@@ -88,5 +93,17 @@ export function getMockUserForRole(role: UserRole): MockUser {
       return createContractorUser();
     case "admin":
       return createResidentUser({ role: "admin", email: testData.users.admin.email });
+    case "buildings_manager":
+      return createResidentUser({
+        role: "buildings_manager",
+        id: "user-bm-e2e",
+        email: "bm@e2e.example.com",
+      });
+    case "super_admin":
+      return createResidentUser({
+        role: "super_admin",
+        id: "user-sa-e2e",
+        email: "super@e2e.example.com",
+      });
   }
 }

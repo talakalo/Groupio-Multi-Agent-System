@@ -77,6 +77,23 @@ describe('SettingsPage', () => {
     });
   });
 
+  it('renders general tab when API returns flat system_settings (no nested general)', async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        max_offers: '100',
+        MATCHING_AGENT_MODE: 'gated',
+      }),
+    });
+
+    render(<SettingsPage />, { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      expect(screen.getByText('General Settings')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('Groupio')).toBeInTheDocument();
+    });
+  });
+
   it('switches to Security tab and shows security settings', async () => {
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,

@@ -12,7 +12,11 @@ Usage:
     # Against Docker Postgres from host (127.0.0.1) — only if 127.0.0.1:5432 is Docker, not local Postgres:
     python scripts/seed_user_accounts.py
 
-Creates (skips if email already exists):
+Creates **only user accounts** in Postgres (skips if email already exists). No buildings, offers,
+or contractors — those are separate. For richer synthetic data see ``scripts/seed_test_data.py``
+(writing to DB may need updates to match ``PostgresClient``).
+
+Accounts (skips if email already exists):
 - Buildings Manager: groupioappofficial@gmail.com / T2207al!@#
 - Resident: takalo878@gmail.com / T2207al!@#
 - Contractor: testusert612@gmail.com / T2207al!

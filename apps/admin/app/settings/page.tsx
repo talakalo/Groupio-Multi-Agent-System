@@ -109,10 +109,111 @@ const TABS: { id: TabId; label: string; icon: React.ComponentType<{ className?: 
 
 const fetchOpts = (): RequestInit => ({ credentials: "include", headers: { "Content-Type": "application/json" } });
 
+function cloneSystemSettings(source: SystemSettings): SystemSettings {
+  return {
+    general: { ...source.general },
+    notifications: {
+      ...source.notifications,
+      templates: [...source.notifications.templates],
+    },
+    security: { ...source.security },
+    agents: source.agents.map((a) => ({ ...a })),
+  };
+}
+
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+function mergeGeneral(base: GeneralSettings, raw: unknown): GeneralSettings {
+  if (!isPlainObject(raw)) return { ...base };
+  const lang = raw.defaultLanguage;
+  const defaultLanguage = lang === "he" || lang === "en" ? lang : base.defaultLanguage;
+  return {
+    platformName: typeof raw.platformName === "string" ? raw.platformName : base.platformName,
+    supportEmail: typeof raw.supportEmail === "string" ? raw.supportEmail : base.supportEmail,
+    defaultLanguage,
+  };
+}
+
+function mergeNotifications(base: NotificationSettings, raw: unknown): NotificationSettings {
+  if (!isPlainObject(raw)) return { ...base, templates: [...base.templates] };
+  const templates = Array.isArray(raw.templates)
+    ? raw.templates.filter((t): t is string => typeof t === "string")
+    : base.templates;
+  return {
+    emailEnabled: typeof raw.emailEnabled === "boolean" ? raw.emailEnabled : base.emailEnabled,
+    whatsappEnabled:
+      typeof raw.whatsappEnabled === "boolean" ? raw.whatsappEnabled : base.whatsappEnabled,
+    pushEnabled: typeof raw.pushEnabled === "boolean" ? raw.pushEnabled : base.pushEnabled,
+    templates: templates.length > 0 ? templates : [...base.templates],
+  };
+}
+
+function coerceNumber(v: unknown, fallback: number): number {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string") {
+    const n = Number(v);
+    if (Number.isFinite(n)) return n;
+  }
+  return fallback;
+}
+
+function mergeSecurity(base: SecuritySettings, raw: unknown): SecuritySettings {
+  if (!isPlainObject(raw)) return { ...base };
+  return {
+    rateLimitPerUser: coerceNumber(raw.rateLimitPerUser, base.rateLimitPerUser),
+    jwtExpiryMinutes: coerceNumber(raw.jwtExpiryMinutes, base.jwtExpiryMinutes),
+    enforce2FA: typeof raw.enforce2FA === "boolean" ? raw.enforce2FA : base.enforce2FA,
+    corsOrigins: typeof raw.corsOrigins === "string" ? raw.corsOrigins : base.corsOrigins,
+  };
+}
+
+function mergeAgentList(defaults: AgentConfig[], raw: unknown): AgentConfig[] {
+  if (!Array.isArray(raw)) return defaults.map((a) => ({ ...a }));
+  const patches = new Map<string, Partial<AgentConfig>>();
+  for (const item of raw) {
+    if (!isPlainObject(item) || typeof item.key !== "string") continue;
+    patches.set(item.key, item as Partial<AgentConfig>);
+  }
+  return defaults.map((def) => {
+    const p = patches.get(def.key);
+    if (!p) return { ...def };
+    return {
+      ...def,
+      ...p,
+      key: def.key,
+      name: typeof p.name === "string" ? p.name : def.name,
+    };
+  });
+}
+
+/** API returns flat key-value rows; UI expects nested SystemSettings. */
+function mergeFetchedSettings(raw: unknown): SystemSettings {
+  const next = cloneSystemSettings(DEFAULT_SETTINGS);
+  if (!isPlainObject(raw)) return next;
+
+  if (isPlainObject(raw.general)) {
+    next.general = mergeGeneral(next.general, raw.general);
+  }
+  if (isPlainObject(raw.notifications)) {
+    next.notifications = mergeNotifications(next.notifications, raw.notifications);
+  }
+  if (isPlainObject(raw.security)) {
+    next.security = mergeSecurity(next.security, raw.security);
+  }
+  if (raw.agents !== undefined) {
+    next.agents = mergeAgentList(DEFAULT_AGENTS, raw.agents);
+  }
+
+  return next;
+}
+
 async function fetchSettings(): Promise<SystemSettings> {
   const res = await fetch(`${API_URL}/api/v1/admin/settings`, fetchOpts());
   if (!res.ok) throw new Error("Failed to fetch settings");
-  return res.json();
+  const raw: unknown = await res.json();
+  return mergeFetchedSettings(raw);
 }
 
 async function saveSettings(settings: SystemSettings): Promise<SystemSettings> {
@@ -122,7 +223,8 @@ async function saveSettings(settings: SystemSettings): Promise<SystemSettings> {
     body: JSON.stringify(settings),
   });
   if (!res.ok) throw new Error("Failed to save settings");
-  return res.json();
+  const raw: unknown = await res.json();
+  return mergeFetchedSettings(raw);
 }
 
 function SettingsToggle({
@@ -199,7 +301,10 @@ export default function SettingsPage() {
   // ---- Helpers to update nested state ----
   const updateGeneral = useCallback(
     (patch: Partial<GeneralSettings>) => {
-      setSettings((s) => ({ ...s, general: { ...s.general, ...patch } }));
+      setSettings((s) => ({
+        ...s,
+        general: { ...(s.general ?? DEFAULT_SETTINGS.general), ...patch },
+      }));
     },
     []
   );
@@ -208,7 +313,10 @@ export default function SettingsPage() {
     (patch: Partial<NotificationSettings>) => {
       setSettings((s) => ({
         ...s,
-        notifications: { ...s.notifications, ...patch },
+        notifications: {
+          ...(s.notifications ?? DEFAULT_SETTINGS.notifications),
+          ...patch,
+        },
       }));
     },
     []
@@ -218,7 +326,7 @@ export default function SettingsPage() {
     (key: string, patch: Partial<Omit<AgentConfig, "key" | "name">>) => {
       setSettings((s) => ({
         ...s,
-        agents: s.agents.map((a) =>
+        agents: (s.agents ?? DEFAULT_AGENTS).map((a) =>
           a.key === key ? { ...a, ...patch } : a
         ),
       }));
@@ -228,7 +336,10 @@ export default function SettingsPage() {
 
   const updateSecurity = useCallback(
     (patch: Partial<SecuritySettings>) => {
-      setSettings((s) => ({ ...s, security: { ...s.security, ...patch } }));
+      setSettings((s) => ({
+        ...s,
+        security: { ...(s.security ?? DEFAULT_SETTINGS.security), ...patch },
+      }));
     },
     []
   );
@@ -254,7 +365,11 @@ export default function SettingsPage() {
           )}
           <button
             className="btn-secondary"
-            onClick={() => setSettings(serverSettings || DEFAULT_SETTINGS)}
+            onClick={() =>
+              setSettings(
+                cloneSystemSettings(serverSettings ?? DEFAULT_SETTINGS)
+              )
+            }
           >
             <RotateCcw className="w-4 h-4" />
             Reset

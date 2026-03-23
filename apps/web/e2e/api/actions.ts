@@ -8,7 +8,11 @@
 
 import { type Page, type BrowserContext } from "@playwright/test";
 import { envConfig } from "../config/env.config";
-import { getMockUserForRole, type UserRole } from "../helpers/user.factory";
+import {
+  getMockUserForRole,
+  type MockUser,
+  type UserRole,
+} from "../helpers/user.factory";
 import {
   createMockResponse,
   createHealthResponse,
@@ -102,12 +106,55 @@ export async function clearAuth(page: Page): Promise<void> {
 
 // ─── API Mocking ─────────────────────────────────────────────────────────────
 
+export type SetupBaseMocksOptions = {
+  /** When true, skip default in-app notification routes so specs can register their own. */
+  skipDefaultNotifications?: boolean;
+  /** Override ``/api/v1/auth/me`` JSON (defaults to resident pilot user). */
+  authMeUser?: MockUser;
+};
+
+/**
+ * Default happy-path mocks for ``NotificationPanel`` (empty list, zero unread).
+ */
+export async function setupDefaultNotificationMocks(page: Page): Promise<void> {
+  await page.route("**/api/v1/notifications**", async (route) => {
+    const req = route.request();
+    const url = req.url();
+    const method = req.method();
+
+    if (url.includes("unread-count")) {
+      await route.fulfill(createMockResponse({ count: 0 }));
+      return;
+    }
+    if (method === "POST" && url.includes("/read-all")) {
+      await route.fulfill(createMockResponse({ status: "ok" }));
+      return;
+    }
+    if (method === "POST" && /\/api\/v1\/notifications\/[^/]+\/read(?:\?|$)/.test(url)) {
+      await route.fulfill(createMockResponse({ status: "ok" }));
+      return;
+    }
+
+    await route.fulfill(
+      createMockResponse({
+        items: [],
+        total: 0,
+        limit: 50,
+        offset: 0,
+      }),
+    );
+  });
+}
+
 /**
  * Set up the standard set of API mocks needed across multiple tests.
  * Intercepts the most common backend endpoints so tests run without a live API.
  */
-export async function setupBaseMocks(page: Page): Promise<void> {
-  const residentUser = getMockUserForRole("resident");
+export async function setupBaseMocks(
+  page: Page,
+  opts: SetupBaseMocksOptions = {},
+): Promise<void> {
+  const authMeUser = opts.authMeUser ?? getMockUserForRole("resident");
 
   // Health
   await page.route("**/api/v1/health", (r) =>
@@ -116,7 +163,7 @@ export async function setupBaseMocks(page: Page): Promise<void> {
 
   // Auth /me
   await page.route("**/api/v1/auth/me", (r) =>
-    r.fulfill(createMockResponse(residentUser)),
+    r.fulfill(createMockResponse(authMeUser)),
   );
 
   // Offers list
@@ -172,6 +219,10 @@ export async function setupBaseMocks(page: Page): Promise<void> {
   await page.route("**/api/v1/activity/recent*", (r) =>
     r.fulfill(createMockResponse({ items: [], total: 0 })),
   );
+
+  if (!opts.skipDefaultNotifications) {
+    await setupDefaultNotificationMocks(page);
+  }
 }
 
 /**
@@ -181,8 +232,10 @@ export async function setupBaseMocks(page: Page): Promise<void> {
 export async function setupAuthAndMocks(
   page: Page,
   role: UserRole = "resident",
+  opts: SetupBaseMocksOptions = {},
 ): Promise<void> {
-  await setupBaseMocks(page);
+  const authMeUser = opts.authMeUser ?? getMockUserForRole(role);
+  await setupBaseMocks(page, { ...opts, authMeUser });
   await loginAs(page, role);
 }
 

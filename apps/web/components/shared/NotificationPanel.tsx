@@ -237,6 +237,7 @@ export function NotificationPanel() {
     <div ref={panelRef} className="relative">
       <button
         type="button"
+        data-testid="notification-panel-trigger"
         onClick={() => setOpen((prev) => !prev)}
         className="relative p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
         aria-label="התראות"
@@ -254,6 +255,7 @@ export function NotificationPanel() {
 
       {open && (
         <div
+          data-testid="notification-panel-dialog"
           className={cn(
             'absolute top-full mt-2 end-0 z-50',
             'w-80 bg-white rounded-2xl shadow-xl border border-gray-100',
@@ -267,6 +269,7 @@ export function NotificationPanel() {
             {signedIn && rows.length > 0 && (
               <button
                 type="button"
+                data-testid="notification-mark-all-read"
                 onClick={() => void handleMarkAllRead()}
                 className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 transition-colors"
                 title="סמן הכל כנקרא"
@@ -284,7 +287,10 @@ export function NotificationPanel() {
               </div>
             )}
             {signedIn && loading && rows.length === 0 && (
-              <div className="flex items-center justify-center gap-2 py-10 text-gray-500 text-sm">
+              <div
+                data-testid="notification-panel-loading"
+                className="flex items-center justify-center gap-2 py-10 text-gray-500 text-sm"
+              >
                 <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
                 טוען…
               </div>
@@ -294,6 +300,7 @@ export function NotificationPanel() {
                 {error}
                 <button
                   type="button"
+                  data-testid="notification-retry"
                   className="block mx-auto mt-2 text-xs text-primary-600 underline"
                   onClick={() => void refresh()}
                 >
@@ -302,7 +309,10 @@ export function NotificationPanel() {
               </div>
             )}
             {signedIn && !loading && !error && rows.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
+              <div
+                data-testid="notification-panel-empty"
+                className="flex flex-col items-center justify-center py-10 px-4 text-center"
+              >
                 <div className="h-12 w-12 rounded-full bg-gray-100 flex items-center justify-center mb-3">
                   <Bell className="h-6 w-6 text-gray-300" />
                 </div>

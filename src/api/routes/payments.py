@@ -10,7 +10,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.responses import Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from src.api.middleware.auth import get_admin_user, get_current_user
 from src.config.settings import get_settings
@@ -34,6 +34,11 @@ class PaymentInitiateRequest(BaseModel):
     offer_id: str
     payment_method_id: str | None = None
     force_escrow: bool = False  # Resident can opt-in to escrow
+    idempotency_key: str | None = Field(
+        default=None,
+        max_length=255,
+        description="Optional client key; forwarded to provider metadata for tracing/dedup.",
+    )
 
 
 VAT_RATE = 0.18  # Israeli מע"מ — 18% as of 2025
@@ -316,18 +321,21 @@ async def initiate_payment(
 
     # Call payment provider with the VAT-inclusive total
     try:
+        charge_meta: dict[str, str] = {
+            "offer_id": request.offer_id,
+            "payment_id": payment_id,
+            "user_email": current_user.email,
+            "subtotal": str(charge_subtotal),
+            "tax_amount": str(charge_tax),
+            "tax_rate": str(VAT_RATE),
+        }
+        if request.idempotency_key:
+            charge_meta["idempotency_key"] = request.idempotency_key
         charge_result = await provider.create_charge(
             amount=charge_total,
             currency="ILS",
             customer_id=current_user.id,
-            metadata={
-                "offer_id": request.offer_id,
-                "payment_id": payment_id,
-                "user_email": current_user.email,
-                "subtotal": str(charge_subtotal),
-                "tax_amount": str(charge_tax),
-                "tax_rate": str(VAT_RATE),
-            },
+            metadata=charge_meta,
         )
         payment_data["transaction_id"] = charge_result.get("transaction_id")
         payment_data["status"] = charge_result.get("status", "processing")

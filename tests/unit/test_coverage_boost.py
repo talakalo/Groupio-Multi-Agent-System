@@ -215,7 +215,7 @@ class TestAgentWorkerLifecycle:
         mock_redis = AsyncMock()
         worker.redis_client = mock_redis
         await worker.disconnect()
-        mock_redis.close.assert_awaited_once()
+        mock_redis.aclose.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_disconnect_without_client(self, worker):
