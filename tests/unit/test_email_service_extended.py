@@ -14,6 +14,7 @@ from src.services.email import EmailService
 @pytest.fixture
 def configured_settings():
     s = MagicMock()
+    s.RESEND_API_KEY = ""  # SMTP path
     s.SMTP_HOST = "smtp.example.com"
     s.SMTP_PORT = 587
     s.SMTP_USER = "user@example.com"
@@ -26,6 +27,7 @@ def configured_settings():
 @pytest.fixture
 def unconfigured_settings():
     s = MagicMock()
+    s.RESEND_API_KEY = ""  # falsy — no Resend key
     s.SMTP_HOST = None
     s.SMTP_USER = None
     s.SMTP_PASSWORD = None
