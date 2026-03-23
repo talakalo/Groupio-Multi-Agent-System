@@ -12,22 +12,23 @@ logger = logging.getLogger(__name__)
 
 
 class EmailService:
-    """Service for sending emails via SMTP (async-safe).
+    """Service for sending emails (async-safe).
 
-    Uses asyncio.to_thread to avoid blocking the event loop on
-    synchronous SMTP operations. If aiosmtplib is installed it can
-    be swapped in as a drop-in replacement for even better performance.
+    Prefers Resend API when RESEND_API_KEY is configured; falls back to
+    SMTP (asyncio.to_thread) for local development without a Resend key.
     """
 
     def __init__(self) -> None:
         self.settings = get_settings()
 
     def _is_configured(self) -> bool:
-        """Check if email service is properly configured."""
+        """Check if email service is properly configured (Resend or SMTP)."""
+        if self.settings.RESEND_API_KEY:
+            return True
         return bool(self.settings.SMTP_HOST and self.settings.SMTP_USER and self.settings.SMTP_PASSWORD)
 
     def _send_sync(self, msg: MIMEMultipart, to_email: str) -> None:
-        """Synchronous SMTP send (run inside a thread)."""
+        """Synchronous SMTP send (run inside a thread, fallback path)."""
         with smtplib.SMTP(self.settings.SMTP_HOST, self.settings.SMTP_PORT) as server:
             server.starttls()
             server.login(self.settings.SMTP_USER, self.settings.SMTP_PASSWORD)
@@ -36,6 +37,20 @@ class EmailService:
                 to_email,
                 msg.as_string(),
             )
+
+    def _send_via_resend_sync(self, to_email: str, subject: str, html_content: str) -> None:
+        """Synchronous Resend API send (run inside a thread)."""
+        import resend  # type: ignore[import-untyped]
+
+        resend.api_key = self.settings.RESEND_API_KEY
+        resend.Emails.send(
+            {
+                "from": f"{self.settings.SMTP_FROM_NAME} <{self.settings.SMTP_FROM_EMAIL}>",
+                "to": [to_email],
+                "subject": subject,
+                "html": html_content,
+            }
+        )
 
     async def send_email(
         self,
@@ -50,7 +65,7 @@ class EmailService:
             to_email: Recipient email address
             subject: Email subject
             html_content: HTML email body
-            text_content: Plain text fallback (optional)
+            text_content: Plain text fallback (only used by SMTP path)
 
         Returns:
             True if email was sent successfully, False otherwise
@@ -60,22 +75,19 @@ class EmailService:
             return False
 
         try:
-            msg = MIMEMultipart("alternative")
-            msg["Subject"] = subject
-            msg["From"] = f"{self.settings.SMTP_FROM_NAME} <{self.settings.SMTP_FROM_EMAIL}>"
-            msg["To"] = to_email
+            if self.settings.RESEND_API_KEY:
+                await asyncio.to_thread(self._send_via_resend_sync, to_email, subject, html_content)
+            else:
+                msg = MIMEMultipart("alternative")
+                msg["Subject"] = subject
+                msg["From"] = f"{self.settings.SMTP_FROM_NAME} <{self.settings.SMTP_FROM_EMAIL}>"
+                msg["To"] = to_email
 
-            # Add plain text part
-            if text_content:
-                part1 = MIMEText(text_content, "plain", "utf-8")
-                msg.attach(part1)
+                if text_content:
+                    msg.attach(MIMEText(text_content, "plain", "utf-8"))
+                msg.attach(MIMEText(html_content, "html", "utf-8"))
 
-            # Add HTML part
-            part2 = MIMEText(html_content, "html", "utf-8")
-            msg.attach(part2)
-
-            # Run blocking SMTP in a thread to avoid blocking the event loop
-            await asyncio.to_thread(self._send_sync, msg, to_email)
+                await asyncio.to_thread(self._send_sync, msg, to_email)
 
             logger.info("Email sent successfully to %s", to_email)
             return True

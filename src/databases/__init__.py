@@ -14,4 +14,6 @@ __all__ = [
     "get_postgres_client",
     "get_redis_client",
     "get_vector_store",
+    # PineconeVectorStore is imported lazily inside get_vector_store() to avoid
+    # a hard dependency on pinecone when VECTOR_DB_PROVIDER=qdrant (default).
 ]

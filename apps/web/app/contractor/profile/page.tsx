@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
+import { Analytics } from '@/lib/analytics';
 import { ApiError, apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
 
@@ -113,6 +114,7 @@ export default function ContractorProfilePage() {
   async function startMembershipCheckout() {
     setCheckoutError(null);
     setCheckoutLoading(true);
+    Analytics.membershipSubscribeClicked({ contractor_id: contractorId ?? undefined });
     try {
       const { url } = await apiClient.createContractorMembershipCheckoutSession();
       window.location.href = url;
