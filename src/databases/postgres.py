@@ -17,6 +17,14 @@ from src.models.user import UserInDB
 # Regex for safe SQL column names (letters, digits, underscores)
 _SAFE_COLUMN_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 
+# Explicit user columns — excludes hashed_password so password hashes are
+# never silently pulled into memory on paths that don't need them.
+_USER_COLS = (
+    "id, email, full_name, phone, role, preferred_language, "
+    "is_active, is_verified, avatar_url, building_id, contractor_id, "
+    "last_login, created_at, updated_at"
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -107,12 +115,16 @@ class PostgresClient:
             db_url = settings.DATABASE_URL
             if db_url.startswith("postgres://"):
                 db_url = db_url.replace("postgres://", "postgresql://", 1)
+            _stmt_timeout = settings.DB_STATEMENT_TIMEOUT_MS
             self._asyncpg_pool = await asyncpg.create_pool(
                 db_url,
                 min_size=5,
                 max_size=25,
                 max_inactive_connection_lifetime=300,
                 command_timeout=60,
+                server_settings={
+                    "statement_timeout": str(_stmt_timeout),
+                } if _stmt_timeout > 0 else {},
             )
         return self._asyncpg_pool
 
@@ -226,37 +238,37 @@ class PostgresClient:
             client = await self._get_client()
             result = await client.table("users").select("*").eq("id", user_id).execute()
             return result.data[0] if result.data else None
-        row = await self._pg_fetch_one("SELECT * FROM users WHERE id = $1", user_id)
+        row = await self._pg_fetch_one(f"SELECT {_USER_COLS} FROM users WHERE id = $1", user_id)
         return row
 
     async def get_user_by_email(self, email: str) -> UserInDB | None:
         """Get user by email."""
         if self._use_supabase_client():
             client = await self._get_client()
-            result = await client.table("users").select("*").eq("email", email).limit(1).execute()
+            result = await client.table("users").select(_USER_COLS).eq("email", email).limit(1).execute()
             row = result.data[0] if result.data else None
         else:
-            row = await self._pg_fetch_one("SELECT * FROM users WHERE email = $1", email)
+            row = await self._pg_fetch_one(f"SELECT {_USER_COLS} FROM users WHERE email = $1", email)
         return UserInDB(**_row_to_user(row)) if row else None
 
     async def get_user_by_phone(self, phone: str) -> UserInDB | None:
         """Get user by phone."""
         if self._use_supabase_client():
             client = await self._get_client()
-            result = await client.table("users").select("*").eq("phone", phone).limit(1).execute()
+            result = await client.table("users").select(_USER_COLS).eq("phone", phone).limit(1).execute()
             row = result.data[0] if result.data else None
         else:
-            row = await self._pg_fetch_one("SELECT * FROM users WHERE phone = $1", phone)
+            row = await self._pg_fetch_one(f"SELECT {_USER_COLS} FROM users WHERE phone = $1", phone)
         return UserInDB(**_row_to_user(row)) if row else None
 
     async def get_user(self, user_id: str) -> UserInDB | None:
         """Get user by ID."""
         if self._use_supabase_client():
             client = await self._get_client()
-            result = await client.table("users").select("*").eq("id", user_id).limit(1).execute()
+            result = await client.table("users").select(_USER_COLS).eq("id", user_id).limit(1).execute()
             row = result.data[0] if result.data else None
         else:
-            row = await self._pg_fetch_one("SELECT * FROM users WHERE id = $1", user_id)
+            row = await self._pg_fetch_one(f"SELECT {_USER_COLS} FROM users WHERE id = $1", user_id)
         return UserInDB(**_row_to_user(row)) if row else None
 
     async def get_user_password_hash(self, user_id: str) -> str | None:
@@ -305,7 +317,7 @@ class PostgresClient:
                 user_data.get("building_id"),
                 user_data.get("contractor_id"),
             )
-            row = await self._pg_fetch_one("SELECT * FROM users WHERE id = $1", user_data["id"])
+            row = await self._pg_fetch_one(f"SELECT {_USER_COLS} FROM users WHERE id = $1", user_data["id"])
         if not row:
             raise RuntimeError("Failed to create user")
         return UserInDB(**_row_to_user(row))
@@ -339,7 +351,7 @@ class PostgresClient:
         else:
             query, args = self._build_safe_update("users", filtered, "id", user_id)
             await self._pg_execute(query, *args)
-            row = await self._pg_fetch_one("SELECT * FROM users WHERE id = $1", user_id)
+            row = await self._pg_fetch_one(f"SELECT {_USER_COLS} FROM users WHERE id = $1", user_id)
         if row:
             return UserInDB(**_row_to_user(row))
         user = await self.get_user(user_id)
