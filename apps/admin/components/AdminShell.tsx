@@ -221,6 +221,21 @@ function Header({ sidebarCollapsed }: { sidebarCollapsed: boolean }) {
   );
 }
 
+// PostHog analytics — optional, requires NEXT_PUBLIC_POSTHOG_KEY env var
+if (typeof window !== "undefined" && process.env.NEXT_PUBLIC_POSTHOG_KEY) {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const posthog = require("posthog-js").default;
+    posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY, {
+      api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://app.posthog.com",
+      capture_pageview: true,
+      autocapture: false,
+    });
+  } catch {
+    // posthog-js not available
+  }
+}
+
 export function AdminShell({ children }: { children: ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const queryClient = getQueryClient();

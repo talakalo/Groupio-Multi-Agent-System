@@ -8,6 +8,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
+import { Analytics } from "@/lib/analytics";
 import { apiClient, ApiError } from "@/lib/api/client";
 import { setAuthCookie } from "@/lib/auth/setAuthCookie";
 import { useAuthStore } from "@/lib/stores/authStore";
@@ -100,6 +101,7 @@ export default function LoginPage() {
         // /me failed; still set cookie with token so middleware allows access
       }
       setAuthCookie(response.token, user);
+      Analytics.userLoggedIn({ role: user?.role ?? "unknown" });
       const role = user?.role ?? "";
       if (["admin", "super_admin", "buildings_manager"].includes(role)) {
         const adminUrl = process.env.NEXT_PUBLIC_ADMIN_URL || "http://localhost:3001";

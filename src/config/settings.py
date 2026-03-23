@@ -31,6 +31,14 @@ class Settings(BaseSettings):
     QDRANT_URL: str = "http://localhost:6333"
     QDRANT_API_KEY: str | None = None
 
+    # Vector database provider: "qdrant" (default, self-hosted) or "pinecone" (managed cloud)
+    VECTOR_DB_PROVIDER: str = "qdrant"
+    # Pinecone (required when VECTOR_DB_PROVIDER=pinecone)
+    # Get API key from: https://app.pinecone.io → API Keys
+    PINECONE_API_KEY: str = ""
+    PINECONE_INDEX_NAME: str = "groupio"
+    PINECONE_ENVIRONMENT: str = ""  # only for legacy non-serverless regions
+
     # Neo4j
     NEO4J_URI: str = "bolt://localhost:7687"
     NEO4J_USER: str = "neo4j"
@@ -144,6 +152,10 @@ class Settings(BaseSettings):
     FRONTEND_URL: str = "https://groupio.co.il"
     # Admin inbox for system alerts (vetting escalations, expiry errors, etc.)
     ADMIN_EMAIL: str = ""
+    # Resend email API (preferred over SMTP in non-dev environments).
+    # Get key from: https://resend.com/api-keys
+    # When set, SMTP settings are ignored.
+    RESEND_API_KEY: str = ""
 
     # Push Notifications (Firebase Cloud Messaging)
     # Set FCM_SERVER_KEY to your Firebase project's server key to enable push notifications.

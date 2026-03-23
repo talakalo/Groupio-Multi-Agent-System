@@ -16,6 +16,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { StepIndicator } from "@/components/shared/StepIndicator";
+import { Analytics } from "@/lib/analytics";
 import { apiClient, ApiError } from "@/lib/api/client";
 import { setAuthCookie } from "@/lib/auth/setAuthCookie";
 import { useAuthStore } from "@/lib/stores/authStore";
@@ -145,6 +146,7 @@ export default function SignupPage(props: PageParamsProps) {
         user = { role: selectedRole };
       }
       setAuthCookie(response.token, user);
+      Analytics.userSignedUp({ role: selectedRole });
       if (selectedRole === "buildings_manager") {
         router.push("/buildings-manager/dashboard");
         return;
