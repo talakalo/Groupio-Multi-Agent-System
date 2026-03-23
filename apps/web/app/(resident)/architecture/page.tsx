@@ -21,7 +21,7 @@ import { useState, useCallback, useRef } from 'react';
 
 import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
-import { unwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
+import { useUnwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
 
 interface AnalysisSuggestion {
   category: string;
@@ -69,7 +69,7 @@ const PRIORITY_COLORS: Record<string, string> = {
 };
 
 export default function ArchitecturePage(props: PageParamsProps) {
-  unwrapPageParams(props);
+  useUnwrapPageParams(props);
   const t = useTranslations('architecture');
   const user = useAuthStore((s) => s.user);
   const [uploading, setUploading] = useState(false);

@@ -2,7 +2,7 @@
 
 import { redirect } from 'next/navigation';
 
-import { unwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
+import { useUnwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
 
 /**
  * Admin shortcut to buildings-manager buildings.
@@ -10,6 +10,6 @@ import { unwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams'
  * buildings-manager features. This redirects to the buildings-manager view.
  */
 export default function AdminBuildingsPage(props: PageParamsProps) {
-  unwrapPageParams(props);
+  useUnwrapPageParams(props);
   redirect('/buildings-manager/buildings');
 }

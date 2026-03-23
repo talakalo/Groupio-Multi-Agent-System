@@ -53,9 +53,26 @@ vi.mock('@/lib/stores/authStore', () => {
 import LoginPage from '../app/(auth)/login/page';
 
 describe('Web LoginPage — navigation', () => {
+  let locationHref = '';
+
   beforeEach(() => {
     vi.clearAllMocks();
     global.fetch = vi.fn();
+    locationHref = '';
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: {
+        set href(url: string) {
+          locationHref = url;
+        },
+        get href() {
+          return locationHref;
+        },
+        assign: vi.fn(),
+        replace: vi.fn(),
+        reload: vi.fn(),
+      },
+    });
   });
 
   it('redirects to /dashboard after a successful login as resident', async () => {
@@ -88,7 +105,7 @@ describe('Web LoginPage — navigation', () => {
     });
   });
 
-  it('redirects to /admin/dashboard after login as admin', async () => {
+  it('redirects admin to NEXT_PUBLIC_ADMIN_URL dashboard with token hash', async () => {
     mockApiLogin.mockResolvedValueOnce({ token: 'auth-token-123' });
     (global.fetch as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce({
@@ -116,11 +133,12 @@ describe('Web LoginPage — navigation', () => {
     fireEvent.click(screen.getByRole('button', { name: /התחברות/i }));
 
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith('/admin/dashboard');
+      expect(locationHref).toMatch(/\/dashboard#token=/);
+      expect(locationHref).toContain(encodeURIComponent('auth-token-123'));
     });
   });
 
-  it('redirects to /admin/dashboard after login as super_admin', async () => {
+  it('redirects super_admin to admin app dashboard with token hash', async () => {
     mockApiLogin.mockResolvedValueOnce({ token: 'auth-token-123' });
     (global.fetch as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce({
@@ -148,11 +166,12 @@ describe('Web LoginPage — navigation', () => {
     fireEvent.click(screen.getByRole('button', { name: /התחברות/i }));
 
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith('/admin/dashboard');
+      expect(locationHref).toMatch(/\/dashboard#token=/);
+      expect(locationHref).toContain(encodeURIComponent('auth-token-123'));
     });
   });
 
-  it('redirects to /buildings-manager/dashboard after login as buildings_manager', async () => {
+  it('redirects buildings_manager to admin app dashboard with token hash', async () => {
     mockApiLogin.mockResolvedValueOnce({ token: 'auth-token-123' });
     (global.fetch as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce({
@@ -180,7 +199,8 @@ describe('Web LoginPage — navigation', () => {
     fireEvent.click(screen.getByRole('button', { name: /התחברות/i }));
 
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith('/buildings-manager/dashboard');
+      expect(locationHref).toMatch(/\/dashboard#token=/);
+      expect(locationHref).toContain(encodeURIComponent('auth-token-123'));
     });
   });
 

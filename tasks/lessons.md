@@ -33,6 +33,7 @@ Transcribed from screenshot:
 - **Hebrew typography needs line-height >= 1.4** — Improves readability for Hebrew text.
 - **Skeleton loading is better UX than spinners** — Use skeleton placeholders for content-heavy loading states.
 - **Duplicate top-level keys in `messages/*.json` silently overwrite** — JSON parsers keep the last value; e.g. two `residentNav` blocks dropped `payments` while keeping `architecture`. Merge into one namespace and add a test that scans the raw file for duplicate keys.
+- **`GET /api/v1/admin/settings` is a flat key-value map** — Do not assign the JSON body directly to nested UI state (`general`, `notifications`, etc.). Normalize by merging onto defaults; PUT responses are also flat.
 - **Trust badges above the fold increase checkout conversion** — Position trust indicators prominently in checkout flows.
 - **window.prompt() and window.location.reload() are anti-patterns** — Use modals and state invalidation instead.
 

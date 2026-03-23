@@ -1,6 +1,8 @@
 """FastAPI application for the Groupio Multi-Agent System."""
 
+import errno
 import logging
+import socket
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -9,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
-from src.api.middleware.auth import get_current_user
+from src.api.middleware.auth import get_current_user, verify_api_key
 from src.api.middleware.logging import RequestLoggingMiddleware
 from src.api.middleware.security import SecurityHeadersMiddleware
 from src.api.routes import api_router
@@ -74,16 +76,36 @@ def _is_db_connection_error(exc: Exception) -> bool:
     """True if exception is due to DB (e.g. PostgreSQL) not reachable."""
     if isinstance(exc, ConnectionRefusedError):
         return True
-    if isinstance(exc, OSError) and getattr(exc, "errno", None) == 61:
+    if isinstance(exc, socket.gaierror):
         return True
+    if isinstance(exc, OSError):
+        code = getattr(exc, "errno", None)
+        if code in (errno.ECONNREFUSED, errno.EADDRNOTAVAIL):
+            return True
     return False
+
+
+def _is_schema_not_ready(exc: Exception) -> bool:
+    """True when a required table/relation is missing (migrations not applied)."""
+    try:
+        import asyncpg.exceptions
+
+        return isinstance(exc, asyncpg.exceptions.UndefinedTableError)
+    except ImportError:
+        return False
 
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Ensure CORS headers on error responses so browser shows real error, not CORS."""
     logger.exception("Unhandled exception: %s", exc)
-    if _is_db_connection_error(exc):
+    if _is_schema_not_ready(exc):
+        status_code = 503
+        content = {
+            "detail": "Database schema not ready. Apply Alembic migrations.",
+            "code": "DB_SCHEMA_NOT_READY",
+        }
+    elif _is_db_connection_error(exc):
         status_code = 503
         content = {"detail": "Database unavailable. Please try again later."}
     else:
@@ -119,7 +141,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-API-Key", "X-Request-ID"],
-    expose_headers=["Authorization"],
+    expose_headers=[],
 )
 
 # Security headers middleware (HSTS, CSP, X-Frame-Options, etc.)
@@ -295,6 +317,7 @@ async def health_check() -> dict[str, Any]:
     "/api/v1/health/db",
     summary="Database pool stats",
     description="Returns asyncpg connection pool statistics (Task 3.5).",
+    dependencies=[Depends(verify_api_key)],
 )
 async def db_pool_health() -> dict:
     """Return DB pool size/free/used stats for monitoring."""

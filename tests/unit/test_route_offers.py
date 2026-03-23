@@ -68,6 +68,7 @@ class TestListOffers:
     def test_list_offers_returns_200(self):
         user = _make_user()
         db = MagicMock()
+        db.get_building_ids_for_user = AsyncMock(return_value=["b1"])
         db.list_offers = AsyncMock(return_value=([_make_offer()], 1))
 
         from src.api.main import app
@@ -88,6 +89,7 @@ class TestListOffers:
     def test_list_offers_with_filters(self):
         user = _make_user()
         db = MagicMock()
+        db.get_building_ids_for_user = AsyncMock(return_value=["b1"])
         db.list_offers = AsyncMock(return_value=([], 0))
 
         from src.api.main import app
@@ -109,6 +111,7 @@ class TestGetOffer:
         user = _make_user()
         db = MagicMock()
         db.get_offer = AsyncMock(return_value=_make_offer())
+        db.is_user_in_building = AsyncMock(return_value=True)
 
         from src.api.main import app
         from src.api.middleware.auth import get_current_user
@@ -447,6 +450,7 @@ class TestGetParticipants:
         user = _make_user()
         db = MagicMock()
         db.get_offer = AsyncMock(return_value=_make_offer())
+        db.is_user_in_building = AsyncMock(return_value=True)
         db.get_offer_participants = AsyncMock(return_value=[{"user_id": "u1"}, {"user_id": "u2"}])
 
         from src.api.main import app

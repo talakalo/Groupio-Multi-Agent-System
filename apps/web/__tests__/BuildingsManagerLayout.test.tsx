@@ -1,8 +1,7 @@
 /**
  * BuildingsManagerLayout — role-based redirects.
- * - Admin/super_admin on /buildings-manager/dashboard → /admin/dashboard
  * - Resident/contractor → /dashboard
- * - buildings_manager stays on buildings-manager routes
+ * - buildings_manager, admin, super_admin may use buildings-manager routes (no auto-redirect to admin app)
  */
 import { render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
@@ -38,9 +37,9 @@ vi.mock('@/lib/stores/authStore', () => ({
   ),
 }));
 
-// unwrapPageParams is a no-op in tests (no props.params/searchParams)
+// useUnwrapPageParams is a no-op in tests (no props.params/searchParams)
 vi.mock('@/lib/utils/unwrapPageParams', () => ({
-  unwrapPageParams: vi.fn(),
+  useUnwrapPageParams: vi.fn(),
 }));
 
 import BuildingsManagerLayout from '../app/buildings-manager/layout';
@@ -53,22 +52,24 @@ describe('BuildingsManagerLayout — admin/super_admin redirect', () => {
     mockPathname = '/buildings-manager/dashboard';
   });
 
-  it('redirects super_admin from /buildings-manager/dashboard to /admin/dashboard', async () => {
+  it('allows super_admin on /buildings-manager/dashboard (no forced redirect)', async () => {
     mockUser = { role: 'super_admin' };
     render(<BuildingsManagerLayout><div>child</div></BuildingsManagerLayout>);
 
     await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith('/admin/dashboard');
+      expect(screen.getByText('child')).toBeInTheDocument();
     });
+    expect(mockReplace).not.toHaveBeenCalledWith('/admin/dashboard');
   });
 
-  it('redirects admin from /buildings-manager/dashboard to /admin/dashboard', async () => {
+  it('allows admin on /buildings-manager/dashboard (no forced redirect)', async () => {
     mockUser = { role: 'admin' };
     render(<BuildingsManagerLayout><div>child</div></BuildingsManagerLayout>);
 
     await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith('/admin/dashboard');
+      expect(screen.getByText('child')).toBeInTheDocument();
     });
+    expect(mockReplace).not.toHaveBeenCalledWith('/admin/dashboard');
   });
 
   it('does NOT redirect buildings_manager from /buildings-manager/dashboard', async () => {

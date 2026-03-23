@@ -6,10 +6,10 @@ import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 
 import { cn } from '@/lib/utils/cn';
-import { unwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
+import { useUnwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
 
 export default function BuildingJoinPage(props: PageParamsProps) {
-  unwrapPageParams(props);
+  useUnwrapPageParams(props);
   const t = useTranslations('building');
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);

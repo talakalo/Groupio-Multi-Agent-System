@@ -15,7 +15,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { apiClient, ApiError } from "@/lib/api/client";
-import { unwrapPageParams, PageParamsProps } from "@/lib/utils/unwrapPageParams";
+import { useUnwrapPageParams, PageParamsProps } from "@/lib/utils/unwrapPageParams";
 
 const changePasswordSchema = z
   .object({
@@ -35,7 +35,7 @@ const changePasswordSchema = z
 type ChangePasswordData = z.infer<typeof changePasswordSchema>;
 
 export default function ChangePasswordPage(props: PageParamsProps) {
-  unwrapPageParams(props);
+  useUnwrapPageParams(props);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);

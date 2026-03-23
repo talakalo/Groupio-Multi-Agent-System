@@ -1,9 +1,16 @@
 """Unit tests for the webhooks API routes."""
 
+import hashlib
+import hmac
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi.testclient import TestClient
+
+
+def _whatsapp_sig(body: bytes, secret: str) -> str:
+    return "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+
 
 # ---------------------------------------------------------------------------
 # GET /webhooks/whatsapp (verification)
@@ -60,8 +67,8 @@ class TestWhatsAppVerify:
 
 
 class TestWhatsAppWebhook:
-    def test_webhook_no_signature_no_secret(self):
-        """When no secret is configured, webhook is accepted regardless of signature."""
+    def test_webhook_rejected_when_secret_not_configured(self):
+        """Fail closed: no WHATSAPP_WEBHOOK_SECRET → 403 (no unsigned webhooks)."""
         payload = {
             "entry": [{"changes": [{"value": {"messages": [{"from": "972501234567", "text": {"body": "Hello"}}]}}]}]
         }
@@ -72,29 +79,30 @@ class TestWhatsAppWebhook:
             mock_settings.return_value.WHATSAPP_WEBHOOK_SECRET = ""
             mock_settings.return_value.WHATSAPP_API_TOKEN = None
             mock_settings.return_value.WHATSAPP_PHONE_ID = None
-            with patch("src.api.routes.webhooks.get_postgres_client") as mock_db:
-                mock_db.return_value.get_building_by_phone = AsyncMock(return_value="b1")
-                with patch("src.api.routes.webhooks.get_orchestrator") as mock_orch:
-                    mock_orch.return_value.run = AsyncMock(return_value={"response": {"message": "hi"}})
-                    client = TestClient(app, raise_server_exceptions=False)
-                    resp = client.post(
-                        "/api/v1/webhooks/whatsapp",
-                        content=json.dumps(payload).encode(),
-                        headers={"Content-Type": "application/json"},
-                    )
-        assert resp.status_code == 200
-
-    def test_webhook_invalid_json(self):
-        """Invalid JSON returns 400."""
-        from src.api.main import app
-
-        with patch("src.api.routes.webhooks.get_settings") as mock_settings:
-            mock_settings.return_value.WHATSAPP_WEBHOOK_SECRET = ""
             client = TestClient(app, raise_server_exceptions=False)
             resp = client.post(
                 "/api/v1/webhooks/whatsapp",
-                content=b"not-valid-json",
+                content=json.dumps(payload).encode(),
                 headers={"Content-Type": "application/json"},
+            )
+        assert resp.status_code == 403
+
+    def test_webhook_invalid_json(self):
+        """Invalid JSON returns 400 after signature verification."""
+        from src.api.main import app
+
+        secret = "whsec-test"
+        body = b"not-valid-json"
+        with patch("src.api.routes.webhooks.get_settings") as mock_settings:
+            mock_settings.return_value.WHATSAPP_WEBHOOK_SECRET = secret
+            client = TestClient(app, raise_server_exceptions=False)
+            resp = client.post(
+                "/api/v1/webhooks/whatsapp",
+                content=body,
+                headers={
+                    "Content-Type": "application/json",
+                    "X-Hub-Signature-256": _whatsapp_sig(body, secret),
+                },
             )
         assert resp.status_code == 400
 
@@ -104,13 +112,18 @@ class TestWhatsAppWebhook:
 
         from src.api.main import app
 
+        secret = "whsec-test"
+        body = json.dumps(payload).encode()
         with patch("src.api.routes.webhooks.get_settings") as mock_settings:
-            mock_settings.return_value.WHATSAPP_WEBHOOK_SECRET = ""
+            mock_settings.return_value.WHATSAPP_WEBHOOK_SECRET = secret
             client = TestClient(app, raise_server_exceptions=False)
             resp = client.post(
                 "/api/v1/webhooks/whatsapp",
-                content=json.dumps(payload).encode(),
-                headers={"Content-Type": "application/json"},
+                content=body,
+                headers={
+                    "Content-Type": "application/json",
+                    "X-Hub-Signature-256": _whatsapp_sig(body, secret),
+                },
             )
         assert resp.status_code == 200
         assert resp.json()["status"] == "ignored"
@@ -193,13 +206,13 @@ class TestContractorUpdateWebhook:
 
 
 def test_verify_signature_no_secret():
-    """Returns True when no secret is configured."""
+    """Fail closed: no secret → verification fails."""
     from src.api.routes.webhooks import _verify_whatsapp_signature
 
     with patch("src.api.routes.webhooks.get_settings") as mock_settings:
         mock_settings.return_value.WHATSAPP_WEBHOOK_SECRET = ""
         result = _verify_whatsapp_signature(b"payload", None)
-    assert result is True
+    assert result is False
 
 
 def test_verify_signature_missing_header():

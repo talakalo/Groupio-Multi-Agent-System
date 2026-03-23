@@ -20,7 +20,7 @@ import { apiClient, ApiError } from "@/lib/api/client";
 import { setAuthCookie } from "@/lib/auth/setAuthCookie";
 import { useAuthStore } from "@/lib/stores/authStore";
 import { cn } from "@/lib/utils/cn";
-import { unwrapPageParams, PageParamsProps } from "@/lib/utils/unwrapPageParams";
+import { useUnwrapPageParams, PageParamsProps } from "@/lib/utils/unwrapPageParams";
 
 const signupSchema = z.object({
   name: z.string().min(2, "נא להזין שם מלא (לפחות 2 תווים)"),
@@ -80,7 +80,7 @@ const ROLE_OPTIONS = [
 ];
 
 export default function SignupPage(props: PageParamsProps) {
-  unwrapPageParams(props);
+  useUnwrapPageParams(props);
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialRole = (searchParams.get("role") as UserRole) || "resident";

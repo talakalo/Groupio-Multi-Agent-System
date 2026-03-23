@@ -7,7 +7,32 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
+import { ApiError, apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
+
+function normalizeMembershipStatusKey(raw: unknown): string {
+  const s = String(raw ?? 'inactive')
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '_');
+  const allowed = [
+    'active',
+    'trialing',
+    'renewal',
+    'past_due',
+    'grace',
+    'canceled',
+    'expired',
+    'inactive',
+  ] as const;
+  return (allowed as readonly string[]).includes(s) ? s : 'unknown';
+}
+
+function formatIsoDate(value: unknown): string | null {
+  if (value == null || value === '') return null;
+  const d = new Date(String(value));
+  return Number.isNaN(d.getTime()) ? null : d.toLocaleDateString();
+}
 
 const profileSchema = z.object({
   businessName: z.string().min(2, 'Business name is required'),
@@ -46,6 +71,59 @@ export default function ContractorProfilePage() {
   const [contractorId, setContractorId] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState<string | null>(null);
   const [docRequest, setDocRequest] = useState<{ message: string; requested_at: string } | null>(null);
+  const [membership, setMembership] = useState<Record<string, unknown> | null>(null);
+  const [membershipFetching, setMembershipFetching] = useState(false);
+  const [membershipLoadError, setMembershipLoadError] = useState(false);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [membershipQueryBanner, setMembershipQueryBanner] = useState<'success' | 'canceled' | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const q = new URLSearchParams(window.location.search).get('membership');
+    if (q === 'success' || q === 'canceled') {
+      setMembershipQueryBanner(q);
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!contractorId || !accessToken) return;
+    let cancelled = false;
+    (async () => {
+      setMembershipFetching(true);
+      setMembershipLoadError(false);
+      try {
+        const m = await apiClient.getMyContractorMembership();
+        if (!cancelled) setMembership(m);
+      } catch {
+        if (!cancelled) {
+          setMembership(null);
+          setMembershipLoadError(true);
+        }
+      } finally {
+        if (!cancelled) setMembershipFetching(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [contractorId, accessToken]);
+
+  async function startMembershipCheckout() {
+    setCheckoutError(null);
+    setCheckoutLoading(true);
+    try {
+      const { url } = await apiClient.createContractorMembershipCheckoutSession();
+      window.location.href = url;
+    } catch (e) {
+      const msg =
+        e instanceof ApiError ? e.message : t('settings.membershipCheckoutError');
+      setCheckoutError(msg);
+    } finally {
+      setCheckoutLoading(false);
+    }
+  }
 
   async function handleDocumentUpload(docType: 'license' | 'insurance' | 'certifications') {
     const input = document.createElement('input');
@@ -181,6 +259,29 @@ export default function ContractorProfilePage() {
     'sharon',
     'shfela',
   ];
+
+  function labelForMembershipStatus(raw: unknown): string {
+    switch (normalizeMembershipStatusKey(raw)) {
+      case 'active':
+        return t('settings.membershipStates.active');
+      case 'trialing':
+        return t('settings.membershipStates.trialing');
+      case 'renewal':
+        return t('settings.membershipStates.renewal');
+      case 'past_due':
+        return t('settings.membershipStates.past_due');
+      case 'grace':
+        return t('settings.membershipStates.grace');
+      case 'canceled':
+        return t('settings.membershipStates.canceled');
+      case 'expired':
+        return t('settings.membershipStates.expired');
+      case 'inactive':
+        return t('settings.membershipStates.inactive');
+      default:
+        return t('settings.membershipStates.unknown');
+    }
+  }
 
   if (isLoading) {
     return (
@@ -503,6 +604,80 @@ export default function ContractorProfilePage() {
           <h2 className="text-xl font-semibold mb-4">{t('sections.settings')}</h2>
 
           <div className="space-y-6">
+            {membershipQueryBanner === 'success' && (
+              <div
+                className="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-900"
+                role="status"
+              >
+                {t('settings.membershipSuccessBanner')}
+              </div>
+            )}
+            {membershipQueryBanner === 'canceled' && (
+              <div
+                className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"
+                role="status"
+              >
+                {t('settings.membershipCanceledBanner')}
+              </div>
+            )}
+
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+              <h3 className="font-medium text-gray-900">{t('settings.membershipTitle')}</h3>
+              <p className="mt-1 text-sm text-gray-600">{t('settings.membershipDescription')}</p>
+
+              {membershipFetching && (
+                <p className="mt-3 text-sm text-gray-500">{t('settings.membershipStatusLoading')}</p>
+              )}
+              {membershipLoadError && (
+                <p className="mt-3 text-sm text-red-600">{t('settings.membershipLoadError')}</p>
+              )}
+
+              {!membershipFetching && membership && !membershipLoadError && (
+                <dl className="mt-4 space-y-2 text-sm">
+                  <div className="flex flex-wrap justify-between gap-2 border-b border-slate-200 pb-2">
+                    <dt className="text-gray-600">{t('settings.membershipStatusLabel')}</dt>
+                    <dd className="font-medium text-gray-900">
+                      {labelForMembershipStatus(membership.membership_status)}
+                    </dd>
+                  </div>
+                  {formatIsoDate(membership.current_period_end) && (
+                    <div className="flex flex-wrap justify-between gap-2">
+                      <dt className="text-gray-600">{t('settings.membershipPeriodEnd')}</dt>
+                      <dd className="font-medium text-gray-900" dir="ltr">
+                        {formatIsoDate(membership.current_period_end)}
+                      </dd>
+                    </div>
+                  )}
+                  {formatIsoDate(membership.next_billing_at) && (
+                    <div className="flex flex-wrap justify-between gap-2">
+                      <dt className="text-gray-600">{t('settings.membershipNextBilling')}</dt>
+                      <dd className="font-medium text-gray-900" dir="ltr">
+                        {formatIsoDate(membership.next_billing_at)}
+                      </dd>
+                    </div>
+                  )}
+                </dl>
+              )}
+
+              {checkoutError && (
+                <p className="mt-3 text-sm text-red-600" role="alert">
+                  {checkoutError}
+                </p>
+              )}
+
+              <button
+                type="button"
+                data-testid="contractor-membership-subscribe"
+                onClick={() => void startMembershipCheckout()}
+                disabled={checkoutLoading || !contractorId}
+                className="mt-4 inline-flex items-center justify-center rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {checkoutLoading
+                  ? t('settings.membershipCheckoutLoading')
+                  : t('settings.membershipSubscribe')}
+              </button>
+            </div>
+
             {/* Notification Preferences */}
             <div>
               <h3 className="font-medium mb-3">{t('settings.notifications')}</h3>

@@ -282,8 +282,10 @@ class TestLoginJson:
 
         redis = AsyncMock()
         redis.check_ip_rate_limit = AsyncMock(return_value=True)
+        redis.is_temporarily_locked = AsyncMock(return_value=0)
         redis.set = AsyncMock()
         redis.clear_login_failures = AsyncMock()
+        redis.clear_temporary_lockout = AsyncMock()
 
         from src.api.main import app
 
@@ -344,6 +346,7 @@ class TestLoginJson:
 
         redis = AsyncMock()
         redis.check_ip_rate_limit = AsyncMock(return_value=True)
+        redis.is_temporarily_locked = AsyncMock(return_value=0)
         redis.increment_login_failures = AsyncMock(return_value=1)
 
         from src.api.main import app
@@ -371,7 +374,9 @@ class TestLoginJson:
 
         redis = AsyncMock()
         redis.check_ip_rate_limit = AsyncMock(return_value=True)
+        redis.is_temporarily_locked = AsyncMock(return_value=0)
         redis.increment_login_failures = AsyncMock(return_value=5)
+        redis.set_temporary_lockout = AsyncMock()
 
         from src.api.main import app
 
@@ -397,6 +402,7 @@ class TestLoginJson:
 
         redis = AsyncMock()
         redis.check_ip_rate_limit = AsyncMock(return_value=True)
+        redis.is_temporarily_locked = AsyncMock(return_value=0)
 
         from src.api.main import app
 
@@ -423,6 +429,7 @@ class TestLoginJson:
 
         redis = AsyncMock()
         redis.check_ip_rate_limit = AsyncMock(return_value=True)
+        redis.is_temporarily_locked = AsyncMock(return_value=0)
 
         mock_settings = AsyncMock()
         mock_settings.ENFORCE_EMAIL_VERIFICATION = True
@@ -457,8 +464,10 @@ class TestLoginJson:
 
         redis = AsyncMock()
         redis.check_ip_rate_limit = AsyncMock(return_value=True)
+        redis.is_temporarily_locked = AsyncMock(return_value=0)
         redis.set = AsyncMock()
         redis.clear_login_failures = AsyncMock()
+        redis.clear_temporary_lockout = AsyncMock()
 
         from src.api.main import app
 

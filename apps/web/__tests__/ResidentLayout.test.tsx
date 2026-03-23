@@ -43,9 +43,9 @@ describe('ResidentLayout — sidebar navigation links', () => {
   const EXPECTED_HREFS = [
     '/dashboard',
     '/offers',
-    '/orders',
-    '/building',
     '/contractors',
+    '/architecture',
+    '/building',
     '/profile',
     '/payments',
     '/chat',

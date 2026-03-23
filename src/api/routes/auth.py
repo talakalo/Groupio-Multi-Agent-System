@@ -12,6 +12,7 @@ from src.api.middleware.auth import (
     create_access_token,
     create_refresh_token,
     get_current_user,
+    get_token_jti,
     hash_password,
     verify_password,
     verify_refresh_token,
@@ -319,13 +320,26 @@ async def login_json(
         logger.info("Login 401: user not found for identifier=%s", masked)
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
+    lock_ttl = await redis.is_temporarily_locked(user.id)
+    if lock_ttl > 0:
+        raise HTTPException(
+            status_code=423,
+            detail="Account temporarily locked due to too many failed attempts",
+            headers={"Retry-After": str(lock_ttl)},
+        )
+
     hashed = await db.get_user_password_hash(user.id)
     if not hashed or not verify_password(request.password, hashed):
         fail_count = await redis.increment_login_failures(user.id)
         if fail_count >= 5:
-            await db.update_user(user.id, {"is_active": False})
-            logger.warning("Account locked due to too many failed logins: %s", user.email)
-            raise HTTPException(status_code=423, detail="Account locked due to too many failed attempts")
+            lock_seconds = 900
+            await redis.set_temporary_lockout(user.id, lock_seconds)
+            logger.warning("Temporary lockout after failed logins: %s", user.email)
+            raise HTTPException(
+                status_code=423,
+                detail="Account temporarily locked due to too many failed attempts",
+                headers={"Retry-After": str(lock_seconds)},
+            )
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     if not user.is_active:
@@ -351,6 +365,7 @@ async def login_json(
         ex=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
     )
     await redis.clear_login_failures(user.id)
+    await redis.clear_temporary_lockout(user.id)
 
     await db.update_user(user.id, {"last_login": datetime.now(UTC)})
 
@@ -459,13 +474,19 @@ async def refresh_token(
 async def logout(
     response: Response,
     current_user: UserInDB = Depends(get_current_user),
+    jti: str | None = Depends(get_token_jti),
 ) -> dict[str, str]:
     """Logout and invalidate tokens.
 
-    Clears refresh_token cookie so middleware no longer treats user as authenticated.
+    Clears refresh_token cookie and adds access-token JTI to Redis denylist
+    so the current bearer token cannot be reused.
     """
     redis = get_redis_client()
     await redis.delete(f"refresh_token:{current_user.id}")
+
+    if jti:
+        settings = get_settings()
+        await redis.add_token_to_denylist(jti, settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60)
 
     response.delete_cookie("refresh_token", path="/")
     response.delete_cookie("access_token", path="/")

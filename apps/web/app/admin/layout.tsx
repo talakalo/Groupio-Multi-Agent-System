@@ -18,7 +18,7 @@ import { useEffect, useState } from 'react';
 import { NotificationPanel } from '@/components/shared/NotificationPanel';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
-import { unwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
+import { useUnwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
 
 interface NavItem {
   href: string;
@@ -32,7 +32,7 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 export default function AdminLayout(props: { children: React.ReactNode } & PageParamsProps) {
-  unwrapPageParams(props);
+  useUnwrapPageParams(props);
   const { children } = props;
   const pathname = usePathname();
   const router = useRouter();

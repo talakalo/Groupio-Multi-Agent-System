@@ -25,7 +25,7 @@ import { EmptyState } from '@/components/shared/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
-import { unwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
+import { useUnwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -209,7 +209,7 @@ function OfferCard({ offer }: { offer: Offer }) {
 // ---------------------------------------------------------------------------
 
 export default function OffersListPage(props: PageParamsProps) {
-  unwrapPageParams(props);
+  useUnwrapPageParams(props);
   const t = useTranslations('offers');
   const tCat = useTranslations('categories');
   const tCommon = useTranslations('common');

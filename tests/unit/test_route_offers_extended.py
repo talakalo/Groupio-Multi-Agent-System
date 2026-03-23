@@ -399,6 +399,7 @@ class TestCreateOffer:
                                 "min_participants": 5,
                                 "max_participants": 50,
                                 "building_id": "b1",
+                                "created_by": "user-1",
                             },
                         )
             assert resp.status_code == 200
@@ -444,6 +445,7 @@ class TestCreateOffer:
                         "min_participants": 5,
                         "max_participants": 50,
                         "building_id": "b1",
+                        "created_by": "user-1",
                     },
                 )
             assert resp.status_code == 403

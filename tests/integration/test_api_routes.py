@@ -29,6 +29,10 @@ def mock_db():
 def mock_redis():
     """Mock Redis client by patching the singleton."""
     redis = AsyncMock()
+    redis.is_temporarily_locked = AsyncMock(return_value=0)
+    redis.clear_temporary_lockout = AsyncMock()
+    redis.clear_login_failures = AsyncMock()
+    redis.increment_login_failures = AsyncMock(return_value=1)
     with patch("src.databases.redis_client._redis_client", redis):
         yield redis
 
@@ -190,6 +194,7 @@ class TestOffersAPI:
 
     def test_list_offers(self, client, mock_db, mock_offer):
         """Test listing offers."""
+        mock_db.get_building_ids_for_user = AsyncMock(return_value=["building-123"])
         mock_db.list_offers = AsyncMock(return_value=([mock_offer], 1))
         override_auth({"id": "user-123", "role": "resident"})
 
@@ -575,12 +580,14 @@ class TestAuthAPI:
                 email="test@example.com",
                 role="resident",
                 is_active=True,
+                is_verified=True,
             )
         )
         mock_redis.set = AsyncMock()
         with patch("src.api.routes.auth.verify_password") as mock_verify:
             mock_verify.return_value = True
             mock_db.get_user_password_hash = AsyncMock(return_value="hashed")
+            mock_db.update_user = AsyncMock()
             response = client.post(
                 "/api/v1/auth/login/json",
                 json={"email": "test@example.com", "password": "password123"},

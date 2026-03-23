@@ -122,11 +122,11 @@ describe('Web SignupPage — navigation', () => {
     expect(loginLink).toBeDefined();
   });
 
-  it('has a logo link pointing to the home page (/)', () => {
+  it('does not expose a home logo link on signup (only auth/legal links)', () => {
     render(<SignupPage />);
     const links = screen.getAllByRole('link');
-    const homeLink = links.find((l) => l.getAttribute('href') === '/');
-    expect(homeLink).toBeDefined();
+    expect(links.some((l) => l.getAttribute('href') === '/')).toBe(false);
+    expect(links.some((l) => l.getAttribute('href') === '/login')).toBe(true);
   });
 
   it('back button returns from step 2 to step 1 without navigating', async () => {

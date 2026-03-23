@@ -40,7 +40,7 @@ interface JsonReport {
   startedAt: string;
   finishedAt: string;
   durationMs: number;
-  status: "passed" | "failed" | "interrupted";
+  status: FullResult['status'];
   totals: {
     total: number;
     passed: number;

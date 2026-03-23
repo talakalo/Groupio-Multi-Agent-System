@@ -203,6 +203,25 @@ class ApiClient {
     );
   }
 
+  /** Marketplace membership state (contractor only). */
+  async getMyContractorMembership() {
+    return this.request<Record<string, unknown>>("/api/v1/contractors/me/membership");
+  }
+
+  /** Stripe Checkout session for contractor subscription; redirects browser to `url`. */
+  async createContractorMembershipCheckoutSession(body?: {
+    success_url?: string | null;
+    cancel_url?: string | null;
+  }) {
+    return this.request<{ url: string; session_id: string }>(
+      "/api/v1/contractors/me/membership/checkout-session",
+      {
+        method: "POST",
+        body: body ?? {},
+      }
+    );
+  }
+
   // ---- Building endpoints ----
 
   async getBuilding(buildingId: string) {
