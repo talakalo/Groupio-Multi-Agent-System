@@ -20,6 +20,7 @@ from src.api.middleware.auth import (
 from src.config.settings import get_settings
 from src.databases.postgres import get_postgres_client
 from src.databases.redis_client import get_redis_client
+from src.utils.security_logger import security_event
 from src.models.user import (
     SELF_REGISTERABLE_ROLES,
     LoginRequest,
@@ -231,10 +232,13 @@ async def login(
     hashed = await db.get_user_password_hash(user.id)
     if not hashed or not verify_password(form_data.password, hashed):
         # Brute-force lockout: increment failure counter
+        _ip = http_request.client.host if http_request.client else None
         fail_count = await redis.increment_login_failures(user.id)
+        security_event.failed_login(user.email, ip=_ip)
         if fail_count >= 5:
             await db.update_user(user.id, {"is_active": False})
             logger.warning("Account locked due to too many failed logins: %s", user.email)
+            security_event.account_locked(user.email, ip=_ip)
             raise HTTPException(status_code=423, detail="Account locked due to too many failed attempts")
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
@@ -330,11 +334,14 @@ async def login_json(
 
     hashed = await db.get_user_password_hash(user.id)
     if not hashed or not verify_password(request.password, hashed):
+        _ip = http_request.client.host if http_request.client else None
         fail_count = await redis.increment_login_failures(user.id)
+        security_event.failed_login(user.email, ip=_ip)
         if fail_count >= 5:
             lock_seconds = 900
             await redis.set_temporary_lockout(user.id, lock_seconds)
             logger.warning("Temporary lockout after failed logins: %s", user.email)
+            security_event.account_temporarily_locked(user.email, ip=_ip)
             raise HTTPException(
                 status_code=423,
                 detail="Account temporarily locked due to too many failed attempts",
@@ -583,6 +590,9 @@ async def request_password_reset(
     )
 
     logger.info("Password reset requested for: %s", user.email)
+    security_event.password_reset_requested(
+        user.email, ip=http_request.client.host if http_request.client else None
+    )
 
     return {"status": "reset_email_sent"}
 

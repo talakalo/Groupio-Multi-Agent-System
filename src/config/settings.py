@@ -107,6 +107,11 @@ class Settings(BaseSettings):
     SENTRY_DSN: str | None = None
     LOG_LEVEL: str = "INFO"
 
+    # PostgreSQL statement timeout in milliseconds. 0 disables the timeout.
+    # Prevents runaway queries from holding connections indefinitely.
+    # Default: 30 000 ms (30 s). Tune down for read-heavy list endpoints.
+    DB_STATEMENT_TIMEOUT_MS: int = 30_000
+
     # Rate Limiting
     RATE_LIMIT_PER_USER: int = 60  # requests per minute
     RATE_LIMIT_WINDOW: int = 60  # seconds
