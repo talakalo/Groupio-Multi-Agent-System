@@ -27,6 +27,11 @@ def pytest_configure(config):  # noqa: ARG001
         message="coroutine 'InterceptedUnaryUnaryCall._invoke' was never awaited",
         category=RuntimeWarning,
     )
+    warnings.filterwarnings(
+        "ignore",
+        message="coroutine 'AsyncMockMixin._execute_mock_call' was never awaited",
+        category=RuntimeWarning,
+    )
 
 
 @pytest.fixture(autouse=True)

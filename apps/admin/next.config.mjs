@@ -57,6 +57,18 @@ const nextConfig = {
     optimizePackageImports: ["lucide-react", "recharts"],
   },
 
+  webpack: (config) => {
+    config.ignoreWarnings = [
+      ...(config.ignoreWarnings || []),
+      { module: /require-in-the-middle/ },
+      {
+        module: /@opentelemetry\/instrumentation/,
+        message: /Critical depend|request of a dependency/,
+      },
+    ];
+    return config;
+  },
+
   async headers() {
     return [
       {
