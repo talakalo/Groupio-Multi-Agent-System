@@ -19,7 +19,7 @@ import { EscrowBadge } from "@/components/features/payments/EscrowBadge";
 import { Breadcrumb } from "@/components/shared/Breadcrumb";
 import { Badge } from "@/components/ui/Badge";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { apiClient } from "@/lib/api/client";
+import { ApiError, apiClient } from "@/lib/api/client";
 import { useUnwrapPageParams, PageParamsProps } from "@/lib/utils/unwrapPageParams";
 
 interface OrderDetail {
@@ -90,6 +90,29 @@ export default function OrderDetailPage(props: PageParamsProps) {
   const [error, setError] = useState<string | null>(null);
   const [approving, setApproving] = useState(false);
   const [approved, setApproved] = useState(false);
+  const [invoiceBusy, setInvoiceBusy] = useState(false);
+  const [invoiceErr, setInvoiceErr] = useState<string | null>(null);
+
+  const handleInvoiceDownload = useCallback(async () => {
+    if (!order?.invoiceId) return;
+    setInvoiceErr(null);
+    setInvoiceBusy(true);
+    try {
+      const blob = await apiClient.downloadInvoiceHtml(order.invoiceId);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `invoice-${order.invoiceId.slice(0, 8)}.html`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setInvoiceErr(e instanceof ApiError ? e.message : "לא ניתן להוריד את החשבונית");
+    } finally {
+      setInvoiceBusy(false);
+    }
+  }, [order?.invoiceId]);
 
   const fetchOrder = useCallback(async () => {
     if (!id) return;
@@ -296,14 +319,20 @@ export default function OrderDetailPage(props: PageParamsProps) {
 
       {/* Invoice Link */}
       {order.invoiceId && (
-        <div className="text-center">
-          <Link
-            href={`/api/v1/payments/invoices/${order.invoiceId}/pdf`}
-            className="text-primary-600 hover:underline text-sm"
-            target="_blank"
+        <div className="text-center space-y-2">
+          <button
+            type="button"
+            onClick={() => void handleInvoiceDownload()}
+            disabled={invoiceBusy}
+            className="text-primary-600 hover:underline text-sm disabled:opacity-50"
           >
-            הורד חשבונית PDF
-          </Link>
+            {invoiceBusy ? "מוריד…" : "הורד חשבונית (HTML להדפסה ל-PDF)"}
+          </button>
+          {invoiceErr && (
+            <p className="text-sm text-red-600" role="alert">
+              {invoiceErr}
+            </p>
+          )}
         </div>
       )}
 

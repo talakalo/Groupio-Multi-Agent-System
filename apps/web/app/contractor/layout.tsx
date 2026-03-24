@@ -3,6 +3,7 @@
 import {
   LayoutDashboard,
   FolderKanban,
+  Wallet,
   UserCircle,
   Menu,
   X,
@@ -19,10 +20,10 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 
+import { NotificationPanel } from '@/components/shared/NotificationPanel';
 import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
-import { NotificationPanel } from '@/components/shared/NotificationPanel';
 
 interface NavItem {
   href: string;
@@ -35,6 +36,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/contractor/offers/active', labelKey: 'activeOffers', icon: ClipboardList },
   { href: '/contractor/offers/create', labelKey: 'createOffer', icon: PlusCircle },
   { href: '/contractor/projects', labelKey: 'projects', icon: FolderKanban },
+  { href: '/contractor/earnings', labelKey: 'earnings', icon: Wallet },
 ];
 
 export default function ContractorLayout({ children }: { children: React.ReactNode }) {
@@ -268,6 +270,7 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
                   type="button"
                   onClick={() => setUserMenuOpen((o) => !o)}
                   className="flex items-center gap-2 ps-3 pe-2 py-1.5 rounded-xl hover:bg-gray-100 transition-colors"
+                  aria-label={t('accountMenu')}
                   aria-expanded={userMenuOpen}
                   aria-haspopup="true"
                 >

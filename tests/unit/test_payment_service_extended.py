@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 import src.services.payment as pay_module
-from src.services.payment import MockPaymentProvider, get_payment_provider
+from src.services.payment import MockPaymentProvider, PaymentProviderUnavailableError, get_payment_provider
 
 # ---------------------------------------------------------------------------
 # MockPaymentProvider
@@ -134,3 +134,21 @@ def test_get_payment_provider_returns_singleton():
         p2 = get_payment_provider()
 
     assert p1 is p2
+
+
+def test_get_payment_provider_bit_not_implemented():
+    mock_settings = MagicMock()
+    mock_settings.PAYMENT_PROVIDER = "bit"
+
+    with patch("src.config.settings.get_settings", return_value=mock_settings):
+        with pytest.raises(PaymentProviderUnavailableError, match="Bit payments are not available"):
+            get_payment_provider()
+
+
+def test_get_payment_provider_paybox_not_implemented():
+    mock_settings = MagicMock()
+    mock_settings.PAYMENT_PROVIDER = "paybox"
+
+    with patch("src.config.settings.get_settings", return_value=mock_settings):
+        with pytest.raises(PaymentProviderUnavailableError, match="PayBox payments are not available"):
+            get_payment_provider()

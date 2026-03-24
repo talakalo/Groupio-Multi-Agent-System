@@ -8,6 +8,7 @@ from typing import Any
 
 import httpx
 from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Query, Request
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 from src.config.settings import get_settings
 from src.databases.postgres import get_postgres_client
@@ -210,6 +211,31 @@ def _parse_whatsapp_payload(payload: dict) -> dict[str, str] | None:
         return None
 
 
+def _whatsapp_transient(exc: BaseException) -> bool:
+    if isinstance(exc, httpx.RequestError):
+        return True
+    if isinstance(exc, httpx.HTTPStatusError):
+        return exc.response.status_code >= 500
+    return False
+
+
+@retry(
+    retry=retry_if_exception(_whatsapp_transient),
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=0.5, min=0.5, max=6),
+    reraise=True,
+)
+async def _post_whatsapp_message(url: str, token: str, payload: dict) -> httpx.Response:
+    async with httpx.AsyncClient(timeout=12.0) as client:
+        response = await client.post(
+            url,
+            headers={"Authorization": f"Bearer {token}"},
+            json=payload,
+        )
+        response.raise_for_status()
+        return response
+
+
 async def _send_whatsapp_reply(phone: str, text: str) -> None:
     """Send a WhatsApp reply via the Meta WhatsApp Business Cloud API.
 
@@ -235,19 +261,22 @@ async def _send_whatsapp_reply(phone: str, text: str) -> None:
         "text": {"body": text},
     }
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.post(
-                url,
-                headers={"Authorization": f"Bearer {settings.WHATSAPP_API_TOKEN}"},
-                json=payload,
-            )
-            response.raise_for_status()
-            logger.info("WhatsApp message sent to %s (status %d)", phone, response.status_code)
+        response = await _post_whatsapp_message(url, settings.WHATSAPP_API_TOKEN, payload)
+        logger.info(
+            "whatsapp_outbound_ok phone_prefix=%s status_code=%s",
+            phone[:4],
+            response.status_code,
+        )
     except httpx.HTTPStatusError as exc:
         logger.error(
-            "WhatsApp API error: status=%d body=%s",
+            "whatsapp_outbound_failed kind=http_error status=%s body=%s phone_prefix=%s",
             exc.response.status_code,
-            exc.response.text[:200],
+            exc.response.text[:500],
+            phone[:4],
         )
     except httpx.RequestError as exc:
-        logger.error("WhatsApp network error: %s", exc)
+        logger.error(
+            "whatsapp_outbound_failed kind=network_error err=%s phone_prefix=%s",
+            exc,
+            phone[:4],
+        )

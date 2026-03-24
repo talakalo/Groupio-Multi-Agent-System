@@ -203,7 +203,8 @@ describe('OffersPage', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Total Offers')).toBeInTheDocument();
-      expect(screen.getByText('Flagged')).toBeInTheDocument();
+      // "Flagged" appears in stats and in the status filter <option>
+      expect(screen.getAllByText('Flagged').length).toBeGreaterThanOrEqual(1);
       expect(screen.getAllByText('Completed').length).toBeGreaterThanOrEqual(1);
     });
   });

@@ -19,6 +19,10 @@ from uuid import uuid4
 logger = logging.getLogger(__name__)
 
 
+class PaymentProviderUnavailableError(RuntimeError):
+    """Raised when PAYMENT_PROVIDER selects a gateway that cannot process charges yet."""
+
+
 class PaymentProvider(ABC):
     """Abstract base class for payment providers (Stripe, PayPlus, etc.)."""
 
@@ -456,8 +460,8 @@ def get_payment_provider() -> PaymentProvider:
     - ``paybox`` — PayBoxPaymentProvider (requires ENABLE_PAYBOX_PAYMENT=true + PAYBOX_TERMINAL + PAYBOX_API_KEY)
 
     In production, the ``mock`` provider is blocked.
-    ``bit`` and ``paybox`` are architecture-ready but raise NotImplementedError
-    until onboarding is complete and the API integration is implemented.
+    ``bit`` and ``paybox`` raise :class:`PaymentProviderUnavailableError` until
+    the charge APIs are implemented (do not use in production).
     See docs/PAYMENT_PROVIDER_ONBOARDING.md for onboarding instructions.
     """
     global _payment_provider
@@ -486,49 +490,23 @@ def get_payment_provider() -> PaymentProvider:
             _payment_provider = MockPaymentProvider()
 
         elif provider_name == "bit":
-            if not settings.ENABLE_BIT_PAYMENT:
-                raise RuntimeError(
-                    "PAYMENT_PROVIDER=bit but ENABLE_BIT_PAYMENT is not set to true. "
-                    "bit integration is not yet live. Complete merchant onboarding first. "
-                    "See docs/PAYMENT_PROVIDER_ONBOARDING.md."
-                )
-            if not settings.BIT_API_KEY or not settings.BIT_MERCHANT_ID:
-                raise RuntimeError(
-                    "PAYMENT_PROVIDER=bit but BIT_API_KEY or BIT_MERCHANT_ID is not set. "
-                    "Obtain credentials by completing bit merchant onboarding. "
-                    "See docs/PAYMENT_PROVIDER_ONBOARDING.md."
-                )
-            logger.info(
-                "Using BitPaymentProvider (environment=%s) — NOTE: API integration not yet complete",
-                settings.BIT_ENVIRONMENT,
+            logger.warning(
+                "PAYMENT_PROVIDER=bit is not supported: charge API is not implemented. "
+                "Use PAYMENT_PROVIDER=stripe (with STRIPE_SECRET_KEY) or mock in development."
             )
-            _payment_provider = BitPaymentProvider(
-                api_key=settings.BIT_API_KEY,
-                merchant_id=settings.BIT_MERCHANT_ID,
-                environment=settings.BIT_ENVIRONMENT,
+            raise PaymentProviderUnavailableError(
+                "Bit payments are not available yet — integration is incomplete. "
+                "Use stripe or mock (development only). See docs/PAYMENT_PROVIDER_ONBOARDING.md."
             )
 
         elif provider_name == "paybox":
-            if not settings.ENABLE_PAYBOX_PAYMENT:
-                raise RuntimeError(
-                    "PAYMENT_PROVIDER=paybox but ENABLE_PAYBOX_PAYMENT is not set to true. "
-                    "PayBox integration is not yet live. Complete merchant onboarding first. "
-                    "See docs/PAYMENT_PROVIDER_ONBOARDING.md."
-                )
-            if not settings.PAYBOX_TERMINAL or not settings.PAYBOX_API_KEY:
-                raise RuntimeError(
-                    "PAYMENT_PROVIDER=paybox but PAYBOX_TERMINAL or PAYBOX_API_KEY is not set. "
-                    "Obtain credentials by completing PayBox merchant onboarding. "
-                    "See docs/PAYMENT_PROVIDER_ONBOARDING.md."
-                )
-            logger.info(
-                "Using PayBoxPaymentProvider (environment=%s) — NOTE: API integration not yet complete",
-                settings.PAYBOX_ENVIRONMENT,
+            logger.warning(
+                "PAYMENT_PROVIDER=paybox is not supported: charge API is not implemented. "
+                "Use PAYMENT_PROVIDER=stripe (with STRIPE_SECRET_KEY) or mock in development."
             )
-            _payment_provider = PayBoxPaymentProvider(
-                terminal=settings.PAYBOX_TERMINAL,
-                api_key=settings.PAYBOX_API_KEY,
-                environment=settings.PAYBOX_ENVIRONMENT,
+            raise PaymentProviderUnavailableError(
+                "PayBox payments are not available yet — integration is incomplete. "
+                "Use stripe or mock (development only). See docs/PAYMENT_PROVIDER_ONBOARDING.md."
             )
 
         else:

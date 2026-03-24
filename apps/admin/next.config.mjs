@@ -1,3 +1,7 @@
+import createNextIntlPlugin from "next-intl/plugin";
+
+const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
+
 const isDev = process.env.NODE_ENV !== "production";
 
 // In development, allow the local backend so fetch calls are not blocked by CSP.
@@ -63,4 +67,4 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+export default withNextIntl(nextConfig);

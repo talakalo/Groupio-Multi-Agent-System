@@ -21,11 +21,11 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 
+import { LanguageToggle } from '@/components/shared/LanguageToggle';
+import { NotificationPanel } from '@/components/shared/NotificationPanel';
 import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
-import { NotificationPanel } from '@/components/shared/NotificationPanel';
-import { LanguageToggle } from '@/components/shared/LanguageToggle';
 
 interface NavItem {
   href: string;
@@ -266,6 +266,7 @@ export default function ResidentLayout({ children }: { children: React.ReactNode
                   type="button"
                   onClick={() => setUserMenuOpen((o) => !o)}
                   className="flex items-center gap-2 ps-3 pe-2 py-1.5 rounded-xl hover:bg-gray-100 transition-colors"
+                  aria-label={t('accountMenu')}
                   aria-expanded={userMenuOpen}
                   aria-haspopup="true"
                 >

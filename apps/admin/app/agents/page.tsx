@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { clsx } from "clsx";
 import {
   RefreshCw,
@@ -15,7 +15,6 @@ import { AgentOrchestrationGraph } from "@/components/features/agents/AgentOrche
 import type { AgentStatus } from "@/components/features/agents/AgentCard";
 import { AgentMetricsChart } from "@/components/features/metrics/AgentMetricsChart";
 import type { AgentChartSeries } from "@/components/features/metrics/AgentMetricsChart";
-import type { Escalation } from "@groupio/types";
 import {
   useSystemStatus,
   useAgentMetrics,
@@ -26,7 +25,6 @@ import {
   useRejectPendingDecision,
   useAgentAutonomy,
   useUpdateAgentMode,
-  useEscalations,
 } from "@/lib/hooks";
 
 // ---------------------------------------------------------------------------
@@ -142,6 +140,17 @@ interface PendingDecisionRow {
 export default function AgentsPage() {
   const { data: systemStatus } = useSystemStatus();
   const reloadMutation = useReloadAgent();
+  const { data: pendingDecisionsData, isLoading: pendingDecisionsLoading } = usePendingDecisions();
+  const approveDecision = useApprovePendingDecision();
+  const rejectDecision = useRejectPendingDecision();
+  const [decisionBanner, setDecisionBanner] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+  const [actingId, setActingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!decisionBanner) return;
+    const t = setTimeout(() => setDecisionBanner(null), 5000);
+    return () => clearTimeout(t);
+  }, [decisionBanner]);
 
   // Track which agent is selected for the detail chart
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
@@ -154,7 +163,6 @@ export default function AgentsPage() {
 
   // Fetch detailed metrics for the selected agent
   const { data: agentDetail } = useAgentMetrics(selectedAgent ?? "router");
-  const { data: escalationsData } = useEscalations();
   const { data: auditActivity = [] } = useActivityLog();
 
   // Map audit log entries to agent activity format
@@ -168,30 +176,16 @@ export default function AgentsPage() {
     }));
   }, [auditActivity]);
 
-  // Map escalations to decision queue items
   const pendingDecisions = useMemo((): PendingDecisionRow[] => {
-    const escalations = escalationsData?.escalations ?? [];
-    return escalations
-      .filter((e: Escalation) => e.status === "open")
-      .slice(0, 5)
-      .map((esc: Escalation) => {
-        const priorityUi: PendingDecisionRow["priority"] =
-          esc.priority === "urgent" || esc.priority === "high"
-            ? "high"
-            : esc.priority === "normal"
-              ? "medium"
-              : "low";
-        return {
-          id: esc.id,
-          agent: (esc.context?.actionsTaken?.[0]?.agent ?? "Support").replace(/^\w/, (c: string) =>
-            c.toUpperCase()
-          ),
-          action: esc.reason,
-          detail: esc.context?.actionsTaken?.map((a) => a.action).join(", ") ?? "",
-          priority: priorityUi,
-        };
-      });
-  }, [escalationsData]);
+    const items = pendingDecisionsData?.items ?? [];
+    return items.slice(0, 20).map((d) => ({
+      id: d.id,
+      agent: d.agent_name || "Agent",
+      action: d.action_type || "pending_action",
+      detail: d.escalation_reason || "",
+      priority: "medium" as const,
+    }));
+  }, [pendingDecisionsData]);
 
   // Derive agent card data from system status
   const agentCards = useMemo(() => {
@@ -393,13 +387,30 @@ export default function AgentsPage() {
         <p className="text-xs text-surface-400 mb-4">
           Agent actions that require admin review or override
         </p>
+        {decisionBanner && (
+          <div
+            role="status"
+            className={clsx(
+              "mb-3 rounded-lg px-3 py-2 text-sm",
+              decisionBanner.kind === "ok"
+                ? "bg-emerald-50 text-emerald-900"
+                : "bg-red-50 text-red-900"
+            )}
+          >
+            {decisionBanner.text}
+          </div>
+        )}
         <div className="divide-y divide-surface-100">
-          {pendingDecisions.length === 0 && (
+          {pendingDecisionsLoading && (
+            <div className="py-6 text-center text-sm text-surface-400">Loading pending decisions…</div>
+          )}
+          {!pendingDecisionsLoading && pendingDecisions.length === 0 && (
             <div className="py-6 text-center text-sm text-surface-400">
               No pending decisions
             </div>
           )}
-          {pendingDecisions.map((decision: PendingDecisionRow) => (
+          {!pendingDecisionsLoading &&
+            pendingDecisions.map((decision: PendingDecisionRow) => (
             <div key={decision.id} className="flex items-center gap-3 py-3">
               <span
                 className={clsx(
@@ -418,18 +429,48 @@ export default function AgentsPage() {
                 <p className="text-xs text-surface-400 mt-0.5">{decision.detail}</p>
               </div>
               <div className="flex gap-2 flex-shrink-0">
-                <button className="px-3 py-1.5 text-xs font-medium rounded-lg bg-primary-50 text-primary-700 hover:bg-primary-100 transition-colors">
+                <button
+                  type="button"
+                  disabled={actingId === decision.id || approveDecision.isPending || rejectDecision.isPending}
+                  onClick={async () => {
+                    setActingId(decision.id);
+                    try {
+                      await approveDecision.mutateAsync({ decisionId: decision.id });
+                      setDecisionBanner({ kind: "ok", text: "Decision approved." });
+                    } catch {
+                      setDecisionBanner({ kind: "err", text: "Approve failed. Check network or permissions." });
+                    } finally {
+                      setActingId(null);
+                    }
+                  }}
+                  className="px-3 py-1.5 text-xs font-medium rounded-lg bg-primary-50 text-primary-700 hover:bg-primary-100 transition-colors disabled:opacity-50"
+                >
                   Approve
                 </button>
-                <button className="px-3 py-1.5 text-xs font-medium rounded-lg bg-surface-100 text-surface-600 hover:bg-surface-200 transition-colors">
-                  Override
+                <button
+                  type="button"
+                  disabled={actingId === decision.id || approveDecision.isPending || rejectDecision.isPending}
+                  onClick={async () => {
+                    setActingId(decision.id);
+                    try {
+                      await rejectDecision.mutateAsync({ decisionId: decision.id, note: "rejected_by_admin" });
+                      setDecisionBanner({ kind: "ok", text: "Decision rejected." });
+                    } catch {
+                      setDecisionBanner({ kind: "err", text: "Reject failed. Check network or permissions." });
+                    } finally {
+                      setActingId(null);
+                    }
+                  }}
+                  className="px-3 py-1.5 text-xs font-medium rounded-lg bg-surface-100 text-surface-600 hover:bg-surface-200 transition-colors disabled:opacity-50"
+                >
+                  Reject
                 </button>
               </div>
             </div>
           ))}
         </div>
         <p className="text-xs text-surface-400 mt-3 text-center">
-          Decision queue updates in real-time via WebSocket
+          Queue refreshes automatically every 30 seconds
         </p>
       </div>
 

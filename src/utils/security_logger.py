@@ -27,9 +27,7 @@ class _SecurityLogger:
     def account_temporarily_locked(self, identifier: str, ip: str | None = None) -> None:
         _log.warning("ACCOUNT_TEMPORARILY_LOCKED identifier=%s ip=%s", identifier, ip)
 
-    def privilege_escalation_attempt(
-        self, identifier: str, requested_role: str, ip: str | None = None
-    ) -> None:
+    def privilege_escalation_attempt(self, identifier: str, requested_role: str, ip: str | None = None) -> None:
         _log.warning(
             "PRIVILEGE_ESCALATION_ATTEMPT identifier=%s requested_role=%s ip=%s",
             identifier,

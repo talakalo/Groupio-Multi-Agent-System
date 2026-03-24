@@ -212,3 +212,16 @@ def generate_request_id() -> str:
 def generate_conversation_id() -> str:
     """Generate a unique conversation ID."""
     return f"conv_{uuid.uuid4().hex[:16]}"
+
+
+def capture_exception_safe(exc: Exception, **tags: str) -> None:
+    """Send exception to Sentry when the SDK is active; swallow all errors."""
+    try:
+        import sentry_sdk
+
+        with sentry_sdk.new_scope() as scope:
+            for key, val in tags.items():
+                scope.set_tag(key, val)
+            scope.capture_exception(exc)
+    except Exception:
+        pass

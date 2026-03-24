@@ -1,6 +1,5 @@
 """Authentication API routes."""
 
-import logging
 from datetime import UTC, datetime
 from uuid import uuid4
 
@@ -20,7 +19,6 @@ from src.api.middleware.auth import (
 from src.config.settings import get_settings
 from src.databases.postgres import get_postgres_client
 from src.databases.redis_client import get_redis_client
-from src.utils.security_logger import security_event
 from src.models.user import (
     SELF_REGISTERABLE_ROLES,
     LoginRequest,
@@ -35,8 +33,10 @@ from src.models.user import (
     UserUpdate,
 )
 from src.services.email import get_email_service
+from src.utils.monitoring import capture_exception_safe, get_logger
+from src.utils.security_logger import security_event
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 router = APIRouter(tags=["auth"])
 
@@ -521,6 +521,20 @@ async def update_current_user(
 
     update_data = request.model_dump(exclude_unset=True)
 
+    if "notification_settings" in update_data and update_data["notification_settings"] is not None:
+        incoming = update_data["notification_settings"]
+        if not isinstance(incoming, dict):
+            raise HTTPException(status_code=400, detail="notification_settings must be an object")
+        existing = dict(current_user.notification_settings or {})
+        merged: dict[str, bool] = {**existing}
+        for k, v in incoming.items():
+            key = str(k)
+            if isinstance(v, bool):
+                merged[key] = v
+            elif isinstance(v, (int, float)) and v in (0, 1):
+                merged[key] = bool(v)
+        update_data["notification_settings"] = merged
+
     # Check phone uniqueness if updating
     if "phone" in update_data:
         existing = await db.get_user_by_phone(update_data["phone"])
@@ -583,16 +597,28 @@ async def request_password_reset(
 
     # Send password reset email
     email_service = get_email_service()
-    await email_service.send_password_reset_email(
-        to_email=user.email,
-        user_name=user.full_name or user.email.split("@")[0],
-        reset_token=reset_token,
-    )
+    try:
+        await email_service.send_password_reset_email(
+            to_email=user.email,
+            user_name=user.full_name or user.email.split("@")[0],
+            reset_token=reset_token,
+        )
+    except Exception as exc:
+        await redis.delete(f"password_reset:{reset_token}")
+        logger.error(
+            "password_reset_email_send_failed",
+            user_id=user.id,
+            error_type=type(exc).__name__,
+            error=str(exc)[:500],
+        )
+        capture_exception_safe(exc, flow="password_reset_email")
+        raise HTTPException(
+            status_code=503,
+            detail="Unable to send reset email. Please try again later.",
+        ) from exc
 
-    logger.info("Password reset requested for: %s", user.email)
-    security_event.password_reset_requested(
-        user.email, ip=http_request.client.host if http_request.client else None
-    )
+    logger.info("password_reset_requested", email=user.email)
+    security_event.password_reset_requested(user.email, ip=http_request.client.host if http_request.client else None)
 
     return {"status": "reset_email_sent"}
 
@@ -604,6 +630,7 @@ async def confirm_password_reset(request: PasswordResetConfirm) -> dict[str, str
 
     user_id = await redis.get(f"password_reset:{request.token}")
     if not user_id:
+        logger.warning("password_reset_confirm_invalid_token")
         raise HTTPException(status_code=400, detail="Invalid or expired reset token")
 
     db = get_postgres_client()
