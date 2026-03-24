@@ -2,10 +2,13 @@
 """One-time migration script: copy all vectors from Qdrant to Pinecone.
 
 Usage:
-    # 1. Set env vars in .env (or export them):
+    # 1. Use the project virtualenv (not system python3) so ``pinecone`` and
+    #    ``qdrant-client`` are installed: ``pip install -e .`` or ``uv sync``.
+    # 2. Set env vars in repo-root .env and/or docker/.env (or export them):
     #    QDRANT_URL, QDRANT_API_KEY, PINECONE_API_KEY, PINECONE_INDEX_NAME
-    # 2. Run:
+    # 3. From repo root:
     #    python scripts/migrate_qdrant_to_pinecone.py
+    #    # or: ./scripts/migrate_qdrant_to_pinecone.py  (executable bit set)
 
 The script reads each Qdrant collection in pages and upserts the same vectors
 into the matching Pinecone namespace. Existing Pinecone vectors with the same
@@ -20,8 +23,15 @@ import os
 import sys
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 # Allow running from repo root without installing the package
-sys.path.insert(0, str(Path(__file__).parent.parent))
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(_REPO_ROOT))
+
+# Same sources as src.config.settings.Settings (docker/.env overrides .env)
+load_dotenv(_REPO_ROOT / ".env", override=False)
+load_dotenv(_REPO_ROOT / "docker" / ".env", override=True)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -77,12 +87,17 @@ async def migrate_collection(qdrant_client, pinecone_index, collection: str) -> 
 
 
 async def main() -> None:
-    from qdrant_client import AsyncQdrantClient
     from pinecone import Pinecone, ServerlessSpec  # type: ignore[import-untyped]
+    from qdrant_client import AsyncQdrantClient
 
     qdrant_url = os.getenv("QDRANT_URL", "http://localhost:6333")
     qdrant_api_key = os.getenv("QDRANT_API_KEY") or None
-    pinecone_api_key = os.environ["PINECONE_API_KEY"]
+    pinecone_api_key = os.getenv("PINECONE_API_KEY", "").strip()
+    if not pinecone_api_key:
+        raise SystemExit(
+            "PINECONE_API_KEY is missing or empty. Add it to .env or docker/.env "
+            "(repo root), or export it before running this script."
+        )
     pinecone_index_name = os.getenv("PINECONE_INDEX_NAME", "groupio")
 
     logger.info("Connecting to Qdrant at %s …", qdrant_url)

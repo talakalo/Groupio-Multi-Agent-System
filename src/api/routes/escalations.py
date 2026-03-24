@@ -2,6 +2,7 @@
 
 import logging
 from datetime import UTC, datetime
+from typing import Any
 from uuid import uuid4
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
@@ -28,10 +29,25 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["escalations"])
 
 
+def _escalation_status_str(status: Any) -> str:
+    """Normalize DB/driver escalation status for comparisons (str vs enum)."""
+    if status is None:
+        return ""
+    if isinstance(status, EscalationStatus):
+        return status.value
+    return str(status).strip().lower()
+
+
 class ResolveEscalationBody(BaseModel):
     """Request body for resolving an escalation."""
 
     resolution_notes: str | None = Field(None, max_length=2000)
+
+
+class AssignEscalationBody(BaseModel):
+    """Admin UI sends ``assigned_to`` in JSON; keep field name aligned with DB column."""
+
+    assigned_to: str = Field(..., min_length=1)
 
 
 @router.post("/", response_model=EscalationResponse)
@@ -223,7 +239,10 @@ async def update_escalation(
     update_data = request.model_dump(exclude_unset=True)
 
     # Track resolution time
-    if request.status == EscalationStatus.RESOLVED and escalation.get("status") != EscalationStatus.RESOLVED:
+    if (
+        request.status == EscalationStatus.RESOLVED
+        and _escalation_status_str(escalation.get("status")) != EscalationStatus.RESOLVED.value
+    ):
         update_data["resolved_at"] = datetime.now(UTC)
 
     updated = await db.update_escalation(escalation_id, update_data)
@@ -236,7 +255,7 @@ async def update_escalation(
 @router.post("/{escalation_id}/assign")
 async def assign_escalation(
     escalation_id: str,
-    admin_id: str,
+    body: AssignEscalationBody,
     current_user: UserInDB = Depends(get_current_user),
 ) -> EscalationResponse:
     """Assign escalation to an admin."""
@@ -244,6 +263,7 @@ async def assign_escalation(
         raise HTTPException(status_code=403, detail="Admin access required")
 
     db = get_postgres_client()
+    admin_id = body.assigned_to
 
     escalation = await db.get_escalation(escalation_id)
     if not escalation:
@@ -325,7 +345,7 @@ async def resolve_escalation(
     if not escalation:
         raise HTTPException(status_code=404, detail="Escalation not found")
 
-    if escalation.get("status") == EscalationStatus.RESOLVED:
+    if _escalation_status_str(escalation.get("status")) == EscalationStatus.RESOLVED.value:
         raise HTTPException(status_code=400, detail="Escalation already resolved")
 
     notes = body.resolution_notes if body else None
@@ -359,7 +379,7 @@ async def reopen_escalation(
     if not escalation:
         raise HTTPException(status_code=404, detail="Escalation not found")
 
-    if escalation.get("status") != EscalationStatus.RESOLVED:
+    if _escalation_status_str(escalation.get("status")) != EscalationStatus.RESOLVED.value:
         raise HTTPException(status_code=400, detail="Can only reopen resolved escalations")
 
     # Add message about reopening

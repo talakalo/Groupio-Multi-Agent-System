@@ -19,7 +19,9 @@
    docker compose -f docker/docker-compose.yml run --rm api python scripts/seed_test_data.py
    ```
 
-   Uses `@test.local` emails and password `TestSeed123!` (override with `SEED_TEST_PASSWORD`). Inspect counts with `--dry-run`. Safe to re-run: existing emails are skipped.
+   Uses `@example.com` seed emails and password `TestSeed123!` (override with `SEED_TEST_PASSWORD`). Inspect counts with `--dry-run`. Safe to re-run: existing emails are skipped.
+
+   **Host vs API DB:** Running `uv run python scripts/seed_test_data.py` on your Mac uses `docker/.env` (often **cloud Supabase**). The Admin app at `localhost:3001` still talks to **`NEXT_PUBLIC_API_URL`** (default `localhost:8000`). If that API points at **local Docker Postgres** or a different project, Offers/Users will look **empty** even after a successful seed. Fix: use the same `DATABASE_URL` / Supabase settings for the API as for the seed, restart the API, or run the seed command **inside** the `api` container (snippet above).
 
 4. **Metrics**: `/metrics` returns 403 when `API_KEYS` is set (Prometheus must send auth). For local dev, set `API_KEYS=[]` in docker/.env to allow unauthenticated scraping.
 

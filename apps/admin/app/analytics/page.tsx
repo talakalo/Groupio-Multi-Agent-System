@@ -81,6 +81,11 @@ export default function AnalyticsPage() {
       activeContractors: totalContractors,
       escalationRate: openTickets > 0 ? 2.5 : 0,
       insights,
+      categoryBreakdown: backendAnalytics.categoryBreakdown ?? {},
+      regionalData: backendAnalytics.regionalData ?? {},
+      dailyOffers: backendAnalytics.dailyOffers ?? [],
+      dailyRevenue: backendAnalytics.dailyRevenue ?? [],
+      agentPerformance: backendAnalytics.agentPerformance ?? [],
     };
   }, [backendAnalytics]);
 
@@ -367,6 +372,14 @@ export default function AnalyticsPage() {
               </tr>
             </thead>
             <tbody>
+              {(data?.agentPerformance ?? []).length === 0 && (
+                <tr>
+                  <td colSpan={5} className="py-8 text-center text-gray-500 text-sm">
+                    No agent metrics yet. Start the API and process traffic, or use PostgreSQL for analytics
+                    rollups.
+                  </td>
+                </tr>
+              )}
               {(data?.agentPerformance ?? []).map((agent) => (
                 <tr key={agent.agent} className="border-b hover:bg-gray-50">
                   <td className="py-3 px-4 font-medium capitalize">{agent.agent}</td>

@@ -1,12 +1,16 @@
 """PostgreSQL/Supabase client for relational data operations."""
 
+import ipaddress
 import json
 import logging
 import re
+import socket
 from collections.abc import AsyncIterator as _AsyncIterator
 from contextlib import asynccontextmanager as _acm
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
+from enum import Enum
 from typing import Any
+from urllib.parse import parse_qs, unquote, urlparse
 from uuid import uuid4
 
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -26,6 +30,173 @@ _USER_COLS = (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _supabase_insert_payload(data: dict[str, Any]) -> dict[str, Any]:
+    """Recursively JSON-serialize values for PostgREST (e.g. datetime → ISO string)."""
+
+    def conv(v: Any) -> Any:
+        if isinstance(v, Enum):
+            return v.value
+        if isinstance(v, datetime):
+            if v.tzinfo is None:
+                return v.replace(tzinfo=UTC).isoformat()
+            return v.isoformat()
+        if isinstance(v, date):
+            return v.isoformat()
+        if isinstance(v, dict):
+            return {k: conv(x) for k, x in v.items()}
+        if isinstance(v, list):
+            return [conv(x) for x in v]
+        return v
+
+    return {k: conv(v) for k, v in data.items()}
+
+
+class SupabaseDirectDbUnreachableError(ConnectionError):
+    """``db.<ref>.supabase.co`` has no IPv4; asyncpg cannot reach it on IPv6-blocked networks."""
+
+
+_POOL_KWARGS = {
+    "min_size": 5,
+    "max_size": 25,
+    "max_inactive_connection_lifetime": 300,
+    "command_timeout": 60,
+}
+
+
+def _first_ipv4_for_host(host: str, port: int = 5432) -> str | None:
+    """Return first IPv4 for host. Uses explicit port (required on some macOS/Python combos)."""
+    host = host.strip()
+    if not host:
+        return None
+    port_s = str(port)
+    try:
+        infos = socket.getaddrinfo(
+            host,
+            port_s,
+            type=socket.SOCK_STREAM,
+            proto=socket.IPPROTO_TCP,
+        )
+    except OSError as exc:
+        logger.warning("DNS resolution failed for %s:%s: %s", host, port_s, exc)
+        return None
+    for family, _socktype, _proto, _canon, sockaddr in infos:
+        if family == socket.AF_INET:
+            return sockaddr[0]
+    logger.warning("No IPv4 address in DNS results for %s (got %d record(s))", host, len(infos))
+    return None
+
+
+def _asyncpg_should_prefer_ipv4(db_url: str, user_flag: bool) -> bool:
+    """Use IPv4 + server_hostname when DNS often returns broken IPv6 (common for Supabase)."""
+    if user_flag:
+        return True
+    u = db_url
+    if u.startswith("postgres://"):
+        u = u.replace("postgres://", "postgresql://", 1)
+    host = urlparse(u).hostname or ""
+    if not host:
+        return False
+    try:
+        ipaddress.ip_address(host)
+    except ValueError:
+        pass
+    else:
+        return False
+    return host.endswith(".supabase.co") or "pooler.supabase.com" in host
+
+
+def _is_supabase_direct_db_host(host: str) -> bool:
+    """``db.<project-ref>.supabase.co`` — often IPv6-only; pooler hosts differ."""
+    h = (host or "").strip().lower()
+    return h.startswith("db.") and h.endswith(".supabase.co")
+
+
+_SUPABASE_DIRECT_DB_IPV4_HELP = (
+    "Direct Supabase host db.<ref>.supabase.co often has no IPv4 (AAAA-only). "
+    "asyncpg then falls back to IPv6, which fails on many networks. "
+    "Fix: (1) Set USE_LOCAL_POSTGRES=0 and use SUPABASE_URL + SUPABASE_KEY (HTTPS API). "
+    "(2) Replace DATABASE_URL with the Session or Transaction pooler URI from Supabase "
+    "Dashboard → Database (pooler endpoints usually have IPv4). "
+    "(3) Use local/Docker Postgres for development."
+)
+
+
+def _asyncpg_pool_connect_kwargs(server_settings: dict[str, str] | None) -> dict[str, Any]:
+    kw: dict[str, Any] = dict(_POOL_KWARGS)
+    if server_settings:
+        kw["server_settings"] = server_settings
+    return kw
+
+
+async def _asyncpg_pool_from_database_url(
+    db_url: str,
+    prefer_ipv4: bool,
+    *,
+    server_settings: dict[str, str] | None = None,
+):
+    """Create asyncpg pool; optionally connect via IPv4 while preserving TLS server name."""
+    import asyncpg
+
+    if db_url.startswith("postgres://"):
+        db_url = db_url.replace("postgres://", "postgresql://", 1)
+
+    base_kw = _asyncpg_pool_connect_kwargs(server_settings)
+
+    if not prefer_ipv4:
+        return await asyncpg.create_pool(db_url, **base_kw)
+
+    parsed = urlparse(db_url)
+    host = parsed.hostname
+    if not host:
+        return await asyncpg.create_pool(db_url, **base_kw)
+
+    try:
+        ipaddress.ip_address(host)
+        return await asyncpg.create_pool(db_url, **base_kw)
+    except ValueError:
+        pass
+
+    port = parsed.port or 5432
+    ipv4 = _first_ipv4_for_host(host, port)
+    if not ipv4:
+        if prefer_ipv4 and _is_supabase_direct_db_host(host):
+            raise SupabaseDirectDbUnreachableError(f"No IPv4 DNS record for {host}. {_SUPABASE_DIRECT_DB_IPV4_HELP}")
+        logger.warning(
+            "IPv4-first path requested but no A record for %s — falling back to default DNS",
+            host,
+        )
+        return await asyncpg.create_pool(db_url, **base_kw)
+
+    user = unquote(parsed.username) if parsed.username else None
+    password = unquote(parsed.password) if parsed.password else None
+    database = (parsed.path or "").lstrip("/") or "postgres"
+    qs = parse_qs(parsed.query)
+    sslmode = (qs.get("sslmode") or [""])[0].lower()
+    if sslmode == "disable":
+        use_ssl = False
+    elif sslmode in ("require", "verify-ca", "verify-full"):
+        use_ssl = True
+    elif host.endswith(".supabase.co"):
+        use_ssl = True
+    else:
+        use_ssl = host not in ("localhost", "127.0.0.1")
+
+    kwargs: dict[str, Any] = {
+        "host": ipv4,
+        "port": port,
+        "user": user,
+        "password": password,
+        "database": database,
+        "server_hostname": host,
+        **base_kw,
+    }
+    if use_ssl:
+        kwargs["ssl"] = True
+
+    logger.info("asyncpg: connecting via IPv4 %s (TLS hostname %s)", ipv4, host)
+    return await asyncpg.create_pool(**kwargs)
 
 
 def _compute_avg_resolution_hours(rows: list[dict]) -> float:
@@ -109,22 +280,20 @@ class PostgresClient:
 
         # Local PostgreSQL via asyncpg
         if self._asyncpg_pool is None:
-            import asyncpg
-
             settings = get_settings()
             db_url = settings.DATABASE_URL
             if db_url.startswith("postgres://"):
                 db_url = db_url.replace("postgres://", "postgresql://", 1)
             _stmt_timeout = settings.DB_STATEMENT_TIMEOUT_MS
-            self._asyncpg_pool = await asyncpg.create_pool(
+            stmt_settings: dict[str, str] | None = (
+                {"statement_timeout": str(_stmt_timeout)} if _stmt_timeout > 0 else None
+            )
+            user_v4 = (settings.DATABASE_PREFER_IPV4 or "").lower() in ("1", "true", "yes")
+            prefer_v4 = _asyncpg_should_prefer_ipv4(db_url, user_v4)
+            self._asyncpg_pool = await _asyncpg_pool_from_database_url(
                 db_url,
-                min_size=5,
-                max_size=25,
-                max_inactive_connection_lifetime=300,
-                command_timeout=60,
-                server_settings={
-                    "statement_timeout": str(_stmt_timeout),
-                } if _stmt_timeout > 0 else {},
+                prefer_v4,
+                server_settings=stmt_settings,
             )
         return self._asyncpg_pool
 
@@ -834,12 +1003,14 @@ class PostgresClient:
         """Create a new offer."""
         if self._use_supabase_client():
             client = await self._get_client()
-            result = await client.table("offers").insert(offer_data).execute()
+            payload = _supabase_insert_payload(offer_data)
+            result = await client.table("offers").insert(payload).execute()
             return result.data[0] if result.data else offer_data
+        tiers = offer_data.get("pricing_tiers") or []
         await self._pg_execute(
             """INSERT INTO offers (id, title, description, category, base_price, min_participants, max_participants,
                deadline, building_id, created_by, status, current_participants, matched_contractor_id, pricing_tiers)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)""",
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb)""",
             offer_data["id"],
             offer_data["title"],
             offer_data["description"],
@@ -853,7 +1024,7 @@ class PostgresClient:
             offer_data.get("status", "draft"),
             offer_data.get("current_participants", 0),
             offer_data.get("matched_contractor_id"),
-            offer_data.get("pricing_tiers") or [],
+            json.dumps(tiers),
         )
         return await self.get_offer(offer_data["id"]) or offer_data
 
@@ -1278,6 +1449,8 @@ class PostgresClient:
             if filters.get("verification_status"):
                 q = q.eq("verification_status", filters["verification_status"])
             if marketplace_only:
+                # PostgREST: avoid ".is.null" inside or() — some gateways return 400 (surfacing as 500).
+                # NULL membership_status is coerced to ACTIVE in ContractorInDB on API responses; treat as active.
                 now_iso = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
                 q = q.or_(
                     "membership_status.eq.active,membership_status.eq.trialing,"
@@ -1326,6 +1499,65 @@ class PostgresClient:
             *args,
         )
         return (rows or [], total)
+
+    async def get_admin_analytics_aggregates(self, days: int = 30) -> dict[str, Any]:
+        """Chart rollups for admin analytics (PostgreSQL). Supabase client returns empty dicts until RPC exists."""
+        out: dict[str, Any] = {
+            "category_breakdown": {},
+            "regional_data": {},
+            "daily_offers": [],
+            "daily_revenue": [],
+        }
+        if self._use_supabase_client():
+            return out
+        try:
+            cat_rows = await self._pg_fetch_all(
+                "SELECT category, COUNT(*)::int AS n FROM offers GROUP BY category ORDER BY n DESC"
+            )
+            out["category_breakdown"] = {
+                str(r["category"]): int(r["n"]) for r in (cat_rows or []) if r.get("category") is not None
+            }
+        except Exception:
+            logger.debug("get_admin_analytics_aggregates: category breakdown failed", exc_info=True)
+        try:
+            reg_rows = await self._pg_fetch_all(
+                "SELECT region, COUNT(*)::int AS n FROM buildings GROUP BY region ORDER BY n DESC"
+            )
+            out["regional_data"] = {
+                str(r["region"]): int(r["n"]) for r in (reg_rows or []) if r.get("region") is not None
+            }
+        except Exception:
+            logger.debug("get_admin_analytics_aggregates: regional failed", exc_info=True)
+        try:
+            daily_o = await self._pg_fetch_all(
+                """
+                SELECT to_char(date_trunc('day', created_at AT TIME ZONE 'UTC'), 'YYYY-MM-DD') AS d,
+                       COUNT(*)::int AS n
+                FROM offers
+                WHERE created_at >= (NOW() AT TIME ZONE 'utc' - $1::int * interval '1 day')
+                GROUP BY 1 ORDER BY 1
+                """,
+                days,
+            )
+            out["daily_offers"] = [{"date": r["d"], "count": int(r["n"])} for r in (daily_o or [])]
+        except Exception:
+            logger.debug("get_admin_analytics_aggregates: daily offers failed", exc_info=True)
+        try:
+            daily_r = await self._pg_fetch_all(
+                """
+                SELECT to_char(date_trunc('day', updated_at AT TIME ZONE 'UTC'), 'YYYY-MM-DD') AS d,
+                       COALESCE(SUM(base_price), 0)::double precision AS amount
+                FROM offers
+                WHERE status = 'completed'
+                  AND updated_at >= (NOW() AT TIME ZONE 'utc' - $1::int * interval '1 day')
+                GROUP BY 1 ORDER BY 1
+                """,
+                days,
+            )
+            out["daily_revenue"] = [{"date": r["d"], "amount": float(r["amount"] or 0)} for r in (daily_r or [])]
+        except Exception:
+            logger.debug("get_admin_analytics_aggregates: daily revenue failed", exc_info=True)
+        return out
 
     async def get_contractor(self, contractor_id: str) -> dict[str, Any] | None:
         """Get a single contractor by ID."""
@@ -1651,8 +1883,10 @@ class PostgresClient:
         """Create an escalation."""
         if self._use_supabase_client():
             client = await self._get_client()
-            result = await client.table("escalations").insert(escalation_data).execute()
+            payload = _supabase_insert_payload(escalation_data)
+            result = await client.table("escalations").insert(payload).execute()
             return result.data[0] if result.data else escalation_data
+        ctx = escalation_data.get("context") or {}
         await self._pg_execute(
             """INSERT INTO escalations
                (id, user_id, conversation_id, source_agent,
@@ -1660,7 +1894,7 @@ class PostgresClient:
                 context, agent_reasoning, resolution_notes,
                 resolved_at)
                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9,
-                       $10, $11, $12, $13)""",
+                       $10::jsonb, $11, $12, $13)""",
             escalation_data["id"],
             escalation_data["user_id"],
             escalation_data["conversation_id"],
@@ -1670,7 +1904,7 @@ class PostgresClient:
             escalation_data["summary"],
             escalation_data.get("status", "open"),
             escalation_data.get("assigned_to"),
-            escalation_data.get("context") or {},
+            json.dumps(ctx),
             escalation_data.get("agent_reasoning"),
             escalation_data.get("resolution_notes"),
             escalation_data.get("resolved_at"),
@@ -1756,7 +1990,8 @@ class PostgresClient:
             return await self.get_escalation(escalation_id) or {}
         if self._use_supabase_client():
             client = await self._get_client()
-            await client.table("escalations").update(filtered).eq("id", escalation_id).execute()
+            payload = _supabase_insert_payload(filtered)
+            await client.table("escalations").update(payload).eq("id", escalation_id).execute()
         else:
             query, args = self._build_safe_update("escalations", filtered, "id", escalation_id)
             await self._pg_execute(query, *args)
@@ -2032,6 +2267,37 @@ class PostgresClient:
         )
         return (rows or [], total)
 
+    async def _batch_building_names(self, building_ids: list[str]) -> dict[str, str]:
+        """Resolve building_id -> display name for admin lists."""
+        seen: set[str] = set()
+        unique: list[str] = []
+        for bid in building_ids:
+            if not bid or bid in seen:
+                continue
+            seen.add(bid)
+            unique.append(str(bid))
+        if not unique:
+            return {}
+        if self._use_supabase_client():
+            client = await self._get_client()
+            res = await client.table("buildings").select("id,name").in_("id", unique).execute()
+            data = res.data or []
+            return {str(r["id"]): (r.get("name") or "") for r in data}
+        rows = await self._pg_fetch_all(
+            "SELECT id, name FROM buildings WHERE id = ANY($1::text[])",
+            unique,
+        )
+        return {str(r["id"]): (r.get("name") or "") for r in (rows or [])}
+
+    @staticmethod
+    def _attach_building_names_to_offers(
+        offers: list[dict[str, Any]],
+        bmap: dict[str, str],
+    ) -> None:
+        for row in offers:
+            bid = row.get("building_id")
+            row["building_name"] = bmap.get(str(bid)) if bid is not None else None
+
     async def get_all_offers_admin(
         self,
         page: int = 1,
@@ -2054,7 +2320,11 @@ class PostgresClient:
                 await q.order("created_at", desc=True).range((page - 1) * page_size, page * page_size - 1).execute()
             )
             total = result.count if hasattr(result, "count") and result.count is not None else len(result.data or [])
-            return (result.data or [], total)
+            rows = result.data or []
+            bids = [str(r["building_id"]) for r in rows if r.get("building_id")]
+            bmap = await self._batch_building_names(bids)
+            self._attach_building_names_to_offers(rows, bmap)
+            return (rows, total)
 
         where_parts: list[str] = []
         args: list[Any] = []
@@ -2075,7 +2345,11 @@ class PostgresClient:
             "SELECT * FROM offers WHERE " + where_sql + " ORDER BY created_at DESC LIMIT $%d OFFSET $%d" % (n1, n2),
             *args,
         )
-        return (rows or [], total)
+        rows = rows or []
+        bids = [str(r["building_id"]) for r in rows if r.get("building_id")]
+        bmap = await self._batch_building_names(bids)
+        self._attach_building_names_to_offers(rows, bmap)
+        return (rows, total)
 
     # ------------------------------------------------------------------
     # Notifications (in-app bell)
@@ -3116,6 +3390,8 @@ class PostgresClient:
             else:
                 await self._pg_fetch_one("SELECT id FROM users LIMIT 1")
             return True
+        except SupabaseDirectDbUnreachableError:
+            raise
         except Exception:
             logger.exception("PostgreSQL health check failed")
             return False
@@ -3130,3 +3406,9 @@ def get_postgres_client() -> PostgresClient:
     if _postgres_client is None:
         _postgres_client = PostgresClient()
     return _postgres_client
+
+
+def reset_postgres_client() -> None:
+    """Drop the singleton (e.g. after changing DB-related env). Used by seed script / tests."""
+    global _postgres_client
+    _postgres_client = None

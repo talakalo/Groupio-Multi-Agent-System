@@ -35,7 +35,9 @@
     "profile": "פרופיל",
     "payments": "תשלומים",
     "aiAssistant": "עוזר AI",
-    "myAccount": "החשבון שלי"
+    "myAccount": "החשבון שלי",
+    "myAccountHint": "פרופיל, התראות והעדפות",
+    "logout": "התנתקות"
   },
   "contractorNav": {
     "dashboard": "לוח בקרה",
@@ -46,6 +48,7 @@
     "contractorBadge": "קבלן",
     "newOffer": "הצעה חדשה",
     "myBusiness": "העסק שלי",
+    "myBusinessHint": "פרטי עסק, מסמכים והגדרות",
     "logout": "התנתקות"
   },
   "dashboard": {
@@ -518,7 +521,10 @@
     "role": "מנהל בניינים",
     "roleSuperAdmin": "מנהל-על",
     "roleAdmin": "מנהל",
-    "myAccount": "החשבון שלי"
+    "myAccount": "החשבון שלי",
+    "myAccountHint": "שם, אימייל והתנתקות",
+    "profile": "חשבון",
+    "logout": "התנתקות"
   },
   "buildingsManager": {
     "dashboard": {
@@ -564,6 +570,15 @@
       "empty": "אין אסקלציות התואמות למסננים",
       "resolve": "סגור פנייה",
       "resolving": "סוגר…"
+    },
+    "account": {
+      "title": "חשבון",
+      "subtitle": "המשתמש המחובר למסוף זה.",
+      "name": "שם",
+      "email": "אימייל",
+      "role": "תפקיד",
+      "signOut": "התנתקות",
+      "backToDashboard": "חזרה ללוח הבקרה"
     }
   },
   "adminNav": {
@@ -571,7 +586,10 @@
     "buildingsManager": "מנהל בניינים",
     "roleSuperAdmin": "מנהל-על",
     "roleAdmin": "מנהל",
-    "myAccount": "החשבון שלי"
+    "myAccount": "החשבון שלי",
+    "myAccountHint": "שם, אימייל והתנתקות",
+    "profile": "חשבון",
+    "logout": "התנתקות"
   },
   "admin": {
     "dashboard": {
@@ -585,6 +603,15 @@
         "title": "הגדרות מערכת",
         "description": "הגדרות פלטפורמה (בקרוב)."
       }
+    },
+    "account": {
+      "title": "חשבון",
+      "subtitle": "משתמש הניהול המחובר.",
+      "name": "שם",
+      "email": "אימייל",
+      "role": "תפקיד",
+      "signOut": "התנתקות",
+      "backToDashboard": "חזרה ללוח הבקרה"
     }
   },
   "onboarding": {

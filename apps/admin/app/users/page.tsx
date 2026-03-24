@@ -27,7 +27,7 @@ import {
   Lock,
 } from "lucide-react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { apiV1 } from "@/lib/backend-url";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -69,7 +69,7 @@ const ROLE_BADGE_CLASSES: Record<string, string> = {
 const fetchOpts = (): RequestInit => ({ credentials: "include", headers: { "Content-Type": "application/json" } });
 
 async function fetchUsers(): Promise<User[]> {
-  const res = await fetch(`${API_URL}/api/v1/admin/users`, fetchOpts());
+  const res = await fetch(apiV1("/admin/users"), fetchOpts());
   if (!res.ok) throw new Error("Failed to fetch users");
   const data = await res.json();
   const raw = data.users ?? data.items ?? data;
@@ -88,7 +88,7 @@ async function updateUser(
   id: string,
   payload: Partial<Pick<User, "role" | "status">>
 ): Promise<User> {
-  const res = await fetch(`${API_URL}/api/v1/admin/users/${id}`, {
+  const res = await fetch(apiV1(`/admin/users/${id}`), {
     method: "PUT",
     ...fetchOpts(),
     body: JSON.stringify(payload),
@@ -103,7 +103,7 @@ async function createUser(payload: {
   phone: string;
   password: string;
 }): Promise<User> {
-  const res = await fetch(`${API_URL}/api/v1/admin/users`, {
+  const res = await fetch(apiV1("/admin/users"), {
     method: "POST",
     ...fetchOpts(),
     body: JSON.stringify({ ...payload, role: "admin" }),

@@ -78,7 +78,7 @@ export default function DashboardPage() {
   const { data: metrics, isError: metricsError } = useDashboardMetrics();
   const { data: systemStatus, isError: systemError } = useSystemStatus();
   const { data: escalationsData } = useEscalations();
-  const { data: health } = useHealthStatus();
+  const { data: health, isError: healthFetchError } = useHealthStatus();
   const { data: analyticsData } = useAdminAnalyticsDashboard();
   const { data: activityLog = [] } = useActivityLog();
   const { data: vettingStatus } = useVettingStatus();
@@ -426,7 +426,13 @@ export default function DashboardPage() {
             <ServiceHealthRow
               label="API Server"
               icon={<Server className="w-4 h-4" />}
-              status={healthServices.api !== undefined ? (healthServices.api ? "healthy" : "down") : "unknown"}
+              status={
+                healthFetchError
+                  ? "down"
+                  : health !== undefined
+                    ? "healthy"
+                    : "unknown"
+              }
             />
             <ServiceHealthRow
               label="Redis"
