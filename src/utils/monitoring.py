@@ -167,7 +167,13 @@ def track_agent_execution(agent_name: str) -> Callable:
                     error_type=type(e).__name__,
                     agent_name=agent_name,
                 ).inc()
-                logger.error("Error in agent %s: %s", agent_name, e, exc_info=True)
+                # Event-style log avoids structlog/format_exc_info processor warnings.
+                logger.error(
+                    "agent_execution_error",
+                    agent_name=agent_name,
+                    error_type=type(e).__name__,
+                    error=str(e),
+                )
                 raise
             finally:
                 duration = time.time() - start_time

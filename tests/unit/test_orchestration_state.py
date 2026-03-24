@@ -67,7 +67,7 @@ def test_calculate_duration_ms_positive():
 
 def test_calculate_duration_ms_naive_timestamp():
     """Handles naive (timezone-unaware) ISO timestamps."""
-    naive = datetime.utcnow().isoformat()
+    naive = datetime.now(UTC).replace(tzinfo=None).isoformat()
     duration = calculate_duration_ms(naive)
     assert duration >= 0
 
