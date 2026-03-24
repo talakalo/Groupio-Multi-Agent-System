@@ -35,7 +35,9 @@
     "profile": "Profile",
     "payments": "Payments",
     "aiAssistant": "AI Assistant",
-    "myAccount": "My Account"
+    "myAccount": "My Account",
+    "myAccountHint": "Profile, notifications & preferences",
+    "logout": "Log out"
   },
   "contractorNav": {
     "dashboard": "Dashboard",
@@ -46,6 +48,7 @@
     "contractorBadge": "Contractor",
     "newOffer": "New Offer",
     "myBusiness": "My Business",
+    "myBusinessHint": "Details, documents & settings",
     "logout": "Log out"
   },
   "dashboard": {
@@ -518,7 +521,10 @@
     "role": "Buildings manager",
     "roleSuperAdmin": "Super admin",
     "roleAdmin": "Admin",
-    "myAccount": "My account"
+    "myAccount": "My account",
+    "myAccountHint": "Name, email & sign out",
+    "profile": "Account",
+    "logout": "Log out"
   },
   "buildingsManager": {
     "dashboard": {
@@ -564,6 +570,15 @@
       "empty": "No escalations match your filters",
       "resolve": "Resolve",
       "resolving": "Resolving…"
+    },
+    "account": {
+      "title": "Account",
+      "subtitle": "Your signed-in user for this console.",
+      "name": "Name",
+      "email": "Email",
+      "role": "Role",
+      "signOut": "Sign out",
+      "backToDashboard": "Back to dashboard"
     }
   },
   "adminNav": {
@@ -571,7 +586,10 @@
     "buildingsManager": "Buildings manager",
     "roleSuperAdmin": "Super admin",
     "roleAdmin": "Admin",
-    "myAccount": "My account"
+    "myAccount": "My account",
+    "myAccountHint": "Name, email & sign out",
+    "profile": "Account",
+    "logout": "Log out"
   },
   "admin": {
     "dashboard": {
@@ -585,6 +603,15 @@
         "title": "System settings",
         "description": "Platform configuration (coming soon)."
       }
+    },
+    "account": {
+      "title": "Account",
+      "subtitle": "Your signed-in admin user.",
+      "name": "Name",
+      "email": "Email",
+      "role": "Role",
+      "signOut": "Sign out",
+      "backToDashboard": "Back to dashboard"
     }
   },
   "onboarding": {

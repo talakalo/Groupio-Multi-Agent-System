@@ -20,6 +20,78 @@ import type {
   PaymentSummary,
 } from "@groupio/types";
 
+/** Map FastAPI/Pydantic escalation rows (snake_case + enum values) to @groupio/types Escalation. */
+function normalizeEscalationFromApi(raw: Record<string, unknown>): Escalation {
+  const statusRaw = String(raw.status ?? "open").toLowerCase();
+  const statusMap: Record<string, Escalation["status"]> = {
+    open: "open",
+    in_progress: "assigned",
+    waiting_customer: "assigned",
+    assigned: "assigned",
+    resolved: "resolved",
+    closed: "resolved",
+  };
+  const status = statusMap[statusRaw] ?? "open";
+
+  const pr = String(raw.priority ?? "medium").toLowerCase();
+  let priority: Escalation["priority"] = "normal";
+  if (pr === "low") priority = "low";
+  else if (pr === "medium") priority = "normal";
+  else if (pr === "high") priority = "high";
+  else if (pr === "critical" || pr === "urgent") priority = "urgent";
+
+  let ctx: Record<string, unknown> = {};
+  const c = raw.context;
+  if (typeof c === "string") {
+    try {
+      const p = JSON.parse(c) as unknown;
+      if (p && typeof p === "object") ctx = p as Record<string, unknown>;
+    } catch {
+      ctx = {};
+    }
+  } else if (c && typeof c === "object") {
+    ctx = c as Record<string, unknown>;
+  }
+
+  const intent = typeof ctx.intent === "string" ? ctx.intent : "";
+  const actionsRaw = ctx.actionsTaken;
+  const actionsTaken: { agent: string; action: string }[] = [];
+  if (Array.isArray(actionsRaw)) {
+    for (const a of actionsRaw) {
+      if (!a || typeof a !== "object") continue;
+      const o = a as { agent?: unknown; action?: unknown };
+      if (typeof o.agent === "string") {
+        actionsTaken.push({
+          agent: o.agent,
+          action: typeof o.action === "string" ? o.action : "",
+        });
+      }
+    }
+  }
+  const ragSummary = typeof ctx.ragSummary === "string" ? ctx.ragSummary : undefined;
+
+  const createdRaw = raw.created_at ?? raw.createdAt;
+  const createdAt =
+    typeof createdRaw === "string"
+      ? createdRaw
+      : createdRaw instanceof Date
+        ? createdRaw.toISOString()
+        : new Date(0).toISOString();
+
+  return {
+    id: String(raw.id ?? ""),
+    userId: String(raw.user_id ?? raw.userId ?? ""),
+    conversationId: String(raw.conversation_id ?? raw.conversationId ?? ""),
+    reason: String(raw.reason ?? ""),
+    priority,
+    status,
+    context: { intent, actionsTaken, ragSummary },
+    createdAt,
+    /** From API `source_agent` when `context.actionsTaken` is empty (e.g. seed rows). */
+    sourceAgent: typeof raw.source_agent === "string" ? raw.source_agent : undefined,
+  } as Escalation;
+}
+
 // ---- Error Types ----
 
 export class ApiError extends Error {
@@ -162,6 +234,7 @@ export class GroupioApiClient {
   private readonly authToken?: string;
   private readonly timeout: number;
   private readonly customHeaders: Record<string, string>;
+  private refreshAccessPromise: Promise<boolean> | null = null;
 
   constructor(config: ApiClientConfig = {}) {
     this.baseUrl = (config.baseUrl ?? "/api/v1").replace(/\/+$/, "");
@@ -211,6 +284,26 @@ export class GroupioApiClient {
     return this.get<ContractorsListResponse>(`/contractors${qs ? `?${qs}` : ""}`);
   }
 
+  /** Admin: all contractors (not restricted to marketplace-visible membership). */
+  async getAdminContractors(params?: {
+    category?: string;
+    region?: string;
+    min_trust_score?: number;
+    verification_status?: string;
+    page?: number;
+    page_size?: number;
+  }): Promise<ContractorsListResponse> {
+    const search = new URLSearchParams();
+    if (params?.category) search.set("category", params.category);
+    if (params?.region) search.set("region", params.region);
+    if (params?.min_trust_score != null) search.set("min_trust_score", String(params.min_trust_score));
+    if (params?.verification_status) search.set("verification_status", params.verification_status);
+    if (params?.page != null) search.set("page", String(params.page));
+    if (params?.page_size != null) search.set("page_size", String(params.page_size));
+    const qs = search.toString();
+    return this.get<ContractorsListResponse>(`/admin/contractors${qs ? `?${qs}` : ""}`);
+  }
+
   async getContractor(id: string): Promise<Contractor> {
     return this.get<Contractor>(`/contractors/${encodeURIComponent(id)}`);
   }
@@ -228,11 +321,80 @@ export class GroupioApiClient {
   }
 
   async getEscalations(): Promise<EscalationsResponse> {
-    return this.get<EscalationsResponse>("/escalations");
+    const raw = await this.get<{
+      items?: Record<string, unknown>[];
+      escalations?: Record<string, unknown>[];
+      total: number;
+    }>("/escalations");
+    const rawList = raw.escalations ?? raw.items ?? [];
+    const list = Array.isArray(rawList)
+      ? rawList.map((row) => normalizeEscalationFromApi(row))
+      : [];
+    return { escalations: list, total: raw.total };
+  }
+
+  /** Admin: partial update (priority, status, assignee, notes). Uses cookie/session pipeline. */
+  async updateEscalation(
+    escalationId: string,
+    body: {
+      status?: string;
+      priority?: string;
+      assigned_to?: string;
+      resolution_notes?: string | null;
+    },
+  ): Promise<Record<string, unknown>> {
+    return this.request<Record<string, unknown>>(
+      "PUT",
+      `/escalations/${encodeURIComponent(escalationId)}`,
+      body,
+    );
+  }
+
+  async assignEscalation(escalationId: string, assignedTo: string): Promise<Record<string, unknown>> {
+    return this.request<Record<string, unknown>>(
+      "POST",
+      `/escalations/${encodeURIComponent(escalationId)}/assign`,
+      { assigned_to: assignedTo },
+    );
+  }
+
+  async resolveEscalation(
+    escalationId: string,
+    resolutionNotes?: string,
+  ): Promise<Record<string, unknown>> {
+    return this.request<Record<string, unknown>>(
+      "POST",
+      `/escalations/${encodeURIComponent(escalationId)}/resolve`,
+      resolutionNotes ? { resolution_notes: resolutionNotes } : {},
+    );
   }
 
   async getSystemStatus(): Promise<SystemStatus> {
-    return this.get<SystemStatus>("/admin/status");
+    const raw = await this.get<{
+      agents?: Record<string, Record<string, unknown>>;
+      vector_collections?: Record<string, { pointsCount?: number; status?: string }>;
+      vectorCollections?: Record<string, { pointsCount?: number; status?: string }>;
+    }>("/admin/status");
+    const agentsIn = raw.agents ?? {};
+    const agents: SystemStatus["agents"] = {};
+    for (const [key, m] of Object.entries(agentsIn)) {
+      agents[key] = {
+        model: String(m.model ?? ""),
+        calls: Number(m.calls ?? 0),
+        errors: Number(m.errors ?? 0),
+        avgDurationMs: Number(m.avg_duration_ms ?? m.avgDurationMs ?? 0),
+        tokens: Number(m.tokens ?? 0),
+      };
+    }
+    const vec = raw.vector_collections ?? raw.vectorCollections ?? {};
+    const vectorCollections: SystemStatus["vectorCollections"] = {};
+    for (const [k, v] of Object.entries(vec)) {
+      vectorCollections[k] = {
+        pointsCount: Number((v as { pointsCount?: number }).pointsCount ?? 0),
+        status: String((v as { status?: string }).status ?? "unknown"),
+      };
+    }
+    return { agents, vectorCollections };
   }
 
   async getAnalytics(): Promise<{
@@ -243,6 +405,12 @@ export class GroupioApiClient {
     openTickets?: number;
     openTicketsChange?: number;
     resolvedToday?: number;
+    totalContractors?: number;
+    categoryBreakdown?: Record<string, number>;
+    regionalData?: Record<string, number>;
+    dailyOffers?: { date: string; count: number }[];
+    dailyRevenue?: { date: string; amount: number }[];
+    agentPerformance?: { agent: string; accuracy: number; responseTime: number; throughput: number }[];
   }> {
     return this.get("/admin/analytics");
   }
@@ -382,7 +550,38 @@ export class GroupioApiClient {
     return headers;
   }
 
-  private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  /** Cookie-based sessions: renew access_token using refresh_token cookie. */
+  private async refreshAccessToken(): Promise<boolean> {
+    if (!this.refreshAccessPromise) {
+      this.refreshAccessPromise = (async () => {
+        try {
+          const url = `${this.baseUrl}/auth/refresh`;
+          const r = await fetch(url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...this.buildHeaders(),
+            },
+            credentials: "include",
+            body: "{}",
+          });
+          return r.ok;
+        } catch {
+          return false;
+        } finally {
+          this.refreshAccessPromise = null;
+        }
+      })();
+    }
+    return this.refreshAccessPromise;
+  }
+
+  private async request<T>(
+    method: string,
+    path: string,
+    body?: unknown,
+    isRetryAfterRefresh = false,
+  ): Promise<T> {
     const url = `${this.baseUrl}${path}`;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeout);
@@ -406,6 +605,18 @@ export class GroupioApiClient {
       );
     } finally {
       clearTimeout(timeoutId);
+    }
+
+    if (
+      response.status === 401 &&
+      !isRetryAfterRefresh &&
+      path !== "/auth/refresh" &&
+      path !== "/auth/login/json"
+    ) {
+      const refreshed = await this.refreshAccessToken();
+      if (refreshed) {
+        return this.request<T>(method, path, body, true);
+      }
     }
 
     if (!response.ok) {

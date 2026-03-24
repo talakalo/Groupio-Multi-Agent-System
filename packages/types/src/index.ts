@@ -213,7 +213,10 @@ export interface EscalationContext {
 }
 
 export interface SystemStatus {
-  agents: Record<string, { model: string; calls: number; errors: number; avgDurationMs?: number; tokens?: number }>;
+  agents: Record<
+    string,
+    { model: string; calls: number; errors: number; avgDurationMs?: number; tokens?: number }
+  >;
   vectorCollections: Record<
     string,
     { pointsCount: number; status: string }

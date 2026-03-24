@@ -1,10 +1,11 @@
 """Escalation Pydantic models."""
 
+import json
 from datetime import datetime
 from enum import StrEnum
-from typing import Any
+from typing import Annotated, Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, field_validator
 
 
 class EscalationPriority(StrEnum):
@@ -30,8 +31,10 @@ class EscalationSource(StrEnum):
     """Source agent that triggered escalation."""
 
     ROUTER = "router"
+    ORCHESTRATOR = "orchestrator"
     MATCHING = "matching"
     PRICING = "pricing"
+    PAYMENT = "payment"
     VETTING = "vetting"
     SUPPORT = "support"
     OUTREACH = "outreach"
@@ -51,6 +54,60 @@ class EscalationReason(StrEnum):
     COMPLAINT = "complaint"
     TECHNICAL_ERROR = "technical_error"
     OTHER = "other"
+    # Seed / admin tooling (scripts/seed_test_data.py)
+    MANUAL_REVIEW = "manual_review"
+    PAYMENT_FAILURE = "payment_failure"
+    USER_COMPLAINT = "user_complaint"
+    QUALITY_ISSUE = "quality_issue"
+    DEADLINE_RISK = "deadline_risk"
+
+
+def _coerce_db_escalation_source(v: Any) -> Any:
+    if v is None:
+        return EscalationSource.SYSTEM.value
+    s = str(v).strip().lower()
+    try:
+        return EscalationSource(s).value
+    except ValueError:
+        return EscalationSource.SYSTEM.value
+
+
+def _coerce_db_escalation_reason(v: Any) -> Any:
+    if v is None:
+        return EscalationReason.OTHER.value
+    s = str(v).strip().lower()
+    try:
+        return EscalationReason(s).value
+    except ValueError:
+        return EscalationReason.OTHER.value
+
+
+def _coerce_db_escalation_status(v: Any) -> Any:
+    if v is None:
+        return EscalationStatus.OPEN.value
+    s = str(v).strip().lower()
+    try:
+        return EscalationStatus(s).value
+    except ValueError:
+        return EscalationStatus.OPEN.value
+
+
+def _coerce_db_escalation_priority(v: Any) -> Any:
+    if v is None:
+        return EscalationPriority.MEDIUM.value
+    s = str(v).strip().lower()
+    if s == "urgent":
+        return EscalationPriority.CRITICAL.value
+    try:
+        return EscalationPriority(s).value
+    except ValueError:
+        return EscalationPriority.MEDIUM.value
+
+
+EscalationSourceDB = Annotated[EscalationSource, BeforeValidator(_coerce_db_escalation_source)]
+EscalationReasonDB = Annotated[EscalationReason, BeforeValidator(_coerce_db_escalation_reason)]
+EscalationStatusDB = Annotated[EscalationStatus, BeforeValidator(_coerce_db_escalation_status)]
+EscalationPriorityDB = Annotated[EscalationPriority, BeforeValidator(_coerce_db_escalation_priority)]
 
 
 class EscalationBase(BaseModel):
@@ -96,11 +153,37 @@ class EscalationInDB(EscalationBase):
 
     model_config = ConfigDict(from_attributes=True)
 
+    # Relaxed / coerced vs EscalationBase: legacy rows and drivers may violate create-time rules.
+    source_agent: EscalationSourceDB
+    reason: EscalationReasonDB
+    priority: EscalationPriorityDB = EscalationPriority.MEDIUM
+    summary: str = Field(..., min_length=1, max_length=2000)
+
     id: str
-    status: EscalationStatus = EscalationStatus.OPEN
+    status: EscalationStatusDB = EscalationStatus.OPEN
     assigned_to: str | None = None
     context: dict[str, Any] = {}
     agent_reasoning: str | None = None
+
+    @field_validator("context", mode="before")
+    @classmethod
+    def coerce_context_dict(cls, v: Any) -> dict[str, Any]:
+        """DB drivers may return JSON/JSONB as str; API expects a dict."""
+        if v is None:
+            return {}
+        if isinstance(v, dict):
+            return v
+        if isinstance(v, str):
+            s = v.strip()
+            if not s:
+                return {}
+            try:
+                parsed = json.loads(s)
+            except json.JSONDecodeError:
+                return {}
+            return parsed if isinstance(parsed, dict) else {}
+        return {}
+
     resolution_notes: str | None = None
     messages: list[EscalationMessage] = []
     created_at: datetime

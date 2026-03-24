@@ -98,8 +98,7 @@ class PineconeVectorStore:
         """Upsert vectors into a namespace (collection) in batches."""
         index = self._get_index()
         records = [
-            {"id": str(id_), "values": vec, "metadata": payload}
-            for id_, vec, payload in zip(ids, vectors, payloads)
+            {"id": str(id_), "values": vec, "metadata": payload} for id_, vec, payload in zip(ids, vectors, payloads)
         ]
 
         def _upsert_batch(batch: list[dict[str, Any]]) -> None:

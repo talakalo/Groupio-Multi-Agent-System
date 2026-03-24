@@ -16,7 +16,13 @@ from src.api.middleware.auth import hash_password, require_admin_only
 from src.databases.postgres import get_postgres_client
 from src.databases.redis_client import get_redis_client
 from src.databases.vector_store import get_vector_store
-from src.models.contractor import ContractorMembershipAdminUpdate
+from src.models.contractor import (
+    ContractorListResponse,
+    ContractorMembershipAdminUpdate,
+    Region,
+    VerificationStatus,
+)
+from src.models.offer import ServiceCategory
 from src.models.user import UserInDB
 from src.orchestration.graph import get_orchestrator
 from src.rag.pipeline import get_rag_pipeline
@@ -86,8 +92,10 @@ async def system_status() -> dict[str, Any]:
         metrics = await agent.get_metrics()
         agent_status[name] = {
             "model": agent.config.model,
-            "calls": metrics.get("calls", 0),
-            "errors": metrics.get("errors", 0),
+            "calls": int(metrics.get("calls", 0) or 0),
+            "errors": int(metrics.get("errors", 0) or 0),
+            "tokens": int(metrics.get("tokens", 0) or 0),
+            "avg_duration_ms": int(float(metrics.get("avg_duration_ms", 0) or metrics.get("avg_latency_ms", 0) or 0)),
         }
 
     vector_status = {}
@@ -188,7 +196,7 @@ async def get_analytics() -> dict[str, Any]:
         today_str = date.today().isoformat()
         completed_offers, _ = await db.get_all_offers_admin(page=1, page_size=1000, status="completed")
         gmv_today = sum(
-            float(o.get("price") or o.get("total_price") or 0)
+            float(o.get("base_price") or o.get("price") or o.get("total_price") or 0)
             for o in completed_offers
             if str(o.get("completed_at", "") or o.get("updated_at", "")).startswith(today_str)
         )
@@ -203,6 +211,35 @@ async def get_analytics() -> dict[str, Any]:
     except Exception:
         logger.debug("Could not fetch contractor count for analytics")
 
+    # --- Charts / breakdowns (PostgreSQL) ---
+    agg: dict[str, Any] = {}
+    try:
+        agg = await db.get_admin_analytics_aggregates(days=30)
+    except Exception:
+        logger.debug("Could not load admin analytics aggregates", exc_info=True)
+
+    agent_performance: list[dict[str, Any]] = []
+    try:
+        orch = get_orchestrator()
+        for aname, a in orch.agents.items():
+            m = await a.get_metrics()
+            calls = int(m.get("calls", 0) or 0)
+            errors = int(m.get("errors", 0) or 0)
+            accuracy = round(100.0 - (errors / calls * 100.0), 1) if calls > 0 else 100.0
+            avg_ms = int(float(m.get("avg_duration_ms", 0) or m.get("avg_latency_ms", 0) or 0))
+            throughput = round(calls / 1440.0, 2)
+            agent_performance.append(
+                {
+                    "agent": aname,
+                    "accuracy": accuracy,
+                    "responseTime": avg_ms,
+                    "throughput": throughput,
+                }
+            )
+        agent_performance.sort(key=lambda x: x["agent"])
+    except Exception:
+        logger.debug("Could not build agent performance for analytics", exc_info=True)
+
     return {
         "gmvToday": gmv_today,
         "gmvChange": 0,
@@ -212,6 +249,11 @@ async def get_analytics() -> dict[str, Any]:
         "openTicketsChange": 0,
         "resolvedToday": resolved_today,
         "totalContractors": total_contractors,
+        "categoryBreakdown": agg.get("category_breakdown") or {},
+        "regionalData": agg.get("regional_data") or {},
+        "dailyOffers": agg.get("daily_offers") or [],
+        "dailyRevenue": agg.get("daily_revenue") or [],
+        "agentPerformance": agent_performance,
     }
 
 
@@ -320,6 +362,38 @@ async def create_admin_user(
         }
     )
     return {"id": user.id, "email": user.email, "role": user.role}
+
+
+@router.get("/contractors", response_model=ContractorListResponse)
+async def list_contractors_admin(
+    category: ServiceCategory | None = None,
+    region: Region | None = None,
+    min_trust_score: float | None = Query(None, ge=0, le=100),
+    verification_status: VerificationStatus | None = None,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=100, ge=1, le=500),
+    admin: UserInDB = Depends(require_admin_only),
+) -> ContractorListResponse:
+    """List all contractors for admin (includes non–marketplace-visible rows)."""
+    logger.debug("list_contractors_admin by %s", admin.email)
+    db = get_postgres_client()
+    filters: dict[str, Any] = {"marketplace_visible_only": False}
+    if category:
+        filters["category"] = category.value
+    if region:
+        filters["region"] = region.value
+    if min_trust_score is not None:
+        filters["min_trust_score"] = min_trust_score
+    if verification_status:
+        filters["verification_status"] = verification_status.value
+    contractors, total = await db.list_contractors(filters=filters, page=page, page_size=page_size)
+    return ContractorListResponse(
+        items=contractors,
+        total=total,
+        page=page,
+        page_size=page_size,
+        has_more=(page * page_size) < total,
+    )
 
 
 # --------------- Offer management ---------------

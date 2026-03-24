@@ -179,23 +179,23 @@ export default function ContractorActiveOffersPage() {
   }, [statusFilter, categoryFilter, sortBy, accessToken, isAuthenticated, refreshAccessToken]);
 
   const statusOptions: { value: OfferStatus; label: string }[] = [
-    { value: 'all', label: t('filters.allStatuses') },
-    { value: 'pending', label: t('filters.pending') },
-    { value: 'accepted', label: t('filters.accepted') },
-    { value: 'in_progress', label: t('filters.inProgress') },
-    { value: 'completed', label: t('filters.completed') },
+    { value: 'all', label: t('active.filters.allStatuses') },
+    { value: 'pending', label: t('active.filters.pending') },
+    { value: 'accepted', label: t('active.filters.accepted') },
+    { value: 'in_progress', label: t('active.filters.inProgress') },
+    { value: 'completed', label: t('active.filters.completed') },
   ];
 
   const categoryOptions: { value: ServiceCategory | 'all'; label: string }[] = [
-    { value: 'all', label: t('filters.allCategories') },
-    { value: 'ac_installation', label: t('categories.ac_installation') },
-    { value: 'kitchen', label: t('categories.kitchen') },
-    { value: 'electrical', label: t('categories.electrical') },
-    { value: 'plumbing', label: t('categories.plumbing') },
-    { value: 'painting', label: t('categories.painting') },
-    { value: 'flooring', label: t('categories.flooring') },
-    { value: 'windows', label: t('categories.windows') },
-    { value: 'security', label: t('categories.security') },
+    { value: 'all', label: t('active.filters.allCategories') },
+    { value: 'ac_installation', label: t('active.categories.ac_installation') },
+    { value: 'kitchen', label: t('active.categories.kitchen') },
+    { value: 'electrical', label: t('active.categories.electrical') },
+    { value: 'plumbing', label: t('active.categories.plumbing') },
+    { value: 'painting', label: t('active.categories.painting') },
+    { value: 'flooring', label: t('active.categories.flooring') },
+    { value: 'windows', label: t('active.categories.windows') },
+    { value: 'security', label: t('active.categories.security') },
   ];
 
   return (
@@ -210,7 +210,7 @@ export default function ContractorActiveOffersPage() {
         <div className="flex flex-wrap gap-4">
           <div className="flex-1 min-w-[200px]">
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              {t('filters.status')}
+              {t('active.filters.status')}
             </label>
             <select
               value={statusFilter}
@@ -227,7 +227,7 @@ export default function ContractorActiveOffersPage() {
 
           <div className="flex-1 min-w-[200px]">
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              {t('filters.category')}
+              {t('active.filters.category')}
             </label>
             <select
               value={categoryFilter}
@@ -244,16 +244,16 @@ export default function ContractorActiveOffersPage() {
 
           <div className="flex-1 min-w-[200px]">
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              {t('filters.sortBy')}
+              {t('active.filters.sortBy')}
             </label>
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as 'date' | 'price' | 'participants')}
               className="w-full rounded-lg border-gray-300 shadow-sm focus:border-sky-500 focus:ring-sky-500"
             >
-              <option value="date">{t('filters.sortByDate')}</option>
-              <option value="price">{t('filters.sortByPrice')}</option>
-              <option value="participants">{t('filters.sortByParticipants')}</option>
+              <option value="date">{t('active.filters.sortByDate')}</option>
+              <option value="price">{t('active.filters.sortByPrice')}</option>
+              <option value="participants">{t('active.filters.sortByParticipants')}</option>
             </select>
           </div>
         </div>

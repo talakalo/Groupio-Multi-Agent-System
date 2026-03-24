@@ -35,7 +35,6 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/contractor/offers/active', labelKey: 'activeOffers', icon: ClipboardList },
   { href: '/contractor/offers/create', labelKey: 'createOffer', icon: PlusCircle },
   { href: '/contractor/projects', labelKey: 'projects', icon: FolderKanban },
-  { href: '/contractor/profile', labelKey: 'profile', icon: UserCircle },
 ];
 
 export default function ContractorLayout({ children }: { children: React.ReactNode }) {
@@ -91,6 +90,7 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
   };
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+  const profileActive = isActive('/contractor/profile');
 
   const sidebar = (
     <nav className="flex flex-col h-full">
@@ -136,22 +136,36 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
         </Link>
       </div>
 
-      {/* User section */}
+      {/* Business profile shortcut (not logout — use header menu for sign out) */}
       <div className="border-t border-gray-100 px-4 py-4">
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="flex items-center gap-3 w-full text-start text-sm text-gray-600 hover:text-gray-900 transition-colors"
-          aria-label={t('logout')}
+        <Link
+          href="/contractor/profile"
+          onClick={() => setSidebarOpen(false)}
+          className={cn(
+            'flex items-center gap-3 w-full text-start text-sm transition-colors rounded-xl px-2 py-2 -mx-2',
+            profileActive
+              ? 'bg-primary-50 text-primary-700 hover:bg-primary-50'
+              : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+          )}
+          aria-label={t('myBusiness')}
+          aria-current={profileActive ? 'page' : undefined}
         >
-          <div className="w-8 h-8 rounded-full bg-accent-100 flex items-center justify-center">
-            <UserCircle className="h-5 w-5 text-accent-600" />
+          <div
+            className={cn(
+              'w-8 h-8 rounded-full flex items-center justify-center',
+              profileActive ? 'bg-primary-100' : 'bg-accent-100'
+            )}
+          >
+            <Building2
+              className={cn('h-5 w-5', profileActive ? 'text-primary-600' : 'text-accent-600')}
+              aria-hidden
+            />
           </div>
           <div className="flex-1 min-w-0">
             <p className="font-medium text-gray-900 truncate">{t('myBusiness')}</p>
+            <p className="text-xs text-gray-500 truncate">{t('myBusinessHint')}</p>
           </div>
-          <LogOut className="h-4 w-4 text-gray-400" />
-        </button>
+        </Link>
       </div>
     </nav>
   );

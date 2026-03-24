@@ -76,6 +76,56 @@ class TestListEscalations:
         finally:
             app.dependency_overrides.clear()
 
+    def test_list_escalations_unknown_reason_coerced(self):
+        """Unknown DB reason values must not break EscalationResponse validation."""
+        user = _make_user(UserRole.ADMIN)
+        db = MagicMock()
+        db.list_escalations = AsyncMock(
+            return_value=([_make_escalation(reason="legacy_unknown_reason")], 1),
+        )
+
+        from src.api.main import app
+        from src.api.middleware.auth import get_current_user
+
+        app.dependency_overrides[get_current_user] = lambda: user
+        try:
+            with patch("src.api.routes.escalations.get_postgres_client", return_value=db):
+                client = TestClient(app, raise_server_exceptions=False)
+                resp = client.get("/api/v1/escalations/")
+            assert resp.status_code == 200
+            assert resp.json()["items"][0]["reason"] == "other"
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_list_escalations_context_json_string_ok(self):
+        """Drivers/seed may return context as a JSON string; response must still validate."""
+        user = _make_user(UserRole.ADMIN)
+        db = MagicMock()
+        db.list_escalations = AsyncMock(
+            return_value=(
+                [
+                    _make_escalation(
+                        context='{"seed": true}',
+                    )
+                ],
+                1,
+            )
+        )
+
+        from src.api.main import app
+        from src.api.middleware.auth import get_current_user
+
+        app.dependency_overrides[get_current_user] = lambda: user
+        try:
+            with patch("src.api.routes.escalations.get_postgres_client", return_value=db):
+                client = TestClient(app, raise_server_exceptions=False)
+                resp = client.get("/api/v1/escalations/")
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["items"][0]["context"] == {"seed": True}
+        finally:
+            app.dependency_overrides.clear()
+
     def test_list_escalations_resident_forbidden(self):
         user = _make_user(UserRole.RESIDENT)
         db = MagicMock()
@@ -512,7 +562,7 @@ class TestAssignEscalation:
                 client = TestClient(app, raise_server_exceptions=False)
                 resp = client.post(
                     "/api/v1/escalations/esc-1/assign",
-                    params={"admin_id": "admin-1"},
+                    json={"assigned_to": "admin-1"},
                 )
             assert resp.status_code == 200
         finally:
@@ -532,7 +582,7 @@ class TestAssignEscalation:
                 client = TestClient(app, raise_server_exceptions=False)
                 resp = client.post(
                     "/api/v1/escalations/missing/assign",
-                    params={"admin_id": "admin-1"},
+                    json={"assigned_to": "admin-1"},
                 )
             assert resp.status_code == 404
         finally:
@@ -553,7 +603,7 @@ class TestAssignEscalation:
                 client = TestClient(app, raise_server_exceptions=False)
                 resp = client.post(
                     "/api/v1/escalations/esc-1/assign",
-                    params={"admin_id": "nonexistent"},
+                    json={"assigned_to": "nonexistent"},
                 )
             assert resp.status_code == 400
         finally:

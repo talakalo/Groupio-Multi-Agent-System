@@ -6,12 +6,20 @@ Usage (from repo root, venv active, DATABASE_URL set):
 
     python scripts/seed_test_data.py
 
+    # Supabase: this script auto-switches to the HTTP API when DATABASE_URL is db.*.supabase.co
+    # and USE_LOCAL_POSTGRES=1 but SUPABASE_URL + SUPABASE_KEY are set. Otherwise use pooler URI
+    # or USE_LOCAL_POSTGRES=0 manually.
+
     # Custom password for all seeded *user* accounts (contractors use the same):
     SEED_TEST_PASSWORD='YourPass123!' python scripts/seed_test_data.py
 
 Docker (same DB as API):
 
     docker compose -f docker/docker-compose.yml run --rm api python scripts/seed_test_data.py
+
+For Supabase over HTTP use a **server** key in ``SUPABASE_KEY`` (or override via
+``SUPABASE_SERVICE_ROLE_KEY``): **secret** key ``sb_secret_…`` (new) or legacy **service_role** JWT
+``eyJ…``. Do **not** use ``sb_publishable_…`` (client-only) or anon JWT.
 
 Creates (skips users/contractors whose email already exists):
 - Staff users: 1 ``admin``, 1 ``buildings_manager``, then mostly ``resident`` accounts
@@ -27,6 +35,8 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import base64
+import json
 import os
 import random
 import sys
@@ -39,6 +49,84 @@ from typing import Any
 _ROOT = Path(__file__).resolve().parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
+
+
+def _jwt_role_unverified(token: str) -> str | None:
+    """Return ``role`` claim without verifying signature (local dev / preflight only)."""
+    try:
+        parts = token.split(".")
+        if len(parts) != 3:
+            return None
+        payload_b64 = parts[1]
+        pad = "=" * (-len(payload_b64) % 4)
+        raw = base64.urlsafe_b64decode(payload_b64 + pad)
+        payload = json.loads(raw.decode("utf-8"))
+        r = payload.get("role")
+        return str(r) if r is not None else None
+    except Exception:
+        return None
+
+
+def _pick_supabase_server_key(s: Any) -> str:
+    """First non-empty server key (secret JWT, sb_secret_, or legacy service_role)."""
+    for v in (
+        (getattr(s, "SUPABASE_SERVICE_ROLE_KEY", None) or "").strip(),
+        (getattr(s, "SUPABASE_SECRET_KEY", None) or "").strip(),
+        (getattr(s, "SERVICE_ROLE_KEY", None) or "").strip(),
+        (os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or "").strip(),
+        (os.environ.get("SUPABASE_SECRET_KEY") or "").strip(),
+        (os.environ.get("SERVICE_ROLE_KEY") or "").strip(),
+    ):
+        if v:
+            return v
+    return ""
+
+
+def _load_seed_dotenv() -> None:
+    """Merge repo ``.env`` then ``docker/.env`` (docker wins) into ``os.environ`` before Settings."""
+    try:
+        from dotenv import load_dotenv
+    except ImportError:
+        return
+    load_dotenv(_ROOT / ".env", override=False)
+    load_dotenv(_ROOT / "docker" / ".env", override=True)
+
+
+def _print_admin_db_alignment_hint() -> None:
+    """Explain why local Admin can look empty after a successful host-side seed."""
+    print(
+        "📌 Admin (e.g. localhost:3001) loads Offers/Users via the **API** (NEXT_PUBLIC_API_URL → /api/v1/admin/…),\n"
+        "   not from your browser’s Supabase URL. The API process must use the **same** Postgres / Supabase\n"
+        "   project as this seed (same DATABASE_URL / SUPABASE_* in the API’s env).\n"
+        "   If the UI is empty: align API env with docker/.env, **restart uvicorn**, or run seed in-container:\n"
+        "   docker compose -f docker/docker-compose.yml run --rm api python scripts/seed_test_data.py\n"
+    )
+
+
+def _server_key_diag(s: Any) -> str:
+    names = ("SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SECRET_KEY", "SERVICE_ROLE_KEY")
+    in_env = [n for n in names if (os.environ.get(n) or "").strip()]
+    in_s = [
+        n
+        for n, a in (
+            ("SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SERVICE_ROLE_KEY"),
+            ("SUPABASE_SECRET_KEY", "SUPABASE_SECRET_KEY"),
+            ("SERVICE_ROLE_KEY", "SERVICE_ROLE_KEY"),
+        )
+        if (getattr(s, a, None) or "").strip()
+    ]
+    if not in_env and not in_s:
+        return (
+            "None of SUPABASE_SERVICE_ROLE_KEY / SUPABASE_SECRET_KEY / SERVICE_ROLE_KEY are set "
+            "(non-empty) in the environment or merged .env files."
+        )
+    parts = []
+    if in_env:
+        parts.append("non-empty in process env: " + ", ".join(in_env))
+    if in_s:
+        parts.append("non-empty in Settings: " + ", ".join(in_s))
+    return "; ".join(parts) + ". If you use root .env + docker/.env, an empty line in docker/.env overrides."
+
 
 FIRST_NAMES = ["יוסי", "דני", "מיכל", "רחל", "אבי", "שרה", "דוד", "חנה", "משה", "לאה"]
 LAST_NAMES = ["כהן", "לוי", "מזרחי", "פרץ", "ביטון", "אברהם", "חדד", "גבאי", "דהן", "אזולאי"]
@@ -110,7 +198,8 @@ def generate_phone() -> str:
 
 
 def generate_seed_email(prefix: str) -> str:
-    return f"groupio.seed.{prefix}.{uuid.uuid4().hex[:10]}@test.local"
+    # Use example.com (RFC 2606) — @test.local / *.local fail Pydantic EmailStr validation.
+    return f"groupio.seed.{prefix}.{uuid.uuid4().hex[:10]}@example.com"
 
 
 def generate_address() -> dict[str, Any]:
@@ -358,7 +447,8 @@ class TestDataSeeder:
         hashed = hash_password(password)
         stats = {
             "users_created": 0,
-            "users_skipped": 0,
+            "users_skipped_duplicate": 0,
+            "users_failed": 0,
             "buildings": 0,
             "residents_linked": 0,
             "contractors": 0,
@@ -372,7 +462,7 @@ class TestDataSeeder:
             try:
                 existing = await db.get_user_by_email(u["email"])
                 if existing:
-                    stats["users_skipped"] += 1
+                    stats["users_skipped_duplicate"] += 1
                     continue
                 await db.create_user(
                     {
@@ -389,8 +479,24 @@ class TestDataSeeder:
                 )
                 stats["users_created"] += 1
             except Exception as exc:
-                print(f"  ⚠️  User skipped {u.get('email')}: {exc}")
-                stats["users_skipped"] += 1
+                print(f"  ⚠️  User insert failed {u.get('email')}: {exc}")
+                stats["users_failed"] += 1
+
+        # Planned UUIDs must match DB rows or building FKs break. Fail fast if inserts did not persist.
+        missing_emails: list[str] = []
+        for u in self.users:
+            row = await db.get_user_by_email(u["email"])
+            if row:
+                u["id"] = str(row.id)
+            else:
+                missing_emails.append(str(u["email"]))
+        if missing_emails:
+            raise RuntimeError(
+                f"{len(missing_emails)} planned user(s) not found in the database after the insert phase. "
+                "If you use Supabase HTTP mode, RLS often blocks inserts with the anon key — set "
+                "SUPABASE_KEY to the service_role secret (Dashboard → Project Settings → API) for "
+                f"this script only, then re-run. First missing email: {missing_emails[0]!r}"
+            )
 
         for b in self.buildings:
             try:
@@ -414,12 +520,12 @@ class TestDataSeeder:
                 )
                 stats["buildings"] += 1
                 bid = b["id"]
-                for uid in resident_ids:
+                for idx, uid in enumerate(resident_ids):
                     try:
                         await db.add_resident_to_building(
                             uid,
                             bid,
-                            unit_number=str(random.randint(1, 32)),
+                            unit_number=f"s{idx + 1:02d}-{uid.replace('-', '')[:8]}",
                             floor=random.randint(0, max(1, b.get("floors", 1) - 1)),
                             is_owner=random.choice([True, False]),
                         )
@@ -434,7 +540,12 @@ class TestDataSeeder:
             try:
                 existing = await db.get_user_by_email(spec["email"])
                 if existing:
-                    print(f"  ⚠️  Contractor email exists, skip: {spec['email']}")
+                    cid = existing.contractor_id
+                    if cid:
+                        spec_index_to_contractor_id[spec_i] = str(cid)
+                        print(f"  Reusing contractor id for existing user: {spec['email']}")
+                    else:
+                        print(f"  ⚠️  User exists without contractor row, skip: {spec['email']}")
                     continue
                 row = await db.create_contractor(spec, password)
                 spec_index_to_contractor_id[spec_i] = str(row["id"])
@@ -512,12 +623,15 @@ class TestDataSeeder:
             stats = await self._write_to_db(pwd)
             print(
                 "\n✅ DB write — "
-                f"users_created={stats['users_created']} users_skipped={stats['users_skipped']} "
+                f"users_created={stats['users_created']} "
+                f"users_skipped_duplicate={stats['users_skipped_duplicate']} "
+                f"users_failed={stats['users_failed']} "
                 f"buildings={stats['buildings']} residents_linked={stats['residents_linked']} "
                 f"contractors={stats['contractors']} offers={stats['offers']} "
                 f"escalations={stats['escalations']}"
             )
             print(f"\n🔑 Seed password for new user accounts (incl. contractor logins): {pwd!r}\n")
+            _print_admin_db_alignment_hint()
         else:
             print("\n(Dry run — no database write)\n")
 
@@ -529,6 +643,92 @@ class TestDataSeeder:
             "escalations": self.escalations,
             "stats": stats,
         }
+
+
+def _bootstrap_seed_environment() -> None:
+    """Prepare env before Settings/Postgres client: service_role key + HTTP API when db.* is IPv6-only."""
+    from urllib.parse import urlparse
+
+    from src.config.settings import get_settings
+    from src.databases.postgres import reset_postgres_client
+
+    _load_seed_dotenv()
+    get_settings.cache_clear()
+
+    mutated = False
+    s = get_settings()
+
+    du = (s.DATABASE_URL or "").strip()
+    if du.startswith("postgres://"):
+        du = du.replace("postgres://", "postgresql://", 1)
+    host = (urlparse(du).hostname or "").strip().lower()
+    force_local = (s.USE_LOCAL_POSTGRES or "").lower() in ("1", "true", "yes")
+    key = (os.environ.get("SUPABASE_KEY") or s.SUPABASE_KEY or "").strip()
+    has_supabase = bool((s.SUPABASE_URL or "").strip() and key)
+    if force_local and has_supabase and host.startswith("db.") and host.endswith(".supabase.co"):
+        print(
+            "\nNote: DATABASE_URL uses db.*.supabase.co with USE_LOCAL_POSTGRES=1 — "
+            "using Supabase HTTP API for this seed (direct Postgres is often unreachable via asyncpg here).\n"
+        )
+        os.environ["USE_LOCAL_POSTGRES"] = "0"
+        mutated = True
+
+    if mutated:
+        get_settings.cache_clear()
+        reset_postgres_client()
+
+    sf = get_settings()
+    server_key = _pick_supabase_server_key(sf)
+    if server_key:
+        os.environ["SUPABASE_KEY"] = server_key
+        print(
+            "\nNote: Using elevated Supabase server key as SUPABASE_KEY for this process "
+            "(from SUPABASE_SERVICE_ROLE_KEY / SUPABASE_SECRET_KEY / SERVICE_ROLE_KEY).\n"
+        )
+        get_settings.cache_clear()
+        reset_postgres_client()
+        sf = get_settings()
+
+    force_pg = (sf.USE_LOCAL_POSTGRES or "").lower() in ("1", "true", "yes")
+    url = (sf.SUPABASE_URL or "").strip()
+    eff_key = (os.environ.get("SUPABASE_KEY") or sf.SUPABASE_KEY or "").strip()
+    if url and not force_pg:
+        if not eff_key:
+            raise SystemExit(
+                "SUPABASE_URL is set but SUPABASE_KEY is empty. Add a server key:\n"
+                "  • Dashboard → Settings → API Keys → **secret** key (sb_secret_…), or\n"
+                "  • Legacy API Keys → **service_role** JWT (eyJ…)\n"
+                "Set SUPABASE_SERVICE_ROLE_KEY, SUPABASE_SECRET_KEY, or SERVICE_ROLE_KEY in docker/.env / .env."
+            )
+        if eff_key.startswith("sb_publishable_"):
+            retry = _pick_supabase_server_key(sf)
+            if retry and not retry.startswith("sb_publishable_"):
+                os.environ["SUPABASE_KEY"] = retry
+                get_settings.cache_clear()
+                reset_postgres_client()
+                eff_key = retry
+            else:
+                raise SystemExit(
+                    "SUPABASE_KEY is still a publishable (client) key — seeding cannot bypass RLS.\n"
+                    + _server_key_diag(sf)
+                    + "\n\nAdd a line to docker/.env (or .env), save the file, then re-run:\n"
+                    "  SUPABASE_SERVICE_ROLE_KEY=sb_secret_…   # from API Keys → Secret\n"
+                    "or  SUPABASE_SERVICE_ROLE_KEY=eyJ…         # Legacy → service_role\n"
+                    "Names also accepted: SUPABASE_SECRET_KEY, SERVICE_ROLE_KEY.\n"
+                    "Tip: remove or fill empty `SUPABASE_SERVICE_ROLE_KEY=` in docker/.env (it overrides root .env).\n"
+                    "Do not commit the secret; use only on your machine for this script."
+                )
+        if eff_key.startswith("sb_secret_"):
+            pass  # New-format server key; bypasses RLS like service_role JWT.
+        elif eff_key.startswith("eyJ"):
+            role = _jwt_role_unverified(eff_key)
+            if role != "service_role":
+                raise SystemExit(
+                    "Seeding needs a JWT with role **service_role** (legacy server key). "
+                    f"Current SUPABASE_KEY has role={role!r}. "
+                    "Dashboard → Settings → API → Legacy API Keys → **service_role**, "
+                    "or use the new **secret** key (sb_secret_…) in SUPABASE_KEY / SUPABASE_SERVICE_ROLE_KEY."
+                )
 
 
 def _parse_args() -> argparse.Namespace:
@@ -544,6 +744,7 @@ def _parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = _parse_args()
+    _bootstrap_seed_environment()
     from src.config.settings import get_settings
 
     get_settings()

@@ -71,6 +71,12 @@ const AGENT_DEFS = [
       "Manages contractor communications, onboarding, and engagement campaigns.",
   },
   {
+    key: "influencer",
+    name: "Influencer Agent",
+    description:
+      "Coordinates influencer partnerships and campaign attribution.",
+  },
+  {
     key: "analytics",
     name: "Analytics Agent",
     description:
@@ -193,6 +199,7 @@ export default function AgentsPage() {
       const sysAgent = systemStatus?.agents?.[def.key];
       const calls = sysAgent?.calls ?? 0;
       const errors = sysAgent?.errors ?? 0;
+      const avgResponseMs = sysAgent?.avgDurationMs ?? 0;
       const errorRate = calls > 0 ? (errors / calls) * 100 : 0;
       const status: AgentStatus =
         !agentToggles[def.key]
@@ -207,9 +214,9 @@ export default function AgentsPage() {
         errors,
         errorRate,
         status,
-        avgResponseMs: 0,
+        avgResponseMs,
         requestsPerMin: +(calls / 1440).toFixed(1) || 0,
-        trendData: [calls],
+        trendData: calls > 0 ? [calls] : [0],
       };
     });
   }, [systemStatus, agentToggles]);
@@ -240,11 +247,12 @@ export default function AgentsPage() {
       const calls = sysAgent?.calls ?? 0;
       const errors = sysAgent?.errors ?? 0;
       const errorRate = calls > 0 ? +((errors / calls) * 100).toFixed(2) : 0;
+      const avgMs = sysAgent?.avgDurationMs ?? 0;
       return {
         agentKey: def.key,
         label: def.name,
         color: CHART_COLORS[idx % CHART_COLORS.length],
-        data: [{ timestamp: now, calls, avgLatencyMs: 0, errorRate }],
+        data: [{ timestamp: now, calls, avgLatencyMs: avgMs, errorRate }],
       };
     });
   }, [selectedAgent, agentDetail, systemStatus]);
@@ -308,6 +316,7 @@ export default function AgentsPage() {
               requestsPerMin={agent.requestsPerMin}
               errorRate={agent.errorRate}
               trendData={agent.trendData}
+              totalCalls={agent.calls}
               enabled={agentToggles[agent.key]}
               onReload={handleReload}
               onConfigure={() => handleToggle(agent.key)}

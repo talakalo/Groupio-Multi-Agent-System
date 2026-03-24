@@ -3,12 +3,16 @@
 import logging
 import secrets
 from functools import lru_cache
+from pathlib import Path
 from urllib.parse import quote
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings
 
 logger = logging.getLogger(__name__)
+
+# Resolve .env from repo root so CLI scripts work regardless of cwd.
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
 _INSECURE_JWT_DEFAULTS = frozenset(
     {
@@ -47,6 +51,12 @@ class Settings(BaseSettings):
     # Supabase / PostgreSQL
     SUPABASE_URL: str = ""
     SUPABASE_KEY: str = ""
+    # Server-only (seed scripts). Never expose to browsers. If set, seed_test_data uses it as SUPABASE_KEY.
+    SUPABASE_SERVICE_ROLE_KEY: str = ""
+    # Alternate env name some teams use; seed_test_data also reads os.environ["SERVICE_ROLE_KEY"].
+    SERVICE_ROLE_KEY: str = ""
+    # Some templates use this for the sb_secret_… / legacy server key.
+    SUPABASE_SECRET_KEY: str = ""
     # Local PostgreSQL (used when SUPABASE_URL is empty or USE_LOCAL_POSTGRES=1)
     DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/groupio"
     # Set to "1" or "true" to force local PostgreSQL (useful when Supabase has connection issues)
@@ -57,6 +67,9 @@ class Settings(BaseSettings):
     DOCKER_POSTGRES_USER: str = ""
     DOCKER_POSTGRES_PASSWORD: str = ""
     DOCKER_POSTGRES_DB: str = ""
+    # Set to "1"/"true" to force asyncpg IPv4 + TLS SNI (see postgres._asyncpg_should_prefer_ipv4).
+    # Supabase hosts (*.supabase.co, *pooler.supabase.com) already prefer IPv4 by default.
+    DATABASE_PREFER_IPV4: str = ""
 
     # Redis
     # In production, set REDIS_URL to include credentials, e.g.:
@@ -214,7 +227,10 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
 
     model_config = {
-        "env_file": [".env", "docker/.env"],
+        "env_file": [
+            str(_REPO_ROOT / ".env"),
+            str(_REPO_ROOT / "docker" / ".env"),
+        ],
         "env_file_encoding": "utf-8",
         "extra": "ignore",
     }
@@ -267,6 +283,19 @@ class Settings(BaseSettings):
                 "Unverified users can log in. Enable it to protect the platform.",
                 self.ENVIRONMENT,
             )
+
+        # --- Outbound email (staging/production): required when verification is enforced ---
+        if is_prod and self.ENFORCE_EMAIL_VERIFICATION:
+            has_resend = bool((self.RESEND_API_KEY or "").strip())
+            has_smtp = bool(
+                (self.SMTP_HOST or "").strip() and (self.SMTP_USER or "").strip() and (self.SMTP_PASSWORD or "").strip()
+            )
+            if not has_resend and not has_smtp:
+                raise ValueError(
+                    f"ENFORCE_EMAIL_VERIFICATION is True in {self.ENVIRONMENT} but no email transport is configured. "
+                    "Set RESEND_API_KEY (recommended) or SMTP_HOST + SMTP_USER + SMTP_PASSWORD. "
+                    "Verification and password-reset emails will not be delivered otherwise."
+                )
 
         # --- Payments: publishable environments (staging + production) ---
         if self.ENVIRONMENT in ("production", "staging"):

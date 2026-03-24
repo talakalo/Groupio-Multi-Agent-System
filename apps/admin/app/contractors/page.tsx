@@ -251,7 +251,13 @@ export default function ContractorsPage() {
     useState<ContractorListItem | null>(null);
 
   const queryClient = useQueryClient();
-  const { data: contractors = [], isLoading } = useContractors();
+  const {
+    data: contractors = [],
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useContractors();
   const [actionLoading, setActionLoading] = useState(false);
 
   // ---- API helpers ----
@@ -677,7 +683,37 @@ export default function ContractorsPage() {
                 </td>
               </tr>
             )}
-            {!isLoading && sorted.length === 0 && (
+            {isError && (
+              <tr>
+                <td colSpan={8} className="table-cell text-center py-10">
+                  <div className="flex flex-col items-center gap-2 text-danger-600">
+                    <span className="text-sm font-medium">
+                      Failed to load contractors
+                    </span>
+                    <span className="text-xs text-surface-500 max-w-md text-center">
+                      {error instanceof Error ? error.message : "Check that you are logged in and NEXT_PUBLIC_API_URL points to the API (e.g. http://localhost:8000)."}
+                    </span>
+                    <button
+                      type="button"
+                      className="btn-secondary btn-sm mt-1"
+                      onClick={() => refetch()}
+                    >
+                      Retry
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            )}
+            {!isLoading && !isError && contractors.length === 0 && (
+              <tr>
+                <td colSpan={8} className="table-cell text-center py-10">
+                  <span className="text-surface-400">
+                    No contractors in the database yet
+                  </span>
+                </td>
+              </tr>
+            )}
+            {!isLoading && !isError && contractors.length > 0 && sorted.length === 0 && (
               <tr>
                 <td colSpan={8} className="table-cell text-center py-10">
                   <span className="text-surface-400">

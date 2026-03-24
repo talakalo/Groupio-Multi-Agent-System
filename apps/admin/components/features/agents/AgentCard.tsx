@@ -38,6 +38,8 @@ export interface AgentCardProps {
   errorRate: number;
   /** Last 12 data points for the mini trend chart */
   trendData?: number[];
+  /** Total calls since process start (from /admin/status) */
+  totalCalls?: number;
   /** Whether the agent is currently enabled */
   enabled?: boolean;
   /** Called when the reload/restart button is clicked */
@@ -131,6 +133,7 @@ export function AgentCard({
   requestsPerMin,
   errorRate,
   trendData = [],
+  totalCalls,
   enabled = true,
   onReload,
   onConfigure,
@@ -158,6 +161,11 @@ export function AgentCard({
             <span className="text-xs text-surface-400 capitalize">
               {agentKey} agent
             </span>
+            {totalCalls != null && (
+              <span className="text-[11px] text-surface-500 mt-0.5 block">
+                {totalCalls.toLocaleString()} calls
+              </span>
+            )}
           </div>
         </div>
 
