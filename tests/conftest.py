@@ -7,6 +7,28 @@ import pytest
 from src.models.agent_state import AgentState
 
 
+def pytest_configure(config):  # noqa: ARG001
+    """Trim noisy warnings from deps / integration stubs (keep failures visible)."""
+    import warnings
+
+    warnings.filterwarnings(
+        "ignore",
+        message="Api key is used with an insecure connection",
+        category=UserWarning,
+    )
+    try:
+        from jwt import InsecureKeyLengthWarning
+
+        warnings.filterwarnings("ignore", category=InsecureKeyLengthWarning)
+    except ImportError:
+        pass
+    warnings.filterwarnings(
+        "ignore",
+        message="coroutine 'InterceptedUnaryUnaryCall._invoke' was never awaited",
+        category=RuntimeWarning,
+    )
+
+
 @pytest.fixture(autouse=True)
 def _disable_llm_cache():
     """Disable the LLM response cache for all tests.

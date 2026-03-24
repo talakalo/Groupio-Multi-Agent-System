@@ -147,9 +147,7 @@ export default function LoginScreen() {
               mode="text"
               compact
               style={styles.forgotLink}
-              onPress={() => {
-                /* TODO: forgot password flow */
-              }}
+              onPress={() => router.push("/(auth)/forgot-password" as never)}
             >
               {i18n.t("auth.forgotPassword")}
             </Button>

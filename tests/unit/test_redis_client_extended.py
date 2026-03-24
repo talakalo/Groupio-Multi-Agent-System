@@ -283,6 +283,8 @@ async def test_health_check_failure(client):
 @pytest.mark.asyncio
 async def test_close(client):
     c, conn = client
+    conn.aclose = AsyncMock()
     conn.close = AsyncMock()
     await c.close()
-    conn.close.assert_awaited_once()
+    conn.aclose.assert_awaited_once()
+    conn.close.assert_not_awaited()

@@ -37,6 +37,7 @@
     "aiAssistant": "AI Assistant",
     "myAccount": "My Account",
     "myAccountHint": "Profile, notifications & preferences",
+    "accountMenu": "Account menu",
     "logout": "Log out"
   },
   "contractorNav": {
@@ -44,12 +45,30 @@
     "activeOffers": "Active Offers",
     "createOffer": "Create Offer",
     "projects": "Projects",
+    "earnings": "Earnings",
     "profile": "Profile",
     "contractorBadge": "Contractor",
     "newOffer": "New Offer",
     "myBusiness": "My Business",
     "myBusinessHint": "Details, documents & settings",
+    "accountMenu": "Account menu",
     "logout": "Log out"
+  },
+  "contractorEarnings": {
+    "title": "Earnings & payouts",
+    "subtitle": "Invoice totals from offers matched to you",
+    "pending": "Pending",
+    "completed": "Completed",
+    "heldEscrow": "Held in escrow",
+    "recent": "Recent invoices",
+    "empty": "No invoice data yet. When residents pay on matched offers, it will appear here.",
+    "loadError": "Could not load earnings. Try again.",
+    "retry": "Retry",
+    "offer": "Offer",
+    "status": "Status",
+    "type": "Type",
+    "amount": "Amount",
+    "paidAt": "Paid"
   },
   "dashboard": {
     "welcome": "Hello, {name}!",
@@ -180,7 +199,9 @@
     "deleteAccountWarning": "Deleting your account is irreversible",
     "deleteAccount": "Delete Account",
     "logout": "Log Out",
-    "saved": "Saved successfully"
+    "saved": "Saved successfully",
+    "notificationsUnsaved": "You have unsaved notification changes. Tap Save to apply.",
+    "saveFailed": "Could not save. Please try again."
   },
   "building": {
     "title": "Building",
@@ -429,6 +450,11 @@
       },
       "settings": {
         "notifications": "Notifications",
+        "notificationsHint": "Choose how we may contact you about new leads and offers.",
+        "notificationsSave": "Save notification preferences",
+        "notificationsSaving": "Saving…",
+        "notificationsSaved": "Preferences saved.",
+        "notificationsSaveError": "Could not save preferences. Try again.",
         "emailOffers": "Email offers",
         "smsOffers": "SMS offers",
         "whatsappOffers": "WhatsApp offers",
@@ -502,6 +528,9 @@
       "completedAt": "Completed",
       "viewDetails": "View Details",
       "requestReview": "Request Review",
+      "requestReviewLoading": "Sending…",
+      "requestReviewSuccess": "Review request sent. Our team will follow up.",
+      "requestReviewError": "Could not send request. Try again.",
       "statuses": {
         "draft": "Draft",
         "pending": "Pending",
@@ -599,9 +628,10 @@
         "title": "Buildings manager",
         "description": "Open the buildings manager console for buildings, residents, and escalations."
       },
-      "systemSettingsCard": {
-        "title": "System settings",
-        "description": "Platform configuration (coming soon)."
+      "standaloneAdminCard": {
+        "title": "Operations admin (separate app)",
+        "description": "Super-admin console runs on its own URL. Open it in a new tab when your team has deployed the admin app.",
+        "cta": "Open admin app"
       }
     },
     "account": {

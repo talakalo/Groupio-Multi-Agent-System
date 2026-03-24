@@ -81,6 +81,13 @@ export async function clearAuthSession(): Promise<void> {
 /**
  * Login with email/phone + password. Persists tokens to SecureStore.
  */
+/** Request password reset email (unauthenticated). */
+export async function requestPasswordReset(email: string): Promise<void> {
+  await request<{ status: string }>("POST", "/auth/password/reset", {
+    body: { email: email.trim().toLowerCase() },
+  });
+}
+
 export async function login(credentials: {
   email?: string;
   phone?: string;
@@ -250,8 +257,18 @@ async function request<T>(
       // ignore parse failures on error bodies
     }
 
+    const detail = errorBody.detail;
+    const detailStr =
+      typeof detail === "string"
+        ? detail
+        : Array.isArray(detail)
+          ? detail
+              .map((e: { msg?: string }) => e?.msg)
+              .filter(Boolean)
+              .join(", ")
+          : undefined;
     throw new ApiError(
-      (errorBody.message as string) ?? response.statusText,
+      detailStr ?? (errorBody.message as string) ?? response.statusText,
       response.status,
       (errorBody.code as string) ?? "UNKNOWN_ERROR",
       errorBody,

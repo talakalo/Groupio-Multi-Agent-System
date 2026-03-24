@@ -70,11 +70,8 @@ describe('ResidentLayout — logout navigation', () => {
   it('calls router.push("/login") after clicking the logout button', async () => {
     render(<ResidentLayout><div>page</div></ResidentLayout>);
 
-    // The layout renders two sidebars (mobile + desktop), so the logout button
-    // appears twice. Click the first occurrence.
-    const logoutBtns = screen.getAllByRole('button', { name: /myAccount/i });
-    expect(logoutBtns.length).toBeGreaterThanOrEqual(1);
-    fireEvent.click(logoutBtns[0]);
+    fireEvent.click(screen.getByRole('button', { name: /accountMenu/i }));
+    fireEvent.click(screen.getByRole('button', { name: /logout/i }));
 
     await waitFor(() => {
       expect(mockLogout).toHaveBeenCalled();

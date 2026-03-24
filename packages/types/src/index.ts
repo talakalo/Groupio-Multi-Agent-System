@@ -2,7 +2,10 @@
 
 export interface Resident {
   id: string;
+  /** UI / legacy camelCase */
   name: string;
+  /** API field (`full_name`); map to `name` when building UI models */
+  full_name?: string;
   email: string;
   phone: string;
   buildingId: string;
@@ -14,6 +17,9 @@ export interface Building {
   address: string;
   city: string;
   region: Region;
+  /** Preferred API / analytics field */
+  total_units?: number;
+  /** Legacy / UI alias; prefer `total_units` when present */
   units: number;
   age: number;
   type: BuildingType;
@@ -51,6 +57,8 @@ export interface Offer {
   tiers: PricingTier[];
   createdAt: string;
   expiresAt: string;
+  /** Agent-generated explanation; API may expose as snake_case `pricing_rationale` */
+  pricingRationale?: string;
 }
 
 export interface PricingTier {
@@ -65,8 +73,13 @@ export interface Review {
   id: string;
   contractorId: string;
   residentId: string;
+  /** Maps API `user_id` when building from contractor_reviews */
+  offerId?: string;
   rating: number;
+  /** Preferred UI field */
   text: string;
+  /** API / DB column name for the same value */
+  comment?: string;
   verified: boolean;
   createdAt: string;
 }
@@ -318,6 +331,8 @@ export interface Payment {
   paymentMethod?: string;
   createdAt: string;
   updatedAt?: string;
+  /** API snake_case: provider — mock | stripe | … (initiate responses include this) */
+  provider?: string;
 }
 
 export interface Invoice {

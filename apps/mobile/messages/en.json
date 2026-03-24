@@ -123,7 +123,13 @@
     "resendSuccess": "Verification email resent successfully",
     "resendFailed": "Failed to resend. Try again.",
     "resendVerification": "Resend verification link",
-    "continueToLogin": "Continue to login"
+    "continueToLogin": "Continue to login",
+    "forgotPasswordTitle": "Reset password",
+    "forgotPasswordHint": "Enter your email and we will send a reset link if an account exists.",
+    "forgotPasswordSubmit": "Send reset link",
+    "forgotPasswordSuccess": "If an account exists for this email, you will receive reset instructions shortly.",
+    "forgotPasswordError": "Could not send reset email. Try again.",
+    "forgotPasswordBack": "Back to sign in"
   },
   "contractor": {
     "quickActions": "Quick Actions",

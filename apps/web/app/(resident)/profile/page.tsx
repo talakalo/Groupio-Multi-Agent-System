@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
@@ -36,7 +36,7 @@ interface ResidentProfile extends Resident {
   fullName?: string;
   language: 'he' | 'en';
   preferredLanguage?: string;
-  notifications: NotificationPreferences;
+  notification_settings?: Record<string, boolean>;
 }
 
 interface NotificationPreferences {
@@ -49,6 +49,28 @@ interface NotificationPreferences {
   pushEnabled: boolean;
   emailEnabled: boolean;
   whatsappEnabled: boolean;
+}
+
+const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
+  newOffers: true,
+  offerUpdates: true,
+  neighborJoined: true,
+  tierReached: true,
+  contractorMessages: true,
+  weeklyDigest: false,
+  pushEnabled: true,
+  emailEnabled: true,
+  whatsappEnabled: false,
+};
+
+function mergeNotificationPreferences(raw: unknown): NotificationPreferences {
+  const base = { ...DEFAULT_NOTIFICATION_PREFERENCES };
+  if (!raw || typeof raw !== 'object') return base;
+  for (const key of Object.keys(base) as (keyof NotificationPreferences)[]) {
+    const v = (raw as Record<string, unknown>)[key];
+    if (typeof v === 'boolean') base[key] = v;
+  }
+  return base;
 }
 
 // ---------------------------------------------------------------------------
@@ -238,6 +260,10 @@ export default function ResidentProfilePage() {
         avatarUrl: data.avatar_url ?? data.avatarUrl ?? '',
         buildingName: data.building_name ?? data.buildingName ?? '',
         apartmentNumber: data.apartment_number ?? data.apartmentNumber ?? '',
+        notification_settings:
+          data.notification_settings && typeof data.notification_settings === 'object'
+            ? (data.notification_settings as Record<string, boolean>)
+            : undefined,
       } as ResidentProfile;
     },
     enabled: !!accessToken,
@@ -251,18 +277,13 @@ export default function ResidentProfilePage() {
     ...formData,
   };
 
-  const [notifications, setNotifications] = useState<NotificationPreferences>({
-    newOffers: true,
-    offerUpdates: true,
-    neighborJoined: true,
-    tierReached: true,
-    contractorMessages: true,
-    weeklyDigest: false,
-    pushEnabled: true,
-    emailEnabled: true,
-    whatsappEnabled: false,
-    ...profileQuery.data?.notifications,
-  });
+  const [notifications, setNotifications] = useState<NotificationPreferences>(DEFAULT_NOTIFICATION_PREFERENCES);
+  const [notificationsDirty, setNotificationsDirty] = useState(false);
+
+  useEffect(() => {
+    if (!profileQuery.data?.id || notificationsDirty) return;
+    setNotifications(mergeNotificationPreferences(profileQuery.data.notification_settings));
+  }, [profileQuery.data?.id, profileQuery.data?.notification_settings, notificationsDirty]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -270,20 +291,26 @@ export default function ResidentProfilePage() {
       if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
       const userId = profileQuery.data?.id;
       if (!userId) throw new Error('No user ID');
+      const payload: Record<string, unknown> = {};
+      const fullName = formData.fullName ?? formData.name;
+      if (fullName !== undefined && fullName !== '') payload.full_name = fullName;
+      if (formData.phone !== undefined && formData.phone !== '') payload.phone = formData.phone;
+      const plang = formData.preferredLanguage ?? formData.language;
+      if (plang !== undefined && plang !== '') payload.preferred_language = plang;
+      const avatarUrl = formData.avatarUrl ?? formData.avatar;
+      if (avatarUrl !== undefined && avatarUrl !== '') payload.avatar_url = avatarUrl;
+      if (notificationsDirty) payload.notification_settings = notifications;
+      if (Object.keys(payload).length === 0) throw new Error('Nothing to save');
       const res = await fetch(`${apiBase}/api/v1/auth/me`, {
         method: 'PUT',
         headers,
-        body: JSON.stringify({
-          full_name: formData.fullName ?? formData.name,
-          phone: formData.phone,
-          preferred_language: formData.preferredLanguage ?? formData.language,
-          avatar_url: formData.avatarUrl ?? formData.avatar,
-        }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error('Failed to save profile');
       return res.json();
     },
     onSuccess: async (data: { preferred_language?: string }) => {
+      setNotificationsDirty(false);
       queryClient.invalidateQueries({ queryKey: ['resident', 'profile'] });
       const lang = data?.preferred_language;
       if (lang) {
@@ -449,6 +476,11 @@ export default function ResidentProfilePage() {
       {/* Notifications tab */}
       {activeTab === 'notifications' && (
         <div className="card">
+          {notificationsDirty && (
+            <p className="mb-3 text-xs font-medium text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2" role="status">
+              {t('notificationsUnsaved')}
+            </p>
+          )}
           <h3 className="text-sm font-bold text-gray-900 mb-1">{t('offerNotifications')}</h3>
           <p className="text-xs text-gray-500 mb-3">{t('offerNotificationsDescription')}</p>
           <div className="divide-y divide-gray-50">
@@ -456,31 +488,46 @@ export default function ResidentProfilePage() {
               label={t('newOffers')}
               description={t('newOffersDescription')}
               checked={notifications.newOffers}
-              onChange={(v) => setNotifications((prev) => ({ ...prev, newOffers: v }))}
+              onChange={(v) => {
+                setNotifications((prev) => ({ ...prev, newOffers: v }));
+                setNotificationsDirty(true);
+              }}
             />
             <NotificationToggle
               label={t('offerUpdates')}
               description={t('offerUpdatesDescription')}
               checked={notifications.offerUpdates}
-              onChange={(v) => setNotifications((prev) => ({ ...prev, offerUpdates: v }))}
+              onChange={(v) => {
+                setNotifications((prev) => ({ ...prev, offerUpdates: v }));
+                setNotificationsDirty(true);
+              }}
             />
             <NotificationToggle
               label={t('neighborJoined')}
               description={t('neighborJoinedDescription')}
               checked={notifications.neighborJoined}
-              onChange={(v) => setNotifications((prev) => ({ ...prev, neighborJoined: v }))}
+              onChange={(v) => {
+                setNotifications((prev) => ({ ...prev, neighborJoined: v }));
+                setNotificationsDirty(true);
+              }}
             />
             <NotificationToggle
               label={t('tierReached')}
               description={t('tierReachedDescription')}
               checked={notifications.tierReached}
-              onChange={(v) => setNotifications((prev) => ({ ...prev, tierReached: v }))}
+              onChange={(v) => {
+                setNotifications((prev) => ({ ...prev, tierReached: v }));
+                setNotificationsDirty(true);
+              }}
             />
             <NotificationToggle
               label={t('contractorMessages')}
               description={t('contractorMessagesDescription')}
               checked={notifications.contractorMessages}
-              onChange={(v) => setNotifications((prev) => ({ ...prev, contractorMessages: v }))}
+              onChange={(v) => {
+                setNotifications((prev) => ({ ...prev, contractorMessages: v }));
+                setNotificationsDirty(true);
+              }}
             />
           </div>
 
@@ -492,19 +539,28 @@ export default function ResidentProfilePage() {
                 label={t('pushNotifications')}
                 description={t('pushNotificationsDescription')}
                 checked={notifications.pushEnabled}
-                onChange={(v) => setNotifications((prev) => ({ ...prev, pushEnabled: v }))}
+                onChange={(v) => {
+                  setNotifications((prev) => ({ ...prev, pushEnabled: v }));
+                  setNotificationsDirty(true);
+                }}
               />
               <NotificationToggle
                 label={t('emailNotifications')}
                 description={t('emailNotificationsDescription')}
                 checked={notifications.emailEnabled}
-                onChange={(v) => setNotifications((prev) => ({ ...prev, emailEnabled: v }))}
+                onChange={(v) => {
+                  setNotifications((prev) => ({ ...prev, emailEnabled: v }));
+                  setNotificationsDirty(true);
+                }}
               />
               <NotificationToggle
                 label={t('whatsappNotifications')}
                 description={t('whatsappNotificationsDescription')}
                 checked={notifications.whatsappEnabled}
-                onChange={(v) => setNotifications((prev) => ({ ...prev, whatsappEnabled: v }))}
+                onChange={(v) => {
+                  setNotifications((prev) => ({ ...prev, whatsappEnabled: v }));
+                  setNotificationsDirty(true);
+                }}
               />
             </div>
           </div>
@@ -514,7 +570,10 @@ export default function ResidentProfilePage() {
               label={t('weeklyDigest')}
               description={t('weeklyDigestDescription')}
               checked={notifications.weeklyDigest}
-              onChange={(v) => setNotifications((prev) => ({ ...prev, weeklyDigest: v }))}
+              onChange={(v) => {
+                setNotifications((prev) => ({ ...prev, weeklyDigest: v }));
+                setNotificationsDirty(true);
+              }}
             />
           </div>
         </div>
@@ -658,11 +717,19 @@ export default function ResidentProfilePage() {
       )}
 
       {/* Save button (fixed at bottom) */}
-      <div className="sticky bottom-4">
+      <div className="sticky bottom-4 space-y-2">
+        {saveMutation.isError && (
+          <p className="text-center text-sm text-red-600" role="alert">
+            {t('saveFailed')}
+          </p>
+        )}
         <button
           type="button"
           onClick={() => saveMutation.mutate()}
-          disabled={saveMutation.isPending}
+          disabled={
+            saveMutation.isPending ||
+            (!notificationsDirty && Object.keys(formData).length === 0)
+          }
           className="btn-primary w-full flex items-center justify-center gap-2 shadow-lg"
         >
           {saveMutation.isPending ? (

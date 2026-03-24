@@ -74,11 +74,8 @@ describe('ContractorLayout — logout navigation', () => {
   it('calls router.push("/login") after clicking the logout button', async () => {
     render(<ContractorLayout><div>page</div></ContractorLayout>);
 
-    // The layout renders two sidebars (mobile + desktop) so the logout button
-    // (aria-label translated as "logout") appears twice — click the first one.
-    const logoutBtns = screen.getAllByRole('button', { name: /logout/i });
-    expect(logoutBtns.length).toBeGreaterThanOrEqual(1);
-    fireEvent.click(logoutBtns[0]);
+    fireEvent.click(screen.getByRole('button', { name: /accountMenu/i }));
+    fireEvent.click(screen.getByRole('button', { name: /logout/i }));
 
     await waitFor(() => {
       expect(mockLogout).toHaveBeenCalled();

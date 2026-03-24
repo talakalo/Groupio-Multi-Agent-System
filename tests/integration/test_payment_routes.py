@@ -264,8 +264,7 @@ class TestPaymentWebhook:
     def test_webhook_payment_succeeded(self, unauth_client, mock_db, mock_payment_record):
         """Webhook with payment.succeeded updates payment status."""
         mock_db.get_payment_by_transaction = AsyncMock(return_value=mock_payment_record)
-        mock_db.update_payment = AsyncMock()
-        mock_db.update_invoice = AsyncMock()
+        mock_db.update_payment_and_invoice_for_webhook = AsyncMock()
 
         response = unauth_client.post(
             "/api/v1/payments/webhook",
@@ -280,7 +279,12 @@ class TestPaymentWebhook:
         data = response.json()
         assert data["status"] == "processed"
         assert data["new_status"] == "succeeded"
-        mock_db.update_payment.assert_awaited_once()
+        mock_db.update_payment_and_invoice_for_webhook.assert_awaited_once_with(
+            "pay-001",
+            "inv-001",
+            "succeeded",
+            "paid",
+        )
 
     def test_webhook_missing_fields(self, unauth_client, mock_db):
         """Webhook without transaction_id or event_type returns 400."""

@@ -26,7 +26,7 @@ _SAFE_COLUMN_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 _USER_COLS = (
     "id, email, full_name, phone, role, preferred_language, "
     "is_active, is_verified, avatar_url, building_id, contractor_id, "
-    "last_login, created_at, updated_at"
+    "last_login, notification_settings, created_at, updated_at"
 )
 
 logger = logging.getLogger(__name__)
@@ -216,6 +216,27 @@ def _compute_avg_resolution_hours(rows: list[dict]) -> float:
     return (total_seconds / count / 3600) if count else 0.0
 
 
+def _coerce_notification_settings(raw: Any) -> dict[str, bool] | None:
+    """Normalize JSONB notification_settings to dict[str, bool]."""
+    if raw is None:
+        return None
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except json.JSONDecodeError:
+            return None
+    if not isinstance(raw, dict):
+        return None
+    out: dict[str, bool] = {}
+    for k, v in raw.items():
+        key = str(k)
+        if isinstance(v, bool):
+            out[key] = v
+        elif isinstance(v, (int, float)) and v in (0, 1):
+            out[key] = bool(v)
+    return out or None
+
+
 def _row_to_user(row: dict) -> dict:
     """Convert DB row to user dict (exclude hashed_password)."""
     return {
@@ -231,6 +252,7 @@ def _row_to_user(row: dict) -> dict:
         "building_id": row.get("building_id"),
         "contractor_id": row.get("contractor_id"),
         "last_login": row.get("last_login"),
+        "notification_settings": _coerce_notification_settings(row.get("notification_settings")),
         "created_at": row.get("created_at") or datetime.now(UTC),
         "updated_at": row.get("updated_at") or datetime.now(UTC),
     }
@@ -505,6 +527,7 @@ class PostgresClient:
             "last_login",
             "role",
             "onboarded_at",
+            "notification_settings",
         }
         filtered = {k: v for k, v in update_data.items() if k in allowed}
         if not filtered:
@@ -2859,6 +2882,36 @@ class PostgresClient:
             or []
         )
 
+    async def list_invoices_for_contractor(self, contractor_id: str) -> list[dict[str, Any]]:
+        """Invoices for offers matched to this contractor or explicitly tagged on the invoice."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            by_id: dict[str, dict[str, Any]] = {}
+            inv_c = await client.table("invoices").select("*").eq("contractor_id", contractor_id).execute()
+            for row in inv_c.data or []:
+                by_id[row["id"]] = row
+            offers_r = await client.table("offers").select("id").eq("matched_contractor_id", contractor_id).execute()
+            offer_ids = [r["id"] for r in (offers_r.data or [])]
+            if offer_ids:
+                inv_o = await client.table("invoices").select("*").in_("offer_id", offer_ids).execute()
+                for row in inv_o.data or []:
+                    by_id[row["id"]] = row
+            merged = sorted(
+                by_id.values(),
+                key=lambda x: str(x.get("created_at") or ""),
+                reverse=True,
+            )
+            return merged[:200]
+        rows = await self._pg_fetch_all(
+            """SELECT i.* FROM invoices i
+               LEFT JOIN offers o ON o.id = i.offer_id
+               WHERE o.matched_contractor_id = $1 OR i.contractor_id = $1
+               ORDER BY i.created_at DESC NULLS LAST
+               LIMIT 200""",
+            contractor_id,
+        )
+        return rows or []
+
     async def get_invoice_by_offer(self, offer_id: str) -> dict[str, Any] | None:
         """Get the invoice for a specific offer."""
         if self._use_supabase_client():
@@ -3006,6 +3059,58 @@ class PostgresClient:
                 *args,
             )
         return await self.get_payment(payment_id) or {}
+
+    async def update_payment_and_invoice_for_webhook(
+        self,
+        payment_id: str,
+        invoice_id: str | None,
+        payment_status: str,
+        invoice_status: str | None,
+    ) -> None:
+        """Apply payment (+ optional invoice) status updates atomically when possible.
+
+        - Local asyncpg: single ``connection.transaction()`` with two UPDATEs.
+        - Supabase: prefer RPC ``apply_webhook_payment_invoice_update`` (migration 032);
+          fall back to sequential table updates if RPC is missing or fails.
+        """
+        async with self.transaction() as conn:
+            if conn is None:
+                if self._use_supabase_client():
+                    client = await self._get_client()
+                    inv = invoice_id if invoice_id and invoice_status else None
+                    inv_st = invoice_status if inv else None
+                    try:
+                        await client.rpc(
+                            "apply_webhook_payment_invoice_update",
+                            {
+                                "p_payment_id": payment_id,
+                                "p_payment_status": payment_status,
+                                "p_invoice_id": inv or "",
+                                "p_invoice_status": inv_st or "",
+                            },
+                        ).execute()
+                        return
+                    except Exception as exc:
+                        logger.warning(
+                            "apply_webhook_payment_invoice_update RPC failed (%s); "
+                            "falling back to sequential payment/invoice updates",
+                            exc,
+                        )
+                await self.update_payment(payment_id, {"status": payment_status})
+                if invoice_id and invoice_status:
+                    await self.update_invoice(invoice_id, {"status": invoice_status})
+                return
+            await conn.execute(
+                "UPDATE payments SET status = $1 WHERE id = $2",
+                payment_status,
+                payment_id,
+            )
+            if invoice_id and invoice_status:
+                await conn.execute(
+                    "UPDATE invoices SET status = $1 WHERE id = $2",
+                    invoice_status,
+                    invoice_id,
+                )
 
     async def list_payments_for_user(self, user_id: str) -> list[dict[str, Any]]:
         """Get all payments for a user."""

@@ -37,6 +37,7 @@
     "aiAssistant": "עוזר AI",
     "myAccount": "החשבון שלי",
     "myAccountHint": "פרופיל, התראות והעדפות",
+    "accountMenu": "תפריט חשבון",
     "logout": "התנתקות"
   },
   "contractorNav": {
@@ -44,12 +45,30 @@
     "activeOffers": "הצעות פעילות",
     "createOffer": "צור הצעה",
     "projects": "פרויקטים",
+    "earnings": "הכנסות ותשלומים",
     "profile": "פרופיל",
     "contractorBadge": "קבלן",
     "newOffer": "הצעה חדשה",
     "myBusiness": "העסק שלי",
     "myBusinessHint": "פרטי עסק, מסמכים והגדרות",
+    "accountMenu": "תפריט חשבון",
     "logout": "התנתקות"
+  },
+  "contractorEarnings": {
+    "title": "הכנסות ותשלומים",
+    "subtitle": "סיכומי חשבוניות עבור הצעות ששויכו אליך",
+    "pending": "ממתין",
+    "completed": "שולם",
+    "heldEscrow": "בנאמנות (Escrow)",
+    "recent": "חשבוניות אחרונות",
+    "empty": "אין עדיין נתוני חשבוניות. כשדיירים משלמים על הצעות ששויכו אליך, הנתונים יופיעו כאן.",
+    "loadError": "לא ניתן לטעון את נתוני ההכנסות. נסו שוב.",
+    "retry": "נסה שוב",
+    "offer": "הצעה",
+    "status": "סטטוס",
+    "type": "סוג",
+    "amount": "סכום",
+    "paidAt": "תאריך תשלום"
   },
   "dashboard": {
     "welcome": "שלום, {name}!",
@@ -180,7 +199,9 @@
     "deleteAccountWarning": "מחיקת החשבון היא פעולה בלתי הפיכה",
     "deleteAccount": "מחק חשבון",
     "logout": "התנתקות",
-    "saved": "נשמר בהצלחה"
+    "saved": "נשמר בהצלחה",
+    "notificationsUnsaved": "יש שינויים בהעדפות ההתראות שלא נשמרו. לחצו על שמירה כדי לעדכן.",
+    "saveFailed": "לא ניתן לשמור. נסו שוב."
   },
   "building": {
     "title": "הבניין",
@@ -429,6 +450,11 @@
       },
       "settings": {
         "notifications": "התראות",
+        "notificationsHint": "בחרו כיצד ליצור עמכם קשר לגבי לידים והצעות חדשות.",
+        "notificationsSave": "שמירת העדפות התראות",
+        "notificationsSaving": "שומר…",
+        "notificationsSaved": "ההעדפות נשמרו.",
+        "notificationsSaveError": "לא ניתן לשמור את ההעדפות. נסו שוב.",
         "emailOffers": "הצעות במייל",
         "smsOffers": "הצעות ב-SMS",
         "whatsappOffers": "הצעות בוואטסאפ",
@@ -502,6 +528,9 @@
       "completedAt": "הושלם",
       "viewDetails": "צפה בפרטים",
       "requestReview": "בקש חוות דעת",
+      "requestReviewLoading": "שולח…",
+      "requestReviewSuccess": "הבקשה נשלחה. הצוות יחזור אליך.",
+      "requestReviewError": "לא ניתן לשלוח את הבקשה. נסו שוב.",
       "statuses": {
         "draft": "טיוטה",
         "pending": "ממתין",
@@ -599,9 +628,10 @@
         "title": "מנהל בניינים",
         "description": "פתיחת מסוף מנהל הבניינים — בניינים, דיירים ואסקלציות."
       },
-      "systemSettingsCard": {
-        "title": "הגדרות מערכת",
-        "description": "הגדרות פלטפורמה (בקרוב)."
+      "standaloneAdminCard": {
+        "title": "ניהול תפעולי (אפליקציה נפרדת)",
+        "description": "מסוף מנהל-העל רץ בכתובת נפרדת. פתחו בלשונית חדשה כשהאפליקציה פרוסה.",
+        "cta": "פתיחת מסוף הניהול"
       }
     },
     "account": {

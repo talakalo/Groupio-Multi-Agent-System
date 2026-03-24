@@ -35,6 +35,8 @@ interface PaymentResult {
   currency: string;
   client_secret?: string | null;
   offer_id?: string;
+  /** Backend payment gateway; only `mock` may complete without Stripe client_secret. */
+  provider?: string | null;
 }
 
 // ---- Stripe Elements (dynamically imported; only loaded when client_secret present) ----
@@ -285,17 +287,32 @@ function CheckoutContent() {
       const result = await apiClient.initiatePayment(offerId) as unknown as PaymentResult;
       setPayment(result);
 
-      if (result.status === "succeeded" || result.status === "paid") {
-        // Mock (or non-Stripe) path: no client_secret — show non-production notice
-        setSimulatedPayment(!result.client_secret);
-        setPhase("success");
-      } else if (result.client_secret) {
+      const prov = (result.provider ?? "").toLowerCase();
+      const isMockProvider = prov === "mock";
+      const succeededLike = result.status === "succeeded" || result.status === "paid";
+
+      if (result.client_secret) {
         setSimulatedPayment(false);
         setPhase("stripe");
-      } else {
+        return;
+      }
+
+      if (isMockProvider && succeededLike) {
         setSimulatedPayment(true);
         setPhase("success");
+        return;
       }
+
+      if (succeededLike || result.status === "processing") {
+        setErrorMessage(
+          "לא ניתן להשלים את התשלום: חסר נתון מאובטח מהספק. אם הבעיה נמשכת, פנו לתמיכה."
+        );
+        setPhase("error");
+        return;
+      }
+
+      setErrorMessage("לא ניתן להשלים את התשלום. נסו שוב או בחרו אמצעי תשלום אחר.");
+      setPhase("error");
     } catch (err) {
       const status = err instanceof ApiError ? err.status : null;
       const msg = err instanceof Error ? err.message : "שגיאה לא ידועה";
