@@ -1738,6 +1738,250 @@ class PostgresClient:
         )
         return row is not None
 
+    # ------------------------------------------------------------------
+    # Transactional outbox (RabbitMQ / async workers)
+    # ------------------------------------------------------------------
+
+    async def insert_outbox_event(
+        self,
+        routing_key: str,
+        event_name: str,
+        payload: dict[str, Any],
+        *,
+        idempotency_key: str | None = None,
+        outbox_id: str | None = None,
+        conn: Any | None = None,
+    ) -> str | None:
+        """Insert an outbox row. Returns id on insert, None if skipped (duplicate idempotency) or table missing.
+
+        Implements both Supabase and asyncpg paths. When ``conn`` is an asyncpg connection (inside
+        ``async with db.transaction() as conn``), the insert participates in that transaction.
+        """
+        oid = outbox_id or str(uuid4())
+        if self._use_supabase_client():
+            client = await self._get_client()
+            row = {
+                "id": oid,
+                "routing_key": routing_key,
+                "event_name": event_name,
+                "payload": _supabase_insert_payload(payload),
+                "idempotency_key": idempotency_key,
+            }
+            try:
+                await client.table("outbox_events").insert(row).execute()
+                return oid
+            except Exception as exc:  # pragma: no cover - supabase error shapes vary
+                err = str(exc).lower()
+                if "duplicate" in err or "unique" in err or "23505" in err:
+                    return None
+                if "outbox_events" in err or "does not exist" in err or "undefinedtable" in err:
+                    logger.warning("outbox_events missing — run alembic upgrade: %s", exc)
+                    return None
+                raise
+        try:
+            sql = """
+                INSERT INTO outbox_events (id, routing_key, event_name, payload, idempotency_key)
+                VALUES ($1, $2, $3, $4::jsonb, $5)
+                ON CONFLICT (idempotency_key) WHERE (idempotency_key IS NOT NULL) DO NOTHING
+                RETURNING id
+                """
+            args = (oid, routing_key, event_name, json.dumps(payload), idempotency_key)
+            if conn is not None:
+                row = await conn.fetchrow(sql, *args)
+                return str(row["id"]) if row else None
+            row = await self._pg_fetch_one(sql, *args)
+            return str(row["id"]) if row else None
+        except Exception as exc:
+            err = str(exc).lower()
+            if "outbox_events" in err or "does not exist" in err or "undefinedtable" in err:
+                logger.warning("outbox_events missing — run alembic upgrade: %s", exc)
+                return None
+            raise
+
+    async def fetch_pending_outbox_events(self, limit: int = 100) -> list[dict[str, Any]]:
+        """Rows with published_at IS NULL, ordered by created_at."""
+        lim = max(1, min(limit, 500))
+        if self._use_supabase_client():
+            client = await self._get_client()
+            try:
+                result = (
+                    await client.table("outbox_events")
+                    .select("*")
+                    .is_("published_at", "null")
+                    .lt("attempts", 50)
+                    .order("created_at")
+                    .limit(lim)
+                    .execute()
+                )
+                return list(result.data or [])
+            except Exception as exc:
+                err = str(exc).lower()
+                if "outbox_events" in err or "does not exist" in err or "undefinedtable" in err:
+                    logger.warning("outbox_events missing — run alembic upgrade: %s", exc)
+                    return []
+                raise
+        return await self._pg_fetch_all(
+            """
+            SELECT * FROM outbox_events
+            WHERE published_at IS NULL AND attempts < 50
+            ORDER BY created_at ASC
+            LIMIT $1
+            """,
+            lim,
+        )
+
+    async def mark_outbox_event_published(self, outbox_id: str) -> None:
+        if self._use_supabase_client():
+            client = await self._get_client()
+            await (
+                client.table("outbox_events")
+                .update({"published_at": datetime.now(UTC).isoformat()})
+                .eq("id", outbox_id)
+                .execute()
+            )
+            return
+        await self._pg_execute(
+            "UPDATE outbox_events SET published_at = NOW() WHERE id = $1",
+            outbox_id,
+        )
+
+    async def mark_outbox_event_failed(self, outbox_id: str, error_message: str) -> None:
+        msg = (error_message or "")[:4000]
+        if self._use_supabase_client():
+            client = await self._get_client()
+            prev = await client.table("outbox_events").select("attempts").eq("id", outbox_id).limit(1).execute()
+            rows = prev.data or []
+            attempts = int(rows[0]["attempts"]) if rows and rows[0].get("attempts") is not None else 0
+            await (
+                client.table("outbox_events")
+                .update({"attempts": attempts + 1, "last_error": msg})
+                .eq("id", outbox_id)
+                .execute()
+            )
+            return
+        await self._pg_execute(
+            """
+            UPDATE outbox_events
+            SET attempts = attempts + 1, last_error = $2
+            WHERE id = $1
+            """,
+            outbox_id,
+            msg,
+        )
+
+    async def reset_outbox_event_for_retry(self, outbox_id: str) -> bool:
+        """Clear publish state so dispatcher picks the row again. Returns True if a row was updated."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            try:
+                result = (
+                    await client.table("outbox_events")
+                    .update({"published_at": None, "attempts": 0, "last_error": None})
+                    .eq("id", outbox_id)
+                    .execute()
+                )
+                return bool(result.data)
+            except Exception as exc:
+                err = str(exc).lower()
+                if "outbox_events" in err or "does not exist" in err or "undefinedtable" in err:
+                    logger.warning("outbox_events missing — run alembic upgrade: %s", exc)
+                    return False
+                raise
+        row = await self._pg_fetch_one(
+            """
+            UPDATE outbox_events
+            SET published_at = NULL, attempts = 0, last_error = NULL
+            WHERE id = $1
+            RETURNING id
+            """,
+            outbox_id,
+        )
+        return row is not None
+
+    async def get_crm_external_ref(self, entity_type: str, groupio_id: str) -> dict[str, Any] | None:
+        if self._use_supabase_client():
+            client = await self._get_client()
+            try:
+                result = (
+                    await client.table("crm_external_refs")
+                    .select("*")
+                    .eq("entity_type", entity_type)
+                    .eq("groupio_id", groupio_id)
+                    .limit(1)
+                    .execute()
+                )
+                rows = result.data or []
+                return rows[0] if rows else None
+            except Exception as exc:
+                err = str(exc).lower()
+                if "crm_external_refs" in err or "does not exist" in err or "undefinedtable" in err:
+                    return None
+                raise
+        return await self._pg_fetch_one(
+            "SELECT * FROM crm_external_refs WHERE entity_type = $1 AND groupio_id = $2 LIMIT 1",
+            entity_type,
+            groupio_id,
+        )
+
+    async def upsert_crm_external_ref(
+        self,
+        entity_type: str,
+        groupio_id: str,
+        crm_entity_type: str,
+        crm_id: str,
+        *,
+        ref_id: str | None = None,
+    ) -> None:
+        rid = ref_id or str(uuid4())
+        if self._use_supabase_client():
+            client = await self._get_client()
+            existing = await self.get_crm_external_ref(entity_type, groupio_id)
+            payload = {
+                "id": existing["id"] if existing else rid,
+                "entity_type": entity_type,
+                "groupio_id": groupio_id,
+                "crm_entity_type": crm_entity_type,
+                "crm_id": crm_id,
+            }
+            try:
+                if existing:
+                    await (
+                        client.table("crm_external_refs")
+                        .update(
+                            {
+                                "crm_entity_type": crm_entity_type,
+                                "crm_id": crm_id,
+                                "updated_at": datetime.now(UTC).isoformat(),
+                            }
+                        )
+                        .eq("id", existing["id"])
+                        .execute()
+                    )
+                else:
+                    await client.table("crm_external_refs").insert(payload).execute()
+            except Exception as exc:
+                err = str(exc).lower()
+                if "crm_external_refs" in err or "does not exist" in err or "undefinedtable" in err:
+                    logger.warning("crm_external_refs missing — run alembic upgrade: %s", exc)
+                    return
+                raise
+            return
+        await self._pg_execute(
+            """
+            INSERT INTO crm_external_refs (id, entity_type, groupio_id, crm_entity_type, crm_id)
+            VALUES ($1, $2, $3, $4, $5)
+            ON CONFLICT (entity_type, groupio_id) DO UPDATE SET
+                crm_entity_type = EXCLUDED.crm_entity_type,
+                crm_id = EXCLUDED.crm_id,
+                updated_at = NOW()
+            """,
+            rid,
+            entity_type,
+            groupio_id,
+            crm_entity_type,
+            crm_id,
+        )
+
     async def get_contractor_by_stripe_customer_id(self, customer_id: str) -> dict[str, Any] | None:
         """Lookup contractor row by Stripe customer id (provider_customer_id)."""
         if not customer_id:

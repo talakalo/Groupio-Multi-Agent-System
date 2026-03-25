@@ -457,6 +457,18 @@ async def initiate_payment(
     async with db.transaction() as conn:
         if not await db.get_invoice_for_offer(current_user.id, request.offer_id):
             await db.create_invoice(existing_invoice, conn=conn)
+            from src.messaging.outbox_helpers import try_enqueue_invoice_created_event
+
+            await try_enqueue_invoice_created_event(
+                db,
+                invoice_id=str(existing_invoice["id"]),
+                offer_id=request.offer_id,
+                user_id=current_user.id,
+                amount=float(existing_invoice.get("amount", charge_total)),
+                currency=str(existing_invoice.get("currency", "ILS")),
+                payment_type=str(existing_invoice.get("payment_type", payment_type)),
+                conn=conn,
+            )
         await db.create_payment(payment_data, conn=conn)
 
     # For direct payments that succeeded, mark invoice as paid immediately
@@ -590,6 +602,71 @@ async def stripe_webhook(request: Request) -> dict:
         new_status,
         invoice_status,
     )
+
+    try:
+        from src.messaging.envelope import EventEnvelope
+        from src.messaging.outbox_helpers import try_enqueue_payment_event
+        from src.messaging.topics import (
+            RK_PAYMENTS_FAILED,
+            RK_PAYMENTS_REFUND_PROCESSED,
+            RK_PAYMENTS_SUCCEEDED,
+        )
+
+        sid = str(event_id) if event_id else ""
+        base_payload = {
+            "payment_id": payment["id"],
+            "offer_id": payment.get("offer_id"),
+            "user_id": payment.get("user_id"),
+            "amount": payment.get("amount"),
+            "stripe_event_id": sid,
+        }
+        if new_status == "succeeded":
+            env = EventEnvelope(
+                event_name="payments.succeeded",
+                entity_type="payment",
+                entity_id=payment["id"],
+                idempotency_key=f"stripe:{sid}:succeeded" if sid else f"payment:{payment['id']}:succeeded",
+                payload={**base_payload, "status": new_status},
+            )
+            await try_enqueue_payment_event(
+                db,
+                RK_PAYMENTS_SUCCEEDED,
+                env.event_name,
+                env.to_json_dict(),
+                idempotency_key=env.idempotency_key,
+            )
+        elif new_status == "refunded":
+            env = EventEnvelope(
+                event_name="payments.refund_processed",
+                entity_type="payment",
+                entity_id=payment["id"],
+                idempotency_key=f"stripe:{sid}:refund" if sid else f"payment:{payment['id']}:refund",
+                payload={**base_payload, "status": new_status},
+            )
+            await try_enqueue_payment_event(
+                db,
+                RK_PAYMENTS_REFUND_PROCESSED,
+                env.event_name,
+                env.to_json_dict(),
+                idempotency_key=env.idempotency_key,
+            )
+        elif new_status == "failed":
+            env = EventEnvelope(
+                event_name="payments.failed",
+                entity_type="payment",
+                entity_id=payment["id"],
+                idempotency_key=f"stripe:{sid}:failed" if sid else f"payment:{payment['id']}:failed",
+                payload={**base_payload, "status": new_status},
+            )
+            await try_enqueue_payment_event(
+                db,
+                RK_PAYMENTS_FAILED,
+                env.event_name,
+                env.to_json_dict(),
+                idempotency_key=env.idempotency_key,
+            )
+    except Exception:
+        logger.exception("Payment outbox enqueue failed after Stripe webhook (non-fatal)")
 
     return {"status": "processed", "payment_id": payment["id"], "new_status": new_status}
 

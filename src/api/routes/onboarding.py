@@ -196,6 +196,28 @@ async def complete_onboarding(
             raise HTTPException(status_code=500, detail="Failed to update user") from exc
 
         logger.info("Resident onboarding complete for user %s → building %s", user_id, building_id)
+        try:
+            from src.messaging.envelope import EventEnvelope
+            from src.messaging.outbox_helpers import try_enqueue_crm
+            from src.messaging.topics import RK_CRM_BUILDING_CREATED
+
+            env = EventEnvelope(
+                event_name="crm.building.created",
+                entity_type="building",
+                entity_id=building_id,
+                idempotency_key=f"crm:building:created:{building_id}",
+                payload={"building_id": building_id, "user_id": user_id},
+            )
+            await try_enqueue_crm(
+                db,
+                RK_CRM_BUILDING_CREATED,
+                env.event_name,
+                env.to_json_dict(),
+                idempotency_key=env.idempotency_key,
+            )
+        except Exception:
+            logger.exception("CRM outbox enqueue failed after resident onboarding (non-fatal)")
+
         return OnboardingResponse(user=UserResponse.model_validate(updated_user.model_dump()))
 
     # ------------------------------------------------------------------
@@ -246,6 +268,28 @@ async def complete_onboarding(
             raise HTTPException(status_code=500, detail="Failed to update user") from exc
 
         logger.info("Contractor onboarding complete for user %s → contractor %s", user_id, contractor_id)
+        try:
+            from src.messaging.envelope import EventEnvelope
+            from src.messaging.outbox_helpers import try_enqueue_crm
+            from src.messaging.topics import RK_CRM_CONTRACTOR_REGISTERED
+
+            env = EventEnvelope(
+                event_name="crm.contractor.registered",
+                entity_type="contractor",
+                entity_id=contractor_id,
+                idempotency_key=f"crm:contractor:registered:{contractor_id}",
+                payload={"contractor_id": contractor_id, "source": "onboarding"},
+            )
+            await try_enqueue_crm(
+                db,
+                RK_CRM_CONTRACTOR_REGISTERED,
+                env.event_name,
+                env.to_json_dict(),
+                idempotency_key=env.idempotency_key,
+            )
+        except Exception:
+            logger.exception("CRM outbox enqueue failed after contractor onboarding (non-fatal)")
+
         return OnboardingResponse(user=UserResponse.model_validate(updated_user.model_dump()))
 
     # Should never reach here (pydantic validates role)

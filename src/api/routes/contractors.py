@@ -90,6 +90,28 @@ async def create_contractor(
     except Exception as e:
         logger.warning("Failed to add contractor to graph DB: %s", e)
 
+    try:
+        from src.messaging.envelope import EventEnvelope
+        from src.messaging.outbox_helpers import try_enqueue_crm
+        from src.messaging.topics import RK_CRM_CONTRACTOR_REGISTERED
+
+        env = EventEnvelope(
+            event_name="crm.contractor.registered",
+            entity_type="contractor",
+            entity_id=contractor_id,
+            idempotency_key=f"crm:contractor:registered:{contractor_id}",
+            payload={"contractor_id": contractor_id},
+        )
+        await try_enqueue_crm(
+            db,
+            RK_CRM_CONTRACTOR_REGISTERED,
+            env.event_name,
+            env.to_json_dict(),
+            idempotency_key=env.idempotency_key,
+        )
+    except Exception:
+        logger.exception("CRM outbox enqueue failed after contractor create (non-fatal)")
+
     return contractor
 
 
@@ -534,6 +556,31 @@ async def verify_contractor(
             "verification_status": status,
         },
     )
+
+    try:
+        from src.messaging.envelope import EventEnvelope
+        from src.messaging.outbox_helpers import try_enqueue_crm
+        from src.messaging.topics import RK_CRM_CONTRACTOR_STATUS_CHANGED
+
+        env = EventEnvelope(
+            event_name="crm.contractor.status_changed",
+            entity_type="contractor",
+            entity_id=contractor_id,
+            idempotency_key=f"crm:contractor:status:{contractor_id}:{status.value}",
+            payload={
+                "contractor_id": contractor_id,
+                "verification_status": status.value,
+            },
+        )
+        await try_enqueue_crm(
+            db,
+            RK_CRM_CONTRACTOR_STATUS_CHANGED,
+            env.event_name,
+            env.to_json_dict(),
+            idempotency_key=env.idempotency_key,
+        )
+    except Exception:
+        logger.exception("CRM outbox enqueue failed after contractor verify (non-fatal)")
 
     return updated
 

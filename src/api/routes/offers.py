@@ -23,6 +23,10 @@ from src.models.offer import (
 from src.models.user import UserInDB, UserRole
 from src.orchestration.graph import get_orchestrator
 from src.rag.embeddings import get_embedding_client
+from src.config.settings import get_settings
+from src.messaging.envelope import EventEnvelope
+from src.messaging.outbox_helpers import try_enqueue_outbox
+from src.messaging.topics import RK_NOTIFICATIONS_SEND_REQUESTED
 from src.services.email import get_email_service
 from src.services.whatsapp_bot import get_whatsapp_bot
 
@@ -390,15 +394,40 @@ async def join_offer(
     email_svc = get_email_service()
 
     if current_user.email:
-        background_tasks.add_task(
-            email_svc.send_offer_joined,
-            to_email=current_user.email,
-            user_name=current_user.full_name or "דייר",
-            offer_title=offer_title,
-            current_participants=new_count,
-            min_participants=min_participants,
-            offer_id=offer_id,
-        )
+        settings = get_settings()
+        if settings.ENABLE_NOTIFICATION_QUEUE and settings.ENABLE_OUTBOX:
+            env = EventEnvelope(
+                event_name="notifications.offer_joined_email",
+                entity_type="offer",
+                entity_id=offer_id,
+                idempotency_key=f"offer_joined_email:{offer_id}:{current_user.id}",
+                payload={
+                    "channel": "email",
+                    "to_email": current_user.email,
+                    "user_name": current_user.full_name or "דייר",
+                    "offer_title": offer_title,
+                    "current_participants": new_count,
+                    "min_participants": min_participants,
+                    "offer_id": offer_id,
+                },
+            )
+            await try_enqueue_outbox(
+                db,
+                RK_NOTIFICATIONS_SEND_REQUESTED,
+                env.event_name,
+                env.to_json_dict(),
+                idempotency_key=env.idempotency_key,
+            )
+        else:
+            background_tasks.add_task(
+                email_svc.send_offer_joined,
+                to_email=current_user.email,
+                user_name=current_user.full_name or "דייר",
+                offer_title=offer_title,
+                current_participants=new_count,
+                min_participants=min_participants,
+                offer_id=offer_id,
+            )
 
     # If threshold just reached, notify all participants
     if new_count == min_participants:

@@ -1462,6 +1462,36 @@ async def request_contractor_docs(
 
 
 # ---------------------------------------------------------------------------
+# Outbox operations (async messaging)
+# ---------------------------------------------------------------------------
+
+
+@router.post("/outbox/{outbox_id}/requeue")
+async def requeue_outbox_event(
+    outbox_id: str,
+    request: Request,
+    admin: UserInDB = Depends(require_admin_only),
+) -> dict[str, str]:
+    """Reset an outbox row so the dispatcher can publish it again (audit: admin-only)."""
+    db = get_postgres_client()
+    ok = await db.reset_outbox_event_for_retry(outbox_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Outbox event not found or not updated")
+    logger.info("Admin %s requeued outbox event %s", admin.email, outbox_id)
+    await db.create_audit_log(
+        {
+            "user_id": admin.id,
+            "action": "requeue_outbox_event",
+            "resource_type": "outbox_events",
+            "resource_id": outbox_id,
+            "details": {},
+            "ip_address": request.client.host if request.client else None,
+        }
+    )
+    return {"status": "requeued", "outbox_id": outbox_id}
+
+
+# ---------------------------------------------------------------------------
 # Credit Awards admin endpoints
 # ---------------------------------------------------------------------------
 

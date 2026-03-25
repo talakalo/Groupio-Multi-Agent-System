@@ -115,6 +115,18 @@ escalations_total = Counter(
     ["reason"],
 )
 
+messaging_publish_total = Counter(
+    "groupio_messaging_publish_total",
+    "RabbitMQ publish attempts",
+    ["result"],
+)
+
+messaging_consumer_messages_total = Counter(
+    "groupio_messaging_consumer_messages_total",
+    "RabbitMQ consumer handling outcomes",
+    ["worker", "result"],
+)
+
 
 # -- Sentry Initialization --
 

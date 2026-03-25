@@ -127,7 +127,8 @@ class TestGetMyPayments:
 class TestInitiatePayment:
     """Tests for POST /api/v1/payments/initiate."""
 
-    def test_initiate_payment_success(self, client, mock_db, mock_offer):
+    @patch("src.messaging.outbox_helpers.try_enqueue_invoice_created_event", new_callable=AsyncMock)
+    def test_initiate_payment_success(self, mock_enqueue_invoice, client, mock_db, mock_offer):
         """Successful payment initiation creates invoice, payment, and calls provider."""
         mock_db.get_offer = AsyncMock(return_value=mock_offer)
         mock_db.is_user_in_building = AsyncMock(return_value=True)
@@ -160,6 +161,41 @@ class TestInitiatePayment:
         assert data["transaction_id"] == "txn_123"
         mock_db.create_invoice.assert_awaited_once()
         mock_db.create_payment.assert_awaited_once()
+        mock_enqueue_invoice.assert_awaited_once()
+        kw = mock_enqueue_invoice.await_args.kwargs
+        assert kw["offer_id"] == "offer-100"
+        assert kw["user_id"] == "user-123"
+        assert "conn" in kw
+        assert "invoice_id" in kw
+
+    @patch("src.messaging.outbox_helpers.try_enqueue_invoice_created_event", new_callable=AsyncMock)
+    def test_initiate_payment_reuses_invoice_does_not_enqueue_created(
+        self, mock_enqueue_invoice, client, mock_db, mock_offer, mock_invoice
+    ):
+        """When an invoice already exists, invoices.created outbox hook must not run."""
+        inv = {**mock_invoice, "subtotal": 84.75, "tax_amount": 15.25, "amount": 100.0, "payment_type": "direct"}
+        mock_db.get_offer = AsyncMock(return_value=mock_offer)
+        mock_db.is_user_in_building = AsyncMock(return_value=True)
+        mock_db.get_invoice_for_offer = AsyncMock(return_value=inv)
+        mock_db.create_invoice = AsyncMock()
+        mock_db.create_payment = AsyncMock()
+
+        with patch("src.api.routes.payments.get_payment_provider") as mock_pp:
+            provider = AsyncMock()
+            provider.create_charge = AsyncMock(
+                return_value={"transaction_id": "txn_999", "status": "processing", "amount": 100}
+            )
+            mock_pp.return_value = provider
+
+            response = client.post(
+                "/api/v1/payments/initiate",
+                json={"offer_id": "offer-100", "payment_method_id": None},
+                headers={"Authorization": "Bearer test-token"},
+            )
+
+        assert response.status_code == 200
+        mock_db.create_invoice.assert_not_called()
+        mock_enqueue_invoice.assert_not_called()
 
     def test_initiate_payment_offer_not_found(self, client, mock_db):
         """Initiating payment for a non-existent offer returns 404."""
