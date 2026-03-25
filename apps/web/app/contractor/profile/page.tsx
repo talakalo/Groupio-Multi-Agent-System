@@ -3,7 +3,7 @@
 import type { Contractor, ServiceCategory, Region } from '@groupio/types';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
@@ -52,6 +52,29 @@ const profileSchema = z.object({
 
 type ProfileForm = z.infer<typeof profileSchema>;
 
+type ContractorNotifPrefs = {
+  email_offers: boolean;
+  sms_offers: boolean;
+  whatsapp_offers: boolean;
+};
+
+const DEFAULT_CONTRACTOR_NOTIF_PREFS: ContractorNotifPrefs = {
+  email_offers: true,
+  sms_offers: true,
+  whatsapp_offers: true,
+};
+
+function mergeContractorNotifPrefs(raw: unknown): ContractorNotifPrefs {
+  const d = DEFAULT_CONTRACTOR_NOTIF_PREFS;
+  if (!raw || typeof raw !== 'object') return { ...d };
+  const r = raw as Record<string, unknown>;
+  return {
+    email_offers: typeof r.email_offers === 'boolean' ? r.email_offers : d.email_offers,
+    sms_offers: typeof r.sms_offers === 'boolean' ? r.sms_offers : d.sms_offers,
+    whatsapp_offers: typeof r.whatsapp_offers === 'boolean' ? r.whatsapp_offers : d.whatsapp_offers,
+  };
+}
+
 export default function ContractorProfilePage() {
   const t = useTranslations('contractor.profile');
   const accessToken = useAuthStore((s) => s.accessToken);
@@ -78,6 +101,12 @@ export default function ContractorProfilePage() {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [membershipQueryBanner, setMembershipQueryBanner] = useState<'success' | 'canceled' | null>(null);
+
+  const [notifPrefs, setNotifPrefs] = useState<ContractorNotifPrefs>(DEFAULT_CONTRACTOR_NOTIF_PREFS);
+  const notifDirtyRef = useRef(false);
+  const [notifSaving, setNotifSaving] = useState(false);
+  const [notifError, setNotifError] = useState<string | null>(null);
+  const [notifSavedAt, setNotifSavedAt] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -124,6 +153,26 @@ export default function ContractorProfilePage() {
       setCheckoutError(msg);
     } finally {
       setCheckoutLoading(false);
+    }
+  }
+
+  async function saveNotificationPreferences() {
+    setNotifError(null);
+    setNotifSavedAt(false);
+    setNotifSaving(true);
+    try {
+      await apiClient.updateCurrentUser({
+        notification_settings: notifPrefs,
+      });
+      notifDirtyRef.current = false;
+      setNotifSavedAt(true);
+      setTimeout(() => setNotifSavedAt(false), 4000);
+    } catch (e) {
+      const msg =
+        e instanceof ApiError ? e.message : t('settings.notificationsSaveError');
+      setNotifError(msg);
+    } finally {
+      setNotifSaving(false);
     }
   }
 
@@ -181,6 +230,10 @@ export default function ContractorProfilePage() {
         const me = await meRes.json();
         const cid = me.contractor_id;
         setContractorId(cid);
+
+        if (!notifDirtyRef.current) {
+          setNotifPrefs(mergeContractorNotifPrefs(me.notification_settings));
+        }
 
         if (cid) {
           const [contractorRes, docReqRes] = await Promise.all([
@@ -683,11 +736,26 @@ export default function ContractorProfilePage() {
             {/* Notification Preferences */}
             <div>
               <h3 className="font-medium mb-3">{t('settings.notifications')}</h3>
+              <p className="text-sm text-gray-500 mb-3">{t('settings.notificationsHint')}</p>
+              {notifError && (
+                <p className="mb-2 text-sm text-red-600" role="alert">
+                  {notifError}
+                </p>
+              )}
+              {notifSavedAt && (
+                <p className="mb-2 text-sm text-green-700" role="status">
+                  {t('settings.notificationsSaved')}
+                </p>
+              )}
               <div className="space-y-2">
                 <label className="flex items-center gap-3">
                   <input
                     type="checkbox"
-                    defaultChecked
+                    checked={notifPrefs.email_offers}
+                    onChange={(e) => {
+                      notifDirtyRef.current = true;
+                      setNotifPrefs((p) => ({ ...p, email_offers: e.target.checked }));
+                    }}
                     className="rounded border-gray-300 text-sky-500 focus:ring-sky-500"
                   />
                   <span className="text-gray-700">{t('settings.emailOffers')}</span>
@@ -695,7 +763,11 @@ export default function ContractorProfilePage() {
                 <label className="flex items-center gap-3">
                   <input
                     type="checkbox"
-                    defaultChecked
+                    checked={notifPrefs.sms_offers}
+                    onChange={(e) => {
+                      notifDirtyRef.current = true;
+                      setNotifPrefs((p) => ({ ...p, sms_offers: e.target.checked }));
+                    }}
                     className="rounded border-gray-300 text-sky-500 focus:ring-sky-500"
                   />
                   <span className="text-gray-700">{t('settings.smsOffers')}</span>
@@ -703,12 +775,24 @@ export default function ContractorProfilePage() {
                 <label className="flex items-center gap-3">
                   <input
                     type="checkbox"
-                    defaultChecked
+                    checked={notifPrefs.whatsapp_offers}
+                    onChange={(e) => {
+                      notifDirtyRef.current = true;
+                      setNotifPrefs((p) => ({ ...p, whatsapp_offers: e.target.checked }));
+                    }}
                     className="rounded border-gray-300 text-sky-500 focus:ring-sky-500"
                   />
                   <span className="text-gray-700">{t('settings.whatsappOffers')}</span>
                 </label>
               </div>
+              <button
+                type="button"
+                onClick={() => void saveNotificationPreferences()}
+                disabled={notifSaving}
+                className="mt-4 inline-flex items-center justify-center rounded-lg border border-sky-600 bg-white px-4 py-2 text-sm font-medium text-sky-700 hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {notifSaving ? t('settings.notificationsSaving') : t('settings.notificationsSave')}
+              </button>
             </div>
 
             {/* Availability */}

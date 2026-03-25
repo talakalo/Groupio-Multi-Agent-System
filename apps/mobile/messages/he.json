@@ -131,7 +131,13 @@
     "resendSuccess": "אימייל אימות נשלח מחדש בהצלחה",
     "resendFailed": "שליחה נכשלה. נסו שנית.",
     "resendVerification": "שלחו שוב קישור אימות",
-    "continueToLogin": "המשיכו לכניסה"
+    "continueToLogin": "המשיכו לכניסה",
+    "forgotPasswordTitle": "איפוס סיסמה",
+    "forgotPasswordHint": "הזינו את כתובת האימייל ונשלח קישור לאיפוס אם קיים חשבון.",
+    "forgotPasswordSubmit": "שליחת קישור",
+    "forgotPasswordSuccess": "אם קיים חשבון עבור האימייל, יישלחו הוראות איפוס בקרוב.",
+    "forgotPasswordError": "לא ניתן לשלוח אימייל. נסו שוב.",
+    "forgotPasswordBack": "חזרה לכניסה"
   },
   "contractor": {
     "quickActions": "פעולות מהירות",

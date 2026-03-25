@@ -5,6 +5,8 @@ import { useTranslations } from 'next-intl';
 import { useState, useEffect } from 'react';
 
 import Link from 'next/link';
+
+import { ApiError, apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
 
 type ProjectStatus = 'all' | 'in_progress' | 'completed' | 'cancelled';
@@ -29,6 +31,10 @@ export default function ContractorProjectsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<ProjectStatus>('all');
   const [year, setYear] = useState(new Date().getFullYear());
+  const [reviewingOfferId, setReviewingOfferId] = useState<string | null>(null);
+  const [reviewBanner, setReviewBanner] = useState<{ offerId: string; ok: boolean; message?: string } | null>(
+    null
+  );
 
   useEffect(() => {
     async function fetchProjects() {
@@ -66,6 +72,20 @@ export default function ContractorProjectsPage() {
     fetchProjects().catch(() => {});
   }, [statusFilter, year, accessToken, isAuthenticated, refreshAccessToken]);
 
+  async function handleRequestReview(offerId: string) {
+    setReviewBanner(null);
+    setReviewingOfferId(offerId);
+    try {
+      await apiClient.requestContractorOfferReview(offerId);
+      setReviewBanner({ offerId, ok: true });
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.message : t('requestReviewError');
+      setReviewBanner({ offerId, ok: false, message: msg });
+    } finally {
+      setReviewingOfferId(null);
+    }
+  }
+
   const stats = {
     total: projects.length,
     completed: projects.filter((p) => p.status === 'completed').length,
@@ -91,6 +111,19 @@ export default function ContractorProjectsPage() {
         <h1 className="text-3xl font-bold text-gray-900">{t('title')}</h1>
         <p className="text-gray-600 mt-2">{t('subtitle')}</p>
       </header>
+
+      {reviewBanner && (
+        <div
+          className={`mb-6 rounded-xl border px-4 py-3 text-sm ${
+            reviewBanner.ok
+              ? 'border-green-200 bg-green-50 text-green-900'
+              : 'border-red-200 bg-red-50 text-red-800'
+          }`}
+          role="status"
+        >
+          {reviewBanner.ok ? t('requestReviewSuccess') : reviewBanner.message || t('requestReviewError')}
+        </div>
+      )}
 
       {/* Stats Overview */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
@@ -233,8 +266,13 @@ export default function ContractorProjectsPage() {
                   {t('viewDetails')}
                 </Link>
                 {project.status === 'completed' && !project.review && (
-                  <button className="text-gray-500 hover:text-gray-700 text-sm font-medium mr-4">
-                    {t('requestReview')}
+                  <button
+                    type="button"
+                    disabled={reviewingOfferId === project.id}
+                    onClick={() => void handleRequestReview(project.id)}
+                    className="text-sky-600 hover:text-sky-800 disabled:opacity-50 text-sm font-medium ms-4"
+                  >
+                    {reviewingOfferId === project.id ? t('requestReviewLoading') : t('requestReview')}
                   </button>
                 )}
               </div>

@@ -9,6 +9,8 @@ import { useUnwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPagePara
 export default function AdminDashboardPage(props: PageParamsProps) {
   useUnwrapPageParams(props);
   const t = useTranslations('admin.dashboard');
+  const standaloneAdminUrl =
+    process.env.NEXT_PUBLIC_ADMIN_APP_URL?.trim() || 'http://localhost:3001';
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
@@ -32,15 +34,22 @@ export default function AdminDashboardPage(props: PageParamsProps) {
           <p className="mt-1 text-sm text-gray-500">{t('buildingsManagerCard.description')}</p>
         </Link>
 
-        <div className="card p-6 border border-gray-100 opacity-75">
+        <a
+          href={standaloneAdminUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="card p-6 hover:shadow-lg transition-all group border border-gray-100 hover:border-indigo-200 block"
+        >
           <div className="flex items-start justify-between">
             <div className="w-12 h-12 rounded-xl bg-indigo-100 flex items-center justify-center">
               <Shield className="h-6 w-6 text-indigo-600" />
             </div>
+            <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-indigo-500 group-hover:translate-x-1 transition-all" />
           </div>
-          <h2 className="mt-4 text-lg font-semibold text-gray-900">{t('systemSettingsCard.title')}</h2>
-          <p className="mt-1 text-sm text-gray-500">{t('systemSettingsCard.description')}</p>
-        </div>
+          <h2 className="mt-4 text-lg font-semibold text-gray-900">{t('standaloneAdminCard.title')}</h2>
+          <p className="mt-1 text-sm text-gray-500">{t('standaloneAdminCard.description')}</p>
+          <p className="mt-3 text-sm font-medium text-indigo-600">{t('standaloneAdminCard.cta')} →</p>
+        </a>
       </div>
     </div>
   );

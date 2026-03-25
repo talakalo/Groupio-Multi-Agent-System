@@ -75,7 +75,12 @@ class RedisClient:
 
     async def close(self) -> None:
         """Close the Redis connection."""
-        await self._redis.close()
+        r = self._redis
+        aclose = getattr(r, "aclose", None)
+        if callable(aclose):
+            await aclose()
+        else:
+            await r.close()
 
     # -- Conversation Memory --
 

@@ -1,6 +1,7 @@
 """Admin API routes for system management."""
 
 import csv
+import inspect
 import io
 import json
 import logging
@@ -28,6 +29,7 @@ from src.orchestration.graph import get_orchestrator
 from src.rag.pipeline import get_rag_pipeline
 from src.services.email import get_email_service
 from src.services.storage import get_storage_service
+from src.utils.monitoring import capture_exception_safe
 
 logger = logging.getLogger(__name__)
 
@@ -173,21 +175,20 @@ async def get_analytics() -> dict[str, Any]:
     gmv_today = 0
     total_contractors = 0
 
-    # --- Escalation stats ---
+    # --- Escalation stats (matches get_escalation_stats() shape) ---
     try:
         stats = await db.get_escalation_stats()
-        by_status = stats.get("by_status") or {}
-        open_tickets = sum(c for s, c in by_status.items() if str(s).lower() not in ("resolved", "closed"))
-        resolved_today = by_status.get("resolved", 0)
+        open_tickets = int(stats.get("total_open") or 0) + int(stats.get("total_in_progress") or 0)
+        resolved_today = int(stats.get("total_resolved_today") or 0)
     except Exception:
-        logger.debug("Could not fetch escalation stats for analytics")
+        logger.warning("Could not fetch escalation stats for analytics", exc_info=True)
 
     # --- Offer stats (active count + GMV) ---
     try:
-        offers, total_offers = await db.get_all_offers_admin(page=1, page_size=1, status="active")
+        _offers, total_offers = await db.get_all_offers_admin(page=1, page_size=1, status="active")
         active_offers = total_offers
     except Exception:
-        pass
+        logger.warning("Could not fetch active offers count for analytics", exc_info=True)
 
     try:
         # Sum the price of today's completed offers for GMV
@@ -201,7 +202,7 @@ async def get_analytics() -> dict[str, Any]:
             if str(o.get("completed_at", "") or o.get("updated_at", "")).startswith(today_str)
         )
     except Exception:
-        pass
+        logger.warning("Could not compute GMV for analytics", exc_info=True)
 
     # --- Contractor count ---
     try:
@@ -209,7 +210,7 @@ async def get_analytics() -> dict[str, Any]:
             filters={"marketplace_visible_only": False}, page=1, page_size=1
         )
     except Exception:
-        logger.debug("Could not fetch contractor count for analytics")
+        logger.warning("Could not fetch contractor count for analytics", exc_info=True)
 
     # --- Charts / breakdowns (PostgreSQL) ---
     agg: dict[str, Any] = {}
@@ -223,10 +224,23 @@ async def get_analytics() -> dict[str, Any]:
         orch = get_orchestrator()
         for aname, a in orch.agents.items():
             m = await a.get_metrics()
-            calls = int(m.get("calls", 0) or 0)
-            errors = int(m.get("errors", 0) or 0)
+            if not isinstance(m, dict):
+                logger.warning("Agent %s get_metrics returned non-dict; skipping", aname)
+                continue
+            safe: dict[str, Any] = {}
+            for k, v in m.items():
+                if inspect.isawaitable(v):
+                    logger.error(
+                        "Agent %s metrics key %r holds awaitable — possible missing await in agent code",
+                        aname,
+                        k,
+                    )
+                    continue
+                safe[k] = v
+            calls = int(safe.get("calls", 0) or 0)
+            errors = int(safe.get("errors", 0) or 0)
             accuracy = round(100.0 - (errors / calls * 100.0), 1) if calls > 0 else 100.0
-            avg_ms = int(float(m.get("avg_duration_ms", 0) or m.get("avg_latency_ms", 0) or 0))
+            avg_ms = int(float(safe.get("avg_duration_ms", 0) or safe.get("avg_latency_ms", 0) or 0))
             throughput = round(calls / 1440.0, 2)
             agent_performance.append(
                 {
@@ -238,7 +252,7 @@ async def get_analytics() -> dict[str, Any]:
             )
         agent_performance.sort(key=lambda x: x["agent"])
     except Exception:
-        logger.debug("Could not build agent performance for analytics", exc_info=True)
+        logger.warning("Could not build agent performance for analytics", exc_info=True)
 
     return {
         "gmvToday": gmv_today,
@@ -1185,6 +1199,12 @@ async def approve_pending_decision(
                         decision_id,
                         payment_id,
                         exc,
+                    )
+                    capture_exception_safe(
+                        exc,
+                        flow="admin_refund_execution",
+                        decision_id=decision_id,
+                        payment_id=payment_id,
                     )
                     await db.create_audit_log(
                         {

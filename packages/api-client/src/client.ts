@@ -428,6 +428,25 @@ export class GroupioApiClient {
     });
   }
 
+  async getContractorEarnings(): Promise<{
+    currency: string;
+    pending_total: number;
+    completed_total: number;
+    held_escrow_total: number;
+    recent: Array<{
+      invoice_id: string;
+      offer_id: string;
+      status: string;
+      payment_type: string;
+      total: number;
+      currency: string;
+      created_at: string | null;
+      paid_at: string | null;
+    }>;
+  }> {
+    return this.get("/payments/contractor/earnings");
+  }
+
   async getPayment(paymentId: string): Promise<Payment> {
     return this.get<Payment>(`/payments/${encodeURIComponent(paymentId)}`);
   }

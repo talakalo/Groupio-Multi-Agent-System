@@ -24,6 +24,9 @@ const RESIDENT_NAV_KEYS = [
   'payments',
   'aiAssistant',
   'myAccount',
+  'myAccountHint',
+  'accountMenu',
+  'logout',
 ] as const;
 
 function getResidentNav(obj: Record<string, unknown>) {

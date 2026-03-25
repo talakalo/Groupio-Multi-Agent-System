@@ -4,6 +4,8 @@ import { useAuthStore } from "@/lib/stores/authStore";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
+
 interface RequestOptions {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
@@ -75,13 +77,25 @@ class ApiClient {
       requestHeaders["Authorization"] = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
-      method,
-      headers: requestHeaders,
-      body: body ? JSON.stringify(body) : undefined,
-      credentials: 'include', // send HTTP-only cookies (refresh token)
-      signal,
-    });
+    const timeoutController = new AbortController();
+    const timeoutId = setTimeout(() => timeoutController.abort(), DEFAULT_REQUEST_TIMEOUT_MS);
+    let combinedSignal: AbortSignal = timeoutController.signal;
+    if (signal) {
+      combinedSignal = AbortSignal.any([signal, timeoutController.signal]);
+    }
+
+    let response: Response;
+    try {
+      response = await fetch(`${this.baseUrl}${endpoint}`, {
+        method,
+        headers: requestHeaders,
+        body: body ? JSON.stringify(body) : undefined,
+        credentials: 'include', // send HTTP-only cookies (refresh token)
+        signal: combinedSignal,
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     if (
       response.status === 401 &&
@@ -344,6 +358,14 @@ class ApiClient {
     });
   }
 
+  /** PATCH-style merge for profile + notification_settings (server merges notification keys). */
+  async updateCurrentUser(body: Record<string, unknown>) {
+    return this.request<Record<string, unknown>>("/api/v1/auth/me", {
+      method: "PUT",
+      body,
+    });
+  }
+
   // ---- Payment endpoints ----
 
   async getMyPayments() {
@@ -351,10 +373,32 @@ class ApiClient {
   }
 
   async initiatePayment(offerId: string, paymentMethodId?: string) {
-    return this.request<import("@groupio/types").Payment>("/api/v1/payments/initiate", {
-      method: "POST",
-      body: { offer_id: offerId, payment_method_id: paymentMethodId },
-    });
+    return this.request<import("@groupio/types").Payment & { provider?: string }>(
+      "/api/v1/payments/initiate",
+      {
+        method: "POST",
+        body: { offer_id: offerId, payment_method_id: paymentMethodId },
+      }
+    );
+  }
+
+  async getContractorEarnings() {
+    return this.request<{
+      currency: string;
+      pending_total: number;
+      completed_total: number;
+      held_escrow_total: number;
+      recent: Array<{
+        invoice_id: string;
+        offer_id: string;
+        status: string;
+        payment_type: string;
+        total: number;
+        currency: string;
+        created_at: string | null;
+        paid_at: string | null;
+      }>;
+    }>("/api/v1/payments/contractor/earnings");
   }
 
   async getPayment(paymentId: string) {
@@ -379,6 +423,48 @@ class ApiClient {
 
   async getMyInvoices() {
     return this.request<import("@groupio/types").Invoice[]>("/api/v1/payments/invoices/my");
+  }
+
+  /** Download printable invoice HTML (use save as PDF in the browser). Requires auth. */
+  async downloadInvoiceHtml(invoiceId: string): Promise<Blob> {
+    const token = this.getAuthToken();
+    const requestHeaders: Record<string, string> = { Accept: "text/html" };
+    if (token) requestHeaders.Authorization = `Bearer ${token}`;
+    const timeoutController = new AbortController();
+    const timeoutId = setTimeout(() => timeoutController.abort(), DEFAULT_REQUEST_TIMEOUT_MS);
+    try {
+      const res = await fetch(
+        `${this.baseUrl}/api/v1/payments/invoices/${encodeURIComponent(invoiceId)}/pdf`,
+        {
+          method: "GET",
+          headers: requestHeaders,
+          credentials: "include",
+          signal: timeoutController.signal,
+        }
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        const detail = err?.detail;
+        const msg =
+          typeof detail === "string"
+            ? detail
+            : Array.isArray(detail)
+              ? detail.map((e: { msg?: string }) => e?.msg).filter(Boolean).join(", ") || res.statusText
+              : res.statusText;
+        throw new ApiError(msg, res.status, err);
+      }
+      return await res.blob();
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  /** Contractor asks ops to review a completed offer (creates an escalation). */
+  async requestContractorOfferReview(offerId: string, message?: string) {
+    return this.request<{ id: string }>("/api/v1/escalations/contractor/request-review", {
+      method: "POST",
+      body: { offer_id: offerId, message: message || undefined },
+    });
   }
 
   // ---- Review endpoints ----

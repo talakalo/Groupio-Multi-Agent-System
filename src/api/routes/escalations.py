@@ -15,6 +15,7 @@ from src.models.escalation import (
     EscalationFilterRequest,
     EscalationListResponse,
     EscalationPriority,
+    EscalationReason,
     EscalationReplyRequest,
     EscalationResponse,
     EscalationSource,
@@ -22,7 +23,7 @@ from src.models.escalation import (
     EscalationStatus,
     EscalationUpdate,
 )
-from src.models.user import UserInDB
+from src.models.user import UserInDB, UserRole
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +49,71 @@ class AssignEscalationBody(BaseModel):
     """Admin UI sends ``assigned_to`` in JSON; keep field name aligned with DB column."""
 
     assigned_to: str = Field(..., min_length=1)
+
+
+class ContractorRequestReviewBody(BaseModel):
+    """Contractor asks ops to review a completed offer (e.g. dispute / quality)."""
+
+    offer_id: str = Field(..., min_length=1, max_length=64)
+    message: str | None = Field(None, max_length=2000)
+
+
+@router.post("/contractor/request-review", response_model=EscalationResponse)
+async def contractor_request_review(
+    body: ContractorRequestReviewBody,
+    current_user: UserInDB = Depends(get_current_user),
+) -> EscalationResponse:
+    """Create a support escalation for a completed offer owned by the logged-in contractor."""
+    if current_user.role != UserRole.CONTRACTOR or not current_user.contractor_id:
+        raise HTTPException(status_code=403, detail="Contractor access required")
+
+    db = get_postgres_client()
+    offer = await db.get_offer(body.offer_id)
+    if not offer:
+        raise HTTPException(status_code=404, detail="Offer not found")
+    if str(offer.get("contractor_id") or "") != str(current_user.contractor_id):
+        raise HTTPException(status_code=403, detail="This offer is not associated with your contractor profile")
+
+    status_val = str(offer.get("status") or "").lower()
+    if status_val != "completed":
+        raise HTTPException(
+            status_code=400,
+            detail="Review requests are only available for completed offers",
+        )
+
+    summary = (body.message or "").strip()
+    if len(summary) < 10:
+        summary = (
+            f"Contractor requests manual review for completed offer {body.offer_id}. "
+            f"(contractor_id={current_user.contractor_id})"
+        )
+    summary = summary[:1000]
+
+    escalation_id = str(uuid4())
+    escalation_data: dict[str, Any] = {
+        "id": escalation_id,
+        "user_id": current_user.id,
+        "conversation_id": f"contractor_offer:{body.offer_id}",
+        "source_agent": EscalationSource.SUPPORT.value,
+        "reason": EscalationReason.MANUAL_REVIEW.value,
+        "priority": EscalationPriority.MEDIUM.value,
+        "summary": summary,
+        "status": EscalationStatus.OPEN.value,
+        "context": {
+            "kind": "contractor_review_request",
+            "offer_id": body.offer_id,
+            "contractor_id": str(current_user.contractor_id),
+        },
+    }
+
+    row = await db.create_escalation(escalation_data)
+    logger.info(
+        "contractor_request_review escalation_id=%s offer_id=%s user_id=%s",
+        escalation_id,
+        body.offer_id,
+        current_user.id,
+    )
+    return EscalationResponse.model_validate(row)
 
 
 @router.post("/", response_model=EscalationResponse)

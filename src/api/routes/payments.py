@@ -2,7 +2,6 @@
 
 import hashlib
 import hmac
-import logging
 import time as _time
 from datetime import UTC, datetime
 from typing import Any
@@ -15,10 +14,11 @@ from pydantic import BaseModel, Field
 from src.api.middleware.auth import get_admin_user, get_current_user
 from src.config.settings import get_settings
 from src.databases.postgres import get_postgres_client
-from src.models.user import UserInDB
-from src.services.payment import get_payment_provider
+from src.models.user import UserInDB, UserRole
+from src.services.payment import PaymentProviderUnavailableError, get_payment_provider
+from src.utils.monitoring import capture_exception_safe, get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 router = APIRouter(tags=["Payments"])
 
@@ -60,6 +60,7 @@ class PaymentResponse(BaseModel):
     transaction_id: str | None = None
     client_secret: str | None = None  # Stripe PaymentIntent client_secret for frontend confirmation
     created_at: str
+    provider: str | None = None  # e.g. mock | stripe — lets checkout fail closed outside mock
 
 
 class InvoiceResponse(BaseModel):
@@ -77,6 +78,39 @@ class InvoiceResponse(BaseModel):
     issued_at: str
     due_date: str | None = None
     items: list[dict] = []
+
+
+class ContractorEarningsLine(BaseModel):
+    """Single invoice row for contractor payout visibility."""
+
+    invoice_id: str
+    offer_id: str
+    status: str
+    payment_type: str = "direct"
+    total: float
+    currency: str = "ILS"
+    created_at: str | None = None
+    paid_at: str | None = None
+
+
+class ContractorEarningsResponse(BaseModel):
+    """Aggregated earnings / invoice status for the logged-in contractor."""
+
+    currency: str = "ILS"
+    pending_total: float = 0.0
+    completed_total: float = 0.0
+    held_escrow_total: float = 0.0
+    recent: list[ContractorEarningsLine] = Field(default_factory=list)
+
+
+def _iso_utc(val: Any) -> str | None:
+    if val is None:
+        return None
+    if isinstance(val, datetime):
+        if val.tzinfo is None:
+            return val.replace(tzinfo=UTC).isoformat()
+        return val.isoformat()
+    return str(val)
 
 
 # ---------------------------------------------------------------------------
@@ -200,9 +234,61 @@ async def get_my_payments(
                 status=p.get("status", "unknown"),
                 transaction_id=p.get("transaction_id"),
                 created_at=p.get("created_at", datetime.now(UTC).isoformat()),
+                provider=p.get("provider_name"),
             )
         )
     return result
+
+
+@router.get("/contractor/earnings", response_model=ContractorEarningsResponse)
+async def get_contractor_earnings(
+    current_user: UserInDB = Depends(get_current_user),
+) -> ContractorEarningsResponse:
+    """Invoices linked to this contractor (matched offers + invoice.contractor_id)."""
+    if current_user.role != UserRole.CONTRACTOR:
+        raise HTTPException(status_code=403, detail="Contractor role required")
+    cid = current_user.contractor_id
+    if not cid:
+        raise HTTPException(status_code=400, detail="Account is not linked to a contractor profile")
+
+    db = get_postgres_client()
+    rows = await db.list_invoices_for_contractor(cid)
+    pending_total = 0.0
+    completed_total = 0.0
+    held_escrow_total = 0.0
+    recent: list[ContractorEarningsLine] = []
+    currency = "ILS"
+
+    for inv in rows:
+        st = str(inv.get("status") or "pending").lower()
+        total = float(inv.get("total") or inv.get("amount") or 0)
+        pt = str(inv.get("payment_type") or "direct").lower()
+        currency = str(inv.get("currency") or currency)
+        line = ContractorEarningsLine(
+            invoice_id=str(inv.get("id", "")),
+            offer_id=str(inv.get("offer_id", "")),
+            status=st,
+            payment_type=pt,
+            total=total,
+            currency=currency,
+            created_at=_iso_utc(inv.get("created_at")),
+            paid_at=_iso_utc(inv.get("paid_at")),
+        )
+        recent.append(line)
+        if st in ("paid", "released"):
+            completed_total += total
+        else:
+            pending_total += total
+            if pt == "escrow":
+                held_escrow_total += total
+
+    return ContractorEarningsResponse(
+        currency=currency,
+        pending_total=round(pending_total, 2),
+        completed_total=round(completed_total, 2),
+        held_escrow_total=round(held_escrow_total, 2),
+        recent=recent,
+    )
 
 
 @router.post("/initiate", response_model=PaymentResponse)
@@ -216,7 +302,12 @@ async def initiate_payment(
     creates a payment record, and calls the payment provider.
     """
     db = get_postgres_client()
-    provider = get_payment_provider()
+    settings = get_settings()
+    provider_key = settings.PAYMENT_PROVIDER.lower()
+    try:
+        provider = get_payment_provider()
+    except PaymentProviderUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     # Verify the offer exists and the user is associated with it
     offer = await db.get_offer(request.offer_id)
@@ -235,14 +326,18 @@ async def initiate_payment(
 
     # Determine escrow vs direct payment
     contractor_trust = None
-    contractor_id = offer.get("contractor_id")
+    contractor_id = offer.get("matched_contractor_id") or offer.get("contractor_id")
     if contractor_id:
         try:
             ctr = await db.get_contractor(contractor_id)
             if ctr:
                 contractor_trust = ctr.get("trust_score")
-        except Exception:
-            pass  # Contractor lookup failure doesn't block payment
+        except Exception as exc:
+            logger.warning(
+                "contractor_trust_lookup_failed",
+                contractor_id=str(contractor_id),
+                error_type=type(exc).__name__,
+            )
 
     thresholds = await _get_escrow_thresholds()
     payment_type = determine_payment_type(
@@ -340,8 +435,22 @@ async def initiate_payment(
         payment_data["transaction_id"] = charge_result.get("transaction_id")
         payment_data["status"] = charge_result.get("status", "processing")
         payment_data["client_secret"] = charge_result.get("client_secret")
+        st_raw = str(payment_data.get("status") or "")
+        if provider_key == "stripe" and st_raw.startswith("requires") and not payment_data.get("client_secret"):
+            logger.error(
+                "stripe_initiate_missing_client_secret",
+                status=st_raw,
+                payment_id=payment_id,
+            )
+            payment_data["status"] = "failed"
     except Exception as exc:
-        logger.error("Payment provider error for payment %s: %s", payment_id, exc)
+        logger.error(
+            "payment_provider_charge_failed",
+            payment_id=payment_id,
+            error_type=type(exc).__name__,
+            error=str(exc)[:500],
+        )
+        capture_exception_safe(exc, flow="payment_initiate", payment_id=payment_id)
         payment_data["status"] = "failed"
 
     # Task 3.2: wrap invoice + payment creation in a single atomic transaction
@@ -381,6 +490,7 @@ async def initiate_payment(
         transaction_id=payment_data.get("transaction_id"),
         client_secret=payment_data.get("client_secret"),
         created_at=payment_data["created_at"],
+        provider=provider_key,
     )
 
 
@@ -406,7 +516,11 @@ async def stripe_webhook(request: Request) -> dict:
                 secret=settings.STRIPE_WEBHOOK_SECRET,
             )
         except Exception as exc:
-            logger.warning("Stripe webhook signature verification failed: %s", exc)
+            logger.warning(
+                "stripe_webhook_signature_failed",
+                error_type=type(exc).__name__,
+                error=str(exc)[:500],
+            )
             raise HTTPException(status_code=400, detail="Invalid Stripe signature") from exc
         try:
             event_id = event["id"]
@@ -427,13 +541,13 @@ async def stripe_webhook(request: Request) -> dict:
         event_type = body.get("type", "")
         event_data = body.get("data", {}).get("object", {})
 
-    logger.info("Stripe webhook received: %s id=%s", event_type, event_id)
+    logger.info("stripe_webhook_received", event_type=event_type, event_id=str(event_id) if event_id else None)
 
     db = get_postgres_client()
     if event_id:
         claimed = await db.try_claim_stripe_webhook_event(str(event_id))
         if not claimed:
-            logger.info("Duplicate Stripe event %s — skipping", event_id)
+            logger.info("stripe_webhook_duplicate_skipped", event_id=str(event_id))
             return {"status": "duplicate", "event_id": event_id}
 
     membership_events = {
@@ -468,17 +582,26 @@ async def stripe_webhook(request: Request) -> dict:
 
     payment = await db.get_payment_by_transaction(transaction_id)
     if not payment:
-        logger.warning("Stripe webhook for unknown transaction: %s", transaction_id)
+        logger.warning(
+            "stripe_webhook_unknown_transaction",
+            transaction_id=str(transaction_id),
+            event_type=event_type,
+        )
         return {"status": "ignored", "reason": "unknown_transaction"}
 
-    await db.update_payment(payment["id"], {"status": new_status})
-
     invoice_id = payment.get("invoice_id")
+    invoice_status: str | None = None
     if invoice_id:
         if new_status == "succeeded":
-            await db.update_invoice(invoice_id, {"status": "paid"})
+            invoice_status = "paid"
         elif new_status == "refunded":
-            await db.update_invoice(invoice_id, {"status": "refunded"})
+            invoice_status = "refunded"
+    await db.update_payment_and_invoice_for_webhook(
+        payment["id"],
+        invoice_id if invoice_status else None,
+        new_status,
+        invoice_status,
+    )
 
     try:
         from src.messaging.envelope import EventEnvelope
@@ -599,6 +722,7 @@ async def get_payment(
         status=payment.get("status", "unknown"),
         transaction_id=payment.get("transaction_id"),
         created_at=payment.get("created_at", ""),
+        provider=payment.get("provider_name"),
     )
 
 
@@ -632,28 +756,31 @@ async def payment_webhook(
         incoming_sig = x_payment_signature or ""
         if not hmac.compare_digest(expected_sig, incoming_sig):
             logger.warning(
-                "Payment webhook signature mismatch — possible forgery attempt (expected prefix=%s, got=%s)",
-                expected_sig[:20],
-                incoming_sig[:20],
+                "payment_webhook_signature_mismatch",
+                expected_prefix=expected_sig[:24],
+                got_prefix=incoming_sig[:24],
             )
             raise HTTPException(status_code=403, detail="Invalid webhook signature")
     elif settings.ENVIRONMENT != "development":
         # In non-dev environments, refuse to process unsigned webhooks
         logger.error(
-            "PAYMENT_WEBHOOK_SECRET is not configured in %s — refusing unsigned webhook to prevent fraud.",
-            settings.ENVIRONMENT,
+            "payment_webhook_secret_missing",
+            environment=settings.ENVIRONMENT,
         )
         raise HTTPException(
             status_code=503,
             detail="Webhook signature verification not configured",
         )
     else:
-        logger.warning("PAYMENT_WEBHOOK_SECRET not set — skipping signature check in development")
+        logger.warning("payment_webhook_unsigned_dev_mode")
 
     import json
 
     body = json.loads(raw_body)
-    logger.info("Payment webhook received: %s", body.get("event_type", "unknown"))
+    logger.info(
+        "payment_webhook_received",
+        event_type=body.get("event_type", "unknown"),
+    )
 
     transaction_id = body.get("transaction_id")
     event_type = body.get("event_type")
@@ -667,7 +794,11 @@ async def payment_webhook(
     # Look up the payment by transaction_id
     payment = await db.get_payment_by_transaction(transaction_id)
     if not payment:
-        logger.warning("Webhook for unknown transaction: %s", transaction_id)
+        logger.warning(
+            "payment_webhook_unknown_transaction",
+            transaction_id=str(transaction_id),
+            event_type=str(event_type),
+        )
         # Return 200 to avoid provider retries for unknown transactions
         return {"status": "ignored", "reason": "unknown_transaction"}
 
@@ -691,15 +822,19 @@ async def payment_webhook(
     }
     new_status = status_mapping.get(event_type, status or payment.get("status"))
 
-    await db.update_payment(payment["id"], {"status": new_status})
-
-    # Update the related invoice if payment succeeded or was refunded
     invoice_id = payment.get("invoice_id")
+    invoice_status: str | None = None
     if invoice_id:
         if new_status == "succeeded":
-            await db.update_invoice(invoice_id, {"status": "paid"})
+            invoice_status = "paid"
         elif new_status == "refunded":
-            await db.update_invoice(invoice_id, {"status": "refunded"})
+            invoice_status = "refunded"
+    await db.update_payment_and_invoice_for_webhook(
+        payment["id"],
+        invoice_id if invoice_status else None,
+        new_status,
+        invoice_status,
+    )
 
     return {"status": "processed", "payment_id": payment["id"], "new_status": new_status}
 
@@ -751,15 +886,22 @@ async def request_refund(
             new_status = "cancelled"
             refund_id = f"cancel_{uuid4().hex[:8]}"
     except Exception as exc:
-        logger.error("Refund failed for payment %s: %s", payment_id, exc)
+        logger.error(
+            "payment_refund_failed",
+            payment_id=payment_id,
+            error_type=type(exc).__name__,
+            error=str(exc)[:500],
+        )
+        capture_exception_safe(exc, flow="payment_refund", payment_id=payment_id)
         raise HTTPException(status_code=502, detail=f"Refund failed: {exc}") from exc
 
-    await db.update_payment(payment_id, {"status": new_status})
-
-    # Also update invoice status if linked
     invoice_id = payment.get("invoice_id")
-    if invoice_id:
-        await db.update_invoice(invoice_id, {"status": "refunded"})
+    await db.update_payment_and_invoice_for_webhook(
+        payment_id,
+        invoice_id,
+        new_status,
+        "refunded" if invoice_id else None,
+    )
 
     logger.info(
         "Refund processed: payment=%s refund_id=%s amount=%s status=%s user=%s reason=%s",
