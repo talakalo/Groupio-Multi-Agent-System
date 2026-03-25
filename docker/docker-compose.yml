@@ -17,12 +17,29 @@ services:
       timeout: 5s
       retries: 5
 
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
   api:
     build:
       context: ..
       dockerfile: docker/Dockerfile
     env_file:
-      - .env
+      - staging-minimal.env
     ports:
       - "8000:8000"
     environment:
@@ -42,9 +59,13 @@ services:
       - DOCKER_POSTGRES_USER=${POSTGRES_USER:-postgres}
       - DOCKER_POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - DOCKER_POSTGRES_DB=${POSTGRES_DB:-groupio}
+      - RABBITMQ_URL=${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
+      - RABBITMQ_EXCHANGE_EVENTS=${RABBITMQ_EXCHANGE_EVENTS:-groupio.events}
     depends_on:
       postgres:
         condition: service_healthy
+      # API does not wait on RabbitMQ: core routes work with messaging flags off.
+      # Start rabbitmq separately when enabling ENABLE_RABBITMQ / workers.
       qdrant:
         condition: service_started
       neo4j:
@@ -94,7 +115,7 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
     env_file:
-      - .env
+      - staging-minimal.env
     command: python -m src.workers.agent_worker
     environment:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
@@ -111,9 +132,11 @@ services:
       - DOCKER_POSTGRES_USER=${POSTGRES_USER:-postgres}
       - DOCKER_POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - DOCKER_POSTGRES_DB=${POSTGRES_DB:-groupio}
+      - RABBITMQ_URL=${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
     depends_on:
       postgres:
         condition: service_healthy
+      # Agent worker uses Redis only; no hard dependency on RabbitMQ.
       redis:
         condition: service_started
       qdrant:
@@ -144,6 +167,94 @@ services:
         condition: service_started
       neo4j:
         condition: service_started
+    restart: unless-stopped
+
+  outbox_dispatcher:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    env_file:
+      - staging-minimal.env
+    command: python -m src.workers.outbox_dispatcher
+    environment:
+      - USE_LOCAL_POSTGRES=${USE_LOCAL_POSTGRES:-1}
+      - DOCKER_POSTGRES_HOST=postgres
+      - DOCKER_POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - DOCKER_POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - DOCKER_POSTGRES_DB=${POSTGRES_DB:-groupio}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-groupio-redis-dev}@redis:6379
+      - RABBITMQ_URL=${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
+      - ENABLE_RABBITMQ=${ENABLE_RABBITMQ:-false}
+      - ENABLE_OUTBOX=${ENABLE_OUTBOX:-false}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  worker_notifications:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    env_file:
+      - staging-minimal.env
+    command: python -m src.workers.worker_notifications
+    environment:
+      - USE_LOCAL_POSTGRES=${USE_LOCAL_POSTGRES:-1}
+      - DOCKER_POSTGRES_HOST=postgres
+      - DOCKER_POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - DOCKER_POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - DOCKER_POSTGRES_DB=${POSTGRES_DB:-groupio}
+      - RABBITMQ_URL=${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
+      - ENABLE_RABBITMQ=${ENABLE_RABBITMQ:-false}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker_crm_sync:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    env_file:
+      - staging-minimal.env
+    command: python -m src.workers.worker_crm_sync
+    environment:
+      - USE_LOCAL_POSTGRES=${USE_LOCAL_POSTGRES:-1}
+      - DOCKER_POSTGRES_HOST=postgres
+      - DOCKER_POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - DOCKER_POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - DOCKER_POSTGRES_DB=${POSTGRES_DB:-groupio}
+      - RABBITMQ_URL=${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
+      - ENABLE_RABBITMQ=${ENABLE_RABBITMQ:-false}
+      - ENABLE_CRM_SYNC=${ENABLE_CRM_SYNC:-false}
+      - ESPOCRM_BASE_URL=${ESPOCRM_BASE_URL:-}
+      - ESPOCRM_API_KEY=${ESPOCRM_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker_payments:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    env_file:
+      - staging-minimal.env
+    command: python -m src.workers.worker_payments
+    environment:
+      - RABBITMQ_URL=${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
+      - ENABLE_RABBITMQ=${ENABLE_RABBITMQ:-false}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
     restart: unless-stopped
 
   prometheus:
@@ -189,5 +300,6 @@ volumes:
   qdrant_data:
   neo4j_data:
   redis_data:
+  rabbitmq_data:
   prometheus_data:
   grafana_data:

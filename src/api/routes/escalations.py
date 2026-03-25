@@ -71,6 +71,28 @@ async def create_escalation(
         request.priority,
     )
 
+    try:
+        from src.messaging.envelope import EventEnvelope
+        from src.messaging.outbox_helpers import try_enqueue_crm
+        from src.messaging.topics import RK_CRM_ESCALATION_CREATED
+
+        env = EventEnvelope(
+            event_name="crm.escalation.created",
+            entity_type="escalation",
+            entity_id=escalation_id,
+            idempotency_key=f"crm:escalation:{escalation_id}",
+            payload={"escalation_id": escalation_id},
+        )
+        await try_enqueue_crm(
+            db,
+            RK_CRM_ESCALATION_CREATED,
+            env.event_name,
+            env.to_json_dict(),
+            idempotency_key=env.idempotency_key,
+        )
+    except Exception:
+        logger.exception("CRM outbox enqueue failed after escalation create (non-fatal)")
+
     return escalation
 
 

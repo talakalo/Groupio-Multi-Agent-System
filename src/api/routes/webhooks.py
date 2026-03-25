@@ -184,6 +184,30 @@ async def contractor_update_webhook(
             ]
             await vetting_agent.run(state)
 
+        if update_type == "document_uploaded":
+            try:
+                from src.messaging.envelope import EventEnvelope
+                from src.messaging.outbox_helpers import try_enqueue_crm
+                from src.messaging.topics import RK_CRM_CONTRACTOR_DOCUMENTS_SUBMITTED
+
+                db = get_postgres_client()
+                env = EventEnvelope(
+                    event_name="crm.contractor.documents_submitted",
+                    entity_type="contractor",
+                    entity_id=str(contractor_id),
+                    idempotency_key=f"crm:contractor:docs:{contractor_id}:{update_type}",
+                    payload={"contractor_id": str(contractor_id), "update_type": update_type},
+                )
+                await try_enqueue_crm(
+                    db,
+                    RK_CRM_CONTRACTOR_DOCUMENTS_SUBMITTED,
+                    env.event_name,
+                    env.to_json_dict(),
+                    idempotency_key=env.idempotency_key,
+                )
+            except Exception:
+                logger.exception("CRM outbox enqueue failed for contractor document webhook (non-fatal)")
+
     return {"status": "processed"}
 
 

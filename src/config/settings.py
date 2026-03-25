@@ -116,6 +116,39 @@ class Settings(BaseSettings):
     ENABLE_GRAPH_QUERIES: bool = True
     ENABLE_PREDICTIVE_MODELS: bool = False
 
+    # Async messaging / CRM (all default off — enable per environment after verification)
+    # RabbitMQ: set ENABLE_RABBITMQ=true and RABBITMQ_URL when using workers + dispatcher.
+    ENABLE_RABBITMQ: bool = False
+    # Transactional outbox (Postgres outbox_events + dispatcher worker).
+    ENABLE_OUTBOX: bool = False
+    # Route selected notifications through outbox → RabbitMQ → worker-notifications.
+    ENABLE_NOTIFICATION_QUEUE: bool = False
+    # CRM sync worker (EspoCRM projection; Groupio DB remains authoritative).
+    ENABLE_CRM_SYNC: bool = False
+    # Outbox rows for payment / invoice derived events (after Stripe webhook DB success).
+    ENABLE_PAYMENT_EVENTS: bool = False
+
+    # RabbitMQ (AMQP URL, e.g. amqp://guest:guest@localhost:5672/)
+    RABBITMQ_URL: str = ""
+    RABBITMQ_EXCHANGE_EVENTS: str = "groupio.events"
+    # Outbox dispatcher poll interval when running as standalone worker.
+    OUTBOX_POLL_INTERVAL_MS: int = 500
+
+    # EspoCRM REST API (optional; used only when ENABLE_CRM_SYNC and workers run).
+    ESPOCRM_BASE_URL: str = ""
+    ESPOCRM_API_KEY: str = ""
+    # Entity type names in Espo API paths (e.g. custom module C_GroupioContractor, or native Account).
+    ESPOCRM_ENTITY_CONTRACTOR: str = "C_GroupioContractor"
+    ESPOCRM_ENTITY_BUILDING: str = "C_GroupioBuilding"
+    ESPOCRM_ENTITY_NOTE: str = "Note"
+    # Attribute keys sent in JSON bodies — must exist on the target entities in Espo.
+    ESPOCRM_FIELD_CONTRACTOR_EXTERNAL_ID: str = "cGroupioContractorId"
+    ESPOCRM_FIELD_CONTRACTOR_VERIFICATION: str = "cGroupioVerificationStatus"
+    ESPOCRM_FIELD_BUILDING_EXTERNAL_ID: str = "cGroupioBuildingId"
+    ESPOCRM_FIELD_BUILDING_ADDRESS: str = "cGroupioAddress"
+    ESPOCRM_FIELD_BUILDING_CITY: str = "cGroupioCity"
+    ESPOCRM_FIELD_BUILDING_REGION: str = "cGroupioRegion"
+
     # Monitoring
     SENTRY_DSN: str | None = None
     LOG_LEVEL: str = "INFO"
