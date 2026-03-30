@@ -45,7 +45,6 @@ function makeQueryClient() {
     defaultOptions: {
       queries: {
         staleTime: 30_000,
-        refetchInterval: 60_000,
         retry: 2,
       },
     },
@@ -262,13 +261,17 @@ function Header({ sidebarCollapsed }: { sidebarCollapsed: boolean }) {
 // PostHog analytics — optional, requires NEXT_PUBLIC_POSTHOG_KEY env var
 if (typeof window !== "undefined" && process.env.NEXT_PUBLIC_POSTHOG_KEY) {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const posthog = require("posthog-js").default;
-    posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY, {
-      api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://app.posthog.com",
-      capture_pageview: true,
-      autocapture: false,
-    });
+    const w = window as Window & { __groupioPosthogInit?: boolean };
+    if (!w.__groupioPosthogInit) {
+      w.__groupioPosthogInit = true;
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const posthog = require("posthog-js").default;
+      posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY, {
+        api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://app.posthog.com",
+        capture_pageview: true,
+        autocapture: false,
+      });
+    }
   } catch {
     // posthog-js not available
   }
