@@ -407,11 +407,50 @@ class ApiClient {
     );
   }
 
+  async getContractorMembership() {
+    return this.request<{
+      membership_status: string | null;
+      membership_plan: string | null;
+      membership_provider: string | null;
+      current_period_end: string | null;
+      next_billing_at: string | null;
+      cancel_at_period_end: boolean | null;
+      trial_ends_at: string | null;
+    }>("/api/v1/contractors/me/membership");
+  }
+
+  async createMembershipCheckoutSession(
+    successUrl?: string,
+    cancelUrl?: string
+  ) {
+    return this.request<{ url: string; session_id: string }>(
+      "/api/v1/contractors/me/membership/checkout-session",
+      {
+        method: "POST",
+        body: JSON.stringify({ success_url: successUrl, cancel_url: cancelUrl }),
+      }
+    );
+  }
+
   /** Resident acknowledges completed work (audit log; full escrow release is admin-operated today). */
   async approveWork(paymentId: string) {
     return this.request<{ status: string }>(
       `/api/v1/payments/${encodeURIComponent(paymentId)}/approve-work`,
       { method: "POST" },
+    );
+  }
+
+  async submitReview(
+    contractorId: string,
+    offerId: string,
+    payload: { rating: number; comment?: string }
+  ) {
+    return this.request<{ id: string; rating: number; comment?: string }>(
+      `/api/v1/contractors/${encodeURIComponent(contractorId)}/reviews`,
+      {
+        method: "POST",
+        body: JSON.stringify({ offer_id: offerId, ...payload }),
+      }
     );
   }
 

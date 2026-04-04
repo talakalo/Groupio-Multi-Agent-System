@@ -563,6 +563,18 @@ class PostgresClient:
                 user_id,
             )
 
+    async def delete_user(self, user_id: str) -> None:
+        """Hard-delete a user row by ID (GDPR right to erasure).
+
+        FK ON DELETE CASCADE rules in the schema handle linked rows
+        (residents, contractors, payments, etc.).
+        """
+        if self._use_supabase_client():
+            client = await self._get_client()
+            await client.table("users").delete().eq("id", user_id).execute()
+        else:
+            await self._pg_execute("DELETE FROM users WHERE id = $1", user_id)
+
     async def get_building(self, building_id: str) -> dict[str, Any] | None:
         """Get building details by ID."""
         if self._use_supabase_client():

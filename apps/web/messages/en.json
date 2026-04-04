@@ -47,12 +47,17 @@
     "projects": "Projects",
     "earnings": "Earnings",
     "profile": "Profile",
+    "membership": "Membership",
     "contractorBadge": "Contractor",
     "newOffer": "New Offer",
     "myBusiness": "My Business",
     "myBusinessHint": "Details, documents & settings",
     "accountMenu": "Account menu",
-    "logout": "Log out"
+    "logout": "Log out",
+    "emailUnverifiedBanner": "Please verify your email address. Check your inbox and click the verification link.",
+    "verificationSent": "Sent! Check your email.",
+    "resendVerification": "Resend verification link",
+    "resending": "Sending..."
   },
   "contractorEarnings": {
     "title": "Earnings & payouts",

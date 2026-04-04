@@ -365,6 +365,7 @@ export interface AdminAnalyticsDashboard {
   openTicketsChange?: number;
   resolvedToday?: number;
   totalContractors?: number;
+  pendingPaymentsCount?: number;
   categoryBreakdown?: Record<string, number>;
   regionalData?: Record<string, number>;
   dailyOffers?: { date: string; count: number }[];

@@ -212,6 +212,14 @@ async def get_analytics() -> dict[str, Any]:
     except Exception:
         logger.warning("Could not fetch contractor count for analytics", exc_info=True)
 
+    # --- Pending payments count ---
+    pending_payments_count = 0
+    try:
+        row = await db._pg_fetch_one("SELECT COUNT(*) AS c FROM payments WHERE status = 'pending'")
+        pending_payments_count = int(row["c"]) if row else 0
+    except Exception:
+        logger.warning("Could not fetch pending payments count for analytics", exc_info=True)
+
     # --- Charts / breakdowns (PostgreSQL) ---
     agg: dict[str, Any] = {}
     try:
@@ -263,6 +271,7 @@ async def get_analytics() -> dict[str, Any]:
         "openTicketsChange": 0,
         "resolvedToday": resolved_today,
         "totalContractors": total_contractors,
+        "pendingPaymentsCount": pending_payments_count,
         "categoryBreakdown": agg.get("category_breakdown") or {},
         "regionalData": agg.get("regional_data") or {},
         "dailyOffers": agg.get("daily_offers") or [],

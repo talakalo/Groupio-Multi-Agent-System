@@ -268,6 +268,21 @@ class RedisClient:
         """Remove a temporary lockout (called on successful login)."""
         await self._redis.delete(f"temp_lock:{user_id}")
 
+    # -- Pub/Sub --
+
+    async def publish(self, channel: str, message: dict[str, Any]) -> None:
+        """Publish a JSON message to a Redis pub/sub channel."""
+        await self._redis.publish(channel, json.dumps(message, default=str))
+
+    def pubsub(self) -> Any:
+        """Return a new pub/sub object backed by a fresh connection.
+
+        The caller is responsible for subscribing and closing the object.
+        Note: pub/sub objects hold a dedicated connection and must not be
+        shared across coroutines without external synchronisation.
+        """
+        return self._redis.pubsub()
+
     # -- Health --
 
     async def health_check(self) -> bool:

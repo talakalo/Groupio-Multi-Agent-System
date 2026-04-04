@@ -2,6 +2,7 @@ import type { Offer } from '@groupio/types';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, useCallback, useRef } from 'react';
 
+import { useAuthStore } from '@/lib/stores/authStore';
 import { offerKeys } from './useOffers';
 
 // ---------------------------------------------------------------------------
@@ -54,6 +55,7 @@ export function useRealtimeOffers({
   wsUrl,
 }: UseRealtimeOffersOptions): UseRealtimeOffersReturn {
   const queryClient = useQueryClient();
+  const accessToken = useAuthStore((s) => s.accessToken);
   const [status, setStatus] = useState<ConnectionStatus>('disconnected');
   const [lastEvent, setLastEvent] = useState<RealtimeEvent | null>(null);
 
@@ -98,7 +100,7 @@ export function useRealtimeOffers({
 
   // ---- Connect / reconnect logic ----
   const connect = useCallback(() => {
-    if (!enabled || !buildingId) return;
+    if (!enabled || !buildingId || !accessToken) return;
 
     // Clean up existing connection
     if (wsRef.current) {
@@ -106,7 +108,8 @@ export function useRealtimeOffers({
       wsRef.current = null;
     }
 
-    const url = `${wsUrl ?? DEFAULT_WS_URL}?buildingId=${encodeURIComponent(buildingId)}`;
+    const base = wsUrl ?? DEFAULT_WS_URL;
+    const url = `${base}?buildingId=${encodeURIComponent(buildingId)}&token=${encodeURIComponent(accessToken)}`;
 
     setStatus('connecting');
 
@@ -157,7 +160,7 @@ export function useRealtimeOffers({
     } catch {
       setStatus('error');
     }
-  }, [buildingId, enabled, handleEvent, wsUrl]);
+  }, [accessToken, buildingId, enabled, handleEvent, wsUrl]);
 
   // ---- Lifecycle ----
   useEffect(() => {

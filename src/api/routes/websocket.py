@@ -1,5 +1,6 @@
 """WebSocket endpoint for real-time admin notifications."""
 
+import asyncio
 import json
 import logging
 import time
@@ -9,6 +10,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
 
 from src.api.middleware.auth import verify_access_token
 from src.databases.postgres import get_postgres_client
+from src.databases.redis_client import get_redis_client
 
 logger = logging.getLogger(__name__)
 
@@ -21,18 +23,32 @@ MAX_MESSAGE_SIZE = 65_536  # 64 KB
 MAX_MESSAGES_PER_MINUTE = 60
 ALLOWED_MESSAGE_TYPES = {"ping", "subscribe", "unsubscribe"}
 
+# Redis pub/sub channel names
+_ADMIN_WS_CHANNEL = "groupio:ws:admin"
+_OFFERS_WS_CHANNEL_PREFIX = "groupio:ws:offers:"
+
 
 class ConnectionManager:
-    def __init__(self):
+    """Manages admin WebSocket connections with Redis pub/sub broadcast.
+
+    When ``broadcast()`` is called, the message is published to a Redis
+    channel so that *all* uvicorn workers receive and forward it to their
+    locally-connected clients.  Each worker runs a background subscriber task
+    (``start_redis_subscriber``) that listens on the channel and calls
+    ``_local_broadcast`` for messages originating from other workers.
+    """
+
+    def __init__(self) -> None:
         self.active_connections: list[WebSocket] = []
         self._rate_limits: dict[int, list[float]] = {}  # ws id -> timestamps
+        self._subscriber_task: asyncio.Task[None] | None = None
 
-    async def connect(self, websocket: WebSocket):
+    async def connect(self, websocket: WebSocket) -> None:
         await websocket.accept()
         self.active_connections.append(websocket)
         logger.info("Admin WebSocket connected. Total: %d", len(self.active_connections))
 
-    def disconnect(self, websocket: WebSocket):
+    def disconnect(self, websocket: WebSocket) -> None:
         if websocket in self.active_connections:
             self.active_connections.remove(websocket)
         self._rate_limits.pop(id(websocket), None)
@@ -51,7 +67,8 @@ class ConnectionManager:
         self._rate_limits[ws_id] = timestamps
         return True
 
-    async def broadcast(self, message: dict[str, Any]):
+    async def _local_broadcast(self, message: dict[str, Any]) -> None:
+        """Send a message to all locally-connected WebSocket clients."""
         disconnected: list[WebSocket] = []
         for connection in self.active_connections:
             try:
@@ -60,6 +77,53 @@ class ConnectionManager:
                 disconnected.append(connection)
         for ws in disconnected:
             self.disconnect(ws)
+
+    async def broadcast(self, message: dict[str, Any]) -> None:
+        """Publish to Redis so all workers receive and forward the message."""
+        try:
+            redis = get_redis_client()
+            await redis.publish(_ADMIN_WS_CHANNEL, message)
+        except Exception:
+            logger.warning("Redis publish failed; falling back to local broadcast", exc_info=True)
+            await self._local_broadcast(message)
+
+    async def start_redis_subscriber(self) -> None:
+        """Start a background task that re-broadcasts Redis pub/sub messages locally.
+
+        Safe to call multiple times — subsequent calls are no-ops if the task
+        is already running.
+        """
+        if self._subscriber_task and not self._subscriber_task.done():
+            return
+        self._subscriber_task = asyncio.create_task(self._redis_subscriber_loop())
+
+    async def _redis_subscriber_loop(self) -> None:
+        """Subscribe to the admin WS channel and forward messages to local clients."""
+        while True:
+            pubsub = None
+            try:
+                redis = get_redis_client()
+                pubsub = redis.pubsub()
+                await pubsub.subscribe(_ADMIN_WS_CHANNEL)
+                async for raw in pubsub.listen():
+                    if raw["type"] != "message":
+                        continue
+                    try:
+                        data = json.loads(raw["data"])
+                    except (json.JSONDecodeError, TypeError):
+                        continue
+                    await self._local_broadcast(data)
+            except asyncio.CancelledError:
+                break
+            except Exception:
+                logger.warning("Admin WS Redis subscriber error; reconnecting in 2s", exc_info=True)
+                await asyncio.sleep(2)
+            finally:
+                if pubsub is not None:
+                    try:
+                        await pubsub.close()
+                    except Exception:
+                        pass
 
 
 manager = ConnectionManager()
@@ -115,6 +179,7 @@ async def admin_websocket(websocket: WebSocket):
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="User not found or disabled")
         return
 
+    await manager.start_redis_subscriber()
     await manager.connect(websocket)
     try:
         while True:
@@ -139,3 +204,98 @@ async def admin_websocket(websocket: WebSocket):
 
 def get_ws_manager() -> ConnectionManager:
     return manager
+
+
+# ---------------------------------------------------------------------------
+# /ws/offers — resident offer updates scoped by building_id
+# ---------------------------------------------------------------------------
+
+_RESIDENT_ROLES = frozenset({"resident", "admin", "super_admin", "buildings_manager"})
+
+
+class OffersConnectionManager:
+    """Tracks per-building WebSocket connections for offer realtime updates."""
+
+    def __init__(self) -> None:
+        # building_id -> list of connected WebSockets
+        self._connections: dict[str, list[WebSocket]] = {}
+
+    async def connect(self, websocket: WebSocket, building_id: str) -> None:
+        await websocket.accept()
+        self._connections.setdefault(building_id, []).append(websocket)
+        logger.info(
+            "Offers WS connected building=%s total=%d",
+            building_id,
+            len(self._connections[building_id]),
+        )
+
+    def disconnect(self, websocket: WebSocket, building_id: str) -> None:
+        conns = self._connections.get(building_id, [])
+        if websocket in conns:
+            conns.remove(websocket)
+        if not conns:
+            self._connections.pop(building_id, None)
+        logger.info("Offers WS disconnected building=%s", building_id)
+
+    async def broadcast_to_building(self, building_id: str, message: dict[str, Any]) -> None:
+        """Send a message to all residents connected for a given building."""
+        disconnected: list[WebSocket] = []
+        for ws in list(self._connections.get(building_id, [])):
+            try:
+                await ws.send_json(message)
+            except Exception:
+                disconnected.append(ws)
+        for ws in disconnected:
+            self.disconnect(ws, building_id)
+
+
+offers_manager = OffersConnectionManager()
+
+
+@router.websocket("/ws/offers")
+async def offers_websocket(websocket: WebSocket) -> None:
+    """Resident-scoped realtime offer updates.
+
+    Query params:
+      - token: JWT access token (required)
+      - buildingId: building to subscribe to (required)
+    """
+    token = websocket.query_params.get("token") or websocket.cookies.get("access_token")
+    if not token:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Missing auth token")
+        return
+
+    payload = verify_access_token(token)
+    if not payload:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid or expired token")
+        return
+
+    role = payload.role.value
+    if role not in _RESIDENT_ROLES:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Insufficient permissions")
+        return
+
+    building_id = websocket.query_params.get("buildingId") or websocket.query_params.get("building_id")
+    if not building_id:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Missing buildingId")
+        return
+
+    user_id = payload.sub
+    db = get_postgres_client()
+    user = await db.get_user(user_id) if user_id else None
+    if not user or not user.is_active:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="User not found or disabled")
+        return
+
+    await offers_manager.connect(websocket, building_id)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            if data == "ping":
+                await websocket.send_text("pong")
+    except WebSocketDisconnect:
+        offers_manager.disconnect(websocket, building_id)
+
+
+def get_offers_ws_manager() -> OffersConnectionManager:
+    return offers_manager

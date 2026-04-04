@@ -11,6 +11,7 @@ import {
   X,
   ChevronLeft,
   Package,
+  Layers,
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -49,6 +50,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'קבלנים', href: '/contractors', icon: HardHat },
   { label: 'הבניין שלי', href: '/building', icon: Building2 },
   { label: 'פרופיל', href: '/profile', icon: UserCircle },
+  { label: 'ניתוח תוכניות', href: '/architecture', icon: Layers },
 ];
 
 // ---------------------------------------------------------------------------

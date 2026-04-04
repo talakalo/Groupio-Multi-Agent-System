@@ -757,18 +757,7 @@ async def delete_account(
     await redis.delete(f"refresh_token:{current_user.id}")
 
     # Delete user — cascade rules in the DB handle linked rows.
-    # If the DB client exposes a delete method, use it; otherwise anonymise.
-    try:
-        await db.delete_user(current_user.id)  # type: ignore[attr-defined]
-    except AttributeError:
-        # Fallback: anonymise PII if hard-delete is not yet implemented
-        anonymised = {
-            "email": f"deleted_{current_user.id}@erasure.invalid",
-            "full_name": "Deleted User",
-            "phone": f"000{current_user.id[:8]}",
-            "is_active": False,
-        }
-        await db.update_user(current_user.id, anonymised)
+    await db.delete_user(current_user.id)
 
     # Clear auth cookie
     response.delete_cookie("refresh_token", path="/")

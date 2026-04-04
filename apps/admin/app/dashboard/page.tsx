@@ -142,7 +142,7 @@ export default function DashboardPage() {
   // Attention bar counts
   const pendingVetting = vettingStatus?.pendingReview ?? 0;
   const openEscalations = recentEscalations.filter((e) => e.status === "open").length;
-  const pendingPayments = 0; // placeholder until payments hook is available
+  const pendingPayments = analyticsData?.pendingPaymentsCount ?? 0;
 
   const attentionItems = useMemo(() => {
     const items: Array<{

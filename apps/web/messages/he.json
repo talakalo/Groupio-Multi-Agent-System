@@ -47,12 +47,17 @@
     "projects": "פרויקטים",
     "earnings": "הכנסות ותשלומים",
     "profile": "פרופיל",
+    "membership": "מנוי",
     "contractorBadge": "קבלן",
     "newOffer": "הצעה חדשה",
     "myBusiness": "העסק שלי",
     "myBusinessHint": "פרטי עסק, מסמכים והגדרות",
     "accountMenu": "תפריט חשבון",
-    "logout": "התנתקות"
+    "logout": "התנתקות",
+    "emailUnverifiedBanner": "נא לאמת את כתובת האימייל שלכם. בדקו את תיבת הדואר ולחצו על קישור האימות.",
+    "verificationSent": "נשלח! בדקו את האימייל.",
+    "resendVerification": "שליחת קישור אימות מחדש",
+    "resending": "שולח..."
   },
   "contractorEarnings": {
     "title": "הכנסות ותשלומים",

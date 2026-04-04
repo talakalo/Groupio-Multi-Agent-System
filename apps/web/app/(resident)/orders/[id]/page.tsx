@@ -9,6 +9,7 @@ import {
   Phone,
   Mail,
   XCircle,
+  Star,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -25,6 +26,7 @@ import { useUnwrapPageParams, PageParamsProps } from "@/lib/utils/unwrapPagePara
 interface OrderDetail {
   id: string;
   offerId: string;
+  contractorId?: string;
   amount: number;
   currency: string;
   status: string;
@@ -34,7 +36,9 @@ interface OrderDetail {
   offer?: {
     title: string;
     category?: string;
+    contractorId?: string;
     contractor?: {
+      id?: string;
       businessName: string;
       phone?: string;
       email?: string;
@@ -92,6 +96,11 @@ export default function OrderDetailPage(props: PageParamsProps) {
   const [approved, setApproved] = useState(false);
   const [invoiceBusy, setInvoiceBusy] = useState(false);
   const [invoiceErr, setInvoiceErr] = useState<string | null>(null);
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewSubmitted, setReviewSubmitted] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
 
   const handleInvoiceDownload = useCallback(async () => {
     if (!order?.invoiceId) return;
@@ -182,6 +191,30 @@ export default function OrderDetailPage(props: PageParamsProps) {
     order.status === "succeeded" &&
     order.escrowStatus === "held" &&
     !approved;
+
+  const effectiveContractorId =
+    order.contractorId ??
+    order.offer?.contractorId ??
+    order.offer?.contractor?.id;
+  const canLeaveReview =
+    order.status === "succeeded" && !!effectiveContractorId && !reviewSubmitted;
+
+  const handleSubmitReview = async () => {
+    if (!effectiveContractorId || reviewRating === 0) return;
+    setReviewSubmitting(true);
+    setReviewError(null);
+    try {
+      await apiClient.submitReview(effectiveContractorId, order.offerId, {
+        rating: reviewRating,
+        comment: reviewComment.trim() || undefined,
+      });
+      setReviewSubmitted(true);
+    } catch {
+      setReviewError("לא ניתן לשמור את הביקורת. נסו שוב.");
+    } finally {
+      setReviewSubmitting(false);
+    }
+  };
 
   const orderTitle = order.offer?.title || "הזמנה";
 
@@ -314,6 +347,64 @@ export default function OrderDetailPage(props: PageParamsProps) {
         <div className="bg-green-100 rounded-xl p-4 text-center text-green-800" role="alert">
           <CheckCircle2 className="w-8 h-8 mx-auto mb-2" />
           <p className="font-semibold">העבודה אושרה! הכסף ישוחרר לקבלן.</p>
+        </div>
+      )}
+
+      {/* Review Card */}
+      {canLeaveReview && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+          <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+            <Star className="w-5 h-5 text-yellow-400" />
+            דרגו את הקבלן
+          </h2>
+          <div className="flex items-center gap-1" dir="ltr">
+            {[1, 2, 3, 4, 5].map((star) => (
+              <button
+                key={star}
+                type="button"
+                onClick={() => setReviewRating(star)}
+                className="focus:outline-none"
+                aria-label={`${star} כוכבים`}
+              >
+                <Star
+                  className={`w-8 h-8 transition-colors ${
+                    star <= reviewRating ? "text-yellow-400 fill-yellow-400" : "text-gray-300"
+                  }`}
+                />
+              </button>
+            ))}
+          </div>
+          <textarea
+            value={reviewComment}
+            onChange={(e) => setReviewComment(e.target.value)}
+            placeholder="הוסיפו הערה (אופציונלי)"
+            rows={3}
+            className="w-full rounded-xl border border-gray-200 p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary-300"
+          />
+          {reviewError && (
+            <p className="text-sm text-red-600" role="alert">{reviewError}</p>
+          )}
+          <button
+            type="button"
+            onClick={() => void handleSubmitReview()}
+            disabled={reviewSubmitting || reviewRating === 0}
+            className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            {reviewSubmitting ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <Star className="w-5 h-5" />
+            )}
+            {reviewSubmitting ? "שומר..." : "שליחת ביקורת"}
+          </button>
+        </div>
+      )}
+
+      {/* Review Submitted Banner */}
+      {reviewSubmitted && (
+        <div className="bg-yellow-50 rounded-xl p-4 text-center text-yellow-800" role="alert">
+          <Star className="w-8 h-8 mx-auto mb-2 text-yellow-400 fill-yellow-400" />
+          <p className="font-semibold">תודה על הביקורת!</p>
         </div>
       )}
 

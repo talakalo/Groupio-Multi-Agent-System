@@ -14,6 +14,7 @@ import {
   ClipboardList,
   Mail,
   Loader2,
+  Crown,
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -37,6 +38,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/contractor/offers/create', labelKey: 'createOffer', icon: PlusCircle },
   { href: '/contractor/projects', labelKey: 'projects', icon: FolderKanban },
   { href: '/contractor/earnings', labelKey: 'earnings', icon: Wallet },
+  { href: '/contractor/membership', labelKey: 'membership', icon: Crown },
 ];
 
 export default function ContractorLayout({ children }: { children: React.ReactNode }) {
@@ -216,10 +218,10 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
           >
             <div className="flex items-center gap-2 text-amber-800 text-sm">
               <Mail className="h-4 w-4 flex-shrink-0" aria-hidden />
-              <span>נא לאמת את כתובת האימייל שלכם. בדקו את תיבת הדואר ולחצו על קישור האימות.</span>
+              <span>{t('emailUnverifiedBanner')}</span>
             </div>
             {resendSent ? (
-              <span className="text-emerald-700 text-sm font-medium">נשלח! בדקו את האימייל.</span>
+              <span className="text-emerald-700 text-sm font-medium">{t('verificationSent')}</span>
             ) : (
               <button
                 type="button"
@@ -238,10 +240,10 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
                 {resending ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    שולח...
+                    {t('resending')}
                   </>
                 ) : (
-                  'שליחת קישור אימות מחדש'
+                  t('resendVerification')
                 )}
               </button>
             )}
