@@ -1,7 +1,8 @@
 'use client';
 
-import { CheckCircle2, Crown, Loader2, AlertCircle, ExternalLink } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { CheckCircle2, Crown, Loader2, AlertCircle, ExternalLink, Mail } from 'lucide-react';
+import { useCallback, useEffect, useState, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 
 import { apiClient } from '@/lib/api/client';
 
@@ -32,7 +33,31 @@ function formatDate(dateStr: string | null) {
   });
 }
 
-export default function ContractorMembershipPage() {
+// Reads ?membership= query param — must be inside Suspense
+function RedirectResultBanner() {
+  const searchParams = useSearchParams();
+  const result = searchParams.get('membership');
+
+  if (result === 'success') {
+    return (
+      <div className="bg-green-50 border border-green-200 rounded-2xl p-4 flex items-center gap-3 text-green-800" role="alert">
+        <CheckCircle2 className="h-5 w-5 flex-shrink-0 text-green-600" />
+        <span className="font-medium">הצטרפתם בהצלחה! המנוי שלכם פעיל כעת.</span>
+      </div>
+    );
+  }
+  if (result === 'canceled') {
+    return (
+      <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-3 text-amber-800" role="alert">
+        <AlertCircle className="h-5 w-5 flex-shrink-0 text-amber-600" />
+        <span>התהליך בוטל. תוכלו לנסות שוב מתי שתרצו.</span>
+      </div>
+    );
+  }
+  return null;
+}
+
+function ContractorMembershipContent() {
   const [membership, setMembership] = useState<MembershipState | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -56,6 +81,7 @@ export default function ContractorMembershipPage() {
     void fetchMembership();
   }, [fetchMembership]);
 
+  // Only for non-active members: opens Stripe Checkout to start a new subscription
   const handleUpgrade = async () => {
     setCheckingOut(true);
     setCheckoutError(null);
@@ -103,6 +129,11 @@ export default function ContractorMembershipPage() {
         </div>
       </div>
 
+      {/* Post-checkout redirect banner */}
+      <Suspense>
+        <RedirectResultBanner />
+      </Suspense>
+
       {/* Current Status Card */}
       <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-5">
         <h2 className="font-semibold text-gray-900">סטטוס נוכחי</h2>
@@ -145,7 +176,7 @@ export default function ContractorMembershipPage() {
         )}
       </div>
 
-      {/* Upgrade / Plans */}
+      {/* Non-active: Upgrade CTA */}
       {!isActive && (
         <div className="bg-gradient-to-br from-primary-50 to-accent-50 rounded-2xl border border-primary-100 p-6 space-y-4">
           <h2 className="font-semibold text-gray-900 flex items-center gap-2">
@@ -186,27 +217,28 @@ export default function ContractorMembershipPage() {
         </div>
       )}
 
-      {/* Already active — manage via Stripe */}
+      {/* Active Stripe member: manage via support
+          NOTE: A dedicated Stripe Customer Portal endpoint (POST /contractors/me/membership/portal-session)
+          should be added to the backend to replace this support link. Until then, direct to support. */}
       {isActive && membership?.membership_provider === 'stripe' && (
         <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-3">
           <h2 className="font-semibold text-gray-900">ניהול מנוי</h2>
           <p className="text-sm text-gray-600">
-            לעדכון פרטי תשלום, ביטול המנוי, או צפייה בהיסטוריית חשבוניות — עברו לפורטל הלקוחות של Stripe.
+            לעדכון פרטי תשלום, ביטול, או צפייה בחשבוניות — פנו אלינו ואנו נטפל בבקשה תוך יום עסקים.
           </p>
-          <button
-            type="button"
-            onClick={() => void handleUpgrade()}
-            disabled={checkingOut}
-            className="flex items-center gap-2 text-sm text-primary-600 hover:underline disabled:opacity-60"
+          <a
+            href="mailto:support@groupio.co.il?subject=ניהול מנוי"
+            className="inline-flex items-center gap-2 text-sm text-primary-600 hover:underline"
           >
-            <ExternalLink className="h-4 w-4" />
-            {checkingOut ? 'טוען...' : 'ניהול מנוי ב-Stripe'}
-          </button>
-          {checkoutError && (
-            <p className="text-sm text-red-600" role="alert">{checkoutError}</p>
-          )}
+            <Mail className="h-4 w-4" />
+            support@groupio.co.il
+          </a>
         </div>
       )}
     </div>
   );
+}
+
+export default function ContractorMembershipPage() {
+  return <ContractorMembershipContent />;
 }

@@ -274,7 +274,7 @@ class RedisClient:
         """Publish a JSON message to a Redis pub/sub channel."""
         await self._redis.publish(channel, json.dumps(message, default=str))
 
-    def pubsub(self) -> Any:
+    def pubsub(self) -> "redis.client.PubSub":
         """Return a new pub/sub object backed by a fresh connection.
 
         The caller is responsible for subscribing and closing the object.

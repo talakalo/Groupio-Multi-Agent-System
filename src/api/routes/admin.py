@@ -215,8 +215,7 @@ async def get_analytics() -> dict[str, Any]:
     # --- Pending payments count ---
     pending_payments_count = 0
     try:
-        row = await db._pg_fetch_one("SELECT COUNT(*) AS c FROM payments WHERE status = 'pending'")
-        pending_payments_count = int(row["c"]) if row else 0
+        pending_payments_count = await db.count_payments_by_status("pending")
     except Exception:
         logger.warning("Could not fetch pending payments count for analytics", exc_info=True)
 

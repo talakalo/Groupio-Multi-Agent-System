@@ -449,8 +449,17 @@ class ApiClient {
       `/api/v1/contractors/${encodeURIComponent(contractorId)}/reviews`,
       {
         method: "POST",
-        body: JSON.stringify({ offer_id: offerId, ...payload }),
+        body: { offer_id: offerId, ...payload },
       }
+    );
+  }
+
+  async getContractorReviews(contractorId: string, page = 1, pageSize = 100) {
+    return this.request<{
+      items: Array<{ id: string; user_id: string; rating: number; comment?: string }>;
+      total: number;
+    }>(
+      `/api/v1/contractors/${encodeURIComponent(contractorId)}/reviews?page=${page}&page_size=${pageSize}`
     );
   }
 

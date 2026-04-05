@@ -21,6 +21,7 @@ import { Breadcrumb } from "@/components/shared/Breadcrumb";
 import { Badge } from "@/components/ui/Badge";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { ApiError, apiClient } from "@/lib/api/client";
+import { useUser } from "@/lib/stores/authStore";
 import { useUnwrapPageParams, PageParamsProps } from "@/lib/utils/unwrapPageParams";
 
 interface OrderDetail {
@@ -89,6 +90,7 @@ function formatDate(dateStr: string) {
 export default function OrderDetailPage(props: PageParamsProps) {
   useUnwrapPageParams(props);
   const { id } = useParams<{ id: string }>();
+  const currentUser = useUser();
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -139,6 +141,27 @@ export default function OrderDetailPage(props: PageParamsProps) {
   useEffect(() => {
     fetchOrder();
   }, [fetchOrder]);
+
+  // Check whether the current user has already reviewed this contractor,
+  // so the review form is not shown again after a page refresh.
+  useEffect(() => {
+    if (!order || !currentUser?.id) return;
+    const contractorId =
+      order.contractorId ??
+      order.offer?.contractorId ??
+      order.offer?.contractor?.id;
+    if (!contractorId) return;
+
+    apiClient
+      .getContractorReviews(contractorId)
+      .then((res) => {
+        const alreadyReviewed = res.items.some((r) => r.user_id === currentUser.id);
+        if (alreadyReviewed) setReviewSubmitted(true);
+      })
+      .catch(() => {
+        // Silently ignore — review form will be shown; backend will reject duplicates
+      });
+  }, [order, currentUser?.id]);
 
   const handleApproveWork = async () => {
     if (!order) return;

@@ -251,19 +251,62 @@ class OffersConnectionManager:
 
 offers_manager = OffersConnectionManager()
 
+# Per-connection rate limiter for /ws/offers (same logic as admin WS)
+_offers_rate_limits: dict[int, list[float]] = {}
+
+
+def _offers_check_rate_limit(websocket: WebSocket) -> bool:
+    ws_id = id(websocket)
+    now = time.time()
+    timestamps = _offers_rate_limits.get(ws_id, [])
+    timestamps = [t for t in timestamps if now - t < 60]
+    if len(timestamps) >= MAX_MESSAGES_PER_MINUTE:
+        return False
+    timestamps.append(now)
+    _offers_rate_limits[ws_id] = timestamps
+    return True
+
+
+def _offers_cleanup_rate_limit(websocket: WebSocket) -> None:
+    _offers_rate_limits.pop(id(websocket), None)
+
 
 @router.websocket("/ws/offers")
 async def offers_websocket(websocket: WebSocket) -> None:
     """Resident-scoped realtime offer updates.
 
+    Authentication:
+      Token is read from the HTTP-only ``access_token`` cookie (preferred — avoids
+      exposing the JWT in server logs / browser history) or from the first message
+      sent by the client after connection: ``{"type": "auth", "token": "<jwt>"}``.
+
     Query params:
-      - token: JWT access token (required)
       - buildingId: building to subscribe to (required)
     """
-    token = websocket.query_params.get("token") or websocket.cookies.get("access_token")
-    if not token:
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Missing auth token")
+    building_id = websocket.query_params.get("buildingId") or websocket.query_params.get("building_id")
+    if not building_id:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Missing buildingId")
         return
+
+    # --- Step 1: try cookie auth (browser sends cookies automatically) ---
+    token: str | None = websocket.cookies.get("access_token")
+
+    # --- Step 2: if no cookie, accept connection and wait for auth message ---
+    if not token:
+        await websocket.accept()
+        try:
+            raw = await websocket.receive_text()
+            try:
+                msg = json.loads(raw)
+                if msg.get("type") == "auth":
+                    token = msg.get("token")
+            except (json.JSONDecodeError, AttributeError):
+                pass
+        except WebSocketDisconnect:
+            return
+        if not token:
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Missing auth token")
+            return
 
     payload = verify_access_token(token)
     if not payload:
@@ -275,11 +318,6 @@ async def offers_websocket(websocket: WebSocket) -> None:
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Insufficient permissions")
         return
 
-    building_id = websocket.query_params.get("buildingId") or websocket.query_params.get("building_id")
-    if not building_id:
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Missing buildingId")
-        return
-
     user_id = payload.sub
     db = get_postgres_client()
     user = await db.get_user(user_id) if user_id else None
@@ -287,14 +325,34 @@ async def offers_websocket(websocket: WebSocket) -> None:
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="User not found or disabled")
         return
 
+    # --- CR-5: Verify the user belongs to the requested building ---
+    # Admins/managers may subscribe to any building; residents are restricted.
+    _ADMIN_LIKE = frozenset({"admin", "super_admin", "buildings_manager"})
+    if role not in _ADMIN_LIKE:
+        try:
+            in_building = await db.is_user_in_building(user_id, building_id)
+        except Exception:
+            logger.warning("Building membership check failed for user %s", user_id, exc_info=True)
+            in_building = False
+        if not in_building:
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Not authorized for this building")
+            return
+
     await offers_manager.connect(websocket, building_id)
     try:
         while True:
             data = await websocket.receive_text()
+
+            if not _offers_check_rate_limit(websocket):
+                await websocket.send_json({"error": "Rate limit exceeded"})
+                continue
+
             if data == "ping":
                 await websocket.send_text("pong")
     except WebSocketDisconnect:
         offers_manager.disconnect(websocket, building_id)
+    finally:
+        _offers_cleanup_rate_limit(websocket)
 
 
 def get_offers_ws_manager() -> OffersConnectionManager:

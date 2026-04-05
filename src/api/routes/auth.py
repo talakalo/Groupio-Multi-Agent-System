@@ -757,10 +757,26 @@ async def delete_account(
     await redis.delete(f"refresh_token:{current_user.id}")
 
     # Delete user — cascade rules in the DB handle linked rows.
-    await db.delete_user(current_user.id)
+    # Falls back to PII anonymisation if the hard-delete fails (e.g. a FK
+    # without CASCADE that cannot be removed before the next migration).
+    try:
+        await db.delete_user(current_user.id)
+    except Exception:
+        logger.warning(
+            "Hard delete failed for user %s; falling back to anonymisation",
+            current_user.id,
+            exc_info=True,
+        )
+        await db.update_user(current_user.id, {
+            "email": f"deleted_{current_user.id}@erasure.invalid",
+            "full_name": "Deleted User",
+            "phone": None,
+            "is_active": False,
+        })
 
-    # Clear auth cookie
+    # Clear both auth cookies so the client cannot continue using stale tokens
     response.delete_cookie("refresh_token", path="/")
+    response.delete_cookie("access_token", path="/")
 
     logger.info("Account deleted (GDPR erasure) for user: %s", current_user.id)
 

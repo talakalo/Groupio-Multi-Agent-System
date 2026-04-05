@@ -34,7 +34,8 @@
     },
     "plugins": [
       "expo-router",
-      "expo-font"
+      "expo-font",
+      "@stripe/stripe-react-native"
     ],
     "experiments": {
       "typedRoutes": true

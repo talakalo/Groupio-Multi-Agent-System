@@ -109,7 +109,10 @@ export function useRealtimeOffers({
     }
 
     const base = wsUrl ?? DEFAULT_WS_URL;
-    const url = `${base}?buildingId=${encodeURIComponent(buildingId)}&token=${encodeURIComponent(accessToken)}`;
+    // buildingId only — token is NOT put in the URL to avoid exposure in server
+    // logs and browser history. Auth is handled via cookie (preferred) or the
+    // first message sent after connection opens.
+    const url = `${base}?buildingId=${encodeURIComponent(buildingId)}`;
 
     setStatus('connecting');
 
@@ -118,6 +121,11 @@ export function useRealtimeOffers({
       wsRef.current = ws;
 
       ws.onopen = () => {
+        // Send auth token as first message when cookies are unavailable
+        // (e.g., non-browser clients or cross-origin WS without credential cookies).
+        // The server also reads the HTTP-only access_token cookie automatically,
+        // so this message is only needed when the cookie path doesn't cover the WS.
+        ws.send(JSON.stringify({ type: 'auth', token: accessToken }));
         setStatus('connected');
         reconnectAttempts.current = 0;
       };

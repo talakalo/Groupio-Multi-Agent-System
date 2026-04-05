@@ -18,7 +18,8 @@
         "EXPO_PUBLIC_API_URL": "http://localhost:8000",
         "EXPO_PUBLIC_E2E": "true",
         "EXPO_PUBLIC_SUPABASE_URL": "http://localhost:54321",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "e2e-anon-key"
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "e2e-anon-key",
+        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_test_REPLACE_WITH_TEST_KEY"
       }
     },
     "development": {
@@ -33,7 +34,8 @@
       "env": {
         "EXPO_PUBLIC_API_URL": "http://localhost:8000",
         "EXPO_PUBLIC_SUPABASE_URL": "http://localhost:54321",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "your-dev-anon-key"
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "your-dev-anon-key",
+        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_test_REPLACE_WITH_TEST_KEY"
       }
     },
     "preview": {
@@ -47,7 +49,8 @@
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api-staging.groupio.co.il",
         "EXPO_PUBLIC_SUPABASE_URL": "https://staging.supabase.groupio.co.il",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "your-staging-anon-key"
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "your-staging-anon-key",
+        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_test_REPLACE_WITH_TEST_KEY"
       }
     },
     "production": {
@@ -61,7 +64,8 @@
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api.groupio.co.il",
         "EXPO_PUBLIC_SUPABASE_URL": "https://supabase.groupio.co.il",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "your-production-anon-key"
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "your-production-anon-key",
+        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_live_REPLACE_WITH_LIVE_KEY_VIA_EAS_SECRETS"
       }
     }
   },

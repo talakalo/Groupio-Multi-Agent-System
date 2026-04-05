@@ -3285,6 +3285,23 @@ class PostgresClient:
             await self._pg_execute(sql_pay, *pay_args)
         return await self.get_payment(data["id"]) or data
 
+    async def count_payments_by_status(self, payment_status: str) -> int:
+        """Return the number of payments with the given status."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            result = (
+                await client.table("payments")
+                .select("id", count="exact")
+                .eq("status", payment_status)
+                .limit(1)
+                .execute()
+            )
+            return result.count or 0
+        row = await self._pg_fetch_one(
+            "SELECT COUNT(*) AS c FROM payments WHERE status = $1", payment_status
+        )
+        return int(row["c"]) if row else 0
+
     async def get_payment(self, payment_id: str) -> dict[str, Any] | None:
         """Get a payment by ID."""
         if self._use_supabase_client():
