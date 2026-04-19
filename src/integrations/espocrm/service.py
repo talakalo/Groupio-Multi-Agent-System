@@ -7,8 +7,8 @@ from typing import Any
 
 from src.config.settings import get_settings
 from src.databases.postgres import PostgresClient
-from src.integrations.espocrm.client import EspoCRMClient
 from src.integrations.espocrm import mappers
+from src.integrations.espocrm.client import EspoCRMClient
 from src.integrations.espocrm.schema import EspoSchema
 
 logger = logging.getLogger(__name__)
