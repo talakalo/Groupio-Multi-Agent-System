@@ -79,9 +79,7 @@ async def run_consumer() -> None:
                     await _handle(data)
                 except Exception:
                     messaging_consumer_messages_total.labels(worker="payments", result="error").inc()
-                    logger.exception(
-                        "payments worker handler failed — message dead-lettered (requeue=False)"
-                    )
+                    logger.exception("payments worker handler failed — message dead-lettered (requeue=False)")
                     raise
 
     await connection.close()
