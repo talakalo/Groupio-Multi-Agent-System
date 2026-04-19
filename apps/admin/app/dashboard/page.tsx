@@ -18,13 +18,16 @@ import {
   CheckCircle2,
   Database,
   Wifi,
+  RefreshCw,
 } from "lucide-react";
 import Link from "next/link";
 import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import { AgentMetricsChart, type AgentChartSeries } from "@/components/features/metrics/AgentMetricsChart";
 import { MetricCard } from "@/components/features/metrics/MetricCard";
 import {
+  getApiClient,
   useDashboardMetrics,
   useSystemStatus,
   useEscalations,
@@ -48,6 +51,31 @@ const AGENTS = [
   { key: "outreach", name: "Outreach" },
   { key: "analytics", name: "Analytics" },
 ] as const;
+
+// ---------------------------------------------------------------------------
+// API shapes
+// ---------------------------------------------------------------------------
+
+interface PaymentSummary {
+  total_collected: number;
+  total_in_escrow: number;
+  total_released_to_contractors: number;
+  total_platform_fees: number;
+  total_refunded: number;
+  pending_payouts: number;
+  currency: string;
+}
+
+function useAdminPaymentSummary() {
+  return useQuery<PaymentSummary>({
+    queryKey: ["admin", "payments", "summary"],
+    queryFn: async () => {
+      const client = getApiClient();
+      return client.getPaymentSummary() as Promise<PaymentSummary>;
+    },
+    refetchInterval: 30_000,
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Activity log entries (sourced from audit logs API)
@@ -75,16 +103,63 @@ const ACTIVITY_TYPE_ICON: Record<
 // ---------------------------------------------------------------------------
 
 export default function DashboardPage() {
-  const { data: metrics, isError: metricsError } = useDashboardMetrics();
-  const { data: systemStatus, isError: systemError } = useSystemStatus();
-  const { data: escalationsData } = useEscalations();
-  const { data: health, isError: healthFetchError } = useHealthStatus();
-  const { data: analyticsData } = useAdminAnalyticsDashboard();
-  const { data: activityLog = [] } = useActivityLog();
-  const { data: vettingStatus } = useVettingStatus();
-  const { data: unverifiedContractors = [] } = useContractors({ verified: false });
+  const {
+    data: metrics,
+    isLoading: metricsLoading,
+    isError: metricsError,
+    refetch: refetchMetrics,
+  } = useDashboardMetrics();
+  const {
+    data: systemStatus,
+    isLoading: systemLoading,
+    isError: systemError,
+    refetch: refetchSystemStatus,
+  } = useSystemStatus();
+  const {
+    data: escalationsData,
+    isLoading: escalationsLoading,
+    isError: escalationsError,
+    refetch: refetchEscalations,
+  } = useEscalations();
+  const {
+    data: health,
+    isLoading: healthLoading,
+    isError: healthFetchError,
+    refetch: refetchHealth,
+  } = useHealthStatus();
+  const { data: analyticsData, isLoading: analyticsLoading, isError: analyticsError } = useAdminAnalyticsDashboard();
+  const { data: activityLog = [], isLoading: activityLoading, isError: activityError } = useActivityLog();
+  const { data: vettingStatus, isLoading: vettingLoading, isError: vettingError } = useVettingStatus();
+  const {
+    data: unverifiedContractors = [],
+    isLoading: contractorsLoading,
+    isError: contractorsError,
+  } = useContractors({ verified: false });
+  const {
+    data: paymentSummary,
+    isLoading: paymentSummaryLoading,
+    isError: paymentSummaryError,
+    refetch: refetchPaymentSummary,
+  } = useAdminPaymentSummary();
 
-  const _hasCriticalError = metricsError || systemError;
+  const isInitialLoading = metricsLoading || systemLoading || healthLoading;
+  const hasCriticalError = metricsError || systemError || healthFetchError;
+  const hasPartialError =
+    hasCriticalError ||
+    escalationsError ||
+    analyticsError ||
+    activityError ||
+    vettingError ||
+    contractorsError ||
+    paymentSummaryError;
+
+  const handleRetry = () => {
+    void refetchMetrics();
+    void refetchSystemStatus();
+    void refetchEscalations();
+    void refetchHealth();
+    void refetchPaymentSummary();
+  };
 
   // Derive agent summary data from system status
   const agentSummary = useMemo(() => {
@@ -142,7 +217,8 @@ export default function DashboardPage() {
   // Attention bar counts
   const pendingVetting = vettingStatus?.pendingReview ?? 0;
   const openEscalations = recentEscalations.filter((e) => e.status === "open").length;
-  const pendingPayments = 0; // placeholder until payments hook is available
+  const pendingPayments = paymentSummary?.pending_payouts ?? 0;
+  const totalInEscrow = paymentSummary?.total_in_escrow ?? 0;
 
   const attentionItems = useMemo(() => {
     const items: Array<{
@@ -189,6 +265,18 @@ export default function DashboardPage() {
       actionLabel: string;
     }> = [];
 
+    // Payment payouts/escrow release actions
+    if (pendingPayments > 0) {
+      actions.push({
+        id: "pending-payments",
+        type: "payment",
+        title: `${pendingPayments} pending payment payout${pendingPayments > 1 ? "s" : ""}`,
+        subtitle: `₪${totalInEscrow.toLocaleString()} currently in escrow`,
+        href: "/payments?status=pending",
+        actionLabel: "Review",
+      });
+    }
+
     // Unverified contractors
     for (const c of unverifiedContractors.slice(0, 3)) {
       actions.push({
@@ -214,12 +302,12 @@ export default function DashboardPage() {
     }
 
     return actions.slice(0, 5);
-  }, [unverifiedContractors, recentEscalations]);
+  }, [pendingPayments, totalInEscrow, unverifiedContractors, recentEscalations]);
 
   // Health bar metrics
   const healthServices = (health?.services ?? {}) as Record<string, boolean | undefined>;
-  const allServicesUp = Object.values(healthServices).every(Boolean);
-  const uptimeLabel = health ? (allServicesUp ? "100%" : "Degraded") : "—";
+  const allServicesUp = health ? Object.values(healthServices).every(Boolean) : false;
+  const uptimeLabel = health ? (allServicesUp ? "100%" : "Degraded") : "Loading";
 
   const gmvSparkline: { value: number }[] = [];
   const offersSparkline: { value: number }[] = [];
@@ -236,12 +324,50 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       {/* ---- Page header ---- */}
-      <div>
-        <h1 className="text-xl font-bold text-surface-900">Dashboard</h1>
-        <p className="text-sm text-surface-500 mt-0.5">
-          System overview and real-time monitoring
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-bold text-surface-900">Dashboard</h1>
+          <p className="text-sm text-surface-500 mt-0.5">
+            System overview and real-time monitoring
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={handleRetry}
+          className="btn-secondary btn-sm"
+          aria-label="Refresh dashboard data"
+        >
+          <RefreshCw className="w-4 h-4" />
+          Refresh
+        </button>
       </div>
+
+      {isInitialLoading && (
+        <div className="rounded-xl border border-primary-100 bg-primary-50 px-4 py-3 text-sm text-primary-800" role="status">
+          Loading live dashboard data…
+        </div>
+      )}
+
+      {hasPartialError && (
+        <div
+          className={clsx(
+            "rounded-xl border px-4 py-3 text-sm flex items-center justify-between gap-3 flex-wrap",
+            hasCriticalError
+              ? "border-danger-200 bg-danger-50 text-danger-800"
+              : "border-warning-200 bg-warning-50 text-warning-800"
+          )}
+          role="alert"
+        >
+          <span>
+            {hasCriticalError
+              ? "Some critical dashboard data failed to load. Check backend/API health and retry."
+              : "Some secondary dashboard widgets failed to load. Core metrics are still available."}
+          </span>
+          <button type="button" onClick={handleRetry} className="font-semibold underline hover:no-underline">
+            Retry
+          </button>
+        </div>
+      )}
 
       {/* ================================================================== */}
       {/* Attention Bar                                                       */}
@@ -279,11 +405,15 @@ export default function DashboardPage() {
               <span
                 className={clsx(
                   "status-dot",
-                  allServicesUp ? "status-dot-healthy" : "status-dot-degraded"
+                  healthLoading
+                    ? "bg-surface-300"
+                    : allServicesUp
+                      ? "status-dot-healthy"
+                      : "status-dot-degraded"
                 )}
               />
               <span className="text-sm font-semibold text-surface-800">
-                System {allServicesUp ? "Healthy" : "Degraded"}
+                System {healthLoading ? "Loading" : allServicesUp ? "Healthy" : "Degraded"}
               </span>
             </div>
             <div className="h-5 w-px bg-surface-200" />
@@ -311,6 +441,7 @@ export default function DashboardPage() {
                 </span>
               </div>
             ))}
+            {healthLoading && <span className="text-xs text-surface-400">Checking services…</span>}
           </div>
         </div>
       </div>
@@ -318,10 +449,10 @@ export default function DashboardPage() {
       {/* ================================================================== */}
       {/* Key Metrics Cards (clickable) — compact density                     */}
       {/* ================================================================== */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
         <MetricCard
           label="Revenue Today"
-          value={`\u20AA${(metrics?.gmvToday ?? 0).toLocaleString()}`}
+          value={metricsLoading ? "…" : `\u20AA${(metrics?.gmvToday ?? 0).toLocaleString()}`}
           changePercent={metrics?.gmvChange}
           changePeriodLabel="vs yesterday"
           variant="success"
@@ -331,7 +462,7 @@ export default function DashboardPage() {
         />
         <MetricCard
           label="Active Offers"
-          value={String(metrics?.activeOffers ?? 0)}
+          value={metricsLoading ? "…" : String(metrics?.activeOffers ?? 0)}
           changePercent={metrics?.activeOffersChange}
           changePeriodLabel="vs last week"
           variant="primary"
@@ -341,14 +472,14 @@ export default function DashboardPage() {
         />
         <MetricCard
           label="Active Contractors"
-          value={String(analyticsData?.totalContractors ?? metrics?.pendingVerifications ?? 0)}
+          value={analyticsLoading || contractorsLoading ? "…" : String(analyticsData?.totalContractors ?? metrics?.pendingVerifications ?? 0)}
           variant="default"
           icon={<ShieldCheck className="w-4.5 h-4.5" />}
           href="/contractors"
         />
         <MetricCard
           label="Open Tickets"
-          value={String(metrics?.openTickets ?? 0)}
+          value={metricsLoading ? "…" : String(metrics?.openTickets ?? 0)}
           changePercent={metrics?.openTicketsChange}
           changePeriodLabel="vs last week"
           variant="warning"
@@ -357,12 +488,19 @@ export default function DashboardPage() {
         />
         <MetricCard
           label="Pending Vetting"
-          value={String(vettingStatus?.pendingReview ?? 0)}
+          value={vettingLoading ? "…" : String(vettingStatus?.pendingReview ?? 0)}
           variant={
             (vettingStatus?.pendingReview ?? 0) > 0 ? "warning" : "default"
           }
           icon={<ShieldAlert className="w-4.5 h-4.5" />}
           href="/contractors?status=pending"
+        />
+        <MetricCard
+          label="Pending Payments"
+          value={paymentSummaryLoading ? "…" : String(pendingPayments)}
+          variant={pendingPayments > 0 ? "warning" : "default"}
+          icon={<CreditCard className="w-4.5 h-4.5" />}
+          href="/payments?status=pending"
         />
       </div>
 
@@ -376,7 +514,13 @@ export default function DashboardPage() {
             Pending Actions
           </h2>
           <div className="card divide-y divide-surface-100">
-            {pendingActions.length === 0 && (
+            {(paymentSummaryLoading || contractorsLoading || escalationsLoading) && pendingActions.length === 0 && (
+              <div className="flex items-center justify-center py-8 text-surface-400 gap-2 text-sm">
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                Loading pending actions…
+              </div>
+            )}
+            {!paymentSummaryLoading && !contractorsLoading && !escalationsLoading && pendingActions.length === 0 && (
               <div className="flex flex-col items-center justify-center py-8 text-surface-400 gap-2">
                 <CheckCircle2 className="w-8 h-8 text-success-400" />
                 <span className="text-sm">All caught up — no pending actions</span>
@@ -463,6 +607,19 @@ export default function DashboardPage() {
             Agent Performance
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2.5">
+            {systemLoading && agentSummary.length === 0 &&
+              AGENTS.map((agent) => (
+                <div key={agent.key} className="card p-3.5 flex flex-col gap-2 animate-pulse">
+                  <div className="h-3 w-20 rounded bg-surface-100" />
+                  <div className="h-6 w-12 rounded bg-surface-100" />
+                  <div className="h-3 w-24 rounded bg-surface-100" />
+                </div>
+              ))}
+            {!systemLoading && agentSummary.length === 0 && (
+              <div className="card p-4 text-sm text-surface-400 col-span-full text-center">
+                No agent status available
+              </div>
+            )}
             {agentSummary.map((agent) => {
               const errorRate =
                 agent.calls > 0
@@ -503,7 +660,12 @@ export default function DashboardPage() {
             Recent Escalations
           </h2>
           <div className="card divide-y divide-surface-100">
-            {recentEscalations.length === 0 && (
+            {escalationsLoading && recentEscalations.length === 0 && (
+              <div className="p-4 text-sm text-surface-400 text-center">
+                Loading escalations…
+              </div>
+            )}
+            {!escalationsLoading && recentEscalations.length === 0 && (
               <div className="p-4 text-sm text-surface-400 text-center">
                 No recent escalations
               </div>
@@ -565,6 +727,16 @@ export default function DashboardPage() {
           Activity Log
         </h2>
         <div className="card divide-y divide-surface-100">
+          {activityLoading && activityLog.length === 0 && (
+            <div className="p-4 text-sm text-surface-400 text-center">
+              Loading activity…
+            </div>
+          )}
+          {!activityLoading && activityLog.length === 0 && (
+            <div className="p-4 text-sm text-surface-400 text-center">
+              No activity yet
+            </div>
+          )}
           {activityLog.map((entry) => {
             const cfg = ACTIVITY_TYPE_ICON[entry.type];
             const Icon = cfg.icon;
