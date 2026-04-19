@@ -42,6 +42,12 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/payments', labelKey: 'payments', icon: CreditCard },
 ];
 
+const ALLOWED_RESIDENT_ROLES = new Set(['resident', 'admin', 'super_admin']);
+const ROLE_DEFAULT_ROUTES: Record<string, string> = {
+  contractor: '/contractor/dashboard',
+  buildings_manager: '/buildings-manager/dashboard',
+};
+
 export default function ResidentLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -69,6 +75,13 @@ export default function ResidentLayout({ children }: { children: React.ReactNode
   }, [token, isAuthenticated, router, refreshAccessToken]);
 
   useEffect(() => {
+    if (!isAuthenticated || !user?.role) return;
+    if (!ALLOWED_RESIDENT_ROLES.has(user.role)) {
+      router.replace(ROLE_DEFAULT_ROUTES[user.role] || '/login');
+    }
+  }, [isAuthenticated, user?.role, router]);
+
+  useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
         setUserMenuOpen(false);
@@ -81,6 +94,10 @@ export default function ResidentLayout({ children }: { children: React.ReactNode
   }, [userMenuOpen]);
 
   if (!token && !isAuthenticated) {
+    return null;
+  }
+
+  if (isAuthenticated && user?.role && !ALLOWED_RESIDENT_ROLES.has(user.role)) {
     return null;
   }
 
