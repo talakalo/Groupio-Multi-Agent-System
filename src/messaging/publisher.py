@@ -54,7 +54,11 @@ async def publish_event(
                 durable=True,
             )
             await exchange.publish(
-                aio_pika.Message(body=body, content_type="application/json", delivery_mode=aio_pika.DeliveryMode.PERSISTENT),
+                aio_pika.Message(
+                    body=body,
+                    content_type="application/json",
+                    delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
+                ),
                 routing_key=routing_key,
                 mandatory=mandatory,
             )
@@ -99,7 +103,11 @@ async def publish_json_raw(routing_key: str, body_dict: dict[str, Any]) -> bool:
                 durable=True,
             )
             await exchange.publish(
-                aio_pika.Message(body=body, content_type="application/json", delivery_mode=aio_pika.DeliveryMode.PERSISTENT),
+                aio_pika.Message(
+                    body=body,
+                    content_type="application/json",
+                    delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
+                ),
                 routing_key=routing_key,
             )
         messaging_publish_total.labels(result="success").inc()

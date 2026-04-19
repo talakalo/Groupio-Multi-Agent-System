@@ -7,9 +7,13 @@ from uuid import uuid4
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 
 from src.api.middleware.auth import get_current_user
+from src.config.settings import get_settings
 from src.databases.postgres import get_postgres_client
 from src.databases.vector_store import get_vector_store
 from src.domain.contractor_membership import contractor_membership_allows_offer_creation
+from src.messaging.envelope import EventEnvelope
+from src.messaging.outbox_helpers import try_enqueue_outbox
+from src.messaging.topics import RK_NOTIFICATIONS_SEND_REQUESTED
 from src.models.offer import (
     OfferCreate,
     OfferJoinRequest,
@@ -23,10 +27,6 @@ from src.models.offer import (
 from src.models.user import UserInDB, UserRole
 from src.orchestration.graph import get_orchestrator
 from src.rag.embeddings import get_embedding_client
-from src.config.settings import get_settings
-from src.messaging.envelope import EventEnvelope
-from src.messaging.outbox_helpers import try_enqueue_outbox
-from src.messaging.topics import RK_NOTIFICATIONS_SEND_REQUESTED
 from src.services.email import get_email_service
 from src.services.whatsapp_bot import get_whatsapp_bot
 
