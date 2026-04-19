@@ -146,11 +146,7 @@ class PaymentAgent(BaseAgent):
         await db.list_payments_for_user(user_id)
 
         # Find the most relevant offer_id from state or payments
-        offer_id = None
-        for entity_key in ("offer_id",):
-            if state.get(entity_key):
-                offer_id = state[entity_key]
-                break
+        offer_id = state.get("offer_id")
 
         invoice = None
         if offer_id:

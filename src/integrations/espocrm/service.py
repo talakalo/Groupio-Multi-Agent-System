@@ -34,7 +34,8 @@ class EspoCRMService:
 
         event_name = data.get("event_name") or ""
         entity_id = data.get("entity_id") or ""
-        payload = data.get("payload") if isinstance(data.get("payload"), dict) else {}
+        raw_payload = data.get("payload")
+        payload: dict[str, Any] = raw_payload if isinstance(raw_payload, dict) else {}
 
         if event_name == "crm.contractor.registered" and entity_id:
             c = await self._db.get_contractor(entity_id)

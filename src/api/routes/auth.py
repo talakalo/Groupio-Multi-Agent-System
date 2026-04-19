@@ -537,8 +537,8 @@ async def update_current_user(
 
     # Check phone uniqueness if updating
     if "phone" in update_data:
-        existing = await db.get_user_by_phone(update_data["phone"])
-        if existing and existing.id != current_user.id:
+        existing_user = await db.get_user_by_phone(update_data["phone"])
+        if existing_user and existing_user.id != current_user.id:
             raise HTTPException(status_code=400, detail="Phone number already in use")
 
     updated = await db.update_user(current_user.id, update_data)

@@ -55,7 +55,7 @@ def contractor_may_view_contractor_profile(
     if viewer is None:
         return False
     role = getattr(viewer, "role", None)
-    role_val = role.value if hasattr(role, "value") else role
+    role_val = getattr(role, "value", role)
     if role_val in ("admin", "super_admin"):
         return True
     cid = getattr(viewer, "contractor_id", None)
