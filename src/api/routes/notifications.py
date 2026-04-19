@@ -72,9 +72,24 @@ async def delete_notification(
 ) -> dict[str, str]:
     """Delete a single notification owned by the authenticated user."""
     db = get_postgres_client()
-    deleted = await db.execute_query(
+
+    if db._use_supabase_client():
+        client = await db._get_client()
+        result = (
+            await client.table("notifications")
+            .delete()
+            .eq("id", notification_id)
+            .eq("user_id", current_user.id)
+            .execute()
+        )
+        if not result.data:
+            raise HTTPException(status_code=404, detail="Notification not found")
+        return {"status": "deleted"}
+
+    deleted = await db._pg_fetch_one(
         "DELETE FROM notifications WHERE id = $1 AND user_id = $2 RETURNING id",
-        {"notification_id": notification_id, "user_id": current_user.id},
+        notification_id,
+        current_user.id,
     )
     if not deleted:
         raise HTTPException(status_code=404, detail="Notification not found")
@@ -87,8 +102,14 @@ async def clear_notifications(
 ) -> dict[str, int | str]:
     """Delete all notifications owned by the authenticated user."""
     db = get_postgres_client()
-    deleted = await db.execute_query(
+
+    if db._use_supabase_client():
+        client = await db._get_client()
+        result = await client.table("notifications").delete().eq("user_id", current_user.id).execute()
+        return {"status": "deleted", "deleted": len(result.data or [])}
+
+    deleted = await db._pg_fetch_all(
         "DELETE FROM notifications WHERE user_id = $1 RETURNING id",
-        {"user_id": current_user.id},
+        current_user.id,
     )
     return {"status": "deleted", "deleted": len(deleted or [])}
