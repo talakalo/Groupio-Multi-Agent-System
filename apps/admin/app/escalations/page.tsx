@@ -18,7 +18,7 @@ import {
   getEscalationActionsTaken,
   getEscalationIntent,
 } from "@/lib/escalation-context";
-import { getApiClient, useEscalations, useResolveEscalation } from "@/lib/hooks";
+import { useEscalations, useResolveEscalation } from "@/lib/hooks";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -26,6 +26,9 @@ import { getApiClient, useEscalations, useResolveEscalation } from "@/lib/hooks"
 
 type PriorityFilter = "all" | "urgent" | "high" | "normal" | "low";
 type StatusFilter = "all" | "open" | "assigned" | "resolved";
+
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/+$/, "");
+const API_BASE_V1 = API_BASE.endsWith("/api/v1") ? API_BASE : `${API_BASE}/api/v1`;
 
 const PRIORITY_ESCALATION_MAP: Record<string, string> = {
   low: "normal",
@@ -46,6 +49,22 @@ function priorityUiToApi(p: string): string {
     urgent: "critical",
   };
   return m[p] ?? p;
+}
+
+async function adminJsonRequest(path: string, init: RequestInit = {}) {
+  const res = await fetch(`${API_BASE_V1}${path}`, {
+    ...init,
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      ...(init.headers ?? {}),
+    },
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(detail || `Request failed with ${res.status}`);
+  }
+  return res.json().catch(() => ({}));
 }
 
 // ---------------------------------------------------------------------------
@@ -190,7 +209,10 @@ export default function EscalationsPage() {
             : null;
         const adminUserId = raw?.trim() || "admin";
 
-        await getApiClient().assignEscalation(id, adminUserId);
+        await adminJsonRequest(`/escalations/${encodeURIComponent(id)}/assign`, {
+          method: "POST",
+          body: JSON.stringify({ assigned_to: adminUserId }),
+        });
         await queryClient.invalidateQueries({ queryKey: ["admin", "escalations"] });
       } catch (err) {
         alert(err instanceof Error ? err.message : "Failed to reassign escalation");
@@ -216,7 +238,10 @@ export default function EscalationsPage() {
         if (!apiPriority) {
           throw new Error("Invalid priority mapping");
         }
-        await getApiClient().updateEscalation(id, { priority: apiPriority });
+        await adminJsonRequest(`/escalations/${encodeURIComponent(id)}`, {
+          method: "PUT",
+          body: JSON.stringify({ priority: apiPriority }),
+        });
         await queryClient.invalidateQueries({ queryKey: ["admin", "escalations"] });
       } catch (err) {
         alert(err instanceof Error ? err.message : "Failed to escalate further");

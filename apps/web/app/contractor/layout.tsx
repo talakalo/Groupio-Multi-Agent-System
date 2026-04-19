@@ -39,6 +39,12 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/contractor/earnings', labelKey: 'earnings', icon: Wallet },
 ];
 
+const ALLOWED_CONTRACTOR_ROLES = new Set(['contractor', 'admin', 'super_admin']);
+const ROLE_DEFAULT_ROUTES: Record<string, string> = {
+  resident: '/dashboard',
+  buildings_manager: '/buildings-manager/dashboard',
+};
+
 export default function ContractorLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -66,6 +72,13 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
   }, [token, isAuthenticated, router, refreshAccessToken]);
 
   useEffect(() => {
+    if (!isAuthenticated || !user?.role) return;
+    if (!ALLOWED_CONTRACTOR_ROLES.has(user.role)) {
+      router.replace(ROLE_DEFAULT_ROUTES[user.role] || '/login');
+    }
+  }, [isAuthenticated, user?.role, router]);
+
+  useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
         setUserMenuOpen(false);
@@ -81,6 +94,9 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
     return null;
   }
 
+  if (isAuthenticated && user?.role && !ALLOWED_CONTRACTOR_ROLES.has(user.role)) {
+    return null;
+  }
 
   const handleLogout = async () => {
     try {
