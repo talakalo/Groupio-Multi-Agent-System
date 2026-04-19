@@ -12,6 +12,8 @@ import { cn } from '@/lib/utils/cn';
 // Constants
 // ---------------------------------------------------------------------------
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
 const ICON_MAP: Record<NotificationType, React.ElementType> = {
   success: CheckCircle,
   error: XCircle,
@@ -58,6 +60,28 @@ function formatTime(date: Date): string {
   return date.toLocaleDateString('he-IL', { day: 'numeric', month: 'short' });
 }
 
+function authHeaders(accessToken: string | null): Record<string, string> {
+  return accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+}
+
+async function deleteNotificationOnServer(id: string, accessToken: string | null) {
+  const res = await fetch(`${API_BASE_URL}/api/v1/notifications/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: authHeaders(accessToken),
+    credentials: 'include',
+  });
+  if (!res.ok) throw new Error('delete_notification_failed');
+}
+
+async function clearNotificationsOnServer(accessToken: string | null) {
+  const res = await fetch(`${API_BASE_URL}/api/v1/notifications/`, {
+    method: 'DELETE',
+    headers: authHeaders(accessToken),
+    credentials: 'include',
+  });
+  if (!res.ok) throw new Error('clear_notifications_failed');
+}
+
 interface RowView {
   id: string;
   type: NotificationType;
@@ -73,10 +97,12 @@ interface RowView {
 
 function NotificationItem({
   row,
-  onMarkReadAndRemove,
+  onMarkRead,
+  onDelete,
 }: {
   row: RowView;
-  onMarkReadAndRemove: (id: string) => void;
+  onMarkRead: (id: string) => void;
+  onDelete: (id: string) => void;
 }) {
   const Icon = ICON_MAP[row.type];
 
@@ -97,14 +123,28 @@ function NotificationItem({
         )}
         <p className="text-[11px] text-gray-400 mt-1">{formatTime(row.createdAt)}</p>
       </div>
-      <button
-        type="button"
-        onClick={() => onMarkReadAndRemove(row.id)}
-        className="shrink-0 opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-gray-200 transition-all"
-        aria-label="סמן כנקרא"
-      >
-        <Trash2 className="h-3.5 w-3.5 text-gray-400" />
-      </button>
+      <div className="shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        {!row.read && (
+          <button
+            type="button"
+            onClick={() => onMarkRead(row.id)}
+            className="p-1 rounded-lg hover:bg-gray-200 transition-all"
+            aria-label="סמן כנקרא"
+            title="סמן כנקרא"
+          >
+            <CheckCheck className="h-3.5 w-3.5 text-gray-400" />
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => onDelete(row.id)}
+          className="p-1 rounded-lg hover:bg-red-50 transition-all"
+          aria-label="מחק התראה"
+          title="מחק התראה"
+        >
+          <Trash2 className="h-3.5 w-3.5 text-gray-400 hover:text-red-500" />
+        </button>
+      </div>
       <span
         className={cn(
           'shrink-0 mt-1.5 h-2 w-2 rounded-full',
@@ -206,6 +246,7 @@ export function NotificationPanel() {
   const handleMarkAllRead = async () => {
     const prev = rows;
     const prevUnread = unreadCount;
+    setError(null);
     setRows((r) => r.map((x) => ({ ...x, read: true })));
     setUnreadCount(0);
     try {
@@ -220,6 +261,7 @@ export function NotificationPanel() {
   const handleMarkOne = async (id: string) => {
     const prev = rows;
     const wasUnread = rows.find((r) => r.id === id)?.read === false;
+    setError(null);
     setRows((r) => r.map((x) => (x.id === id ? { ...x, read: true } : x)));
     if (wasUnread) setUnreadCount((c) => Math.max(0, c - 1));
     try {
@@ -228,6 +270,37 @@ export function NotificationPanel() {
       setRows(prev);
       if (wasUnread) setUnreadCount((c) => c + 1);
       setError('לא ניתן לעדכן התראה. נסו שוב.');
+    }
+  };
+
+  const handleDeleteOne = async (id: string) => {
+    const prev = rows;
+    const prevUnread = unreadCount;
+    const wasUnread = rows.find((r) => r.id === id)?.read === false;
+    setError(null);
+    setRows((r) => r.filter((x) => x.id !== id));
+    if (wasUnread) setUnreadCount((c) => Math.max(0, c - 1));
+    try {
+      await deleteNotificationOnServer(id, accessToken);
+    } catch {
+      setRows(prev);
+      setUnreadCount(prevUnread);
+      setError('לא ניתן למחוק התראה. נסו שוב.');
+    }
+  };
+
+  const handleClearAll = async () => {
+    const prev = rows;
+    const prevUnread = unreadCount;
+    setError(null);
+    setRows([]);
+    setUnreadCount(0);
+    try {
+      await clearNotificationsOnServer(accessToken);
+    } catch {
+      setRows(prev);
+      setUnreadCount(prevUnread);
+      setError('לא ניתן לנקות התראות. נסו שוב.');
     }
   };
 
@@ -267,16 +340,28 @@ export function NotificationPanel() {
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
             <h3 className="text-sm font-semibold text-gray-900">התראות</h3>
             {signedIn && rows.length > 0 && (
-              <button
-                type="button"
-                data-testid="notification-mark-all-read"
-                onClick={() => void handleMarkAllRead()}
-                className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 transition-colors"
-                title="סמן הכל כנקרא"
-              >
-                <CheckCheck className="h-3.5 w-3.5" />
-                <span>סמן כנקרא</span>
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  data-testid="notification-mark-all-read"
+                  onClick={() => void handleMarkAllRead()}
+                  className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 transition-colors"
+                  title="סמן הכל כנקרא"
+                >
+                  <CheckCheck className="h-3.5 w-3.5" />
+                  <span>סמן</span>
+                </button>
+                <button
+                  type="button"
+                  data-testid="notification-clear-all"
+                  onClick={() => void handleClearAll()}
+                  className="flex items-center gap-1 text-xs text-gray-500 hover:text-red-600 transition-colors"
+                  title="נקה את כל ההתראות"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span>נקה</span>
+                </button>
+              </div>
             )}
           </div>
 
@@ -324,7 +409,12 @@ export function NotificationPanel() {
             )}
             {signedIn &&
               rows.map((row) => (
-                <NotificationItem key={row.id} row={row} onMarkReadAndRemove={(id) => void handleMarkOne(id)} />
+                <NotificationItem
+                  key={row.id}
+                  row={row}
+                  onMarkRead={(id) => void handleMarkOne(id)}
+                  onDelete={(id) => void handleDeleteOne(id)}
+                />
               ))}
           </div>
 
