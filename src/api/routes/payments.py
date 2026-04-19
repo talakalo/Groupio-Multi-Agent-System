@@ -820,7 +820,8 @@ async def payment_webhook(
         "charge.refunded": "refunded",
         "charge.dispute.created": "disputed",
     }
-    new_status = status_mapping.get(event_type, status or payment.get("status"))
+    resolved_status = status_mapping.get(event_type, status or payment.get("status"))
+    new_status: str = str(resolved_status) if resolved_status is not None else "pending"
 
     invoice_id = payment.get("invoice_id")
     invoice_status: str | None = None

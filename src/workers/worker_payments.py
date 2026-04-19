@@ -19,7 +19,8 @@ logger = logging.getLogger(__name__)
 
 async def _handle(data: dict[str, Any]) -> None:
     event_name = data.get("event_name") or ""
-    payload = data.get("payload") if isinstance(data.get("payload"), dict) else {}
+    raw_payload = data.get("payload")
+    payload: dict[str, Any] = raw_payload if isinstance(raw_payload, dict) else {}
     if event_name == "invoices.created":
         logger.info(
             "payments worker: event=%s invoice_id=%s offer_id=%s user_id=%s",

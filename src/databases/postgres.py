@@ -83,7 +83,8 @@ def _first_ipv4_for_host(host: str, port: int = 5432) -> str | None:
         return None
     for family, _socktype, _proto, _canon, sockaddr in infos:
         if family == socket.AF_INET:
-            return sockaddr[0]
+            # For AF_INET, sockaddr is tuple[str, int]; sockaddr[0] is the IPv4 string.
+            return str(sockaddr[0])
     logger.warning("No IPv4 address in DNS results for %s (got %d record(s))", host, len(infos))
     return None
 
@@ -1787,10 +1788,10 @@ class PostgresClient:
                 """
             args = (oid, routing_key, event_name, json.dumps(payload), idempotency_key)
             if conn is not None:
-                row = await conn.fetchrow(sql, *args)
-                return str(row["id"]) if row else None
-            row = await self._pg_fetch_one(sql, *args)
-            return str(row["id"]) if row else None
+                fetched = await conn.fetchrow(sql, *args)
+                return str(fetched["id"]) if fetched else None
+            fetched = await self._pg_fetch_one(sql, *args)
+            return str(fetched["id"]) if fetched else None
         except Exception as exc:
             err = str(exc).lower()
             if "outbox_events" in err or "does not exist" in err or "undefinedtable" in err:
