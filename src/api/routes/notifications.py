@@ -63,3 +63,32 @@ async def mark_notification_read_route(
     if not updated:
         raise HTTPException(status_code=404, detail="Notification not found")
     return {"status": "ok"}
+
+
+@router.delete("/{notification_id}")
+async def delete_notification(
+    notification_id: str,
+    current_user: UserInDB = Depends(get_current_user),
+) -> dict[str, str]:
+    """Delete a single notification owned by the authenticated user."""
+    db = get_postgres_client()
+    deleted = await db.execute_query(
+        "DELETE FROM notifications WHERE id = $1 AND user_id = $2 RETURNING id",
+        {"notification_id": notification_id, "user_id": current_user.id},
+    )
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    return {"status": "deleted"}
+
+
+@router.delete("/")
+async def clear_notifications(
+    current_user: UserInDB = Depends(get_current_user),
+) -> dict[str, int | str]:
+    """Delete all notifications owned by the authenticated user."""
+    db = get_postgres_client()
+    deleted = await db.execute_query(
+        "DELETE FROM notifications WHERE user_id = $1 RETURNING id",
+        {"user_id": current_user.id},
+    )
+    return {"status": "deleted", "deleted": len(deleted or [])}
