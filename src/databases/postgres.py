@@ -29,6 +29,38 @@ _USER_COLS = (
     "last_login, notification_settings, created_at, updated_at"
 )
 
+# PERF-7: explicit column lists for high-traffic list queries to avoid
+# `SELECT *` payload bloat. asyncpg branch only — Supabase's PostgREST
+# `.select("*")` is left alone to survive additive schema migrations without
+# client-side column bookkeeping. If these column sets drift from the live
+# schema, the fallback path (Supabase) keeps working.
+_OFFER_COLS = (
+    "id, title, description, category, base_price, min_participants, "
+    "max_participants, deadline, building_id, created_by, status, "
+    "current_participants, matched_contractor_id, pricing_tiers, "
+    "pricing_rationale, created_at, updated_at"
+)
+_CONTRACTOR_COLS = (
+    "id, user_id, business_name, contact_name, email, phone, description, "
+    "categories, regions, years_experience, employee_count, website, "
+    "verification_status, trust_score, trust_score_breakdown, license_number, "
+    "license_verified, insurance_expiry, insurance_verified, certifications, "
+    "average_rating, total_reviews, completed_projects, response_rate, "
+    "average_response_time_hours, membership_status, membership_plan, "
+    "membership_provider, provider_customer_id, provider_subscription_id, "
+    "current_period_start, current_period_end, next_billing_at, "
+    "cancel_at_period_end, canceled_at, billing_failure_count, "
+    "membership_grace_until, trial_ends_at, last_payment_at, "
+    "created_at, updated_at"
+)
+_PAYMENT_COLS = (
+    "id, invoice_id, user_id, offer_id, amount, currency, status, "
+    "subtotal, tax_rate, tax_amount, payment_method, payment_method_id, "
+    "transaction_id, provider, provider_name, provider_ref, "
+    "provider_transaction_id, provider_data, metadata, "
+    "created_at, updated_at"
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -1104,7 +1136,11 @@ class PostgresClient:
         args.extend([page_size, (page - 1) * page_size])
         n1, n2 = len(args) - 1, len(args)
         rows = await self._pg_fetch_all(
-            "SELECT * FROM offers WHERE " + where_sql + " ORDER BY created_at DESC LIMIT $%d OFFSET $%d" % (n1, n2),
+            "SELECT "
+            + _OFFER_COLS
+            + " FROM offers WHERE "
+            + where_sql
+            + " ORDER BY created_at DESC LIMIT $%d OFFSET $%d" % (n1, n2),
             *args,
         )
         return (rows or [], total)
@@ -1517,7 +1553,9 @@ class PostgresClient:
         args.extend([page_size, (page - 1) * page_size])
         n1, n2 = len(args) - 1, len(args)
         rows = await self._pg_fetch_all(
-            "SELECT * FROM contractors WHERE "
+            "SELECT "
+            + _CONTRACTOR_COLS
+            + " FROM contractors WHERE "
             + where_sql
             + " ORDER BY trust_score DESC NULLS LAST LIMIT $%d OFFSET $%d" % (n1, n2),
             *args,
@@ -2131,6 +2169,60 @@ class PostgresClient:
                     row["cnt"],
                     contractor_id,
                 )
+
+    async def batch_update_contractor_ratings(self, contractor_ids: list[str]) -> int:
+        """Recalculate average_rating and total_reviews for many contractors in one pass.
+
+        asyncpg branch: single SQL UPDATE with a `FROM (SELECT ... GROUP BY)` subquery,
+        turning the loop version (1 read + 1 write per contractor) into 1 round-trip.
+        Supabase branch: uses a semaphored fan-out over `update_contractor_rating`
+        until a native RPC exists — same end-state, still far fewer queries than the
+        previous serial loop.
+
+        Returns the number of contractor rows updated.
+        """
+        if not contractor_ids:
+            return 0
+        if self._use_supabase_client():
+            import asyncio
+
+            sem = asyncio.Semaphore(25)
+
+            async def _one(cid: str) -> int:
+                async with sem:
+                    try:
+                        await self.update_contractor_rating(cid)
+                        return 1
+                    except Exception:
+                        logger.exception("batch_update_contractor_ratings: supabase fallback failed for %s", cid)
+                        return 0
+
+            results = await asyncio.gather(*(_one(cid) for cid in contractor_ids))
+            return sum(results)
+        pool = await self._get_client()
+        async with pool.acquire() as conn:
+            result = await conn.execute(
+                """
+                UPDATE contractors AS c
+                SET average_rating = sub.avg_rating,
+                    total_reviews = sub.cnt,
+                    updated_at = NOW()
+                FROM (
+                    SELECT contractor_id,
+                           AVG(rating)::double precision AS avg_rating,
+                           COUNT(*)::int AS cnt
+                    FROM contractor_reviews
+                    WHERE contractor_id = ANY($1::text[])
+                    GROUP BY contractor_id
+                ) AS sub
+                WHERE c.id = sub.contractor_id
+                """,
+                contractor_ids,
+            )
+            try:
+                return int(result.split()[-1])
+            except (AttributeError, ValueError, IndexError):
+                return 0
 
     async def get_contractor_stats(self, contractor_id: str) -> dict[str, Any]:
         """Get aggregate stats for a contractor."""
@@ -3371,11 +3463,56 @@ class PostgresClient:
             return result.data or []
         return (
             await self._pg_fetch_all(
-                "SELECT * FROM payments WHERE user_id = $1 ORDER BY created_at DESC",
+                "SELECT " + _PAYMENT_COLS + " FROM payments WHERE user_id = $1 ORDER BY created_at DESC",
                 user_id,
             )
             or []
         )
+
+    async def list_payments_for_user_paginated(
+        self,
+        user_id: str,
+        page: int = 1,
+        page_size: int = 20,
+        status: str | None = None,
+    ) -> tuple[list[dict[str, Any]], int]:
+        """Paginated payment history. Returns ``(rows, total)`` — PERF-9.
+
+        Used by the resident-facing ``/payments/my`` endpoint so the default
+        dashboard only hydrates one page instead of the entire lifetime of a
+        user's transactions.
+        """
+        page = max(1, int(page))
+        page_size = max(1, min(100, int(page_size)))
+        if self._use_supabase_client():
+            client = await self._get_client()
+            q = client.table("payments").select("*", count="exact").eq("user_id", user_id)
+            if status:
+                q = q.eq("status", status)
+            result = (
+                await q.order("created_at", desc=True).range((page - 1) * page_size, page * page_size - 1).execute()
+            )
+            total = result.count if hasattr(result, "count") and result.count is not None else len(result.data or [])
+            return (result.data or [], int(total))
+        where = "user_id = $1"
+        args: list[Any] = [user_id]
+        if status:
+            args.append(status)
+            where += f" AND status = ${len(args)}"
+        count_row = await self._pg_fetch_one(
+            f"SELECT COUNT(*) AS c FROM payments WHERE {where}",
+            *args,
+        )
+        total = int(count_row["c"]) if count_row else 0
+        args.extend([page_size, (page - 1) * page_size])
+        n1, n2 = len(args) - 1, len(args)
+        rows = await self._pg_fetch_all(
+            "SELECT "
+            + _PAYMENT_COLS
+            + f" FROM payments WHERE {where} ORDER BY created_at DESC LIMIT ${n1} OFFSET ${n2}",
+            *args,
+        )
+        return (rows or [], total)
 
     async def get_payment_by_transaction(self, transaction_id: str) -> dict[str, Any] | None:
         """Look up a payment by its provider transaction ID."""

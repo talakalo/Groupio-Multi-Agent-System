@@ -332,8 +332,56 @@ class GraphStore:
         region: str | None = None,
         batch_size: int = 500,
     ) -> int:
-        """Compute and materialise SIMILAR_TO edges between buildings. Returns edge count written."""
+        """Compute and materialise SIMILAR_TO edges between buildings. Returns edge count written.
+
+        PERF-11: when ``ENABLE_GDS_SIMILARITY`` is on, keeps only the top-K
+        highest-scoring neighbours per building (configurable via
+        ``GDS_SIMILARITY_TOP_K`` / ``GDS_SIMILARITY_MIN_SCORE``). This turns
+        the worst-case O(n^2) edge set into O(n * k), which keeps Neo4j
+        storage/edge count linear with building count. The default (flag off)
+        preserves the original exhaustive computation for safety.
+        """
+        from src.config.settings import get_settings
+
+        settings = get_settings()
         region_filter = "AND a.region = $region AND b.region = $region" if region else ""
+        params: dict[str, Any] = {}
+        if region:
+            params["region"] = region
+
+        if settings.ENABLE_GDS_SIMILARITY:
+            params["min_score"] = float(settings.GDS_SIMILARITY_MIN_SCORE)
+            params["top_k"] = int(settings.GDS_SIMILARITY_TOP_K)
+            query = f"""
+            MATCH (a:Building), (b:Building)
+            WHERE a.id < b.id
+              AND a.region = b.region
+              AND a.building_type = b.building_type
+              AND abs(coalesce(a.units, 0) - coalesce(b.units, 0)) <=
+                  coalesce(a.units, 1) * 0.3
+              {region_filter}
+            WITH a, b,
+                 0.4 + CASE WHEN a.building_type = b.building_type THEN 0.3 ELSE 0.0 END as structural_score
+            OPTIONAL MATCH (ra:Resident)-[:LIVES_IN]->(a)
+            OPTIONAL MATCH (rb:Resident)-[:LIVES_IN]->(b)
+            OPTIONAL MATCH (ra)-[:JOINED]->(shared:Offer)<-[:JOINED]-(rb)
+            WITH a, b, structural_score,
+                 COUNT(DISTINCT shared) as shared_offers
+            WITH a, b,
+                 structural_score + (toFloat(shared_offers) * 0.1) as raw_score
+            WHERE raw_score >= $min_score
+            WITH a, collect({{peer: b, score: raw_score}}) AS peers
+            UNWIND [p IN peers[0..$top_k] | p] AS pick
+            WITH a, pick.peer AS b, pick.score AS raw_score
+            MERGE (a)-[s:SIMILAR_TO]->(b)
+            SET s.similarity_score = raw_score,
+                s.computed_at = datetime(),
+                s.basis = ['region', 'building_type', 'unit_count', 'shared_offers']
+            RETURN COUNT(s) as edges_written
+            """
+            results = await self.execute(query, params)
+            return int(results[0]["edges_written"]) if results else 0
+
         query = f"""
         MATCH (a:Building), (b:Building)
         WHERE a.id < b.id
@@ -358,9 +406,6 @@ class GraphStore:
             s.basis = ['region', 'building_type', 'unit_count', 'shared_offers']
         RETURN COUNT(s) as edges_written
         """
-        params: dict[str, Any] = {}
-        if region:
-            params["region"] = region
         results = await self.execute(query, params)
         return int(results[0]["edges_written"]) if results else 0
 

@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
 from src.api.middleware.auth import get_current_user, verify_api_key
+from src.api.middleware.caching import CacheHeaderMiddleware
 from src.api.middleware.logging import RequestLoggingMiddleware
 from src.api.middleware.security import SecurityHeadersMiddleware
 from src.api.routes import api_router
@@ -149,6 +150,11 @@ app.add_middleware(SecurityHeadersMiddleware, environment=settings.ENVIRONMENT)
 
 # Request logging middleware (with PII redaction)
 app.add_middleware(RequestLoggingMiddleware)
+
+# Cache-Control middleware (PERF-12) — outermost so its explicit values
+# override the conservative ``no-store`` default from SecurityHeadersMiddleware
+# for cacheable GETs (offers, contractors, buildings, etc.).
+app.add_middleware(CacheHeaderMiddleware)
 
 # Include API routes (auth, offers, contractors, buildings, etc.)
 app.include_router(api_router, prefix="/api/v1")

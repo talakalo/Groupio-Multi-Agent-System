@@ -22,9 +22,10 @@ import {
   Phone,
 } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 
 import { apiClient, ApiError } from "@/lib/api/client";
+import { useApiData } from "@/lib/hooks/useApiData";
 import { cn } from "@/lib/utils/cn";
 
 // ---- Types ----
@@ -333,25 +334,24 @@ function ReviewButton({
 // ---- Main page ----
 
 export default function OrdersPage() {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<OrderTab>("active");
 
-  const fetchOrders = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const payments = await apiClient.getMyPayments() as unknown as Order[];
-      setOrders(Array.isArray(payments) ? payments : []);
-    } catch {
-      setError("לא ניתן לטעון את ההזמנות. נסו שוב.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { fetchOrders(); }, [fetchOrders]);
+  // PERF-8: react-query via shared useApiData hook.
+  // PERF-9: paginated envelope; normalise whether we get a list or the new shape.
+  const {
+    data: orders = [],
+    isLoading: loading,
+    error,
+    refetch,
+  } = useApiData<Order[]>(
+    ["orders", "my", { page: 1, limit: 50 }],
+    async () => {
+      const raw = await apiClient.getMyPayments({ page: 1, limit: 50 });
+      const list = Array.isArray(raw) ? raw : (raw?.payments ?? []);
+      return list as unknown as Order[];
+    },
+  );
+  const fetchOrders = () => { void refetch(); };
 
   const tabs: { key: OrderTab; label: string }[] = [
     { key: "active", label: "פעילות" },
@@ -422,7 +422,7 @@ export default function OrdersPage() {
       ) : error ? (
         <div className="flex flex-col items-center py-12 text-center">
           <AlertCircle className="w-10 h-10 text-red-400 mb-3" aria-hidden="true" />
-          <p className="text-gray-600">{error}</p>
+          <p className="text-gray-600">לא ניתן לטעון את ההזמנות. נסו שוב.</p>
           <button onClick={fetchOrders} className="mt-3 text-indigo-600 text-sm font-medium hover:underline">
             נסה שוב
           </button>

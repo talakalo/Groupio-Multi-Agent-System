@@ -115,6 +115,12 @@ class Settings(BaseSettings):
     ENABLE_WEB_SEARCH: bool = True
     ENABLE_GRAPH_QUERIES: bool = True
     ENABLE_PREDICTIVE_MODELS: bool = False
+    # PERF-11: when True, building similarity materialisation uses a top-K
+    # bounded Cypher projection (LIMIT + similarity threshold). When False,
+    # falls back to the original all-to-all computation.
+    ENABLE_GDS_SIMILARITY: bool = False
+    GDS_SIMILARITY_TOP_K: int = 15
+    GDS_SIMILARITY_MIN_SCORE: float = 0.7
 
     # Async messaging / CRM (all default off — enable per environment after verification)
     # RabbitMQ: set ENABLE_RABBITMQ=true and RABBITMQ_URL when using workers + dispatcher.

@@ -3,14 +3,76 @@
 import asyncio
 import json
 import logging
+import time
 from typing import Any
 
-from anthropic import AsyncAnthropic
-from tenacity import retry, stop_after_attempt, wait_exponential
+import httpx
+from anthropic import (
+    APIConnectionError,
+    APIStatusError,
+    APITimeoutError,
+    AsyncAnthropic,
+    RateLimitError,
+)
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 from src.config.settings import get_settings
 
 logger = logging.getLogger(__name__)
+
+
+class LLMServiceBusyError(RuntimeError):
+    """Raised when the upstream LLM is overloaded and all retries are exhausted.
+
+    Routes/agents can catch this to emit a 503 or degrade gracefully instead of
+    surfacing raw Anthropic errors to end users.
+    """
+
+
+# Statuses we always retry on: 408, 425, 429, 500, 502, 503, 504, and Anthropic's 529 "overloaded".
+_RETRYABLE_STATUSES: frozenset[int] = frozenset({408, 425, 429, 500, 502, 503, 504, 529})
+
+
+def _should_retry(exc: BaseException) -> bool:
+    """Predicate for Tenacity: retry on rate-limits, server errors, and network/timeout blips."""
+    if isinstance(exc, RateLimitError):
+        return True
+    if isinstance(exc, APIStatusError):
+        return int(getattr(exc, "status_code", 0) or 0) in _RETRYABLE_STATUSES
+    if isinstance(exc, (APIConnectionError, APITimeoutError, asyncio.TimeoutError, httpx.TimeoutException)):
+        return True
+    return False
+
+
+class _TokenBucket:
+    """Minimal async token-bucket rate limiter.
+
+    Enforces an upper bound of ``rate`` requests/sec to the Anthropic API with
+    a burst allowance of ``capacity``. Cheap enough to hold while awaiting the
+    upstream call since it only uses an asyncio lock.
+    """
+
+    def __init__(self, rate: float, capacity: int) -> None:
+        self._rate = float(rate)
+        self._capacity = int(capacity)
+        self._tokens: float = float(capacity)
+        self._updated_at: float = time.monotonic()
+        self._lock = asyncio.Lock()
+
+    async def acquire(self) -> None:
+        while True:
+            async with self._lock:
+                now = time.monotonic()
+                elapsed = now - self._updated_at
+                if elapsed > 0:
+                    self._tokens = min(self._capacity, self._tokens + elapsed * self._rate)
+                    self._updated_at = now
+                if self._tokens >= 1.0:
+                    self._tokens -= 1.0
+                    return
+                deficit = 1.0 - self._tokens
+                sleep_for = deficit / self._rate if self._rate > 0 else 0.1
+            await asyncio.sleep(max(sleep_for, 0.01))
 
 
 class LLMClient:
@@ -18,16 +80,27 @@ class LLMClient:
 
     def __init__(self) -> None:
         settings = get_settings()
-        self._client = AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+        # max_retries=0 → defer retry policy to our Tenacity decorator (see
+        # ``_should_retry``) so we don't double-retry; explicit httpx timeout
+        # prevents hangs at the transport layer.
+        self._client = AsyncAnthropic(
+            api_key=settings.ANTHROPIC_API_KEY,
+            timeout=httpx.Timeout(60.0, connect=10.0),
+            max_retries=0,
+        )
         self._model = settings.PRIMARY_MODEL
         self._fallback_model = settings.FALLBACK_MODEL
         self._max_tokens = settings.MAX_TOKENS
         self._temperature = settings.TEMPERATURE
         self._timeout_secs = settings.LLM_TIMEOUT_SECONDS
+        # ~10 rps steady, burst to 15. Tunable via settings later if needed.
+        self._rate_limiter = _TokenBucket(rate=10.0, capacity=15)
 
     @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=1, max=15),
+        retry=retry_if_exception(_should_retry),
+        stop=stop_after_attempt(4),
+        wait=wait_exponential(multiplier=2, min=2, max=30),
+        reraise=True,
     )
     async def create_message(
         self,
@@ -71,11 +144,20 @@ class LLMClient:
         if tools:
             kwargs["tools"] = tools
 
+        await self._rate_limiter.acquire()
         try:
             response = await asyncio.wait_for(
                 self._client.messages.create(**kwargs),
                 timeout=self._timeout_secs,
             )
+        except APIStatusError as exc:
+            status = int(getattr(exc, "status_code", 0) or 0)
+            if status == 529:
+                # Anthropic "overloaded" — surface a friendly, structured error
+                # to callers so they can pick between fallback/degradation.
+                logger.warning("Anthropic 529 overloaded on model %s; retries exhausted", selected_model)
+                raise LLMServiceBusyError("LLM upstream is overloaded; try again shortly") from exc
+            raise
         except TimeoutError:
             if not use_fallback and self._fallback_model and self._fallback_model != selected_model:
                 logger.warning(

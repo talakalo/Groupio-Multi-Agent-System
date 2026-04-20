@@ -103,8 +103,8 @@ class TestGetMyPayments:
     """Tests for GET /api/v1/payments/my."""
 
     def test_get_my_payments(self, client, mock_db, mock_payment_record):
-        """Current user can list their own payments."""
-        mock_db.list_payments_for_user = AsyncMock(return_value=[mock_payment_record])
+        """Current user can list their own payments (paginated — PERF-9)."""
+        mock_db.list_payments_for_user_paginated = AsyncMock(return_value=([mock_payment_record], 1))
 
         response = client.get(
             "/api/v1/payments/my",
@@ -113,10 +113,12 @@ class TestGetMyPayments:
 
         assert response.status_code == 200
         data = response.json()
-        assert isinstance(data, list)
-        assert len(data) == 1
-        assert data[0]["id"] == "pay-001"
-        assert data[0]["status"] == "succeeded"
+        assert isinstance(data, dict)
+        assert data["total"] == 1
+        assert data["page"] == 1
+        assert len(data["payments"]) == 1
+        assert data["payments"][0]["id"] == "pay-001"
+        assert data["payments"][0]["status"] == "succeeded"
 
 
 # ---------------------------------------------------------------------------
