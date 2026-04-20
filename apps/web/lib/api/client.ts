@@ -53,6 +53,17 @@ class ApiClient {
     this._on401Retry = fn;
   }
 
+  /**
+   * Test-only: reset in-flight GET dedup map and any pending refresh promise.
+   * The client is a module-level singleton; without this, a never-resolving
+   * mocked fetch in one test can poison subsequent tests that hit the same
+   * endpoint (they'd receive the stale pending Promise from `_inflightGets`).
+   */
+  __resetInternalsForTests(): void {
+    this._inflightGets.clear();
+    this._refreshPromise = null;
+  }
+
   private async refreshToken(): Promise<string | null> {
     if (this._refreshPromise) {
       return this._refreshPromise; // Reuse in-flight refresh
