@@ -32,9 +32,12 @@ vi.mock('@/lib/stores/authStore', () => ({
     selector({
       accessToken: mockToken,
       user: mockUser,
+      isAuthenticated: Boolean(mockToken),
       logout: vi.fn(() => Promise.resolve()),
+      refreshAccessToken: vi.fn(() => Promise.resolve()),
     })
   ),
+  useAuthHasHydrated: () => true,
 }));
 
 // useUnwrapPageParams is a no-op in tests (no props.params/searchParams)
