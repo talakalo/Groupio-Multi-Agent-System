@@ -654,7 +654,7 @@ export default function OfferDetailPage(props: PageParamsProps) {
           <div className="card">
             <TimelineStep
               label={t('offerCreated')}
-              date={formatDate(offer.createdAt)}
+              date={offer.createdAt ? formatDate(offer.createdAt) : undefined}
               isComplete={true}
               isCurrent={false}
             />
