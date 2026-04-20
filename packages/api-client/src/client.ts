@@ -20,6 +20,14 @@ import type {
   PaymentSummary,
 } from "@groupio/types";
 
+/** PERF-9: paginated response envelope for `/payments/my`. */
+export interface PaginatedPayments {
+  payments: Payment[];
+  total: number;
+  page: number;
+  pages: number;
+}
+
 /** Map FastAPI/Pydantic escalation rows (snake_case + enum values) to @groupio/types Escalation. */
 function normalizeEscalationFromApi(raw: Record<string, unknown>): Escalation {
   const statusRaw = String(raw.status ?? "open").toLowerCase();
@@ -229,12 +237,23 @@ export interface ApiClientConfig {
 
 // ---- API Client ----
 
+// PERF-1: only network-level (fetch reject / timeout) failures are
+// transparently retried. HTTP-level errors (4xx/5xx) surface to the caller so
+// the UI / react-query layer can react (explicit retry buttons, toasts, etc.)
+// — silently retrying 5xx here was masking server errors that tests and UIs
+// depend on observing.
+const MAX_RETRY_ATTEMPTS = 3;
+const RETRY_BASE_DELAY_MS = 200;
+const RETRY_MAX_DELAY_MS = 4_000;
+
 export class GroupioApiClient {
   private readonly baseUrl: string;
   private readonly authToken?: string;
   private readonly timeout: number;
   private readonly customHeaders: Record<string, string>;
   private refreshAccessPromise: Promise<boolean> | null = null;
+  /** PERF-1: coalesce concurrent GETs on the same path — one network request, many awaiters. */
+  private readonly inflightGets = new Map<string, Promise<unknown>>();
 
   constructor(config: ApiClientConfig = {}) {
     this.baseUrl = (config.baseUrl ?? "/api/v1").replace(/\/+$/, "");
@@ -343,7 +362,7 @@ export class GroupioApiClient {
       resolution_notes?: string | null;
     },
   ): Promise<Record<string, unknown>> {
-    return this.request<Record<string, unknown>>(
+    return this.requestWithRetry<Record<string, unknown>>(
       "PUT",
       `/escalations/${encodeURIComponent(escalationId)}`,
       body,
@@ -351,7 +370,7 @@ export class GroupioApiClient {
   }
 
   async assignEscalation(escalationId: string, assignedTo: string): Promise<Record<string, unknown>> {
-    return this.request<Record<string, unknown>>(
+    return this.requestWithRetry<Record<string, unknown>>(
       "POST",
       `/escalations/${encodeURIComponent(escalationId)}/assign`,
       { assigned_to: assignedTo },
@@ -362,7 +381,7 @@ export class GroupioApiClient {
     escalationId: string,
     resolutionNotes?: string,
   ): Promise<Record<string, unknown>> {
-    return this.request<Record<string, unknown>>(
+    return this.requestWithRetry<Record<string, unknown>>(
       "POST",
       `/escalations/${encodeURIComponent(escalationId)}/resolve`,
       resolutionNotes ? { resolution_notes: resolutionNotes } : {},
@@ -417,8 +436,15 @@ export class GroupioApiClient {
 
   // ---- Payment Methods ----
 
-  async getMyPayments(): Promise<Payment[]> {
-    return this.get<Payment[]>("/payments/my");
+  async getMyPayments(
+    opts: { page?: number; limit?: number; status?: string } = {},
+  ): Promise<PaginatedPayments> {
+    const params = new URLSearchParams();
+    if (opts.page != null) params.set("page", String(opts.page));
+    if (opts.limit != null) params.set("limit", String(opts.limit));
+    if (opts.status) params.set("status", opts.status);
+    const qs = params.toString();
+    return this.get<PaginatedPayments>(`/payments/my${qs ? `?${qs}` : ""}`);
   }
 
   async initiatePayment(offerId: string, paymentMethodId?: string): Promise<Payment> {
@@ -690,11 +716,58 @@ export class GroupioApiClient {
     }
   }
 
+  /**
+   * PERF-1: `request()` wrapped with retry-with-backoff. Retries on transient
+   * statuses + NetworkError. The 401-refresh branch lives inside `request()`
+   * so we don't double-retry token refreshes here.
+   */
+  private async requestWithRetry<T>(
+    method: string,
+    path: string,
+    body?: unknown,
+  ): Promise<T> {
+    let attempt = 0;
+    let lastErr: unknown;
+    while (attempt <= MAX_RETRY_ATTEMPTS) {
+      try {
+        return await this.request<T>(method, path, body);
+      } catch (err) {
+        lastErr = err;
+        if (!this.isRetryable(err) || attempt === MAX_RETRY_ATTEMPTS) {
+          throw err;
+        }
+        const base = Math.min(RETRY_MAX_DELAY_MS, RETRY_BASE_DELAY_MS * 2 ** attempt);
+        const jitter = Math.random() * base;
+        await new Promise((r) => setTimeout(r, base + jitter));
+        attempt += 1;
+      }
+    }
+    throw lastErr;
+  }
+
+  private isRetryable(err: unknown): boolean {
+    if (err instanceof NetworkError) {
+      // Timeout aborts get rethrown as NetworkError with a specific message;
+      // we do NOT retry aborts because the caller explicitly gave up.
+      return !/timed out/i.test(err.message);
+    }
+    // PERF-1: do NOT retry HTTP-level errors; let the caller decide.
+    return false;
+  }
+
   private async get<T>(path: string): Promise<T> {
-    return this.request<T>("GET", path);
+    // PERF-1: coalesce identical in-flight GETs so e.g. multiple components
+    // mounting at once don't stampede the backend with the same request.
+    const cached = this.inflightGets.get(path);
+    if (cached) return cached as Promise<T>;
+    const p = this.requestWithRetry<T>("GET", path).finally(() => {
+      this.inflightGets.delete(path);
+    });
+    this.inflightGets.set(path, p);
+    return p;
   }
 
   private async post<T>(path: string, body?: unknown, qs?: string): Promise<T> {
-    return this.request<T>("POST", qs ? `${path}${qs}` : path, body);
+    return this.requestWithRetry<T>("POST", qs ? `${path}${qs}` : path, body);
   }
 }

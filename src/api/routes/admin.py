@@ -986,10 +986,12 @@ async def suspend_user(
             "ip_address": request.client.host if request.client else None,
         }
     )
+    from src.api.middleware.auth import invalidate_cached_user
     from src.databases.redis_client import get_redis_client as _get_redis
 
     redis = _get_redis()
     await redis.delete(f"refresh_token:{user_id}")
+    await invalidate_cached_user(user_id)
     logger.info("Admin %s suspended user %s", admin.id, user_id)
     return {"status": "suspended", "user_id": user_id}
 
@@ -1016,6 +1018,9 @@ async def activate_user(
             "ip_address": request.client.host if request.client else None,
         }
     )
+    from src.api.middleware.auth import invalidate_cached_user
+
+    await invalidate_cached_user(user_id)
     logger.info("Admin %s activated user %s", admin.id, user_id)
     return {"status": "active", "user_id": user_id}
 

@@ -22,7 +22,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { NotificationPanel } from '@/components/shared/NotificationPanel';
 import { apiClient } from '@/lib/api/client';
-import { useAuthStore } from '@/lib/stores/authStore';
+import { useAuthHasHydrated, useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
 
 interface NavItem {
@@ -60,8 +60,10 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
   const [resending, setResending] = useState(false);
   const refreshAccessToken = useAuthStore((s) => s.refreshAccessToken);
   const logout = useAuthStore((s) => s.logout);
+  const hasHydrated = useAuthHasHydrated();
 
   useEffect(() => {
+    if (!hasHydrated) return;
     if (!token && isAuthenticated) {
       refreshAccessToken().then((success) => {
         if (!success) router.replace('/login');
@@ -69,14 +71,15 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
     } else if (!token && !isAuthenticated) {
       router.replace('/login');
     }
-  }, [token, isAuthenticated, router, refreshAccessToken]);
+  }, [hasHydrated, token, isAuthenticated, router, refreshAccessToken]);
 
   useEffect(() => {
+    if (!hasHydrated) return;
     if (!isAuthenticated || !user?.role) return;
     if (!ALLOWED_CONTRACTOR_ROLES.has(user.role)) {
       router.replace(ROLE_DEFAULT_ROUTES[user.role] || '/login');
     }
-  }, [isAuthenticated, user?.role, router]);
+  }, [hasHydrated, isAuthenticated, user?.role, router]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -89,6 +92,10 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
       return () => document.removeEventListener('click', handleClickOutside);
     }
   }, [userMenuOpen]);
+
+  if (!hasHydrated) {
+    return null;
+  }
 
   if (!token && !isAuthenticated) {
     return null;

@@ -385,8 +385,10 @@ test.describe("Order Detail Page", () => {
     await expect(page.locator("main, [role='main']")).toBeVisible({
       timeout: 15000,
     });
-    // Order detail should show key info (title or amount)
-    await expect(page.getByText(/התקנת מזגנים|4,500|₪/)).toBeVisible({ timeout: 5000 });
+    // Order detail should show key info (title or amount). The page renders
+    // the title in the breadcrumb + <h1>, and the amount in the status block,
+    // so this regex matches several nodes — scope to the first match.
+    await expect(page.getByText(/התקנת מזגנים|4,500|₪/).first()).toBeVisible({ timeout: 5000 });
   });
 });
 

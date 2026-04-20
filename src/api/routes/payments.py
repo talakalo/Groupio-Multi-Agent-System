@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
@@ -209,14 +209,31 @@ def determine_payment_type(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/my", response_model=list[PaymentResponse])
+class PaginatedPaymentsResponse(BaseModel):
+    """Paginated payment history response — PERF-9."""
+
+    payments: list[PaymentResponse]
+    total: int
+    page: int
+    pages: int
+
+
+@router.get("/my", response_model=PaginatedPaymentsResponse)
 async def get_my_payments(
     current_user: UserInDB = Depends(get_current_user),
-) -> list[PaymentResponse]:
-    """Get the current user's payment history."""
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    status: str | None = Query(None),
+) -> PaginatedPaymentsResponse:
+    """Get the current user's payment history (paginated — PERF-9)."""
     db = get_postgres_client()
-    payments = await db.list_payments_for_user(current_user.id)
-    result = []
+    payments, total = await db.list_payments_for_user_paginated(
+        current_user.id,
+        page=page,
+        page_size=limit,
+        status=status,
+    )
+    result: list[PaymentResponse] = []
     for p in payments:
         raw_amount = p.get("amount", 0)
         subtotal = p.get("subtotal", round(raw_amount / (1 + VAT_RATE), 2))
@@ -237,7 +254,8 @@ async def get_my_payments(
                 provider=p.get("provider_name"),
             )
         )
-    return result
+    pages = (total + limit - 1) // limit if limit > 0 else 1
+    return PaginatedPaymentsResponse(payments=result, total=total, page=page, pages=pages)
 
 
 @router.get("/contractor/earnings", response_model=ContractorEarningsResponse)

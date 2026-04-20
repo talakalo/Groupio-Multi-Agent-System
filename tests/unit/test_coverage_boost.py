@@ -258,21 +258,23 @@ class TestAgentWorkerLifecycle:
 class TestSchedulerTasks:
     @pytest.mark.asyncio
     async def test_recalculate_trust_scores(self):
+        """Scheduler uses single batch call after PERF-3, not per-contractor loop."""
         mock_db = AsyncMock()
         mock_db.list_contractors = AsyncMock(return_value=([{"id": "c1"}, {"id": "c2"}], 2))
-        mock_db.update_contractor_rating = AsyncMock()
+        mock_db.batch_update_contractor_ratings = AsyncMock(return_value=2)
 
         with patch("src.workers.scheduler.get_postgres_client", return_value=mock_db):
             from src.workers.scheduler import recalculate_trust_scores
 
             await recalculate_trust_scores()
-            assert mock_db.update_contractor_rating.await_count == 2
+            mock_db.batch_update_contractor_ratings.assert_awaited_once_with(["c1", "c2"])
 
     @pytest.mark.asyncio
     async def test_recalculate_trust_scores_partial_failure(self):
+        """Batch call raising should be caught by scheduler (no re-raise)."""
         mock_db = AsyncMock()
         mock_db.list_contractors = AsyncMock(return_value=([{"id": "c1"}], 1))
-        mock_db.update_contractor_rating = AsyncMock(side_effect=Exception("DB error"))
+        mock_db.batch_update_contractor_ratings = AsyncMock(side_effect=Exception("DB error"))
 
         with patch("src.workers.scheduler.get_postgres_client", return_value=mock_db):
             from src.workers.scheduler import recalculate_trust_scores

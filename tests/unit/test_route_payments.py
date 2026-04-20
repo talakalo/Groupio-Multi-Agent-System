@@ -46,7 +46,7 @@ class TestGetMyPayments:
     def test_get_my_payments_ok(self):
         user = _make_user()
         db = AsyncMock()
-        db.list_payments_for_user = AsyncMock(return_value=[_make_payment()])
+        db.list_payments_for_user_paginated = AsyncMock(return_value=([_make_payment()], 1))
 
         from src.api.main import app
         from src.api.middleware.auth import get_current_user
@@ -57,14 +57,17 @@ class TestGetMyPayments:
                 client = TestClient(app, raise_server_exceptions=False)
                 resp = client.get("/api/v1/payments/my")
             assert resp.status_code == 200
-            assert isinstance(resp.json(), list)
+            body = resp.json()
+            assert isinstance(body, dict)
+            assert body["total"] == 1
+            assert len(body["payments"]) == 1
         finally:
             app.dependency_overrides.clear()
 
     def test_get_my_payments_empty(self):
         user = _make_user()
         db = AsyncMock()
-        db.list_payments_for_user = AsyncMock(return_value=[])
+        db.list_payments_for_user_paginated = AsyncMock(return_value=([], 0))
 
         from src.api.main import app
         from src.api.middleware.auth import get_current_user
@@ -75,7 +78,9 @@ class TestGetMyPayments:
                 client = TestClient(app, raise_server_exceptions=False)
                 resp = client.get("/api/v1/payments/my")
             assert resp.status_code == 200
-            assert resp.json() == []
+            body = resp.json()
+            assert body["total"] == 0
+            assert body["payments"] == []
         finally:
             app.dependency_overrides.clear()
 

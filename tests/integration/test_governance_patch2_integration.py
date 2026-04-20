@@ -172,6 +172,7 @@ class TestEmailVerificationEnforcedAtMiddleware:
         mock_db_auth = AsyncMock()
         mock_db_auth.get_user = AsyncMock(return_value=verified)
         mock_db_auth.list_payments_for_user = AsyncMock(return_value=[])
+        mock_db_auth.list_payments_for_user_paginated = AsyncMock(return_value=([], 0))
 
         mock_settings = MagicMock()
         mock_settings.ENFORCE_EMAIL_VERIFICATION = True
