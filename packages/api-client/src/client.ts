@@ -237,10 +237,11 @@ export interface ApiClientConfig {
 
 // ---- API Client ----
 
-// PERF-1: HTTP statuses we transparently retry with exponential backoff + jitter.
-// Note: 401 is handled separately by the access-token-refresh flow below; 5xx
-// and 429-style statuses are the network "retryable" set.
-const RETRYABLE_STATUSES: ReadonlySet<number> = new Set([408, 425, 429, 500, 502, 503, 504, 529]);
+// PERF-1: only network-level (fetch reject / timeout) failures are
+// transparently retried. HTTP-level errors (4xx/5xx) surface to the caller so
+// the UI / react-query layer can react (explicit retry buttons, toasts, etc.)
+// — silently retrying 5xx here was masking server errors that tests and UIs
+// depend on observing.
 const MAX_RETRY_ATTEMPTS = 3;
 const RETRY_BASE_DELAY_MS = 200;
 const RETRY_MAX_DELAY_MS = 4_000;
@@ -750,7 +751,7 @@ export class GroupioApiClient {
       // we do NOT retry aborts because the caller explicitly gave up.
       return !/timed out/i.test(err.message);
     }
-    if (err instanceof ApiError) return RETRYABLE_STATUSES.has(err.status);
+    // PERF-1: do NOT retry HTTP-level errors; let the caller decide.
     return false;
   }
 

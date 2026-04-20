@@ -21,10 +21,13 @@ interface RequestOptions {
   signal?: AbortSignal;
 }
 
-// PERF-1: HTTP statuses we transparently retry with exponential backoff + jitter.
-// 401 is covered by the access-token-refresh flow inside `_singleRequest` and
-// is intentionally absent here so we don't double-retry auth failures.
-const RETRYABLE_STATUSES: ReadonlySet<number> = new Set([408, 425, 429, 500, 502, 503, 504, 529]);
+// PERF-1: network-level (fetch reject) failures are transparently retried
+// with exponential backoff + jitter. HTTP-level errors (4xx/5xx) are NOT
+// retried here — they surface to the caller so the UI / react-query layer
+// can decide (explicit retry buttons, react-query `retry: 2`, etc.). This
+// keeps client-level retry safe for both idempotent GETs and side-effecting
+// POSTs, and avoids silently masking server errors that tests and UIs
+// depend on observing.
 const MAX_RETRY_ATTEMPTS = 3;
 const RETRY_BASE_DELAY_MS = 200;
 const RETRY_MAX_DELAY_MS = 4_000;
@@ -132,10 +135,11 @@ class ApiClient {
   }
 
   private _isRetryable(err: unknown): boolean {
-    if (err instanceof ApiError) return RETRYABLE_STATUSES.has(err.status);
+    // PERF-1: do NOT retry HTTP-level errors; let the caller decide.
+    if (err instanceof ApiError) return false;
     // AbortError from user-supplied signals bubbles up as DOMException — don't retry.
     if (err instanceof DOMException && err.name === "AbortError") return false;
-    // Network-level failure (fetch reject) is retryable.
+    // Network-level failure (fetch reject) — retry transparently.
     return true;
   }
 

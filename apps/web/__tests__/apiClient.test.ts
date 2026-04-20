@@ -184,21 +184,17 @@ describe('ApiClient', () => {
     });
 
     it('falls back to statusText when body has no detail', async () => {
-      // PERF-1: 500 is a retryable status, so the client may retry up to
-      // MAX_RETRY_ATTEMPTS (3) times after the first failure. Queue one
-      // mock per expected fetch call so every retry hits the same 500.
-      const mk = () => ({
+      // PERF-1: HTTP 5xx is NOT retried by the client (UI / react-query
+      // handles retry), so a single mocked 500 is enough.
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
         ok: false,
         status: 500,
         statusText: 'Internal Server Error',
         json: async () => ({ error: 'something broke' }),
       });
-      for (let i = 0; i < 4; i += 1) {
-        (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(mk());
-      }
 
       await expect(apiClient.getOffer('err')).rejects.toThrow('Internal Server Error');
-    }, 15_000);
+    });
   });
 
   // ---- Endpoint-specific tests ----
