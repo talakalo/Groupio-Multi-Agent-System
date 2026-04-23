@@ -262,14 +262,14 @@ class TestGetMyPaymentsVAT:
             "transaction_id": "txn_abc",
             "created_at": datetime.now(UTC).isoformat(),
         }
-        mock_db.list_payments_for_user = AsyncMock(return_value=[payment_with_vat])
+        mock_db.list_payments_for_user_paginated = AsyncMock(return_value=([payment_with_vat], 1))
 
         resp = client.get("/api/v1/payments/my", headers={"Authorization": "Bearer tok"})
 
         assert resp.status_code == 200
         data = resp.json()
-        assert len(data) == 1
-        p = data[0]
+        assert len(data["payments"]) == 1
+        p = data["payments"][0]
         assert p["amount"] == pytest.approx(1180.0)
         assert p["subtotal"] == pytest.approx(1000.0)
         assert p["tax_rate"] == pytest.approx(0.18)
@@ -286,13 +286,13 @@ class TestGetMyPaymentsVAT:
             "status": "succeeded",
             "created_at": datetime.now(UTC).isoformat(),
         }
-        mock_db.list_payments_for_user = AsyncMock(return_value=[legacy_payment])
+        mock_db.list_payments_for_user_paginated = AsyncMock(return_value=([legacy_payment], 1))
 
         resp = client.get("/api/v1/payments/my", headers={"Authorization": "Bearer tok"})
 
         assert resp.status_code == 200
         data = resp.json()
-        p = data[0]
+        p = data["payments"][0]
         # Back-calculated values (1180 / 1.18 = 1000)
         assert p["subtotal"] == pytest.approx(1000.0, abs=1.0)
         assert p["tax_amount"] == pytest.approx(180.0, abs=1.0)
@@ -312,12 +312,12 @@ class TestGetMyPaymentsVAT:
             }
             for i in range(1, 4)
         ]
-        mock_db.list_payments_for_user = AsyncMock(return_value=payments)
+        mock_db.list_payments_for_user_paginated = AsyncMock(return_value=(payments, len(payments)))
 
         resp = client.get("/api/v1/payments/my", headers={"Authorization": "Bearer tok"})
 
         assert resp.status_code == 200
-        for item in resp.json():
+        for item in resp.json()["payments"]:
             assert "subtotal" in item
             assert "tax_rate" in item
             assert "tax_amount" in item

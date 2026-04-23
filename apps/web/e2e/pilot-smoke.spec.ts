@@ -489,13 +489,16 @@ test("14. Checkout page — mock payment succeeds immediately without Stripe UI"
   await setupBaseMocks(page);
   await loginAs(page, "resident");
 
-  // Mock payment initiate — mock provider returns "succeeded" with no client_secret
+  // Mock payment initiate — mock provider returns "succeeded" with no client_secret.
+  // `provider: "mock"` is required: the checkout page only treats a secret-less
+  // success as a simulated payment when the provider explicitly reports "mock".
   await page.route("**/api/v1/payments/initiate", (r) =>
     r.fulfill({
       status: 200,
       body: JSON.stringify({
         id: "pay-smoke-1",
         status: "succeeded",
+        provider: "mock",
         amount: 4050,
         currency: "ILS",
         client_secret: null,
@@ -510,6 +513,7 @@ test("14. Checkout page — mock payment succeeds immediately without Stripe UI"
   await expect(page.getByText(/התשלום בוצע בהצלחה/i)).toBeVisible({ timeout: 10_000 });
   // Escrow badge should be visible
   await expect(page.getByText(/נאמנות|Escrow/i).first()).toBeVisible();
-  // Link to payments history
-  await expect(page.getByRole("link", { name: /להיסטוריית תשלומים/i })).toBeVisible();
+  // The success state offers two links: "להזמנות שלי" (my orders) and a
+  // "back to offer" link. Assert at least one of the expected CTAs is shown.
+  await expect(page.getByRole("link", { name: /להזמנות שלי|לתשלומים שלי|חזרה להצעה/i }).first()).toBeVisible();
 });

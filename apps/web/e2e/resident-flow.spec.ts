@@ -325,7 +325,7 @@ test.describe("Resident Browse Offers Flow", () => {
       { name: "groupio-auth", value: encodeURIComponent(JSON.stringify({ state: { user: { role: "resident" }, isAuthenticated: true } })), url: "http://localhost:3000" },
     ]);
 
-    await page.route("**/api/v1/offers*", (route) => {
+    await page.route("**/api/v1/offers**", (route) => {
       const url = new URL(route.request().url());
       const pathMatch = url.pathname.match(/\/api\/v1\/offers\/([^/?]+)$/);
       if (pathMatch) {
@@ -402,7 +402,7 @@ test.describe("Resident Join Offer Flow", () => {
       { name: "groupio-auth", value: encodeURIComponent(JSON.stringify({ state: { user: { role: "resident" }, isAuthenticated: true } })), url: "http://localhost:3000" },
     ]);
 
-    await page.route("**/api/v1/offers*", (route) => {
+    await page.route("**/api/v1/offers**", (route) => {
       const url = new URL(route.request().url());
       if (url.pathname.endsWith("/join")) {
         return route.fulfill({
@@ -585,7 +585,7 @@ test.describe("Critical User Journey — Register → Login → Join Offer", () 
     await page.route('**/api/v1/auth/me', (route) =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: 'user_e2e', email: 'e2e-resident@groupio-test.co.il', role: 'resident', full_name: 'Test Resident', phone: '0501234567', is_verified: true }) })
     );
-    await page.route('**/api/v1/offers*', (route) => {
+    await page.route('**/api/v1/offers**', (route) => {
       const url = new URL(route.request().url());
       if (url.pathname.endsWith('/join')) {
         return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, participants: 9 }) });

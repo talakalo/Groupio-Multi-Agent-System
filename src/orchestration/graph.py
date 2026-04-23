@@ -1,5 +1,7 @@
 """LangGraph workflow orchestration for the Groupio agent system."""
 
+import asyncio
+import json
 import logging
 from typing import Any
 
@@ -26,6 +28,43 @@ from src.orchestration.state_contract import validate_agent_state
 from src.rag.pipeline import get_rag_pipeline
 
 logger = logging.getLogger(__name__)
+
+# PERF-5+10: short-TTL context cache so repeat turns in a conversation skip
+# the profile/building/offers round-trip. Kept very short because the
+# orchestrator state evolves quickly (new offers, joined participants).
+_CTX_CACHE_PREFIX = "orch:ctx:"
+_CTX_CACHE_TTL_SECONDS = 120
+
+
+async def _cache_get_ctx(user_id: str, building_id: str | None) -> dict[str, Any] | None:
+    """Best-effort read of the enriched orchestration slice from Redis."""
+    try:
+        from src.databases.redis_client import get_redis_client
+
+        key = f"{_CTX_CACHE_PREFIX}{user_id}:{building_id or '-'}"
+        raw = await get_redis_client().get(key)
+    except Exception as exc:
+        logger.debug("orch ctx cache read failed: %s", exc)
+        return None
+    if not raw:
+        return None
+    try:
+        parsed = json.loads(raw)
+        return parsed if isinstance(parsed, dict) else None
+    except (TypeError, ValueError):
+        return None
+
+
+async def _cache_set_ctx(user_id: str, building_id: str | None, ctx: dict[str, Any]) -> None:
+    """Best-effort write of the enriched orchestration slice to Redis."""
+    try:
+        from src.databases.redis_client import get_redis_client
+
+        key = f"{_CTX_CACHE_PREFIX}{user_id}:{building_id or '-'}"
+        await get_redis_client().set(key, json.dumps(ctx, default=str), ex=_CTX_CACHE_TTL_SECONDS)
+    except Exception as exc:
+        logger.debug("orch ctx cache write failed: %s", exc)
+
 
 # Intent-to-agent mapping
 INTENT_AGENT_MAP = {
@@ -213,29 +252,58 @@ class GroupioOrchestrator:
         user_id = state["user_id"]
         building_id = state.get("building_id")
 
-        # Enrich with user profile
-        try:
-            profile = await self._db.get_user_profile(user_id)
+        # PERF-5+10: try the short-TTL Redis slice first so repeat turns skip DB.
+        cached_ctx = await _cache_get_ctx(user_id, building_id)
+        if cached_ctx:
+            if cached_ctx.get("user_profile") is not None:
+                state["user_profile"] = cached_ctx["user_profile"]
+            if cached_ctx.get("building_context") is not None:
+                state["building_context"] = cached_ctx["building_context"]
+            if cached_ctx.get("active_offers") is not None:
+                state["active_offers"] = cached_ctx["active_offers"]
+        else:
+            # PERF-5: fan out profile/building in parallel; offers depends on
+            # the building lookup succeeding so we await it serially after.
+            async def _load_profile() -> Any:
+                try:
+                    return await self._db.get_user_profile(user_id)
+                except Exception:
+                    logger.warning("Could not load user profile for %s", user_id)
+                    return None
+
+            async def _load_building() -> Any:
+                if not building_id:
+                    return None
+                try:
+                    return await self._db.get_building(building_id)
+                except Exception:
+                    logger.warning("Could not load building %s", building_id)
+                    return None
+
+            profile, building = await asyncio.gather(_load_profile(), _load_building())
             if profile:
                 state["user_profile"] = profile
-        except Exception:
-            logger.warning("Could not load user profile for %s", user_id)
+            if building:
+                state["building_context"] = building
 
-        # Enrich with building context
-        if building_id:
-            try:
-                building = await self._db.get_building(building_id)
-                if building:
-                    state["building_context"] = building
-            except Exception:
-                logger.warning("Could not load building %s", building_id)
+            offers: list[dict[str, Any]] | None = None
+            if building_id:
+                try:
+                    offers = await self._db.get_active_offers(building_id)
+                    if offers is not None:
+                        state["active_offers"] = offers
+                except Exception:
+                    offers = None
 
-            # Load active offers
-            try:
-                offers = await self._db.get_active_offers(building_id)
-                state["active_offers"] = offers
-            except Exception:
-                pass
+            await _cache_set_ctx(
+                user_id,
+                building_id,
+                {
+                    "user_profile": profile,
+                    "building_context": building,
+                    "active_offers": offers,
+                },
+            )
 
         # Run router agent
         state = await self.agents["router"].run(state)

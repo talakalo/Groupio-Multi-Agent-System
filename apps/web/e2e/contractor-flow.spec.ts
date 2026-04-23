@@ -212,10 +212,13 @@ test.describe("Contractor Create Offer Flow", () => {
   test("should display offer creation form", async ({ page }) => {
     await page.goto("/contractor/offers/create");
 
-    // Form inputs are registered via react-hook-form (name attr only, no id)
+    // Step 1 of the wizard shows category chips + title/description; basePrice
+    // lives on Step 2 ("תמחור") and is not in the DOM until we advance. Keep
+    // assertions limited to what Step 1 actually renders.
     await expect(page.locator('input[name="title"]')).toBeVisible({ timeout: 10000 });
-    await expect(page.locator('select[name="category"]')).toBeVisible();
-    await expect(page.locator('input[name="basePrice"]')).toBeVisible();
+    await expect(page.locator('textarea[name="description"]')).toBeVisible();
+    // Category is rendered as a CategoryChips button group, not a native select.
+    await expect(page.getByRole("button", { name: "מטבחים", exact: true })).toBeVisible();
   });
 
   test("should fill in and submit offer form", async ({ page }) => {
@@ -248,33 +251,49 @@ test.describe("Contractor Create Offer Flow", () => {
     await page.goto("/contractor/offers/create");
     await expect(page).toHaveURL(/contractor\/offers\/create/, { timeout: 20000 });
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("networkidle");
 
-    // Wait for create form (title input only exists on create page, not login)
-    const titleInput = page.locator('input[name="title"]');
-    await expect(titleInput).toBeVisible({ timeout: 20000 });
-    await titleInput.scrollIntoViewIfNeeded();
-    await titleInput.fill("התקנת מזגנים מקצועית", { timeout: 10000 });
-    await page.locator('textarea[name="description"]').scrollIntoViewIfNeeded();
-    await page.locator('textarea[name="description"]').fill("שירות מקצועי ואחריות מלאה. התקנה מקצועית עם אחריות לשנה. לפחות 50 תווים נדרשים כאן.", { timeout: 10000 });
-    await page.locator('select[name="category"]').selectOption("ac_installation");
+    // Step 1 — details: pick a category, fill title/description/timeline.
+    await expect(page.locator('input[name="title"]')).toBeVisible({ timeout: 20000 });
+    await page.getByRole("button", { name: "מטבחים", exact: true }).click();
+    await page.locator('input[name="title"]').fill("התקנת מזגנים מקצועית");
+    await page
+      .locator('textarea[name="description"]')
+      .fill(
+        "שירות מקצועי ואחריות מלאה. התקנה מקצועית עם אחריות לשנה. לפחות 50 תווים נדרשים כאן.",
+      );
+    await page.locator('input[name="timeline"]').fill("2-3 שבועות");
+    await page.getByRole("button", { name: /^הבא/ }).click();
+
+    // Step 2 — pricing (fill base price + default tier's pricePerUnit to pass zod).
+    await expect(page.locator('input[name="basePrice"]')).toBeVisible({ timeout: 10000 });
+    await page.locator('input[name="basePrice"]').fill("4500");
+    await page.locator('#create-tier-price-0').fill("4500");
+    await page.getByRole("button", { name: /^הבא/ }).click();
+
+    // Step 3 — target / participants / validity.
+    await expect(page.locator('input[name="buildingId"]')).toBeVisible({ timeout: 10000 });
+    await page.locator('input[name="buildingId"]').fill("bld_001");
     await page.locator('select[name="region"]').selectOption("center");
-    await page.locator('input[name="buildingId"]').fill("bld_001", { timeout: 10000 });
-
-    // Pricing section may be below fold; scroll and fill (re-query to avoid detached refs)
-    await page.locator('input[name="basePrice"]').scrollIntoViewIfNeeded();
-    await page.locator('input[name="basePrice"]').fill("4500", { timeout: 15000 });
-
+    await page.locator('input[name="minParticipants"]').fill("3");
+    await page.locator('input[name="maxParticipants"]').fill("10");
+    await page.locator('input[type="checkbox"][value="installation"]').check({ force: true });
     const futureDate = new Date();
     futureDate.setMonth(futureDate.getMonth() + 2);
-    await page.locator('input[name="validUntil"]').scrollIntoViewIfNeeded();
-    await page.locator('input[name="validUntil"]').fill(futureDate.toISOString().split("T")[0]!, { timeout: 15000 });
+    await page.locator('input[name="validUntil"]').fill(futureDate.toISOString().split("T")[0]!);
+    await page.getByRole("button", { name: /^הבא/ }).click();
 
-    await page.locator('input[value="installation"]').scrollIntoViewIfNeeded();
-    await page.locator('input[value="installation"]').check({ force: true });
-
-    await page.locator('button[type="submit"]').click();
-    await expect(page).toHaveURL(/contractor\/projects\//, { timeout: 10000 });
+    // Step 4 — preview + publish.
+    await expect(page.getByRole("button", { name: /פרסום הצעה/ })).toBeVisible({ timeout: 10000 });
+    await Promise.all([
+      page.waitForResponse(
+        (r) => r.url().includes("/api/v1/offers") && r.request().method() === "POST",
+        { timeout: 20000 },
+      ),
+      page.getByRole("button", { name: /פרסום הצעה/ }).click(),
+    ]);
+    // router.push lands on /contractor/projects/{id}; dev server may need to
+    // compile this route lazily, so give the URL change a generous window.
+    await expect(page).toHaveURL(/contractor\/projects\//, { timeout: 30000 });
   });
 });
 

@@ -217,39 +217,40 @@ async def test_recalculate_trust_scores_empty():
     """recalculate_trust_scores with no contractors completes silently."""
     db = AsyncMock()
     db.list_contractors = AsyncMock(return_value=([], 0))
+    db.batch_update_contractor_ratings = AsyncMock()
 
     with patch("src.workers.scheduler.get_postgres_client", return_value=db):
         await recalculate_trust_scores()
 
-    db.update_contractor_rating.assert_not_called()
+    db.batch_update_contractor_ratings.assert_not_called()
 
 
 @pytest.mark.asyncio
 async def test_recalculate_trust_scores_success():
-    """recalculate_trust_scores calls update_contractor_rating for each contractor."""
+    """Scheduler performs a single batch update (PERF-3) rather than per-contractor loop."""
     contractors = [{"id": "c1"}, {"id": "c2"}]
     db = AsyncMock()
     db.list_contractors = AsyncMock(return_value=(contractors, 2))
-    db.update_contractor_rating = AsyncMock()
+    db.batch_update_contractor_ratings = AsyncMock(return_value=2)
 
     with patch("src.workers.scheduler.get_postgres_client", return_value=db):
         await recalculate_trust_scores()
 
-    assert db.update_contractor_rating.call_count == 2
+    db.batch_update_contractor_ratings.assert_awaited_once_with(["c1", "c2"])
 
 
 @pytest.mark.asyncio
 async def test_recalculate_trust_scores_handles_error():
-    """Errors on individual contractors are caught and processing continues."""
+    """Batch call raising is caught by the scheduler (no re-raise)."""
     contractors = [{"id": "c1"}, {"id": "c2"}]
     db = AsyncMock()
     db.list_contractors = AsyncMock(return_value=(contractors, 2))
-    db.update_contractor_rating = AsyncMock(side_effect=[RuntimeError("fail"), None])
+    db.batch_update_contractor_ratings = AsyncMock(side_effect=RuntimeError("fail"))
 
     with patch("src.workers.scheduler.get_postgres_client", return_value=db):
-        await recalculate_trust_scores()
+        await recalculate_trust_scores()  # should not raise
 
-    assert db.update_contractor_rating.call_count == 2
+    db.batch_update_contractor_ratings.assert_awaited_once()
 
 
 # ---------------------------------------------------------------------------

@@ -1,4 +1,5 @@
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
@@ -49,6 +50,7 @@ vi.mock("@/lib/stores/authStore", () => {
   return { useAuthStore: fn };
 });
 
+import { apiClient } from "../lib/api/client";
 import PaymentsPage from "../app/(resident)/payments/page";
 
 const MOCK_PAYMENTS = [
@@ -83,7 +85,9 @@ const MOCK_PAYMENTS = [
 ];
 
 function mockFetchSuccess(data: unknown) {
-  (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+  // Persistent: the page is rendered behind react-query; the client-side
+  // retry logic (PERF-1) may also fire multiple attempts on flaky paths.
+  (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
     ok: true,
     status: 200,
     json: async () => data,
@@ -92,20 +96,41 @@ function mockFetchSuccess(data: unknown) {
 }
 
 function mockFetchFailure() {
-  (global.fetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+  // Persistent: apiClient retries transient failures; every attempt must fail
+  // for the react-query error state to surface.
+  (global.fetch as ReturnType<typeof vi.fn>).mockRejectedValue(
     new Error("Network error")
   );
 }
 
 function mockFetchNeverResolve() {
-  (global.fetch as ReturnType<typeof vi.fn>).mockImplementationOnce(
+  (global.fetch as ReturnType<typeof vi.fn>).mockImplementation(
     () => new Promise(() => {})
+  );
+}
+
+/** Render under a fresh QueryClient with retries disabled for deterministic tests. */
+function renderWithClient(ui: React.ReactElement) {
+  const client = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, staleTime: 0, gcTime: 0 },
+      mutations: { retry: false },
+    },
+  });
+  return render(
+    <QueryClientProvider client={client}>{ui}</QueryClientProvider>,
   );
 }
 
 describe("PaymentsPage", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    // Reset fully so persistent mockResolvedValue/mockRejectedValue from prior
+    // tests doesn't leak into the next one.
+    (global.fetch as ReturnType<typeof vi.fn>).mockReset();
+    // PERF-1: apiClient is a module-level singleton with an in-flight GET
+    // dedup map — clear it between tests so a never-resolving mock in one
+    // test can't poison a later test hitting the same endpoint.
+    apiClient.__resetInternalsForTests();
     // Set a token so the apiClient sends auth headers
     if (typeof window !== "undefined") {
       window.localStorage.setItem("auth_token", "test-token");
@@ -116,36 +141,43 @@ describe("PaymentsPage", () => {
 
   it("shows loading state initially", () => {
     mockFetchNeverResolve();
-    render(<PaymentsPage />);
+    renderWithClient(<PaymentsPage />);
     // During loading, header and skeleton placeholders are shown
     expect(screen.getByText("התשלומים שלי")).toBeInTheDocument();
   });
 
   it("shows error state when API fails", async () => {
     mockFetchFailure();
-    render(<PaymentsPage />);
+    renderWithClient(<PaymentsPage />);
 
-    await waitFor(() => {
-      expect(screen.getByText(/לא ניתן לטעון/)).toBeDefined();
-    });
-  });
+    // PERF-1: apiClient retries transient failures with exponential backoff
+    // before surfacing the error to react-query, so allow extra time.
+    await waitFor(
+      () => {
+        expect(screen.getByText(/לא ניתן לטעון/)).toBeDefined();
+      },
+      { timeout: 8000 },
+    );
+  }, 10_000);
 
   it("shows retry button on error", async () => {
     mockFetchFailure();
-    render(<PaymentsPage />);
+    renderWithClient(<PaymentsPage />);
 
-    await waitFor(() => {
-      // "נסה שוב" appears in both the error message and button; check that a clickable element exists
-      const retryElements = screen.getAllByText(/נסה שוב/);
-      expect(retryElements.length).toBeGreaterThanOrEqual(1);
-    });
-  });
+    await waitFor(
+      () => {
+        const retryElements = screen.getAllByText(/נסה שוב/);
+        expect(retryElements.length).toBeGreaterThanOrEqual(1);
+      },
+      { timeout: 8000 },
+    );
+  }, 10_000);
 
   // ---- Successful Render ----
 
   it("renders page header and escrow explainer", async () => {
     mockFetchSuccess(MOCK_PAYMENTS);
-    render(<PaymentsPage />);
+    renderWithClient(<PaymentsPage />);
 
     // Header is always rendered (not dependent on data)
     expect(screen.getByText(/התשלומים שלי/)).toBeDefined();
@@ -154,7 +186,7 @@ describe("PaymentsPage", () => {
 
   it("renders stat cards", async () => {
     mockFetchSuccess(MOCK_PAYMENTS);
-    render(<PaymentsPage />);
+    renderWithClient(<PaymentsPage />);
 
     await waitFor(() => {
       expect(screen.getByText(/סה״כ שולם/)).toBeDefined();
@@ -165,7 +197,7 @@ describe("PaymentsPage", () => {
 
   it("renders all payments in list", async () => {
     mockFetchSuccess(MOCK_PAYMENTS);
-    render(<PaymentsPage />);
+    renderWithClient(<PaymentsPage />);
 
     await waitFor(() => {
       expect(screen.getByText(/offer-10/)).toBeDefined();
@@ -176,7 +208,7 @@ describe("PaymentsPage", () => {
 
   it("renders payment status badges in Hebrew", async () => {
     mockFetchSuccess(MOCK_PAYMENTS);
-    render(<PaymentsPage />);
+    renderWithClient(<PaymentsPage />);
 
     await waitFor(() => {
       // Check that status badges render (using getAllByText since some might match partially)
@@ -190,7 +222,7 @@ describe("PaymentsPage", () => {
 
   it("renders filter tabs", async () => {
     mockFetchSuccess(MOCK_PAYMENTS);
-    render(<PaymentsPage />);
+    renderWithClient(<PaymentsPage />);
 
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "הכל" })).toBeDefined();
@@ -202,7 +234,7 @@ describe("PaymentsPage", () => {
 
   it("filters to show only pending payments", async () => {
     mockFetchSuccess(MOCK_PAYMENTS);
-    render(<PaymentsPage />);
+    renderWithClient(<PaymentsPage />);
 
     await waitFor(() => {
       expect(screen.getByText(/offer-10/)).toBeDefined();
@@ -219,7 +251,7 @@ describe("PaymentsPage", () => {
 
   it("filters to show only succeeded payments", async () => {
     mockFetchSuccess(MOCK_PAYMENTS);
-    render(<PaymentsPage />);
+    renderWithClient(<PaymentsPage />);
 
     await waitFor(() => {
       expect(screen.getByText(/offer-10/)).toBeDefined();
@@ -237,7 +269,7 @@ describe("PaymentsPage", () => {
 
   it("shows empty state when no payments exist", async () => {
     mockFetchSuccess([]);
-    render(<PaymentsPage />);
+    renderWithClient(<PaymentsPage />);
 
     await waitFor(() => {
       expect(screen.getByText(/עדיין אין תשלומים/)).toBeDefined();
@@ -246,7 +278,7 @@ describe("PaymentsPage", () => {
 
   it("shows category empty state when filter yields no results", async () => {
     mockFetchSuccess([MOCK_PAYMENTS[0]]);
-    render(<PaymentsPage />);
+    renderWithClient(<PaymentsPage />);
 
     await waitFor(() => {
       expect(screen.getByText(/offer-10/)).toBeDefined();
@@ -270,7 +302,7 @@ describe("PaymentsPage", () => {
         text: async () => JSON.stringify(MOCK_PAYMENTS),
       })
     );
-    render(<PaymentsPage />);
+    renderWithClient(<PaymentsPage />);
 
     await waitFor(() => {
       expect(screen.getByText(/offer-10/)).toBeDefined();

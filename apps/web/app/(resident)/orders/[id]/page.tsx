@@ -12,7 +12,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { OrderTimeline } from "@/components/features/orders/OrderTimeline";
 import { EscrowBadge } from "@/components/features/payments/EscrowBadge";
@@ -20,6 +21,7 @@ import { Breadcrumb } from "@/components/shared/Breadcrumb";
 import { Badge } from "@/components/ui/Badge";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { ApiError, apiClient } from "@/lib/api/client";
+import { useApiData } from "@/lib/hooks/useApiData";
 import { useUnwrapPageParams, PageParamsProps } from "@/lib/utils/unwrapPageParams";
 
 interface OrderDetail {
@@ -85,13 +87,44 @@ function formatDate(dateStr: string) {
 export default function OrderDetailPage(props: PageParamsProps) {
   useUnwrapPageParams(props);
   const { id } = useParams<{ id: string }>();
-  const [order, setOrder] = useState<OrderDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [approving, setApproving] = useState(false);
-  const [approved, setApproved] = useState(false);
+  const queryClient = useQueryClient();
+  const [approveErr, setApproveErr] = useState<string | null>(null);
   const [invoiceBusy, setInvoiceBusy] = useState(false);
   const [invoiceErr, setInvoiceErr] = useState<string | null>(null);
+
+  // PERF-8: react-query via shared useApiData hook.
+  const {
+    data: order = null,
+    isLoading: loading,
+    error: loadErr,
+    refetch: fetchOrder,
+  } = useApiData<OrderDetail | null>(
+    ["orders", id],
+    async () => {
+      const data = await apiClient.getPayment(id);
+      return data as unknown as OrderDetail;
+    },
+    { enabled: !!id },
+  );
+
+  const approveMutation = useMutation({
+    mutationFn: async () => {
+      if (!order) throw new Error("Order not loaded");
+      return apiClient.approveWork(order.id);
+    },
+    onSuccess: () => {
+      setApproveErr(null);
+      queryClient.invalidateQueries({ queryKey: ["orders", id] });
+      queryClient.invalidateQueries({ queryKey: ["orders", "my"] });
+      queryClient.invalidateQueries({ queryKey: ["payments", "my"] });
+    },
+    onError: () => {
+      setApproveErr("שגיאה באישור העבודה. נסו שוב.");
+    },
+  });
+  const approving = approveMutation.isPending;
+  const approved = approveMutation.isSuccess;
+  const error = approveErr ?? (loadErr ? "לא ניתן לטעון את פרטי ההזמנה" : null);
 
   const handleInvoiceDownload = useCallback(async () => {
     if (!order?.invoiceId) return;
@@ -114,35 +147,9 @@ export default function OrderDetailPage(props: PageParamsProps) {
     }
   }, [order?.invoiceId]);
 
-  const fetchOrder = useCallback(async () => {
-    if (!id) return;
-    setLoading(true);
-    try {
-      const data = await apiClient.getPayment(id);
-      setOrder(data as unknown as OrderDetail);
-    } catch {
-      setError("לא ניתן לטעון את פרטי ההזמנה");
-    } finally {
-      setLoading(false);
-    }
-  }, [id]);
-
-  useEffect(() => {
-    fetchOrder();
-  }, [fetchOrder]);
-
-  const handleApproveWork = async () => {
+  const handleApproveWork = () => {
     if (!order) return;
-    setApproving(true);
-    try {
-      await apiClient.approveWork(order.id);
-      setApproved(true);
-      await fetchOrder();
-    } catch {
-      setError("שגיאה באישור העבודה. נסו שוב.");
-    } finally {
-      setApproving(false);
-    }
+    approveMutation.mutate();
   };
 
   if (loading) {

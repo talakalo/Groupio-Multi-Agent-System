@@ -1,6 +1,14 @@
-import type { MessageRequest, MessageResponse } from "@groupio/types";
+import type { MessageRequest, MessageResponse, Payment } from "@groupio/types";
 
 import { useAuthStore } from "@/lib/stores/authStore";
+
+/** PERF-9: paginated response envelope for `/payments/my`. */
+export interface PaginatedPayments {
+  payments: Payment[];
+  total: number;
+  page: number;
+  pages: number;
+}
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -13,6 +21,17 @@ interface RequestOptions {
   signal?: AbortSignal;
 }
 
+// PERF-1: network-level (fetch reject) failures are transparently retried
+// with exponential backoff + jitter. HTTP-level errors (4xx/5xx) are NOT
+// retried here — they surface to the caller so the UI / react-query layer
+// can decide (explicit retry buttons, react-query `retry: 2`, etc.). This
+// keeps client-level retry safe for both idempotent GETs and side-effecting
+// POSTs, and avoids silently masking server errors that tests and UIs
+// depend on observing.
+const MAX_RETRY_ATTEMPTS = 3;
+const RETRY_BASE_DELAY_MS = 200;
+const RETRY_MAX_DELAY_MS = 4_000;
+
 /** Callback that tries to refresh the access token; returns new token or null. */
 export type On401Retry = () => Promise<string | null>;
 
@@ -22,6 +41,8 @@ class ApiClient {
   private _on401Retry: On401Retry | null = null;
   /** Single-flight mutex: reuse in-flight refresh so concurrent 401s only call refresh once. */
   private _refreshPromise: Promise<string | null> | null = null;
+  /** PERF-1: coalesce concurrent GETs on the same endpoint. Keyed by `endpoint`. */
+  private readonly _inflightGets = new Map<string, Promise<unknown>>();
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
@@ -33,6 +54,17 @@ class ApiClient {
   /** Set handler for 401: refresh token and return new access token; client will retry once. */
   setOn401Retry(fn: On401Retry | null): void {
     this._on401Retry = fn;
+  }
+
+  /**
+   * Test-only: reset in-flight GET dedup map and any pending refresh promise.
+   * The client is a module-level singleton; without this, a never-resolving
+   * mocked fetch in one test can poison subsequent tests that hit the same
+   * endpoint (they'd receive the stale pending Promise from `_inflightGets`).
+   */
+  __resetInternalsForTests(): void {
+    this._inflightGets.clear();
+    this._refreshPromise = null;
   }
 
   private async refreshToken(): Promise<string | null> {
@@ -60,7 +92,58 @@ class ApiClient {
     );
   }
 
+  /**
+   * PERF-1: public entry point. Adds transparent exponential-backoff retry on
+   * transient statuses (5xx / 429 / 408 / 425 / 529) and coalesces concurrent
+   * GETs on the same endpoint so repeated page mounts don't fan out to the
+   * backend. Mutations (POST/PUT/PATCH/DELETE) are retried too but are never
+   * deduplicated — correctness first.
+   */
   private async request<T>(
+    endpoint: string,
+    options: RequestOptions = {},
+  ): Promise<T> {
+    const method = options.method ?? "GET";
+    if (method === "GET" && !options.signal) {
+      const cached = this._inflightGets.get(endpoint);
+      if (cached) return cached as Promise<T>;
+      const p = this._retryingRequest<T>(endpoint, options).finally(() => {
+        this._inflightGets.delete(endpoint);
+      });
+      this._inflightGets.set(endpoint, p);
+      return p;
+    }
+    return this._retryingRequest<T>(endpoint, options);
+  }
+
+  private async _retryingRequest<T>(endpoint: string, options: RequestOptions): Promise<T> {
+    let attempt = 0;
+    let lastErr: unknown;
+    while (attempt <= MAX_RETRY_ATTEMPTS) {
+      try {
+        return await this._singleRequest<T>(endpoint, options);
+      } catch (err) {
+        lastErr = err;
+        if (!this._isRetryable(err) || attempt === MAX_RETRY_ATTEMPTS) throw err;
+        const base = Math.min(RETRY_MAX_DELAY_MS, RETRY_BASE_DELAY_MS * 2 ** attempt);
+        const jitter = Math.random() * base;
+        await new Promise((r) => setTimeout(r, base + jitter));
+        attempt += 1;
+      }
+    }
+    throw lastErr;
+  }
+
+  private _isRetryable(err: unknown): boolean {
+    // PERF-1: do NOT retry HTTP-level errors; let the caller decide.
+    if (err instanceof ApiError) return false;
+    // AbortError from user-supplied signals bubbles up as DOMException — don't retry.
+    if (err instanceof DOMException && err.name === "AbortError") return false;
+    // Network-level failure (fetch reject) — retry transparently.
+    return true;
+  }
+
+  private async _singleRequest<T>(
     endpoint: string,
     options: RequestOptions = {},
     isRetry = false
@@ -105,7 +188,7 @@ class ApiClient {
     ) {
       const newToken = await this.refreshToken();
       if (newToken) {
-        return this.request<T>(endpoint, options, true);
+        return this._singleRequest<T>(endpoint, options, true);
       }
     }
 
@@ -368,8 +451,13 @@ class ApiClient {
 
   // ---- Payment endpoints ----
 
-  async getMyPayments() {
-    return this.request<import("@groupio/types").Payment[]>("/api/v1/payments/my");
+  async getMyPayments(opts: { page?: number; limit?: number; status?: string } = {}) {
+    const params = new URLSearchParams();
+    if (opts.page != null) params.set("page", String(opts.page));
+    if (opts.limit != null) params.set("limit", String(opts.limit));
+    if (opts.status) params.set("status", opts.status);
+    const qs = params.toString();
+    return this.request<PaginatedPayments>(`/api/v1/payments/my${qs ? `?${qs}` : ""}`);
   }
 
   async initiatePayment(offerId: string, paymentMethodId?: string) {

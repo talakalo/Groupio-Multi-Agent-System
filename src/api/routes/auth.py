@@ -537,11 +537,14 @@ async def update_current_user(
 
     # Check phone uniqueness if updating
     if "phone" in update_data:
-        existing = await db.get_user_by_phone(update_data["phone"])
-        if existing and existing.id != current_user.id:
+        existing_user = await db.get_user_by_phone(update_data["phone"])
+        if existing_user and existing_user.id != current_user.id:
             raise HTTPException(status_code=400, detail="Phone number already in use")
 
     updated = await db.update_user(current_user.id, update_data)
+    from src.api.middleware.auth import invalidate_cached_user
+
+    await invalidate_cached_user(current_user.id)
     return updated
 
 
@@ -562,9 +565,12 @@ async def change_password(
     new_hashed = hash_password(request.new_password)
     await db.update_user_password(current_user.id, new_hashed)
 
-    # Invalidate all refresh tokens
+    # Invalidate all refresh tokens + auth user cache (forces re-fetch of active status)
     redis = get_redis_client()
     await redis.delete(f"refresh_token:{current_user.id}")
+    from src.api.middleware.auth import invalidate_cached_user
+
+    await invalidate_cached_user(current_user.id)
 
     logger.info("Password changed for user: %s", current_user.email)
 
@@ -755,6 +761,9 @@ async def delete_account(
 
     # Revoke refresh token first (prevents any concurrent re-auth)
     await redis.delete(f"refresh_token:{current_user.id}")
+    from src.api.middleware.auth import invalidate_cached_user
+
+    await invalidate_cached_user(current_user.id)
 
     # Delete user — cascade rules in the DB handle linked rows.
     # If the DB client exposes a delete method, use it; otherwise anonymise.

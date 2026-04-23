@@ -24,7 +24,7 @@ import { useEffect, useRef, useState } from 'react';
 import { LanguageToggle } from '@/components/shared/LanguageToggle';
 import { NotificationPanel } from '@/components/shared/NotificationPanel';
 import { apiClient } from '@/lib/api/client';
-import { useAuthStore } from '@/lib/stores/authStore';
+import { useAuthHasHydrated, useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
 
 interface NavItem {
@@ -61,10 +61,15 @@ export default function ResidentLayout({ children }: { children: React.ReactNode
   const isVerified = useAuthStore((s) => s.user?.isVerified ?? true);
   const refreshAccessToken = useAuthStore((s) => s.refreshAccessToken);
   const logout = useAuthStore((s) => s.logout);
+  const hasHydrated = useAuthHasHydrated();
   const [resendSent, setResendSent] = useState(false);
   const [resending, setResending] = useState(false);
 
   useEffect(() => {
+    // Wait for persist to rehydrate before making redirect decisions;
+    // otherwise we race the localStorage restore and bounce authenticated
+    // users to /login on every navigation.
+    if (!hasHydrated) return;
     if (!token && isAuthenticated) {
       refreshAccessToken().then((success) => {
         if (!success) router.replace('/login');
@@ -72,14 +77,15 @@ export default function ResidentLayout({ children }: { children: React.ReactNode
     } else if (!token && !isAuthenticated) {
       router.replace('/login');
     }
-  }, [token, isAuthenticated, router, refreshAccessToken]);
+  }, [hasHydrated, token, isAuthenticated, router, refreshAccessToken]);
 
   useEffect(() => {
+    if (!hasHydrated) return;
     if (!isAuthenticated || !user?.role) return;
     if (!ALLOWED_RESIDENT_ROLES.has(user.role)) {
       router.replace(ROLE_DEFAULT_ROUTES[user.role] || '/login');
     }
-  }, [isAuthenticated, user?.role, router]);
+  }, [hasHydrated, isAuthenticated, user?.role, router]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -92,6 +98,13 @@ export default function ResidentLayout({ children }: { children: React.ReactNode
       return () => document.removeEventListener('click', handleClickOutside);
     }
   }, [userMenuOpen]);
+
+  // Hold rendering until persist has rehydrated. This guarantees the
+  // auth-gate below sees the correct isAuthenticated/role values and avoids
+  // a flash of the full shell on every page load.
+  if (!hasHydrated) {
+    return null;
+  }
 
   if (!token && !isAuthenticated) {
     return null;

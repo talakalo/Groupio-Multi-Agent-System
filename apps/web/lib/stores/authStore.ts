@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 
@@ -22,12 +23,19 @@ export interface AuthState {
   accessToken: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  /**
+   * True once Zustand persist has finished rehydrating from localStorage.
+   * Protected layouts MUST wait for this before redirecting to /login, otherwise
+   * they race the rehydration and bounce authenticated users off the page.
+   */
+  _hasHydrated: boolean;
 
   // Actions
   setUser: (user: User | null) => void;
   setAccessToken: (token: string | null) => void;
   clearAuth: () => void;
   setLoading: (loading: boolean) => void;
+  _setHasHydrated: (b: boolean) => void;
 
   // Async actions
   login: (email: string, password: string) => Promise<void>;
@@ -55,6 +63,9 @@ export const useAuthStore = create<AuthState>()(
       accessToken: null,
       isAuthenticated: false,
       isLoading: false,
+      _hasHydrated: false,
+
+      _setHasHydrated: (b) => set({ _hasHydrated: b }),
 
       setUser: (user) =>
         set({
@@ -249,9 +260,35 @@ export const useAuthStore = create<AuthState>()(
         user: state.user,
         isAuthenticated: state.isAuthenticated,
       }),
+      onRehydrateStorage: () => () => {
+        // Always flip the flag, even on error or when no persisted state
+        // existed — protected layouts block on this before redirecting, so
+        // a missed callback would leave the UI stuck forever.
+        useAuthStore.getState()._setHasHydrated(true);
+      },
     }
   )
 );
+
+/**
+ * React hook: returns `true` once the auth store has finished rehydrating from
+ * localStorage on the client. Starts as `false` on the server and during the
+ * very first client render, which lets protected layouts avoid the
+ * "redirect-to-/login-before-persist-rehydrates" race.
+ *
+ * Also defensively flips to `true` after mount on the client, in case
+ * rehydration completed before our subscription attached (fast-path client
+ * navigations) or localStorage was unavailable.
+ */
+export function useAuthHasHydrated(): boolean {
+  const hasHydrated = useAuthStore((s) => s._hasHydrated);
+  useEffect(() => {
+    if (!useAuthStore.getState()._hasHydrated) {
+      useAuthStore.getState()._setHasHydrated(true);
+    }
+  }, []);
+  return hasHydrated;
+}
 
 // Selector hooks for better performance
 export const useUser = () => useAuthStore((state) => state.user);

@@ -184,6 +184,8 @@ describe('ApiClient', () => {
     });
 
     it('falls back to statusText when body has no detail', async () => {
+      // PERF-1: HTTP 5xx is NOT retried by the client (UI / react-query
+      // handles retry), so a single mocked 500 is enough.
       (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
         ok: false,
         status: 500,

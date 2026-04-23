@@ -134,42 +134,50 @@ async def check_expired_offers():
             logger.error("Failed to cancel expired offer %s: %s", offer_id, exc)
             continue  # Skip notifications if cancellation itself failed
 
-        # Notify each participant
-        for p in participants:
+        # Notify each participant concurrently (max 10 in flight) — PERF-4.
+        sem = asyncio.Semaphore(10)
+
+        async def _notify(p: dict) -> None:
             p_email = p.get("email") or p.get("user_email", "")
             if not p_email:
-                continue
-            try:
-                await email_svc.send_offer_cancelled(
-                    to_email=p_email,
-                    user_name=p.get("full_name") or p.get("user_name", "דייר"),
-                    offer_title=offer_title,
-                    reason="פג תוקף ההצעה",
-                )
-            except Exception as exc:
-                logger.warning(
-                    "Failed to send expiry notification to %s for offer %s: %s",
-                    p_email,
-                    offer_id,
-                    exc,
-                )
+                return
+            async with sem:
+                try:
+                    await email_svc.send_offer_cancelled(
+                        to_email=p_email,
+                        user_name=p.get("full_name") or p.get("user_name", "דייר"),
+                        offer_title=offer_title,
+                        reason="פג תוקף ההצעה",
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "Failed to send expiry notification to %s for offer %s: %s",
+                        p_email,
+                        offer_id,
+                        exc,
+                    )
+
+        await asyncio.gather(*(_notify(p) for p in participants))
 
 
 @scheduler.register("recalculate_trust_scores", interval_seconds=604800)  # Weekly
 async def recalculate_trust_scores():
-    """Recalculate trust scores for all active contractors."""
+    """Recalculate trust scores for all active contractors in a single batched pass."""
     db = get_postgres_client()
     contractors, _ = await db.list_contractors(
         filters={"verification_status": "verified", "marketplace_visible_only": False},
         page=1,
         page_size=1000,
     )
-    for contractor in contractors:
-        try:
-            await db.update_contractor_rating(contractor["id"])
-            logger.info("Recalculated trust score for contractor %s", contractor["id"])
-        except Exception as exc:
-            logger.error("Failed to recalculate for %s: %s", contractor["id"], exc)
+    ids = [c["id"] for c in contractors]
+    if not ids:
+        logger.info("recalculate_trust_scores: no verified contractors to process")
+        return
+    try:
+        updated = await db.batch_update_contractor_ratings(ids)
+        logger.info("recalculate_trust_scores: batch-updated %s of %s contractors", updated, len(ids))
+    except Exception as exc:
+        logger.exception("recalculate_trust_scores: batch update failed: %s", exc)
 
 
 @scheduler.register("cleanup_stale_conversations", interval_seconds=86400)  # Daily

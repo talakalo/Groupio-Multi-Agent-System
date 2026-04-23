@@ -19,7 +19,8 @@ logger = logging.getLogger(__name__)
 
 async def _handle(data: dict[str, Any]) -> None:
     event_name = data.get("event_name") or ""
-    payload = data.get("payload") if isinstance(data.get("payload"), dict) else {}
+    raw_payload = data.get("payload")
+    payload: dict[str, Any] = raw_payload if isinstance(raw_payload, dict) else {}
     if event_name == "invoices.created":
         logger.info(
             "payments worker: event=%s invoice_id=%s offer_id=%s user_id=%s",
@@ -79,9 +80,7 @@ async def run_consumer() -> None:
                     await _handle(data)
                 except Exception:
                     messaging_consumer_messages_total.labels(worker="payments", result="error").inc()
-                    logger.exception(
-                        "payments worker handler failed — message dead-lettered (requeue=False)"
-                    )
+                    logger.exception("payments worker handler failed — message dead-lettered (requeue=False)")
                     raise
 
     await connection.close()

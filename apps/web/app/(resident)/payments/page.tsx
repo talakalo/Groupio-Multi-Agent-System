@@ -15,12 +15,13 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 
 import { EscrowBadge } from '@/components/features/payments/EscrowBadge';
 import { Badge } from '@/components/ui/Badge';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { apiClient } from '@/lib/api/client';
+import { useApiData } from '@/lib/hooks/useApiData';
 import { useUnwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
 
 // ---- Types ----
@@ -192,28 +193,26 @@ function EscrowExplainer() {
 export default function PaymentsPage(props: PageParamsProps) {
   useUnwrapPageParams(props);
   const t = useTranslations('payments');
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'pending' | 'succeeded' | 'refunded'>('all');
 
-  const fetchPayments = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await apiClient.getMyPayments();
-      setPayments(Array.isArray(data) ? data : []);
-    } catch (err) {
-      setError(t('loadError'));
-      setPayments([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [t]);
-
-  useEffect(() => {
-    fetchPayments();
-  }, [fetchPayments]);
+  // PERF-8: react-query via shared useApiData hook. Backend returns
+  // `{ payments, total, page, pages }` after PERF-9; legacy-array shape kept
+  // as a fallback during rollout.
+  const {
+    data: payments = [],
+    isLoading: loading,
+    error,
+    refetch,
+  } = useApiData<Payment[]>(
+    ['payments', 'my', { page: 1, limit: 50 }],
+    async () => {
+      const data = await apiClient.getMyPayments({ page: 1, limit: 50 });
+      return Array.isArray((data as unknown) as Payment[])
+        ? ((data as unknown) as Payment[])
+        : (data?.payments ?? []);
+    },
+  );
+  const fetchPayments = () => { void refetch(); };
 
   const filteredPayments = payments.filter((p) => {
     if (filter === 'all') return true;
@@ -337,7 +336,7 @@ export default function PaymentsPage(props: PageParamsProps) {
         ) : error ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <AlertCircle className="w-10 h-10 text-red-400 mb-3" />
-            <p className="text-gray-600">{error}</p>
+            <p className="text-gray-600">{t('loadError')}</p>
             <button
               onClick={fetchPayments}
               className="mt-3 text-primary-600 text-sm font-medium hover:underline"

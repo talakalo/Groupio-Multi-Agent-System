@@ -16,7 +16,7 @@ import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 
 import { NotificationPanel } from '@/components/shared/NotificationPanel';
-import { useAuthStore } from '@/lib/stores/authStore';
+import { useAuthHasHydrated, useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
 
 interface NavItem {
@@ -39,18 +39,30 @@ export default function BuildingsManagerLayout({ children }: { children: React.R
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const token = useAuthStore((s) => s.accessToken);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
+  const refreshAccessToken = useAuthStore((s) => s.refreshAccessToken);
+  const hasHydrated = useAuthHasHydrated();
 
   useEffect(() => {
-    if (!token) {
+    if (!hasHydrated) return;
+    // `accessToken` is in-memory only; rely on the persisted `isAuthenticated`
+    // flag (and the HTTP-only refresh cookie) as the source of truth and
+    // silently refresh if we landed here without a token in memory.
+    if (!isAuthenticated) {
       router.replace('/login');
       return;
+    }
+    if (!token) {
+      refreshAccessToken().then((ok) => {
+        if (!ok) router.replace('/login');
+      });
     }
     if (user && user.role !== 'buildings_manager' && user.role !== 'admin' && user.role !== 'super_admin') {
       router.replace('/dashboard');
     }
-  }, [token, user, router]);
+  }, [hasHydrated, token, isAuthenticated, user, router, refreshAccessToken]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -64,7 +76,10 @@ export default function BuildingsManagerLayout({ children }: { children: React.R
     }
   }, [userMenuOpen]);
 
-  if (!token) {
+  if (!hasHydrated) {
+    return null;
+  }
+  if (!isAuthenticated) {
     return null;
   }
 
