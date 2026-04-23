@@ -136,10 +136,12 @@ async def test_get_contractor_building_history_limit_affects_key(store, fake_red
 @pytest.mark.asyncio
 async def test_graph_cache_does_not_cross_pollute_methods(store, fake_redis):
     """Different methods must never share cache entries even for equal args."""
-    store.execute = AsyncMock(side_effect=[
-        [{"reputation": {"contractor_id": "c1"}}],
-        [{"patterns": {"contractor_id": "c1"}}],
-    ])
+    store.execute = AsyncMock(
+        side_effect=[
+            [{"reputation": {"contractor_id": "c1"}}],
+            [{"patterns": {"contractor_id": "c1"}}],
+        ]
+    )
 
     rep = await store.get_contractor_reputation("c1")
     pat = await store.detect_suspicious_patterns("c1")
