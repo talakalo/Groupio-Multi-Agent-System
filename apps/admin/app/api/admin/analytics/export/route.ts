@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 
 /**
- * Admin analytics CSV export route.
- * Fetches summary data from the backend and returns a CSV with the current snapshot.
- * A full historical export requires a dedicated backend endpoint (not yet implemented).
+ * Admin analytics CSV export.
+ *
+ * Snapshots the current state from /api/v1/admin/analytics and returns a CSV.
+ * A historical export requires a dedicated backend endpoint that still needs
+ * to be built — this route documents the gap by refusing to fabricate a row
+ * of zeros when the backend is unreachable.
  */
 export async function POST(request: NextRequest) {
   const backendUrl = (
@@ -11,35 +14,38 @@ export async function POST(request: NextRequest) {
   ).replace(/\/+$/, "");
   const url = `${backendUrl}/api/v1/admin/analytics`;
 
-  let gmvToday = 0;
-  let activeOffers = 0;
-  let openTickets = 0;
-  let totalContractors = 0;
+  const authHeader = request.headers.get("authorization");
+  const headers: Record<string, string> = {};
+  if (authHeader) headers["Authorization"] = authHeader;
+
+  let data: {
+    gmvToday?: number;
+    activeOffers?: number;
+    openTickets?: number;
+    totalContractors?: number;
+  };
 
   try {
-    const authHeader = request.headers.get("authorization");
-    const headers: Record<string, string> = {};
-    if (authHeader) headers["Authorization"] = authHeader;
-
-    const res = await fetch(url, {
-      headers,
-      signal: AbortSignal.timeout(5000),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      gmvToday = data.gmvToday ?? 0;
-      activeOffers = data.activeOffers ?? 0;
-      openTickets = data.openTickets ?? 0;
-      totalContractors = data.totalContractors ?? 0;
+    const res = await fetch(url, { headers, signal: AbortSignal.timeout(5000) });
+    if (!res.ok) {
+      return NextResponse.json(
+        { error: `Backend analytics returned ${res.status}` },
+        { status: 502 },
+      );
     }
-  } catch {
-    // Use zeros if backend unavailable
+    data = await res.json();
+  } catch (err) {
+    const message =
+      err instanceof DOMException && err.name === "TimeoutError"
+        ? "Backend analytics timed out"
+        : "Backend analytics unreachable";
+    return NextResponse.json({ error: message }, { status: 504 });
   }
 
   const today = new Date().toISOString().slice(0, 10);
   const csv = [
     "date,active_offers,gmv_today,open_tickets,total_contractors",
-    `${today},${activeOffers},${gmvToday},${openTickets},${totalContractors}`,
+    `${today},${data.activeOffers ?? 0},${data.gmvToday ?? 0},${data.openTickets ?? 0},${data.totalContractors ?? 0}`,
   ].join("\n");
 
   return new NextResponse(csv, {

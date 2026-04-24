@@ -236,11 +236,12 @@ jobs:
 
       - name: Run tests with coverage enforcement
         run: |
-          # Threshold temporarily at 76% while async-events files from PR #167
-          # are excluded via [tool.coverage.run] omit in pyproject.toml.
-          # Raise back to 80% as each omitted file gets its test follow-up.
-          # Tracked: #TODO-coverage-async-events
-          pytest tests/ --cov=src --cov-fail-under=76 --cov-report=xml --cov-report=term-missing
+          # Threshold raised from 76% now that the four async workers
+          # (outbox_dispatcher, worker_crm_sync, worker_notifications,
+          # worker_payments) + espocrm/service.py have dedicated unit tests
+          # and are no longer on the [tool.coverage.run] omit list. Target
+          # remains 80% — the remaining gap is messaging/* + stripe_contractor_webhooks.
+          pytest tests/ --cov=src --cov-fail-under=78 --cov-report=xml --cov-report=term-missing
 
       - name: Run integration tests
         env:

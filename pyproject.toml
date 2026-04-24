@@ -83,12 +83,14 @@ omit = [
     "src/messaging/publisher.py",
     "src/messaging/topology.py",
     "src/integrations/espocrm/client.py",
-    "src/integrations/espocrm/service.py",
+    # outbox_dispatcher, worker_crm_sync, worker_notifications, worker_payments
+    # and espocrm/service.py are covered by:
+    #   tests/unit/test_outbox_dispatcher_branches.py
+    #   tests/unit/test_outbox_dispatcher_failures.py
+    #   tests/unit/test_worker_crm_sync.py
+    #   tests/unit/test_worker_notifications.py
+    #   tests/unit/test_worker_payments.py
     "src/services/stripe_contractor_webhooks.py",
-    "src/workers/outbox_dispatcher.py",
-    "src/workers/worker_crm_sync.py",
-    "src/workers/worker_notifications.py",
-    "src/workers/worker_payments.py",
 ]
 
 [tool.ruff]
