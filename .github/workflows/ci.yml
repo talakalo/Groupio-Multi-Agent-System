@@ -236,12 +236,13 @@ jobs:
 
       - name: Run tests with coverage enforcement
         run: |
-          # Threshold raised from 76% now that the four async workers
-          # (outbox_dispatcher, worker_crm_sync, worker_notifications,
-          # worker_payments) + espocrm/service.py have dedicated unit tests
-          # and are no longer on the [tool.coverage.run] omit list. Target
-          # remains 80% — the remaining gap is messaging/* + stripe_contractor_webhooks.
-          pytest tests/ --cov=src --cov-fail-under=78 --cov-report=xml --cov-report=term-missing
+          # Threshold restored to the 80% target. Messaging layer, all four
+          # async workers, the espocrm service and the contractor Stripe
+          # webhook handler now have dedicated unit tests and are off the
+          # [tool.coverage.run] omit list. The only remaining omit is
+          # src/integrations/espocrm/client.py (httpx wrapper), which needs
+          # a real CRM integration test before it can be counted.
+          pytest tests/ --cov=src --cov-fail-under=80 --cov-report=xml --cov-report=term-missing
 
       - name: Run integration tests
         env:

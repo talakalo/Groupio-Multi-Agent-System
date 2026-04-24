@@ -34,8 +34,26 @@ on:
           - contractor
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Gating strategy
+# ─────────────────────────────────────────────────────────────────────────────
+# Previously every step had ``continue-on-error: true``, which meant mobile
+# regressions could never fail a PR. That mask is removed below.
+#
+# In exchange, each Maestro run step is now gated on the relevant secrets
+# being present — so a fork PR (no secrets) skips the run cleanly with a
+# "::notice::" entry, while a trunk/main push with secrets provisioned runs
+# the flows for real and fails the job on any flow regression.
+#
+# Secrets required for a real run:
+#   * MAESTRO_CLOUD_API_KEY  — enables the Maestro Cloud path
+#   * E2E_RESIDENT_EMAIL / E2E_RESIDENT_PASSWORD    — resident login fixture
+#   * E2E_CONTRACTOR_EMAIL / E2E_CONTRACTOR_PASSWORD — contractor login fixture
+#   * EXPO_TOKEN (optional) — required only when building APKs via EAS
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Android E2E Job
-# Builds a debug APK via EAS and runs Maestro flows on an Android emulator.
+# Runs Maestro flows on Maestro Cloud (preferred) or a local emulator.
 # ─────────────────────────────────────────────────────────────────────────────
 jobs:
   e2e-android:
@@ -50,6 +68,18 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Detect mobile E2E secrets
+        id: secrets_check
+        env:
+          MAESTRO_CLOUD_API_KEY: ${{ secrets.MAESTRO_CLOUD_API_KEY }}
+        run: |
+          if [ -n "$MAESTRO_CLOUD_API_KEY" ]; then
+            echo "has_maestro_cloud=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_maestro_cloud=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::MAESTRO_CLOUD_API_KEY not set — Maestro Cloud run will be skipped"
+          fi
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -79,7 +109,7 @@ jobs:
       - name: Verify Maestro installation
         run: maestro --version
 
-      # ── Option A: Build APK via EAS (requires EAS_TOKEN secret) ────────────
+      # ── Option A: Build APK via EAS (requires EXPO_TOKEN secret) ───────────
       # Uncomment when EAS is configured:
       #
       # - name: Setup EAS
@@ -102,6 +132,7 @@ jobs:
       # Maestro Cloud handles device provisioning — no emulator setup needed.
       # Requires MAESTRO_CLOUD_API_KEY secret in repository settings.
       - name: Run Maestro Cloud (Android)
+        if: steps.secrets_check.outputs.has_maestro_cloud == 'true'
         working-directory: apps/mobile
         env:
           MAESTRO_CLOUD_API_KEY: ${{ secrets.MAESTRO_CLOUD_API_KEY }}
@@ -118,18 +149,22 @@ jobs:
             contractor) FLOW_PATH=".maestro/flows/03-contractor" ;;
             *)         FLOW_PATH=".maestro/flows" ;;
           esac
+          if [ ! -f ./build/app-e2e.apk ]; then
+            echo "::warning::./build/app-e2e.apk missing — EAS / local APK build must land before this step can pass"
+            exit 1
+          fi
           maestro cloud \
             --apiKey "$MAESTRO_CLOUD_API_KEY" \
             --platform android \
             --app-file ./build/app-e2e.apk \
             $FLOW_PATH
-        # NOTE: This step requires a pre-built APK at ./build/app-e2e.apk.
-        # Either use EAS (Option A above) or a local build to produce it first.
-        continue-on-error: true  # Don't fail CI if Maestro Cloud key is not set
 
       # ── Local emulator run (alternative to Maestro Cloud) ────────────────
+      # Only runs when Maestro Cloud is unavailable and we still want to
+      # exercise the flow locally. Skips silently on fork PRs where no
+      # secrets are provisioned (the emulator path doesn't need any).
       - name: Run Maestro locally on Android emulator
-        if: env.MAESTRO_CLOUD_API_KEY == ''
+        if: steps.secrets_check.outputs.has_maestro_cloud != 'true'
         uses: reactivecircus/android-emulator-runner@v2
         env:
           TEST_RESIDENT_EMAIL: ${{ secrets.E2E_RESIDENT_EMAIL || 'e2e.resident@test.groupio.co.il' }}
@@ -145,13 +180,16 @@ jobs:
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: |
-            # Install the APK (if available)
-            # adb install apps/mobile/build/app-e2e.apk
-
-            # Run smoke flows only in local emulator mode (faster)
+            # Install the APK (if available). If the APK has not been built
+            # (EAS / local build not wired yet), skip with a clear message
+            # rather than running Maestro against an empty emulator.
+            if [ ! -f apps/mobile/build/app-e2e.apk ]; then
+              echo "::notice::apps/mobile/build/app-e2e.apk missing — local Maestro run skipped until EAS / local build is wired"
+              exit 0
+            fi
+            adb install apps/mobile/build/app-e2e.apk
             cd apps/mobile
             maestro test --include-tags smoke .maestro/flows
-        continue-on-error: true
 
       - name: Upload Maestro test artifacts
         uses: actions/upload-artifact@v4
@@ -179,6 +217,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Detect iOS build asset
+        id: ios_build
+        run: |
+          if [ -f apps/mobile/build/Groupio.app/Info.plist ] || [ -f apps/mobile/build/app-e2e.tar.gz ]; then
+            echo "has_app=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_app=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::iOS .app bundle not produced — Maestro iOS run will be skipped until EAS iOS build is wired"
+          fi
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -199,11 +247,13 @@ jobs:
           echo "$HOME/.maestro/bin" >> $GITHUB_PATH
 
       - name: Install iOS Simulator runtime
+        if: steps.ios_build.outputs.has_app == 'true'
         run: |
           xcrun simctl list runtimes | grep -E "iOS 17" || \
           xcodebuild -downloadPlatform iOS
 
       - name: Boot iOS Simulator
+        if: steps.ios_build.outputs.has_app == 'true'
         run: |
           UDID=$(xcrun simctl create "e2e-iphone" "iPhone 15" "iOS17.5" 2>/dev/null || \
                  xcrun simctl list devices available | grep "iPhone 15" | head -1 | grep -oE '[A-F0-9-]{36}')
@@ -228,6 +278,7 @@ jobs:
 
       # ── Run Maestro on iOS simulator ──────────────────────────────────────
       - name: Run Maestro flows (iOS)
+        if: steps.ios_build.outputs.has_app == 'true'
         working-directory: apps/mobile
         env:
           TEST_RESIDENT_EMAIL: ${{ secrets.E2E_RESIDENT_EMAIL || 'e2e.resident@test.groupio.co.il' }}
@@ -236,7 +287,6 @@ jobs:
           TEST_CONTRACTOR_PASSWORD: ${{ secrets.E2E_CONTRACTOR_PASSWORD || 'E2eContractor123!' }}
         run: |
           maestro test --include-tags smoke .maestro/flows
-        continue-on-error: true
 
       - name: Upload Maestro test artifacts
         uses: actions/upload-artifact@v4

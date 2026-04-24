@@ -73,24 +73,18 @@ python_functions = ["test_*"]
 addopts = "--cov-fail-under=50 --timeout=120"  # Per-test timeout to avoid CI SIGTERM on slow/hanging tests
 
 [tool.coverage.run]
-# Temporarily omit the async-events scope shipped in PR #167 without tests.
-# Each file here needs its own follow-up test PR; as tests land, entries are
-# removed from this list and the CI threshold is raised back toward 80%.
-# Tracked follow-up: #TODO-coverage-async-events
+# Async-events scope from PR #167 is now fully covered — see:
+#   tests/unit/test_messaging_layer.py          (connection, constants,
+#                                                publisher, topology)
+#   tests/unit/test_outbox_dispatcher_branches.py / _failures.py
+#   tests/unit/test_worker_crm_sync.py          (includes espocrm/service.py)
+#   tests/unit/test_worker_notifications.py
+#   tests/unit/test_worker_payments.py
+#   tests/unit/test_stripe_contractor_webhooks.py
+# The espocrm *client* is an httpx wrapper; covering it would require a real
+# CRM fixture, so it stays omitted until an integration test lands.
 omit = [
-    "src/messaging/connection.py",
-    "src/messaging/constants.py",
-    "src/messaging/publisher.py",
-    "src/messaging/topology.py",
     "src/integrations/espocrm/client.py",
-    # outbox_dispatcher, worker_crm_sync, worker_notifications, worker_payments
-    # and espocrm/service.py are covered by:
-    #   tests/unit/test_outbox_dispatcher_branches.py
-    #   tests/unit/test_outbox_dispatcher_failures.py
-    #   tests/unit/test_worker_crm_sync.py
-    #   tests/unit/test_worker_notifications.py
-    #   tests/unit/test_worker_payments.py
-    "src/services/stripe_contractor_webhooks.py",
 ]
 
 [tool.ruff]

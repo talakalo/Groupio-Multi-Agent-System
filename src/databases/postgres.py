@@ -438,6 +438,41 @@ class PostgresClient:
             async with conn.transaction():
                 yield conn
 
+    @_acm
+    async def tenant_scope(self, user_id: str) -> "_AsyncIterator[Any]":
+        """Run a block with the per-request app.current_user_id session
+        variable installed.
+
+        The RLS policies introduced in migration 037 read this variable via
+        ``current_setting('app.current_user_id', true)`` to decide whether
+        a given row belongs to the caller. This helper sets it on a dedicated
+        connection inside a transaction so it is automatically reset when the
+        block exits (``set_config(..., is_local=true)`` is transaction-scoped).
+
+        Usage::
+
+            async with db.tenant_scope(current_user.id) as conn:
+                rows = await conn.fetch("SELECT * FROM offers WHERE ...")
+
+        For the Supabase client path the helper yields ``None``; the
+        Supabase RLS chain (migrations 032 / 033 / 034) relies on ``auth.uid()``
+        from the JWT instead of this session variable, so there is nothing to
+        install.
+        """
+        if self._use_supabase_client():
+            yield None
+            return
+
+        pool = await self._get_client()
+        async with pool.acquire() as conn:
+            async with conn.transaction():
+                # is_local=true (third arg) = setting lives only for this tx
+                await conn.execute(
+                    "SELECT set_config('app.current_user_id', $1, true)",
+                    str(user_id),
+                )
+                yield conn
+
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=10),
