@@ -194,7 +194,7 @@ export default function ResidentProfilePage() {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
 
-      const res = await fetch(`${apiBase}/api/v1/auth/password-reset`, {
+      const res = await fetch(`${apiBase}/api/v1/auth/password/change`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
