@@ -5,6 +5,7 @@ import { Building2, Users, AlertCircle, Search } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 
+import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
 
@@ -25,17 +26,15 @@ export default function BuildingsManagerBuildingsPage() {
   const t = useTranslations('buildingsManager.buildings');
   const accessToken = useAuthStore((s) => s.accessToken);
   const [search, setSearch] = useState('');
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-  const headers: Record<string, string> = accessToken
-    ? { Authorization: `Bearer ${accessToken}` }
-    : {};
 
   const buildingsQuery = useQuery<{ items: Building[]; total: number }>({
     queryKey: ['buildings-manager', 'buildings'],
     queryFn: async () => {
-      const res = await fetch(`${apiBase}/api/v1/buildings?page_size=50`, { headers });
-      if (!res.ok) return { items: [], total: 0 };
-      return res.json();
+      const data = await apiClient.listBuildings({ page_size: 50 });
+      return {
+        items: (data.items ?? []) as unknown as Building[],
+        total: data.total ?? 0,
+      };
     },
     enabled: !!accessToken,
   });

@@ -625,6 +625,122 @@ class ApiClient {
     );
   }
 
+  /** List buildings (paginated). */
+  async listBuildings(params?: { page?: number; page_size?: number }) {
+    const search = new URLSearchParams();
+    if (params?.page != null) search.set("page", String(params.page));
+    if (params?.page_size != null) search.set("page_size", String(params.page_size));
+    const qs = search.toString();
+    return this.request<{ items: Array<Record<string, unknown>>; total: number }>(
+      `/api/v1/buildings${qs ? `?${qs}` : ""}`,
+    );
+  }
+
+  /** List escalations with optional status filter (paginated). */
+  async listEscalations(params?: { status?: string; page?: number; page_size?: number }) {
+    const search = new URLSearchParams();
+    if (params?.status) search.set("status", params.status);
+    if (params?.page != null) search.set("page", String(params.page));
+    if (params?.page_size != null) search.set("page_size", String(params.page_size));
+    const qs = search.toString();
+    return this.request<{ items: Array<Record<string, unknown>>; total: number }>(
+      `/api/v1/escalations${qs ? `?${qs}` : ""}`,
+    );
+  }
+
+  /** Mark an escalation resolved with an optional resolution note. */
+  async resolveEscalation(escalationId: string, body: Record<string, unknown> = {}) {
+    return this.request<{ status: string }>(
+      `/api/v1/escalations/${encodeURIComponent(escalationId)}/resolve`,
+      { method: "POST", body },
+    );
+  }
+
+  /** Update a contractor profile (PUT /contractors/{id}). */
+  async updateContractor(contractorId: string, body: Record<string, unknown>) {
+    return this.request<Record<string, unknown>>(
+      `/api/v1/contractors/${encodeURIComponent(contractorId)}`,
+      { method: "PUT", body },
+    );
+  }
+
+  /** Upload a contractor document (license, insurance, etc.). */
+  async uploadContractorDoc(file: Blob, filename = "doc"): Promise<Record<string, unknown>> {
+    const form = new FormData();
+    form.append("file", file, filename);
+    return this.request<Record<string, unknown>>(`/api/v1/uploads/contractor-docs`, {
+      method: "POST",
+      body: form,
+    });
+  }
+
+  /** Pending document requests sent to the current contractor. */
+  async getMyContractorDocRequests() {
+    return this.request<{
+      pending: boolean;
+      items: Array<{ message?: string; requested_at?: string }>;
+    }>(`/api/v1/contractors/me/doc-requests`);
+  }
+
+  /** Aggregate stats for a contractor (active offers, completed jobs, revenue, …). */
+  async getContractorStats(contractorId: string) {
+    return this.request<Record<string, unknown>>(
+      `/api/v1/contractors/${encodeURIComponent(contractorId)}/stats`,
+    );
+  }
+
+  /** Resident joins a building via an invite code. */
+  async joinBuilding(inviteCode: string) {
+    return this.request<{ status: string; building_id?: string }>(
+      `/api/v1/buildings/join`,
+      { method: "POST", body: { invite_code: inviteCode } },
+    );
+  }
+
+  /** Address enrichment (data.gov.il fallback to stub when disabled). */
+  async normalizeAddress(address: string, city: string) {
+    return this.request<{
+      address: string;
+      city: string;
+      street: string | null;
+      house_number: string | null;
+      municipality: string | null;
+      confidence: number;
+      source: string;
+    }>(`/api/v1/enrichment/normalize-address`, {
+      method: "POST",
+      body: { address, city },
+    });
+  }
+
+  /** Submit the post-signup onboarding payload (resident or contractor). */
+  async submitOnboarding(payload: Record<string, unknown>) {
+    return this.request<Record<string, unknown>>(`/api/v1/onboarding`, {
+      method: "POST",
+      body: payload,
+    });
+  }
+
+  /** Paginated list of reviews left on a contractor (read-only listing). */
+  async getContractorReviews(contractorId: string, params?: { limit?: number; offset?: number }) {
+    const search = new URLSearchParams();
+    if (params?.limit != null) search.set("limit", String(params.limit));
+    if (params?.offset != null) search.set("offset", String(params.offset));
+    const qs = search.toString();
+    return this.request<{
+      items: Array<{
+        id: string;
+        contractor_id: string;
+        user_id?: string;
+        offer_id?: string;
+        rating: number;
+        comment?: string;
+        created_at: string;
+      }>;
+      total: number;
+    }>(`/api/v1/contractors/${encodeURIComponent(contractorId)}/reviews${qs ? `?${qs}` : ""}`);
+  }
+
   // ---- Offer participants ----
 
   async getOfferParticipants(offerId: string, params?: { page?: number; page_size?: number }) {

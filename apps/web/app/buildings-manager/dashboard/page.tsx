@@ -5,6 +5,7 @@ import { Building2, AlertCircle, Users, TrendingUp } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 
+import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
 
@@ -68,25 +69,21 @@ function StatCard({
 export default function BuildingsManagerDashboardPage() {
   const t = useTranslations('buildingsManager.dashboard');
   const accessToken = useAuthStore((s) => s.accessToken);
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-  const headers: Record<string, string> = accessToken
-    ? { Authorization: `Bearer ${accessToken}` }
-    : {};
 
   const statsQuery = useQuery<ManagerStats>({
     queryKey: ['buildings-manager', 'stats'],
     queryFn: async () => {
-      const [buildingsRes, escalationsRes] = await Promise.all([
-        fetch(`${apiBase}/api/v1/buildings?page_size=100`, { headers }),
-        fetch(`${apiBase}/api/v1/escalations?status=open&page_size=1`, { headers }),
+      const [buildingsResult, escalationsResult] = await Promise.allSettled([
+        apiClient.listBuildings({ page_size: 100 }),
+        apiClient.listEscalations({ status: 'open', page_size: 1 }),
       ]);
 
-      const buildings = buildingsRes.ok ? await buildingsRes.json() : { items: [], total: 0 };
-      const escalations = escalationsRes.ok
-        ? await escalationsRes.json()
-        : { total: 0 };
+      const buildings =
+        buildingsResult.status === 'fulfilled' ? buildingsResult.value : { items: [], total: 0 };
+      const escalations =
+        escalationsResult.status === 'fulfilled' ? escalationsResult.value : { items: [], total: 0 };
 
-      const items: BuildingSummary[] = buildings.items ?? [];
+      const items = (buildings.items ?? []) as unknown as BuildingSummary[];
       const totalResidents = items.reduce((sum: number, b: BuildingSummary) => sum + (b.units ?? 0), 0);
       const activeOffers = items.reduce((sum: number, b: BuildingSummary) => sum + (b.activeOffers ?? 0), 0);
 
@@ -103,19 +100,26 @@ export default function BuildingsManagerDashboardPage() {
   const buildingsQuery = useQuery<{ items: BuildingSummary[] }>({
     queryKey: ['buildings-manager', 'buildings', 'recent'],
     queryFn: async () => {
-      const res = await fetch(`${apiBase}/api/v1/buildings?page_size=5`, { headers });
-      if (!res.ok) return { items: [] };
-      return res.json();
+      const data = await apiClient.listBuildings({ page_size: 5 });
+      return { items: (data.items ?? []) as unknown as BuildingSummary[] };
     },
     enabled: !!accessToken,
   });
 
-  const escalationsQuery = useQuery<{ items: { id: string; reason: string; priority: string; created_at: string }[] }>({
+  const escalationsQuery = useQuery<{
+    items: { id: string; reason: string; priority: string; created_at: string }[];
+  }>({
     queryKey: ['buildings-manager', 'escalations', 'open'],
     queryFn: async () => {
-      const res = await fetch(`${apiBase}/api/v1/escalations?status=open&page_size=5`, { headers });
-      if (!res.ok) return { items: [] };
-      return res.json();
+      const data = await apiClient.listEscalations({ status: 'open', page_size: 5 });
+      return {
+        items: (data.items ?? []) as unknown as {
+          id: string;
+          reason: string;
+          priority: string;
+          created_at: string;
+        }[],
+      };
     },
     enabled: !!accessToken,
   });

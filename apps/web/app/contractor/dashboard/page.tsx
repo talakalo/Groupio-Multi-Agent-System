@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import { AIChat } from '@/components/features/chat/AIChat';
 import { OfferCard } from '@/components/features/offers/OfferCard';
 import { StatCard } from '@/components/shared/StatCard';
+import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
 
 
@@ -30,30 +31,30 @@ export default function ContractorDashboardPage() {
       }
       if (!token) return;
 
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      const headers: Record<string, string> = {
-        Authorization: `Bearer ${token}`,
-      };
-
       try {
-        // Get current user to find contractor_id
-        const meRes = await fetch(`${apiBase}/api/v1/auth/me`, { headers, credentials: 'include' });
-        if (!meRes.ok) throw new Error('Not authenticated');
-        const me = await meRes.json();
+        const me = (await apiClient.getMe()) as Record<string, unknown> & {
+          contractor_id?: string;
+        };
         const contractorId = me.contractor_id;
 
         if (contractorId) {
-          const [statsRes, offersRes] = await Promise.all([
-            fetch(`${apiBase}/api/v1/contractors/${contractorId}/stats`, { headers }),
-            fetch(`${apiBase}/api/v1/offers?status=active`, { headers }),
+          const [statsResult, offersResult] = await Promise.allSettled([
+            apiClient.getContractorStats(contractorId),
+            apiClient.getOffers({ status: 'active' }),
           ]);
 
-          if (statsRes.ok) setStats(await statsRes.json());
-          if (offersRes.ok) {
-            const data = await offersRes.json();
+          if (statsResult.status === 'fulfilled') {
+            setStats(statsResult.value as ContractorStats);
+          }
+          if (offersResult.status === 'fulfilled') {
+            const data = offersResult.value as { items?: Offer[]; offers?: Offer[] };
             const allOffers = data.items ?? data.offers ?? [];
-            setActiveOffers(allOffers.filter((o: Offer) => o.status === 'active' || o.status === 'in_progress'));
-            setPendingOffers(allOffers.filter((o: Offer) => o.status === 'pending' || o.status === 'draft'));
+            setActiveOffers(
+              allOffers.filter((o: Offer) => o.status === 'active' || o.status === 'in_progress'),
+            );
+            setPendingOffers(
+              allOffers.filter((o: Offer) => o.status === 'pending' || o.status === 'draft'),
+            );
           }
         }
       } catch (error) {
