@@ -156,6 +156,20 @@ class ApiClient {
       ...headers,
     };
 
+    // FormData / Blob / URLSearchParams must NOT be JSON-stringified, and
+    // we must NOT force Content-Type to application/json — fetch lets the
+    // browser pick the right boundary for multipart bodies.
+    const isMultipart =
+      typeof FormData !== "undefined" && body instanceof FormData;
+    const isBinary =
+      typeof Blob !== "undefined" && body instanceof Blob;
+    const isUrlEncoded =
+      typeof URLSearchParams !== "undefined" && body instanceof URLSearchParams;
+    if (isMultipart || isBinary || isUrlEncoded) {
+      delete requestHeaders["Content-Type"];
+      delete requestHeaders["content-type"];
+    }
+
     if (token) {
       requestHeaders["Authorization"] = `Bearer ${token}`;
     }
@@ -169,10 +183,15 @@ class ApiClient {
 
     let response: Response;
     try {
+      const fetchBody: BodyInit | undefined = body
+        ? isMultipart || isBinary || isUrlEncoded
+          ? (body as BodyInit)
+          : JSON.stringify(body)
+        : undefined;
       response = await fetch(`${this.baseUrl}${endpoint}`, {
         method,
         headers: requestHeaders,
-        body: body ? JSON.stringify(body) : undefined,
+        body: fetchBody,
         credentials: 'include', // send HTTP-only cookies (refresh token)
         signal: combinedSignal,
       });
@@ -325,6 +344,45 @@ class ApiClient {
     return this.request<import("@groupio/types").Building>(
       `/api/v1/buildings/${buildingId}`
     );
+  }
+
+  /** Building scoped to the current authenticated user. */
+  async getMyBuilding() {
+    return this.request<import("@groupio/types").Building>(
+      `/api/v1/buildings/me`
+    );
+  }
+
+  /** Recent activity feed (payments, escalations, etc.) for the current user. */
+  async getRecentActivity() {
+    return this.request<{ items: Array<Record<string, unknown>> }>(
+      `/api/v1/activity/recent`
+    );
+  }
+
+  /** Upload an avatar. Caller hands a Blob/File which becomes a multipart body. */
+  async uploadAvatar(file: Blob, filename = "avatar"): Promise<{ avatar_url: string }> {
+    const form = new FormData();
+    form.append("file", file, filename);
+    return this.request<{ avatar_url: string }>(`/api/v1/uploads/avatar`, {
+      method: "POST",
+      body: form,
+      // Do not set Content-Type — the browser will add the multipart boundary.
+    });
+  }
+
+  /** Fetch the current authenticated user's profile (`GET /auth/me`). */
+  async getMe() {
+    return this.request<import("@groupio/types").User & Record<string, unknown>>(
+      `/api/v1/auth/me`
+    );
+  }
+
+  /** GDPR deletion of the current user (`DELETE /auth/me`). */
+  async deleteAccount() {
+    return this.request<{ status: string }>(`/api/v1/auth/me`, {
+      method: "DELETE",
+    });
   }
 
   // ---- Auth endpoints ----

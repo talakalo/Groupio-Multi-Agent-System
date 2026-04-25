@@ -73,19 +73,17 @@ python_functions = ["test_*"]
 addopts = "--cov-fail-under=50 --timeout=120"  # Per-test timeout to avoid CI SIGTERM on slow/hanging tests
 
 [tool.coverage.run]
-# Async-events scope from PR #167 is now fully covered — see:
-#   tests/unit/test_messaging_layer.py          (connection, constants,
-#                                                publisher, topology)
+# Async-events scope from PR #167 is fully covered — see:
+#   tests/unit/test_messaging_layer.py            (connection, constants,
+#                                                  publisher, topology)
 #   tests/unit/test_outbox_dispatcher_branches.py / _failures.py
-#   tests/unit/test_worker_crm_sync.py          (includes espocrm/service.py)
+#   tests/unit/test_worker_crm_sync.py            (incl. espocrm/service.py)
 #   tests/unit/test_worker_notifications.py
 #   tests/unit/test_worker_payments.py
 #   tests/unit/test_stripe_contractor_webhooks.py
-# The espocrm *client* is an httpx wrapper; covering it would require a real
-# CRM fixture, so it stays omitted until an integration test lands.
-omit = [
-    "src/integrations/espocrm/client.py",
-]
+#   tests/unit/test_espocrm_client.py             (httpx MockTransport)
+# All previously-omitted files now have dedicated tests; nothing to omit.
+omit = []
 
 [tool.ruff]
 target-version = "py311"

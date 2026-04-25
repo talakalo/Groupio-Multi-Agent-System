@@ -22,6 +22,7 @@ import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
 
+import { apiClient, ApiError } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
 
@@ -149,7 +150,6 @@ export default function ResidentProfilePage() {
   const [passwordStatus, setPasswordStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
 
   const accessToken = useAuthStore((s) => s.accessToken);
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
   const handleAvatarUpload = () => {
     const input = document.createElement('input');
@@ -160,24 +160,10 @@ export default function ResidentProfilePage() {
       if (!file) return;
 
       setIsUploadingAvatar(true);
-      const formData = new FormData();
-      formData.append('file', file);
-
       try {
-        const headers: Record<string, string> = {};
-        if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
-
-        const res = await fetch(`${apiBase}/api/v1/uploads/avatar`, {
-          method: 'POST',
-          headers,
-          body: formData,
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          setFormData((prev) => ({ ...prev, avatar: data.avatar_url, avatarUrl: data.avatar_url }));
-          queryClient.invalidateQueries({ queryKey: ['resident', 'profile'] });
-        }
+        const data = await apiClient.uploadAvatar(file, file.name || 'avatar');
+        setFormData((prev) => ({ ...prev, avatar: data.avatar_url, avatarUrl: data.avatar_url }));
+        queryClient.invalidateQueries({ queryKey: ['resident', 'profile'] });
       } catch (error) {
         console.error('Avatar upload failed:', error);
       } finally {
@@ -191,26 +177,10 @@ export default function ResidentProfilePage() {
     if (!passwordForm.newPassword || passwordForm.newPassword !== passwordForm.confirm) return;
     setPasswordStatus('loading');
     try {
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
-
-      const res = await fetch(`${apiBase}/api/v1/auth/password/change`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          current_password: passwordForm.current,
-          new_password: passwordForm.newPassword,
-        }),
-      });
-
-      if (res.ok) {
-        setPasswordStatus('success');
-        setPasswordForm({ current: '', newPassword: '', confirm: '' });
-        setTimeout(() => setPasswordStatus('idle'), 3000);
-      } else {
-        setPasswordStatus('error');
-        setTimeout(() => setPasswordStatus('idle'), 3000);
-      }
+      await apiClient.changePassword(passwordForm.current, passwordForm.newPassword);
+      setPasswordStatus('success');
+      setPasswordForm({ current: '', newPassword: '', confirm: '' });
+      setTimeout(() => setPasswordStatus('idle'), 3000);
     } catch {
       setPasswordStatus('error');
       setTimeout(() => setPasswordStatus('idle'), 3000);
@@ -228,14 +198,7 @@ export default function ResidentProfilePage() {
     }
     setDeleteError('');
     try {
-      const headers: Record<string, string> = {};
-      if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
-
-      await fetch(`${apiBase}/api/v1/auth/me`, {
-        method: 'DELETE',
-        headers,
-      });
-
+      await apiClient.deleteAccount();
       await logoutAction();
       router.push('/login');
     } catch (error) {
@@ -247,22 +210,30 @@ export default function ResidentProfilePage() {
   const profileQuery = useQuery<ResidentProfile>({
     queryKey: ['resident', 'profile'],
     queryFn: async () => {
-      const headers: Record<string, string> = {};
-      if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
-      const res = await fetch(`${apiBase}/api/v1/auth/me`, { headers });
-      if (!res.ok) throw new Error('Failed to fetch profile');
-      const data = await res.json();
+      const data = (await apiClient.getMe()) as Record<string, unknown> & {
+        full_name?: string;
+        fullName?: string;
+        preferred_language?: string;
+        preferredLanguage?: string;
+        avatar_url?: string;
+        avatarUrl?: string;
+        building_name?: string;
+        buildingName?: string;
+        apartment_number?: string;
+        apartmentNumber?: string;
+        notification_settings?: Record<string, boolean>;
+      };
       return {
-        ...data,
+        ...(data as object),
         fullName: data.full_name ?? data.fullName ?? '',
-        phone: data.phone ?? '',
+        phone: (data as { phone?: string }).phone ?? '',
         preferredLanguage: data.preferred_language ?? data.preferredLanguage ?? 'he',
         avatarUrl: data.avatar_url ?? data.avatarUrl ?? '',
         buildingName: data.building_name ?? data.buildingName ?? '',
         apartmentNumber: data.apartment_number ?? data.apartmentNumber ?? '',
         notification_settings:
           data.notification_settings && typeof data.notification_settings === 'object'
-            ? (data.notification_settings as Record<string, boolean>)
+            ? data.notification_settings
             : undefined,
       } as ResidentProfile;
     },
@@ -287,8 +258,6 @@ export default function ResidentProfilePage() {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
       const userId = profileQuery.data?.id;
       if (!userId) throw new Error('No user ID');
       const payload: Record<string, unknown> = {};
@@ -301,13 +270,7 @@ export default function ResidentProfilePage() {
       if (avatarUrl !== undefined && avatarUrl !== '') payload.avatar_url = avatarUrl;
       if (notificationsDirty) payload.notification_settings = notifications;
       if (Object.keys(payload).length === 0) throw new Error('Nothing to save');
-      const res = await fetch(`${apiBase}/api/v1/auth/me`, {
-        method: 'PUT',
-        headers,
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) throw new Error('Failed to save profile');
-      return res.json();
+      return apiClient.updateCurrentUser(payload);
     },
     onSuccess: async (data: { preferred_language?: string }) => {
       setNotificationsDirty(false);

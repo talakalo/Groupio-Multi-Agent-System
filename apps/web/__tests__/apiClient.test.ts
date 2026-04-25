@@ -384,4 +384,82 @@ describe('ApiClient', () => {
       expect(options.method).toBe('POST');
     });
   });
+
+  describe('multipart bodies', () => {
+    it('uploadAvatar sends FormData without forcing JSON Content-Type', async () => {
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ avatar_url: 'https://cdn/x.png' }),
+      });
+
+      const blob = new Blob(['hi'], { type: 'image/png' });
+      const result = await apiClient.uploadAvatar(blob, 'a.png');
+
+      const [url, options] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(url).toContain('/api/v1/uploads/avatar');
+      expect(options.method).toBe('POST');
+      // Critical: hand the FormData instance to fetch unchanged. JSON-stringifying
+      // it would yield '{}' and the upload would silently fail.
+      expect(options.body).toBeInstanceOf(FormData);
+      // And the JSON Content-Type default must be removed so the browser supplies
+      // the multipart boundary.
+      const headers = options.headers as Record<string, string>;
+      const ct = headers['Content-Type'] ?? headers['content-type'];
+      expect(ct).toBeUndefined();
+      expect(result.avatar_url).toBe('https://cdn/x.png');
+    });
+  });
+
+  describe('profile + building helpers', () => {
+    it('getMe hits GET /api/v1/auth/me', async () => {
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ id: 'u1', full_name: 'A' }),
+      });
+
+      const result = await apiClient.getMe();
+
+      const [url, options] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(url).toContain('/api/v1/auth/me');
+      expect(options.method ?? 'GET').toBe('GET');
+      expect((result as { id: string }).id).toBe('u1');
+    });
+
+    it('getMyBuilding hits GET /api/v1/buildings/me', async () => {
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ id: 'b1', name: 'X' }),
+      });
+
+      await apiClient.getMyBuilding();
+
+      const callUrl = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+      expect(callUrl).toContain('/api/v1/buildings/me');
+    });
+
+    it('getRecentActivity hits GET /api/v1/activity/recent', async () => {
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ items: [] }),
+      });
+
+      await apiClient.getRecentActivity();
+
+      const callUrl = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+      expect(callUrl).toContain('/api/v1/activity/recent');
+    });
+
+    it('deleteAccount issues DELETE /api/v1/auth/me', async () => {
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ status: 'deleted' }),
+      });
+
+      await apiClient.deleteAccount();
+
+      const [url, options] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(url).toContain('/api/v1/auth/me');
+      expect(options.method).toBe('DELETE');
+    });
+  });
 });

@@ -621,7 +621,7 @@ export default function OfferDetailPage(props: PageParamsProps) {
               כיצד חושב המחיר?
             </summary>
             <p className="mt-2 leading-relaxed">
-              {(offer as { pricingRationale?: string }).pricingRationale ||
+              {offer.pricingRationale ||
                 'המחיר חושב על ידי AI על בסיס מספר משתתפים, קטגוריה, ומחירי שוק.'}
             </p>
           </details>
