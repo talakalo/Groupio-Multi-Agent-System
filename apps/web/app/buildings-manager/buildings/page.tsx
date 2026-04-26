@@ -1,10 +1,12 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { Building2, Users, AlertCircle, Search } from 'lucide-react';
+import { Building2, Users, AlertCircle, Plus, Search } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 
+import { BuildingCreateModal } from '@/components/features/buildings/BuildingCreateModal';
+import { BuildingInvitePanel } from '@/components/features/buildings/BuildingInvitePanel';
 import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
@@ -25,7 +27,15 @@ interface Building {
 export default function BuildingsManagerBuildingsPage() {
   const t = useTranslations('buildingsManager.buildings');
   const accessToken = useAuthStore((s) => s.accessToken);
+  const userRole = useAuthStore((s) => s.user?.role);
+  const userId = useAuthStore((s) => s.user?.id);
   const [search, setSearch] = useState('');
+  const [createOpen, setCreateOpen] = useState(false);
+  const [highlight, setHighlight] = useState<{
+    id: string;
+    name: string;
+    invite_code?: string;
+  } | null>(null);
 
   const buildingsQuery = useQuery<{ items: Building[]; total: number }>({
     queryKey: ['buildings-manager', 'buildings'],
@@ -48,6 +58,8 @@ export default function BuildingsManagerBuildingsPage() {
       )
     : buildings;
 
+  const canCreate = ['admin', 'super_admin', 'buildings_manager'].includes(userRole ?? '');
+
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
@@ -57,7 +69,41 @@ export default function BuildingsManagerBuildingsPage() {
             {t('total', { count: buildingsQuery.data?.total ?? 0 })}
           </p>
         </div>
+        {canCreate ? (
+          <button
+            type="button"
+            onClick={() => setCreateOpen(true)}
+            data-testid="open-building-create"
+            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700"
+          >
+            <Plus className="h-4 w-4" />
+            {t('createCta') || 'Create building'}
+          </button>
+        ) : null}
       </div>
+
+      {highlight ? (
+        <BuildingInvitePanel
+          buildingId={highlight.id}
+          buildingName={highlight.name}
+          inviteCode={highlight.invite_code ?? ''}
+          canRotate={
+            userRole === 'admin' ||
+            userRole === 'super_admin' ||
+            (userRole === 'buildings_manager' &&
+              buildings.find((b) => b.id === highlight.id)?.admin_user_id === userId)
+          }
+          onRotated={(newCode) =>
+            setHighlight((h) => (h ? { ...h, invite_code: newCode } : h))
+          }
+        />
+      ) : null}
+
+      <BuildingCreateModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onCreated={(b) => setHighlight(b)}
+      />
 
       {/* Search */}
       <div className="relative">

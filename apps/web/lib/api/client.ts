@@ -697,6 +697,30 @@ class ApiClient {
     );
   }
 
+  /** BM/admin creates a new building. Caller becomes the admin_user_id. */
+  async createBuilding(payload: {
+    name: string;
+    address: string;
+    city: string;
+    region: string;
+    total_units?: number;
+    floors?: number;
+    year_built?: number;
+  }) {
+    return this.request<import("@groupio/types").Building & { invite_code?: string }>(
+      `/api/v1/buildings/`,
+      { method: "POST", body: payload },
+    );
+  }
+
+  /** Rotate the invite code for a building. BM/admin only. */
+  async regenerateBuildingInviteCode(buildingId: string) {
+    return this.request<{ building_id: string; invite_code: string }>(
+      `/api/v1/buildings/${encodeURIComponent(buildingId)}/regenerate-invite`,
+      { method: "POST" },
+    );
+  }
+
   /** Address enrichment (data.gov.il fallback to stub when disabled). */
   async normalizeAddress(address: string, city: string) {
     return this.request<{

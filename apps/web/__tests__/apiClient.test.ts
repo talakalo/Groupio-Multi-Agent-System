@@ -462,4 +462,66 @@ describe('ApiClient', () => {
       expect(options.method).toBe('DELETE');
     });
   });
+
+  describe('building create + invite-code rotation (B3)', () => {
+    it('createBuilding POSTs the typed payload to /api/v1/buildings/', async () => {
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          id: 'b-1',
+          name: 'Test Building',
+          address: '1 Main',
+          city: 'Tel Aviv',
+          region: 'tel_aviv',
+          invite_code: 'ABCDEFGH',
+        }),
+      });
+
+      const result = await apiClient.createBuilding({
+        name: 'Test Building',
+        address: '1 Main',
+        city: 'Tel Aviv',
+        region: 'tel_aviv',
+        total_units: 12,
+        floors: 4,
+      });
+
+      const [url, options] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(url).toContain('/api/v1/buildings/');
+      expect(options.method).toBe('POST');
+      const body = JSON.parse(options.body as string);
+      expect(body).toMatchObject({
+        name: 'Test Building',
+        total_units: 12,
+        floors: 4,
+      });
+      expect((result as { invite_code?: string }).invite_code).toBe('ABCDEFGH');
+    });
+
+    it('regenerateBuildingInviteCode POSTs to the rotation endpoint', async () => {
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ building_id: 'b-1', invite_code: 'NEWCODE9' }),
+      });
+
+      const result = await apiClient.regenerateBuildingInviteCode('b-1');
+
+      const [url, options] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(url).toContain('/api/v1/buildings/b-1/regenerate-invite');
+      expect(options.method).toBe('POST');
+      expect(result).toEqual({ building_id: 'b-1', invite_code: 'NEWCODE9' });
+    });
+
+    it('regenerateBuildingInviteCode URL-encodes the building id', async () => {
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ building_id: 'a/b', invite_code: 'X' }),
+      });
+
+      await apiClient.regenerateBuildingInviteCode('a/b');
+
+      const callUrl = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+      expect(callUrl).toContain('/api/v1/buildings/a%2Fb/regenerate-invite');
+    });
+  });
 });

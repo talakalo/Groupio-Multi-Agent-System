@@ -4,10 +4,24 @@ import ipaddress
 import json
 import logging
 import re
+import secrets
 import socket
+import string
 from collections.abc import AsyncIterator as _AsyncIterator
 from contextlib import asynccontextmanager as _acm
 from datetime import UTC, date, datetime
+
+
+# Building invite codes — uppercase alphanumerics, no ambiguous chars
+# (no 0/O, no 1/I/L). 8 chars from a 30-char alphabet ≈ 6.5e11 combinations,
+# which gives plenty of room for collisions to be vanishingly unlikely while
+# the code stays readable in WhatsApp / SMS shares.
+_INVITE_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+
+
+def generate_invite_code(length: int = 8) -> str:
+    """Generate a building invite code (uppercase, unambiguous characters)."""
+    return "".join(secrets.choice(_INVITE_CODE_ALPHABET) for _ in range(length))
 from enum import Enum
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
@@ -726,7 +740,18 @@ class PostgresClient:
         return [str(r["id"]) for r in (rows or []) if r.get("id")]
 
     async def create_building(self, building_data: dict[str, Any]) -> dict[str, Any]:
-        """Create a new building."""
+        """Create a new building.
+
+        Allocates a fresh invite_code if the caller hasn't supplied one. The
+        invite_code column is populated explicitly here (rather than relying
+        on a DB trigger) so both the asyncpg and Supabase paths set it the
+        same way.
+        """
+        # Auto-generate a stored invite code unless the caller pre-set one
+        # (tests and migrations sometimes provide a deterministic value).
+        if not building_data.get("invite_code"):
+            building_data["invite_code"] = generate_invite_code()
+
         if self._use_supabase_client():
             client = await self._get_client()
             result = await client.table("buildings").insert(building_data).execute()
@@ -735,11 +760,11 @@ class PostgresClient:
             "id, name, address, city, region, total_units, floors, year_built, admin_user_id, "
             "resident_count, active_offers, completed_offers, total_savings, whatsapp_group_id, "
             "municipality_code, municipality_name, address_normalized, enrichment_confidence, "
-            "enrichment_source, enriched_at"
+            "enrichment_source, enriched_at, invite_code"
         )
         await self._pg_execute(
             f"""INSERT INTO buildings ({cols})
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)""",
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)""",
             building_data["id"],
             building_data["name"],
             building_data["address"],
@@ -760,8 +785,34 @@ class PostgresClient:
             building_data.get("enrichment_confidence"),
             building_data.get("enrichment_source"),
             building_data.get("enriched_at"),
+            building_data["invite_code"],
         )
         return await self.get_building(building_data["id"]) or building_data
+
+    async def regenerate_building_invite_code(
+        self, building_id: str, new_code: str | None = None
+    ) -> str:
+        """Rotate the invite code for a building. Returns the new code.
+
+        Pass an explicit ``new_code`` to make the operation deterministic in
+        tests; otherwise a fresh one is generated.
+        """
+        code = new_code or generate_invite_code()
+        if self._use_supabase_client():
+            client = await self._get_client()
+            await (
+                client.table("buildings")
+                .update({"invite_code": code})
+                .eq("id", building_id)
+                .execute()
+            )
+        else:
+            await self._pg_execute(
+                "UPDATE buildings SET invite_code = $1 WHERE id = $2",
+                code,
+                building_id,
+            )
+        return code
 
     async def list_buildings(
         self,
