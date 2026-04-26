@@ -9,7 +9,15 @@ import {
   I18nManager,
   Pressable,
 } from "react-native";
-import { Text, Card, useTheme, Avatar, Divider, Chip } from "react-native-paper";
+import {
+  Text,
+  Card,
+  useTheme,
+  Avatar,
+  Divider,
+  Chip,
+  Button,
+} from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 
@@ -302,6 +310,39 @@ export default function HomeScreen() {
             />
           </View>
         </View>
+
+        {/* ---- No-building banner (resident only) ---- */}
+        {!isContractor && !buildingId ? (
+          <Card
+            mode="contained"
+            style={styles.joinBanner}
+            testID="home-join-building-banner"
+          >
+            <Card.Content>
+              <Text variant="titleMedium" style={styles.joinBannerTitle}>
+                {i18n.t("home.noBuildingTitle") || "Join your building"}
+              </Text>
+              <Text
+                variant="bodySmall"
+                style={[
+                  styles.joinBannerBody,
+                  { color: theme.colors.onSurfaceVariant },
+                ]}
+              >
+                {i18n.t("home.noBuildingHint") ||
+                  "Enter the invite code your committee or buildings manager shared with you."}
+              </Text>
+              <Button
+                mode="contained"
+                onPress={() => router.push("/join-building")}
+                style={styles.joinBannerCta}
+                testID="home-join-building-cta"
+              >
+                {i18n.t("home.joinBuildingCta") || "Enter invite code"}
+              </Button>
+            </Card.Content>
+          </Card>
+        ) : null}
 
         {/* ---- Stats Row ---- */}
         {isContractor ? (
@@ -953,6 +994,22 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 24,
+  },
+
+  joinBanner: {
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  joinBannerTitle: {
+    fontWeight: "600",
+    marginBottom: 4,
+  },
+  joinBannerBody: {
+    marginBottom: 12,
+  },
+  joinBannerCta: {
+    alignSelf: "flex-start",
   },
 
   // Contractor compact offer/project rows

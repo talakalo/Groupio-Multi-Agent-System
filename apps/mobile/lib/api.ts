@@ -88,6 +88,25 @@ export async function requestPasswordReset(email: string): Promise<void> {
   });
 }
 
+/** Confirm a password reset using the emailed token (unauthenticated). */
+export async function confirmPasswordReset(
+  token: string,
+  newPassword: string,
+): Promise<void> {
+  await request<{ status: string }>("POST", "/auth/password/reset/confirm", {
+    body: { token, new_password: newPassword },
+  });
+}
+
+/** Join a building via an invite code (resident, post-signup or after-signup). */
+export async function joinBuilding(inviteCode: string): Promise<void> {
+  await request<{ status: string; building_id?: string }>(
+    "POST",
+    "/buildings/join",
+    { body: { invite_code: inviteCode } },
+  );
+}
+
 export async function login(credentials: {
   email?: string;
   phone?: string;
@@ -520,8 +539,13 @@ export async function signup(payload: SignupPayload): Promise<SignupResponse> {
 }
 
 export async function resendVerification(email: string): Promise<void> {
-  return request<void>("POST", "/auth/resend-verification", {
-    body: { email },
+  // Backend has TWO endpoints:
+  //   /auth/resend-verification           — requires auth (logged-in user)
+  //   /auth/resend-verification-by-email  — unauthenticated, takes email body
+  // The mobile flow always reaches this from an unauthenticated screen
+  // (verify-email, signup completion), so the public endpoint is correct.
+  return request<void>("POST", "/auth/resend-verification-by-email", {
+    body: { email: email.trim().toLowerCase() },
   });
 }
 
