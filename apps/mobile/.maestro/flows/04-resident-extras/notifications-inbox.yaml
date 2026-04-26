@@ -1,0 +1,37 @@
+# Flow: Resident — notification inbox (M5)
+# Walks the resident from the profile tab into /notifications and exercises
+# the "mark all read" affordance.
+#
+# Run: maestro test .maestro/flows/04-resident-extras/notifications-inbox.yaml
+
+appId: ${APP_ID}
+tags:
+  - resident
+  - notifications
+  - smoke
+---
+
+- runFlow: ../../subflows/launch-fresh.yaml
+- runFlow: ../../subflows/login-resident.yaml
+
+# Open the profile tab, then the new "Notification inbox" link.
+- tapOn: "Profile"
+- assertVisible:
+    id: "profile-tab-link-notifications"
+    timeout: 5000
+- tapOn:
+    id: "profile-tab-link-notifications"
+
+# Empty state OR list — both are valid; we just assert the screen rendered.
+- assertVisible:
+    text: "Notifications|notifications.title"
+    timeout: 8000
+
+# Mark-all-read is only present when there ARE unread items; tap when visible.
+- runFlow:
+    when:
+      visible:
+        id: "notifications-mark-all"
+    commands:
+      - tapOn:
+          id: "notifications-mark-all"
