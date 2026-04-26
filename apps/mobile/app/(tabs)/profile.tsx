@@ -580,6 +580,17 @@ export default function ProfileScreen() {
           title={i18n.t("profile.notifications")}
           icon="bell-outline"
         >
+          <View style={styles.infoList}>
+            <InfoRow
+              icon="inbox-outline"
+              label={i18n.t("notifications.inbox") || "Notification inbox"}
+              value=""
+              onPress={() => router.push("/notifications")}
+              iconColor={theme.colors.primary}
+              testID="profile-tab-link-notifications"
+            />
+            <Divider style={styles.infoDivider} />
+          </View>
           <View style={styles.settingsList}>
             <SettingToggle
               icon="bell-ring-outline"

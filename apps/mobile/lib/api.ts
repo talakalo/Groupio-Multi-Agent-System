@@ -826,3 +826,92 @@ export async function getContractorEarnings(
     { signal },
   );
 }
+
+// ---------------------------------------------------------------------------
+// Address enrichment + onboarding (M4)
+// ---------------------------------------------------------------------------
+
+export interface NormalizedAddress {
+  address: string;
+  city: string;
+  street: string | null;
+  house_number: string | null;
+  municipality: string | null;
+  confidence: number;
+  source: string;
+}
+
+export async function normalizeAddress(
+  address: string,
+  city: string,
+): Promise<NormalizedAddress> {
+  return request<NormalizedAddress>("POST", "/enrichment/normalize-address", {
+    body: { address, city },
+  });
+}
+
+export async function submitOnboarding(
+  payload: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  return request<Record<string, unknown>>("POST", "/onboarding", { body: payload });
+}
+
+// ---------------------------------------------------------------------------
+// In-app notifications (M5)
+// ---------------------------------------------------------------------------
+
+export interface NotificationItem {
+  id: string;
+  user_id: string;
+  type?: string;
+  title?: string;
+  body?: string;
+  data?: Record<string, unknown>;
+  read_at?: string | null;
+  created_at: string;
+}
+
+export async function getNotifications(
+  params?: { limit?: number; offset?: number; unread_only?: boolean },
+  signal?: AbortSignal,
+): Promise<{ items: NotificationItem[]; total: number }> {
+  return request<{ items: NotificationItem[]; total: number }>(
+    "GET",
+    "/notifications",
+    {
+      params: {
+        limit: params?.limit,
+        offset: params?.offset,
+        unread_only: params?.unread_only,
+      },
+      signal,
+    },
+  );
+}
+
+export async function getUnreadNotificationCount(
+  signal?: AbortSignal,
+): Promise<number> {
+  const data = await request<{ count: number }>("GET", "/notifications/unread-count", {
+    signal,
+  });
+  return data.count;
+}
+
+export async function markNotificationRead(notificationId: string): Promise<void> {
+  await request<{ status: string }>(
+    "POST",
+    `/notifications/${encodeURIComponent(notificationId)}/read`,
+  );
+}
+
+export async function markAllNotificationsRead(): Promise<void> {
+  await request<{ status: string }>("POST", "/notifications/read-all");
+}
+
+export async function deleteNotification(notificationId: string): Promise<void> {
+  await request<{ status: string }>(
+    "DELETE",
+    `/notifications/${encodeURIComponent(notificationId)}`,
+  );
+}
