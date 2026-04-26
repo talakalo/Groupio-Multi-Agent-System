@@ -761,6 +761,75 @@ export interface ContractorReview {
   created_at: string;
 }
 
+// ---------------------------------------------------------------------------
+// Architecture plan upload + analysis (M8)
+// ---------------------------------------------------------------------------
+
+export interface ArchitectureUploadResponse {
+  id: string;
+  file_name: string;
+  analysis_status: string;
+}
+
+export async function uploadArchitecturePlan(
+  uri: string,
+  buildingId: string,
+  filename = "plan",
+): Promise<ArchitectureUploadResponse> {
+  const formData = new FormData();
+  const inferredName = uri.split("/").pop() ?? filename;
+  const match = /\.(\w+)$/.exec(inferredName);
+  const type = match ? `application/${match[1]}` : "application/pdf";
+  formData.append("file", {
+    uri,
+    name: inferredName,
+    type,
+  } as unknown as Blob);
+
+  const token = getAuthToken();
+  const baseUrl = (process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8000")
+    .replace(/\/+$/, "")
+    .replace(/\/api\/v1$/, "");
+  const qs = buildingId
+    ? `?building_id=${encodeURIComponent(buildingId)}`
+    : "";
+  const res = await fetch(`${baseUrl}/api/v1/uploads/architecture${qs}`, {
+    method: "POST",
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: formData,
+  });
+  if (!res.ok) {
+    let detail: string | undefined;
+    try {
+      detail = (await res.json()).detail;
+    } catch {
+      // ignore
+    }
+    throw new ApiError(detail ?? `HTTP ${res.status}`, res.status);
+  }
+  return res.json();
+}
+
+export interface FileUploadStatus {
+  id: string;
+  analysis_status: string;
+  analysis_result: unknown;
+  [key: string]: unknown;
+}
+
+export async function getFileUpload(
+  fileId: string,
+  signal?: AbortSignal,
+): Promise<FileUploadStatus> {
+  return request<FileUploadStatus>(
+    "GET",
+    `/uploads/${encodeURIComponent(fileId)}`,
+    { signal },
+  );
+}
+
 /** Paginated list of reviews left on a contractor. */
 export async function getContractorReviews(
   contractorId: string,
