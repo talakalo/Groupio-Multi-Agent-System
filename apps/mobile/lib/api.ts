@@ -751,6 +751,35 @@ export async function getContractor(
   );
 }
 
+export interface ContractorReview {
+  id: string;
+  contractor_id: string;
+  user_id?: string;
+  offer_id?: string;
+  rating: number;
+  comment?: string;
+  created_at: string;
+}
+
+/** Paginated list of reviews left on a contractor. */
+export async function getContractorReviews(
+  contractorId: string,
+  params?: { limit?: number; offset?: number },
+  signal?: AbortSignal,
+): Promise<{ items: ContractorReview[]; total: number }> {
+  return request<{ items: ContractorReview[]; total: number }>(
+    "GET",
+    `/contractors/${encodeURIComponent(contractorId)}/reviews`,
+    {
+      params: {
+        limit: params?.limit,
+        offset: params?.offset,
+      },
+      signal,
+    },
+  );
+}
+
 /** Update a contractor profile (PUT /contractors/{id}). */
 export async function updateContractor(
   contractorId: string,

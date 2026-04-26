@@ -216,7 +216,10 @@ export default function HomeScreen() {
           router.push("/offers" as never);
           break;
         case "find_contractor":
-          router.push("/offers" as never);
+          // Browse contractors directly (the dedicated /contractors screen
+          // shows the full directory with search and reviews) rather than
+          // bouncing through the offers tab.
+          router.push("/contractors" as never);
           break;
         case "chat":
           router.push("/chat" as never);
