@@ -717,3 +717,112 @@ export interface ContractorProjectsFilters {
   page?: number;
   limit?: number;
 }
+
+// ---------------------------------------------------------------------------
+// Contractor profile + earnings + doc uploads (M2 + M3)
+// ---------------------------------------------------------------------------
+
+export interface ContractorProfile {
+  id: string;
+  businessName?: string;
+  ownerName?: string;
+  phone?: string;
+  email?: string;
+  description?: string;
+  yearsInBusiness?: number;
+  licenseNumber?: string;
+  insuranceExpiry?: string;
+  categories?: ServiceCategory[];
+  regions?: string[];
+  verified?: boolean;
+  trustScore?: number;
+  documents?: Array<{ id: string; type: string; url?: string; uploaded_at?: string }>;
+}
+
+/** Fetch a contractor's full profile by id. */
+export async function getContractor(
+  contractorId: string,
+  signal?: AbortSignal,
+): Promise<ContractorProfile> {
+  return request<ContractorProfile>(
+    "GET",
+    `/contractors/${encodeURIComponent(contractorId)}`,
+    { signal },
+  );
+}
+
+/** Update a contractor profile (PUT /contractors/{id}). */
+export async function updateContractor(
+  contractorId: string,
+  body: Partial<ContractorProfile> & Record<string, unknown>,
+): Promise<ContractorProfile> {
+  return request<ContractorProfile>(
+    "PUT",
+    `/contractors/${encodeURIComponent(contractorId)}`,
+    { body },
+  );
+}
+
+/** Upload a contractor document (license, insurance, etc.) — multipart. */
+export async function uploadContractorDoc(
+  uri: string,
+  filename = "doc",
+): Promise<Record<string, unknown>> {
+  const formData = new FormData();
+  const inferredName = uri.split("/").pop() ?? filename;
+  const match = /\.(\w+)$/.exec(inferredName);
+  const type = match ? `application/${match[1]}` : "application/pdf";
+  formData.append("file", {
+    uri,
+    name: inferredName,
+    type,
+  } as unknown as Blob);
+
+  const token = getAuthToken();
+  const baseUrl = (process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8000")
+    .replace(/\/+$/, "")
+    .replace(/\/api\/v1$/, "");
+  const res = await fetch(`${baseUrl}/api/v1/uploads/contractor-docs`, {
+    method: "POST",
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: formData,
+  });
+  if (!res.ok) {
+    let detail: string | undefined;
+    try {
+      detail = (await res.json()).detail;
+    } catch {
+      // ignore
+    }
+    throw new ApiError(detail ?? `HTTP ${res.status}`, res.status);
+  }
+  return res.json();
+}
+
+export interface ContractorEarnings {
+  total_earnings: number;
+  pending_payouts: number;
+  current_period?: { start: string; end: string };
+  items: Array<{
+    payment_id: string;
+    offer_id?: string;
+    offer_title?: string;
+    amount: number;
+    currency: string;
+    status: string;
+    paid_at?: string;
+  }>;
+}
+
+/** Fetch payout/earnings history for the authenticated contractor. */
+export async function getContractorEarnings(
+  signal?: AbortSignal,
+): Promise<ContractorEarnings> {
+  return request<ContractorEarnings>(
+    "GET",
+    "/payments/contractor/earnings",
+    { signal },
+  );
+}
