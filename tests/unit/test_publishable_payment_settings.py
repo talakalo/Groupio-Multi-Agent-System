@@ -82,3 +82,37 @@ def test_staging_allows_missing_email_when_verification_disabled() -> None:
         )
     )
     assert s.ENFORCE_EMAIL_VERIFICATION is False
+
+
+def test_staging_rejects_disabled_datagov_enrichment() -> None:
+    # Enrichment service returns stub responses (confidence=0.0) when
+    # ENABLE_DATAGOV_IL is off. Shipping that in staging/production silently
+    # degrades address / municipality features — the validator refuses boot.
+    with pytest.raises(ValidationError, match="ENABLE_DATAGOV_IL"):
+        Settings(
+            **_staging_base(
+                PAYMENT_PROVIDER="stripe",
+                STRIPE_SECRET_KEY="sk_test_123",
+                STRIPE_WEBHOOK_SECRET="whsec_test",
+                ENABLE_DATAGOV_IL="0",
+            )
+        )
+
+
+def test_staging_accepts_enabled_datagov_enrichment() -> None:
+    s = Settings(
+        **_staging_base(
+            PAYMENT_PROVIDER="stripe",
+            STRIPE_SECRET_KEY="sk_test_123",
+            STRIPE_WEBHOOK_SECRET="whsec_test",
+            ENABLE_DATAGOV_IL="1",
+        )
+    )
+    assert s.ENABLE_DATAGOV_IL == "1"
+
+
+def test_development_does_not_require_datagov_enrichment() -> None:
+    # Local / dev boxes typically work offline; the gate only fires in
+    # staging/production.
+    s = Settings(ENVIRONMENT="development", ENABLE_DATAGOV_IL="0")
+    assert s.ENABLE_DATAGOV_IL == "0"

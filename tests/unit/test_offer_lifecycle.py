@@ -226,3 +226,26 @@ async def test_on_offer_cancelled_offer_not_found(lifecycle, mock_db):
     result = await lifecycle.on_offer_cancelled("off_missing")
 
     assert result["action"] == "none"
+
+
+# ---------------------------------------------------------------------------
+# Singleton accessor
+# ---------------------------------------------------------------------------
+
+
+def test_get_offer_lifecycle_returns_singleton():
+    """``get_offer_lifecycle()`` must hand back the same instance across
+    calls. Other workers rely on this — re-instantiating per call would
+    drop any in-progress idempotency state."""
+    from src.workers import offer_lifecycle as mod
+    from src.workers.offer_lifecycle import OfferLifecycleManager, get_offer_lifecycle
+
+    # Reset module-level singleton so this test is deterministic regardless
+    # of test order.
+    mod._lifecycle_manager = None  # type: ignore[attr-defined]
+
+    first = get_offer_lifecycle()
+    second = get_offer_lifecycle()
+
+    assert isinstance(first, OfferLifecycleManager)
+    assert first is second

@@ -185,28 +185,11 @@ export default function ContractorProfilePage() {
       if (!file) return;
 
       setIsUploading(docType);
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      const token = accessToken;
-      const formData = new FormData();
-      formData.append('file', file);
-
       try {
-        const headers: Record<string, string> = {};
-        if (token) headers['Authorization'] = `Bearer ${token}`;
-
-        const res = await fetch(`${apiBase}/api/v1/uploads/contractor-docs`, {
-          method: 'POST',
-          headers,
-          body: formData,
-        });
-
-        if (res.ok) {
-          alert(t('documents.uploadSuccess'));
-          // Refresh profile to show updated documents
-          window.location.reload();
-        } else {
-          alert(t('documents.uploadError'));
-        }
+        await apiClient.uploadContractorDoc(file, file.name || 'doc');
+        alert(t('documents.uploadSuccess'));
+        // Refresh profile to show updated documents
+        window.location.reload();
       } catch (error) {
         console.error('Upload failed:', error);
         alert(t('documents.uploadError'));
@@ -219,15 +202,11 @@ export default function ContractorProfilePage() {
 
   useEffect(() => {
     async function fetchProfile() {
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      const token = accessToken;
-      const headers: Record<string, string> = {};
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-
       try {
-        const meRes = await fetch(`${apiBase}/api/v1/auth/me`, { headers });
-        if (!meRes.ok) throw new Error('Not authenticated');
-        const me = await meRes.json();
+        const me = (await apiClient.getMe()) as Record<string, unknown> & {
+          contractor_id?: string;
+          notification_settings?: unknown;
+        };
         const cid = me.contractor_id;
         setContractorId(cid);
 
@@ -236,19 +215,22 @@ export default function ContractorProfilePage() {
         }
 
         if (cid) {
-          const [contractorRes, docReqRes] = await Promise.all([
-            fetch(`${apiBase}/api/v1/contractors/${cid}`, { headers, credentials: 'include' }),
-            fetch(`${apiBase}/api/v1/contractors/me/doc-requests`, { headers, credentials: 'include' }),
+          const [contractorResult, docReqResult] = await Promise.allSettled([
+            apiClient.getContractor(cid),
+            apiClient.getMyContractorDocRequests(),
           ]);
-          if (contractorRes.ok) {
-            const data = await contractorRes.json();
+          if (contractorResult.status === 'fulfilled') {
+            const data = contractorResult.value as Record<string, unknown>;
             setContractor(data);
             reset(data);
           }
-          if (docReqRes.ok) {
-            const dr = await docReqRes.json();
+          if (docReqResult.status === 'fulfilled') {
+            const dr = docReqResult.value;
             if (dr.pending && dr.items?.[0]) {
-              setDocRequest({ message: dr.items[0].message ?? '', requested_at: dr.items[0].requested_at ?? '' });
+              setDocRequest({
+                message: dr.items[0].message ?? '',
+                requested_at: dr.items[0].requested_at ?? '',
+              });
             }
           }
         }
@@ -265,27 +247,15 @@ export default function ContractorProfilePage() {
   async function onSubmit(data: ProfileForm) {
     if (!contractorId) return;
     setIsSaving(true);
-    const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-    // Access token lives only in Zustand memory — never in localStorage.
-    const token = useAuthStore.getState().accessToken;
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
 
     try {
-      const res = await fetch(`${apiBase}/api/v1/contractors/${contractorId}`, {
-        method: 'PUT',
-        headers,
-        body: JSON.stringify(data),
-      });
-
-      if (res.ok) {
-        const updated = await res.json();
-        setContractor(updated);
-        reset(updated);
-        alert(t('saveSuccess'));
-      } else {
-        alert(t('saveError'));
-      }
+      const updated = await apiClient.updateContractor(
+        contractorId,
+        data as unknown as Record<string, unknown>,
+      );
+      setContractor(updated);
+      reset(updated);
+      alert(t('saveSuccess'));
     } catch (error) {
       console.error('Failed to save profile:', error);
       alert(t('saveError'));

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 
+import { ApiError, apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
 
 // API returns snake_case: title, building_id, current_participants, pricing_tiers, deadline, created_at
@@ -84,26 +85,15 @@ export default function ContractorProjectDetailPage() {
 
     setIsLoading(true);
     setError(null);
-    const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-    const headers: Record<string, string> = {
-      Authorization: `Bearer ${token}`,
-    };
-
     try {
-      const res = await fetch(`${apiBase}/api/v1/offers/${id}`, { headers });
-      if (!res.ok) {
-        if (res.status === 404) {
-          setError('Project not found');
-        } else {
-          setError('Failed to load project');
-        }
-        setProject(null);
-        return;
+      const data = await apiClient.getOffer(id);
+      setProject(data as unknown as ProjectDetail);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) {
+        setError('Project not found');
+      } else {
+        setError('Failed to load project');
       }
-      const data = await res.json();
-      setProject(data);
-    } catch {
-      setError('Failed to load project');
       setProject(null);
     } finally {
       setIsLoading(false);

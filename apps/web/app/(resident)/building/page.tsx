@@ -25,6 +25,7 @@ import { useState } from 'react';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { Badge } from '@/components/ui/Badge';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { apiClient, ApiError } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
 import { useUnwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
@@ -127,26 +128,30 @@ export default function BuildingPage(props: PageParamsProps) {
   const [activeTab, setActiveTab] = useState<'neighbors' | 'offers' | 'settings'>('neighbors');
 
   const accessToken = useAuthStore((s) => s.accessToken);
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
   const buildingQuery = useQuery<BuildingProfile | null>({
     queryKey: ['building', 'profile'],
     queryFn: async () => {
-      const res = await fetch(`${apiBase}/api/v1/buildings/me`, {
-        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
-      });
-      if (!res.ok) {
-        if (res.status === 404) return null;
-        throw new Error('Failed to fetch building');
+      try {
+        const data = (await apiClient.getMyBuilding()) as Record<string, unknown> & {
+          residents?: unknown[];
+          activeOffers?: unknown[];
+          totalSavings?: number;
+          total_savings?: number;
+          inviteCode?: string;
+          invite_code?: string;
+        };
+        return {
+          ...(data as object),
+          residents: Array.isArray(data.residents) ? data.residents : [],
+          activeOffers: Array.isArray(data.activeOffers) ? data.activeOffers : [],
+          totalSavings: data.totalSavings ?? data.total_savings ?? 0,
+          inviteCode: data.inviteCode ?? data.invite_code ?? '',
+        } as BuildingProfile;
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 404) return null;
+        throw err;
       }
-      const data = await res.json();
-      return {
-        ...data,
-        residents: data.residents ?? [],
-        activeOffers: data.activeOffers ?? [],
-        totalSavings: data.totalSavings ?? data.total_savings ?? 0,
-        inviteCode: data.inviteCode ?? data.invite_code ?? '',
-      } as BuildingProfile;
     },
     enabled: !!accessToken,
   });

@@ -259,7 +259,10 @@ def downgrade() -> None:
     op.execute("DROP POLICY IF EXISTS building_residents_self_or_staff_read ON building_residents")
     op.execute("DROP POLICY IF EXISTS buildings_resident_or_staff_read ON buildings")
 
-    # Restore 032 offers policy text (legacy column name) for strict downgrade chain
+    # Restore the 032 offers policy. The original 032 upgrade referenced
+    # ``offers.contractor_id`` which does not exist; that bug has been fixed in
+    # place (the column is ``matched_contractor_id``) so the downgraded state
+    # matches the corrected parent migration.
     op.execute(
         """
         DROP POLICY IF EXISTS offers_resident_contractor_admin_read ON offers;
@@ -274,7 +277,7 @@ def downgrade() -> None:
               SELECT 1 FROM users u
               WHERE u.id = auth.uid()::text
                 AND u.contractor_id IS NOT NULL
-                AND u.contractor_id = offers.contractor_id
+                AND u.contractor_id = offers.matched_contractor_id
             )
             OR EXISTS (
               SELECT 1 FROM users u
