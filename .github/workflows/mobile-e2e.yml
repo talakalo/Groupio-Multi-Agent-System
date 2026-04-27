@@ -92,24 +92,33 @@ jobs:
           fi
 
       # ── Toolchain setup ────────────────────────────────────────────────────
-      # IMPORTANT: pnpm/action-setup must run BEFORE actions/setup-node when
-      # actions/setup-node uses ``cache: pnpm`` — setup-node looks up pnpm on
-      # PATH at cache-resolution time. Reversing the order produces a fast
-      # "Unable to locate executable file: pnpm" failure (the original cause
-      # of the 11s/8s green-was-masked failures on this branch).
+      # IMPORTANT:
+      #  1. pnpm/action-setup must run BEFORE actions/setup-node when
+      #     actions/setup-node uses ``cache: pnpm`` — setup-node looks up
+      #     pnpm on PATH at cache-resolution time.
+      #  2. setup-node's pnpm cache action runs in the post-job phase and
+      #     fails ("Path Validation Error: Path(s) ... do not exist") when
+      #     the pnpm store directory was never created — i.e. when the
+      #     install step was skipped via ``if:``. Gate the whole toolchain
+      #     (pnpm setup + setup-node + install) on the same condition that
+      #     gates the actual Maestro run, so on PRs without an APK / Cloud
+      #     key the job is a fast no-op rather than a noisy error.
       - name: Install pnpm
+        if: steps.secrets_check.outputs.has_maestro_cloud == 'true' || steps.android_apk.outputs.has_apk == 'true'
         # No `version:` — pnpm/action-setup@v4 reads it from package.json
         # `packageManager` (pnpm@9.0.0). Setting both raises
         # ERR_PNPM_BAD_PM_VERSION when the two values don't match exactly.
         uses: pnpm/action-setup@v4
 
       - name: Set up Node.js
+        if: steps.secrets_check.outputs.has_maestro_cloud == 'true' || steps.android_apk.outputs.has_apk == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "pnpm"
 
       - name: Install dependencies
+        if: steps.secrets_check.outputs.has_maestro_cloud == 'true' || steps.android_apk.outputs.has_apk == 'true'
         run: pnpm install --frozen-lockfile
 
       - name: Set up Java (for Android build tools)
@@ -240,27 +249,31 @@ jobs:
           fi
 
       # ── Toolchain setup ────────────────────────────────────────────────────
-      # pnpm/action-setup must run BEFORE actions/setup-node when setup-node
-      # uses ``cache: pnpm`` (it looks up pnpm on PATH at cache-resolution
-      # time). Reversing the order yields a fast "Unable to locate executable
-      # file: pnpm" failure — the original cause of the 8s green-was-masked
-      # iOS failures on this branch.
+      # IMPORTANT:
+      #  1. pnpm/action-setup must run BEFORE actions/setup-node when
+      #     actions/setup-node uses ``cache: pnpm`` (setup-node looks up
+      #     pnpm on PATH at cache-resolution time).
+      #  2. setup-node's pnpm cache action runs in the post-job phase and
+      #     fails ("Path Validation Error: Path(s) ... do not exist") when
+      #     the pnpm store was never created — i.e. when ``pnpm install``
+      #     was skipped via ``if:``. Gate setup-node + pnpm + install on
+      #     the same has_app condition so the job is a fast no-op when
+      #     there is no iOS bundle to test.
       - name: Install pnpm
+        if: steps.ios_build.outputs.has_app == 'true'
         # No `version:` — pnpm/action-setup@v4 reads it from package.json
         # `packageManager` (pnpm@9.0.0). Setting both raises
         # ERR_PNPM_BAD_PM_VERSION when the two values don't match exactly.
         uses: pnpm/action-setup@v4
 
       - name: Set up Node.js
+        if: steps.ios_build.outputs.has_app == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "pnpm"
 
       - name: Install dependencies
-        # Install only when the iOS build asset is present — otherwise the
-        # job is a no-op anyway and we don't need to spend several minutes
-        # of macOS runner time on pnpm install.
         if: steps.ios_build.outputs.has_app == 'true'
         run: pnpm install --frozen-lockfile
 
