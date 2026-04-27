@@ -98,9 +98,10 @@ jobs:
       # "Unable to locate executable file: pnpm" failure (the original cause
       # of the 11s/8s green-was-masked failures on this branch).
       - name: Install pnpm
+        # No `version:` — pnpm/action-setup@v4 reads it from package.json
+        # `packageManager` (pnpm@9.0.0). Setting both raises
+        # ERR_PNPM_BAD_PM_VERSION when the two values don't match exactly.
         uses: pnpm/action-setup@v4
-        with:
-          version: 9
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -245,9 +246,10 @@ jobs:
       # file: pnpm" failure — the original cause of the 8s green-was-masked
       # iOS failures on this branch.
       - name: Install pnpm
+        # No `version:` — pnpm/action-setup@v4 reads it from package.json
+        # `packageManager` (pnpm@9.0.0). Setting both raises
+        # ERR_PNPM_BAD_PM_VERSION when the two values don't match exactly.
         uses: pnpm/action-setup@v4
-        with:
-          version: 9
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
