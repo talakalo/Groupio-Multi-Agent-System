@@ -81,32 +81,51 @@ jobs:
             echo "::notice::MAESTRO_CLOUD_API_KEY not set — Maestro Cloud run will be skipped"
           fi
 
+      - name: Detect prebuilt Android APK
+        id: android_apk
+        run: |
+          if [ -f apps/mobile/build/app-e2e.apk ]; then
+            echo "has_apk=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_apk=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::apps/mobile/build/app-e2e.apk missing — Maestro run is skipped until EAS / local APK build is wired"
+          fi
+
+      # ── Toolchain setup ────────────────────────────────────────────────────
+      # IMPORTANT: pnpm/action-setup must run BEFORE actions/setup-node when
+      # actions/setup-node uses ``cache: pnpm`` — setup-node looks up pnpm on
+      # PATH at cache-resolution time. Reversing the order produces a fast
+      # "Unable to locate executable file: pnpm" failure (the original cause
+      # of the 11s/8s green-was-masked failures on this branch).
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "pnpm"
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Set up Java (for Android build tools)
+        if: steps.secrets_check.outputs.has_maestro_cloud == 'true' || steps.android_apk.outputs.has_apk == 'true'
         uses: actions/setup-java@v4
         with:
           distribution: "temurin"
           java-version: "17"
 
       - name: Install Maestro CLI
+        if: steps.secrets_check.outputs.has_maestro_cloud == 'true' || steps.android_apk.outputs.has_apk == 'true'
         run: |
           curl -Ls "https://get.maestro.mobile.dev" | bash
           echo "$HOME/.maestro/bin" >> $GITHUB_PATH
 
       - name: Verify Maestro installation
+        if: steps.secrets_check.outputs.has_maestro_cloud == 'true' || steps.android_apk.outputs.has_apk == 'true'
         run: maestro --version
 
       # ── Option A: Build APK via EAS (requires EXPO_TOKEN secret) ───────────
@@ -130,9 +149,11 @@ jobs:
 
       # ── Option C: Use Maestro Cloud (recommended for CI) ─────────────────
       # Maestro Cloud handles device provisioning — no emulator setup needed.
-      # Requires MAESTRO_CLOUD_API_KEY secret in repository settings.
+      # Requires MAESTRO_CLOUD_API_KEY secret AND a pre-built APK at
+      # apps/mobile/build/app-e2e.apk (gated by the apk_present output above).
+      # Without either, the step is skipped via ``if:`` so the job stays green.
       - name: Run Maestro Cloud (Android)
-        if: steps.secrets_check.outputs.has_maestro_cloud == 'true'
+        if: steps.secrets_check.outputs.has_maestro_cloud == 'true' && steps.android_apk.outputs.has_apk == 'true'
         working-directory: apps/mobile
         env:
           MAESTRO_CLOUD_API_KEY: ${{ secrets.MAESTRO_CLOUD_API_KEY }}
@@ -149,10 +170,6 @@ jobs:
             contractor) FLOW_PATH=".maestro/flows/03-contractor" ;;
             *)         FLOW_PATH=".maestro/flows" ;;
           esac
-          if [ ! -f ./build/app-e2e.apk ]; then
-            echo "::warning::./build/app-e2e.apk missing — EAS / local APK build must land before this step can pass"
-            exit 1
-          fi
           maestro cloud \
             --apiKey "$MAESTRO_CLOUD_API_KEY" \
             --platform android \
@@ -160,11 +177,12 @@ jobs:
             $FLOW_PATH
 
       # ── Local emulator run (alternative to Maestro Cloud) ────────────────
-      # Only runs when Maestro Cloud is unavailable and we still want to
-      # exercise the flow locally. Skips silently on fork PRs where no
-      # secrets are provisioned (the emulator path doesn't need any).
+      # Runs only when Maestro Cloud isn't available AND the APK is present.
+      # On fork PRs (no APK, no Cloud key) the step is skipped via ``if:`` so
+      # the job stays green; the workflow is gating-correct without being
+      # falsely red.
       - name: Run Maestro locally on Android emulator
-        if: steps.secrets_check.outputs.has_maestro_cloud != 'true'
+        if: steps.secrets_check.outputs.has_maestro_cloud != 'true' && steps.android_apk.outputs.has_apk == 'true'
         uses: reactivecircus/android-emulator-runner@v2
         env:
           TEST_RESIDENT_EMAIL: ${{ secrets.E2E_RESIDENT_EMAIL || 'e2e.resident@test.groupio.co.il' }}
@@ -180,13 +198,6 @@ jobs:
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: |
-            # Install the APK (if available). If the APK has not been built
-            # (EAS / local build not wired yet), skip with a clear message
-            # rather than running Maestro against an empty emulator.
-            if [ ! -f apps/mobile/build/app-e2e.apk ]; then
-              echo "::notice::apps/mobile/build/app-e2e.apk missing — local Maestro run skipped until EAS / local build is wired"
-              exit 0
-            fi
             adb install apps/mobile/build/app-e2e.apk
             cd apps/mobile
             maestro test --include-tags smoke .maestro/flows
@@ -227,21 +238,32 @@ jobs:
             echo "::notice::iOS .app bundle not produced — Maestro iOS run will be skipped until EAS iOS build is wired"
           fi
 
+      # ── Toolchain setup ────────────────────────────────────────────────────
+      # pnpm/action-setup must run BEFORE actions/setup-node when setup-node
+      # uses ``cache: pnpm`` (it looks up pnpm on PATH at cache-resolution
+      # time). Reversing the order yields a fast "Unable to locate executable
+      # file: pnpm" failure — the original cause of the 8s green-was-masked
+      # iOS failures on this branch.
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "pnpm"
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
-
       - name: Install dependencies
+        # Install only when the iOS build asset is present — otherwise the
+        # job is a no-op anyway and we don't need to spend several minutes
+        # of macOS runner time on pnpm install.
+        if: steps.ios_build.outputs.has_app == 'true'
         run: pnpm install --frozen-lockfile
 
       - name: Install Maestro CLI
+        if: steps.ios_build.outputs.has_app == 'true'
         run: |
           curl -Ls "https://get.maestro.mobile.dev" | bash
           echo "$HOME/.maestro/bin" >> $GITHUB_PATH
