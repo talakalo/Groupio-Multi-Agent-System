@@ -610,6 +610,22 @@ export async function createCheckout(
   return request<CheckoutResponse>("POST", "/checkout", { body: payload });
 }
 
+export interface InitiatePaymentResponse {
+  id: string;
+  status: string;
+  client_secret?: string;
+  provider?: string;
+}
+
+export async function initiatePayment(
+  offerId: string,
+  paymentMethodId?: string,
+): Promise<InitiatePaymentResponse> {
+  return request<InitiatePaymentResponse>("POST", "/payments/initiate", {
+    body: { offer_id: offerId, payment_method_id: paymentMethodId },
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Building detail
 // ---------------------------------------------------------------------------
