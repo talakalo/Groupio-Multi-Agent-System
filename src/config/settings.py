@@ -362,6 +362,22 @@ class Settings(BaseSettings):
                         "(required for payment + subscription webhook verification)."
                     )
 
+        # --- Data enrichment (staging/production): warn when disabled ---
+        # When ENABLE_DATAGOV_IL is off the enrichment service returns
+        # stub responses (source="stub", confidence=0.0). The frontend
+        # already hides stubs on the onboarding address-suggestion flow,
+        # but any downstream consumer treating a stub as a valid result
+        # would persist useless data. Fail the boot so ops fixes the flag.
+        if is_prod:
+            enable_datagov = str(self.ENABLE_DATAGOV_IL or "").lower() in ("1", "true", "yes")
+            if not enable_datagov:
+                raise ValueError(
+                    f"ENABLE_DATAGOV_IL is disabled in {self.ENVIRONMENT}. "
+                    "Address / municipality enrichment would return stub "
+                    "responses (confidence=0.0). Set ENABLE_DATAGOV_IL=1 or "
+                    "remove enrichment UI surfaces before deploying."
+                )
+
         # --- Required secrets in production ---
         if is_prod:
             if not self.PAYMENT_WEBHOOK_SECRET:

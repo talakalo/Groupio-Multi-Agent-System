@@ -156,6 +156,20 @@ class ApiClient {
       ...headers,
     };
 
+    // FormData / Blob / URLSearchParams must NOT be JSON-stringified, and
+    // we must NOT force Content-Type to application/json — fetch lets the
+    // browser pick the right boundary for multipart bodies.
+    const isMultipart =
+      typeof FormData !== "undefined" && body instanceof FormData;
+    const isBinary =
+      typeof Blob !== "undefined" && body instanceof Blob;
+    const isUrlEncoded =
+      typeof URLSearchParams !== "undefined" && body instanceof URLSearchParams;
+    if (isMultipart || isBinary || isUrlEncoded) {
+      delete requestHeaders["Content-Type"];
+      delete requestHeaders["content-type"];
+    }
+
     if (token) {
       requestHeaders["Authorization"] = `Bearer ${token}`;
     }
@@ -169,10 +183,15 @@ class ApiClient {
 
     let response: Response;
     try {
+      const fetchBody: BodyInit | undefined = body
+        ? isMultipart || isBinary || isUrlEncoded
+          ? (body as BodyInit)
+          : JSON.stringify(body)
+        : undefined;
       response = await fetch(`${this.baseUrl}${endpoint}`, {
         method,
         headers: requestHeaders,
-        body: body ? JSON.stringify(body) : undefined,
+        body: fetchBody,
         credentials: 'include', // send HTTP-only cookies (refresh token)
         signal: combinedSignal,
       });
@@ -325,6 +344,45 @@ class ApiClient {
     return this.request<import("@groupio/types").Building>(
       `/api/v1/buildings/${buildingId}`
     );
+  }
+
+  /** Building scoped to the current authenticated user. */
+  async getMyBuilding() {
+    return this.request<import("@groupio/types").Building>(
+      `/api/v1/buildings/me`
+    );
+  }
+
+  /** Recent activity feed (payments, escalations, etc.) for the current user. */
+  async getRecentActivity() {
+    return this.request<{ items: Array<Record<string, unknown>> }>(
+      `/api/v1/activity/recent`
+    );
+  }
+
+  /** Upload an avatar. Caller hands a Blob/File which becomes a multipart body. */
+  async uploadAvatar(file: Blob, filename = "avatar"): Promise<{ avatar_url: string }> {
+    const form = new FormData();
+    form.append("file", file, filename);
+    return this.request<{ avatar_url: string }>(`/api/v1/uploads/avatar`, {
+      method: "POST",
+      body: form,
+      // Do not set Content-Type — the browser will add the multipart boundary.
+    });
+  }
+
+  /** Fetch the current authenticated user's profile (`GET /auth/me`). */
+  async getMe() {
+    return this.request<import("@groupio/types").User & Record<string, unknown>>(
+      `/api/v1/auth/me`
+    );
+  }
+
+  /** GDPR deletion of the current user (`DELETE /auth/me`). */
+  async deleteAccount() {
+    return this.request<{ status: string }>(`/api/v1/auth/me`, {
+      method: "DELETE",
+    });
   }
 
   // ---- Auth endpoints ----
@@ -565,6 +623,146 @@ class ApiClient {
       `/api/v1/contractors/${encodeURIComponent(contractorId)}/reviews`,
       { method: "POST", body: data }
     );
+  }
+
+  /** List buildings (paginated). */
+  async listBuildings(params?: { page?: number; page_size?: number }) {
+    const search = new URLSearchParams();
+    if (params?.page != null) search.set("page", String(params.page));
+    if (params?.page_size != null) search.set("page_size", String(params.page_size));
+    const qs = search.toString();
+    return this.request<{ items: Array<Record<string, unknown>>; total: number }>(
+      `/api/v1/buildings${qs ? `?${qs}` : ""}`,
+    );
+  }
+
+  /** List escalations with optional status filter (paginated). */
+  async listEscalations(params?: { status?: string; page?: number; page_size?: number }) {
+    const search = new URLSearchParams();
+    if (params?.status) search.set("status", params.status);
+    if (params?.page != null) search.set("page", String(params.page));
+    if (params?.page_size != null) search.set("page_size", String(params.page_size));
+    const qs = search.toString();
+    return this.request<{ items: Array<Record<string, unknown>>; total: number }>(
+      `/api/v1/escalations${qs ? `?${qs}` : ""}`,
+    );
+  }
+
+  /** Mark an escalation resolved with an optional resolution note. */
+  async resolveEscalation(escalationId: string, body: Record<string, unknown> = {}) {
+    return this.request<{ status: string }>(
+      `/api/v1/escalations/${encodeURIComponent(escalationId)}/resolve`,
+      { method: "POST", body },
+    );
+  }
+
+  /** Update a contractor profile (PUT /contractors/{id}). */
+  async updateContractor(contractorId: string, body: Record<string, unknown>) {
+    return this.request<Record<string, unknown>>(
+      `/api/v1/contractors/${encodeURIComponent(contractorId)}`,
+      { method: "PUT", body },
+    );
+  }
+
+  /** Upload a contractor document (license, insurance, etc.). */
+  async uploadContractorDoc(file: Blob, filename = "doc"): Promise<Record<string, unknown>> {
+    const form = new FormData();
+    form.append("file", file, filename);
+    return this.request<Record<string, unknown>>(`/api/v1/uploads/contractor-docs`, {
+      method: "POST",
+      body: form,
+    });
+  }
+
+  /** Pending document requests sent to the current contractor. */
+  async getMyContractorDocRequests() {
+    return this.request<{
+      pending: boolean;
+      items: Array<{ message?: string; requested_at?: string }>;
+    }>(`/api/v1/contractors/me/doc-requests`);
+  }
+
+  /** Aggregate stats for a contractor (active offers, completed jobs, revenue, …). */
+  async getContractorStats(contractorId: string) {
+    return this.request<Record<string, unknown>>(
+      `/api/v1/contractors/${encodeURIComponent(contractorId)}/stats`,
+    );
+  }
+
+  /** Resident joins a building via an invite code. */
+  async joinBuilding(inviteCode: string) {
+    return this.request<{ status: string; building_id?: string }>(
+      `/api/v1/buildings/join`,
+      { method: "POST", body: { invite_code: inviteCode } },
+    );
+  }
+
+  /** BM/admin creates a new building. Caller becomes the admin_user_id. */
+  async createBuilding(payload: {
+    name: string;
+    address: string;
+    city: string;
+    region: string;
+    total_units?: number;
+    floors?: number;
+    year_built?: number;
+  }) {
+    return this.request<import("@groupio/types").Building & { invite_code?: string }>(
+      `/api/v1/buildings/`,
+      { method: "POST", body: payload },
+    );
+  }
+
+  /** Rotate the invite code for a building. BM/admin only. */
+  async regenerateBuildingInviteCode(buildingId: string) {
+    return this.request<{ building_id: string; invite_code: string }>(
+      `/api/v1/buildings/${encodeURIComponent(buildingId)}/regenerate-invite`,
+      { method: "POST" },
+    );
+  }
+
+  /** Address enrichment (data.gov.il fallback to stub when disabled). */
+  async normalizeAddress(address: string, city: string) {
+    return this.request<{
+      address: string;
+      city: string;
+      street: string | null;
+      house_number: string | null;
+      municipality: string | null;
+      confidence: number;
+      source: string;
+    }>(`/api/v1/enrichment/normalize-address`, {
+      method: "POST",
+      body: { address, city },
+    });
+  }
+
+  /** Submit the post-signup onboarding payload (resident or contractor). */
+  async submitOnboarding(payload: Record<string, unknown>) {
+    return this.request<Record<string, unknown>>(`/api/v1/onboarding`, {
+      method: "POST",
+      body: payload,
+    });
+  }
+
+  /** Paginated list of reviews left on a contractor (read-only listing). */
+  async getContractorReviews(contractorId: string, params?: { limit?: number; offset?: number }) {
+    const search = new URLSearchParams();
+    if (params?.limit != null) search.set("limit", String(params.limit));
+    if (params?.offset != null) search.set("offset", String(params.offset));
+    const qs = search.toString();
+    return this.request<{
+      items: Array<{
+        id: string;
+        contractor_id: string;
+        user_id?: string;
+        offer_id?: string;
+        rating: number;
+        comment?: string;
+        created_at: string;
+      }>;
+      total: number;
+    }>(`/api/v1/contractors/${encodeURIComponent(contractorId)}/reviews${qs ? `?${qs}` : ""}`);
   }
 
   // ---- Offer participants ----

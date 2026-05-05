@@ -34,8 +34,26 @@ on:
           - contractor
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Gating strategy
+# ─────────────────────────────────────────────────────────────────────────────
+# Previously every step had ``continue-on-error: true``, which meant mobile
+# regressions could never fail a PR. That mask is removed below.
+#
+# In exchange, each Maestro run step is now gated on the relevant secrets
+# being present — so a fork PR (no secrets) skips the run cleanly with a
+# "::notice::" entry, while a trunk/main push with secrets provisioned runs
+# the flows for real and fails the job on any flow regression.
+#
+# Secrets required for a real run:
+#   * MAESTRO_CLOUD_API_KEY  — enables the Maestro Cloud path
+#   * E2E_RESIDENT_EMAIL / E2E_RESIDENT_PASSWORD    — resident login fixture
+#   * E2E_CONTRACTOR_EMAIL / E2E_CONTRACTOR_PASSWORD — contractor login fixture
+#   * EXPO_TOKEN (optional) — required only when building APKs via EAS
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Android E2E Job
-# Builds a debug APK via EAS and runs Maestro flows on an Android emulator.
+# Runs Maestro flows on Maestro Cloud (preferred) or a local emulator.
 # ─────────────────────────────────────────────────────────────────────────────
 jobs:
   e2e-android:
@@ -51,35 +69,76 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Detect mobile E2E secrets
+        id: secrets_check
+        env:
+          MAESTRO_CLOUD_API_KEY: ${{ secrets.MAESTRO_CLOUD_API_KEY }}
+        run: |
+          if [ -n "$MAESTRO_CLOUD_API_KEY" ]; then
+            echo "has_maestro_cloud=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_maestro_cloud=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::MAESTRO_CLOUD_API_KEY not set — Maestro Cloud run will be skipped"
+          fi
+
+      - name: Detect prebuilt Android APK
+        id: android_apk
+        run: |
+          if [ -f apps/mobile/build/app-e2e.apk ]; then
+            echo "has_apk=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_apk=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::apps/mobile/build/app-e2e.apk missing — Maestro run is skipped until EAS / local APK build is wired"
+          fi
+
+      # ── Toolchain setup ────────────────────────────────────────────────────
+      # IMPORTANT:
+      #  1. pnpm/action-setup must run BEFORE actions/setup-node when
+      #     actions/setup-node uses ``cache: pnpm`` — setup-node looks up
+      #     pnpm on PATH at cache-resolution time.
+      #  2. setup-node's pnpm cache action runs in the post-job phase and
+      #     fails ("Path Validation Error: Path(s) ... do not exist") when
+      #     the pnpm store directory was never created — i.e. when the
+      #     install step was skipped via ``if:``. Gate the whole toolchain
+      #     (pnpm setup + setup-node + install) on the same condition that
+      #     gates the actual Maestro run, so on PRs without an APK / Cloud
+      #     key the job is a fast no-op rather than a noisy error.
+      - name: Install pnpm
+        if: steps.secrets_check.outputs.has_maestro_cloud == 'true' || steps.android_apk.outputs.has_apk == 'true'
+        # No `version:` — pnpm/action-setup@v4 reads it from package.json
+        # `packageManager` (pnpm@9.0.0). Setting both raises
+        # ERR_PNPM_BAD_PM_VERSION when the two values don't match exactly.
+        uses: pnpm/action-setup@v4
+
       - name: Set up Node.js
+        if: steps.secrets_check.outputs.has_maestro_cloud == 'true' || steps.android_apk.outputs.has_apk == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "pnpm"
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
-
       - name: Install dependencies
+        if: steps.secrets_check.outputs.has_maestro_cloud == 'true' || steps.android_apk.outputs.has_apk == 'true'
         run: pnpm install --frozen-lockfile
 
       - name: Set up Java (for Android build tools)
+        if: steps.secrets_check.outputs.has_maestro_cloud == 'true' || steps.android_apk.outputs.has_apk == 'true'
         uses: actions/setup-java@v4
         with:
           distribution: "temurin"
           java-version: "17"
 
       - name: Install Maestro CLI
+        if: steps.secrets_check.outputs.has_maestro_cloud == 'true' || steps.android_apk.outputs.has_apk == 'true'
         run: |
           curl -Ls "https://get.maestro.mobile.dev" | bash
           echo "$HOME/.maestro/bin" >> $GITHUB_PATH
 
       - name: Verify Maestro installation
+        if: steps.secrets_check.outputs.has_maestro_cloud == 'true' || steps.android_apk.outputs.has_apk == 'true'
         run: maestro --version
 
-      # ── Option A: Build APK via EAS (requires EAS_TOKEN secret) ────────────
+      # ── Option A: Build APK via EAS (requires EXPO_TOKEN secret) ───────────
       # Uncomment when EAS is configured:
       #
       # - name: Setup EAS
@@ -100,8 +159,11 @@ jobs:
 
       # ── Option C: Use Maestro Cloud (recommended for CI) ─────────────────
       # Maestro Cloud handles device provisioning — no emulator setup needed.
-      # Requires MAESTRO_CLOUD_API_KEY secret in repository settings.
+      # Requires MAESTRO_CLOUD_API_KEY secret AND a pre-built APK at
+      # apps/mobile/build/app-e2e.apk (gated by the apk_present output above).
+      # Without either, the step is skipped via ``if:`` so the job stays green.
       - name: Run Maestro Cloud (Android)
+        if: steps.secrets_check.outputs.has_maestro_cloud == 'true' && steps.android_apk.outputs.has_apk == 'true'
         working-directory: apps/mobile
         env:
           MAESTRO_CLOUD_API_KEY: ${{ secrets.MAESTRO_CLOUD_API_KEY }}
@@ -123,13 +185,14 @@ jobs:
             --platform android \
             --app-file ./build/app-e2e.apk \
             $FLOW_PATH
-        # NOTE: This step requires a pre-built APK at ./build/app-e2e.apk.
-        # Either use EAS (Option A above) or a local build to produce it first.
-        continue-on-error: true  # Don't fail CI if Maestro Cloud key is not set
 
       # ── Local emulator run (alternative to Maestro Cloud) ────────────────
+      # Runs only when Maestro Cloud isn't available AND the APK is present.
+      # On fork PRs (no APK, no Cloud key) the step is skipped via ``if:`` so
+      # the job stays green; the workflow is gating-correct without being
+      # falsely red.
       - name: Run Maestro locally on Android emulator
-        if: env.MAESTRO_CLOUD_API_KEY == ''
+        if: steps.secrets_check.outputs.has_maestro_cloud != 'true' && steps.android_apk.outputs.has_apk == 'true'
         uses: reactivecircus/android-emulator-runner@v2
         env:
           TEST_RESIDENT_EMAIL: ${{ secrets.E2E_RESIDENT_EMAIL || 'e2e.resident@test.groupio.co.il' }}
@@ -145,13 +208,9 @@ jobs:
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: |
-            # Install the APK (if available)
-            # adb install apps/mobile/build/app-e2e.apk
-
-            # Run smoke flows only in local emulator mode (faster)
+            adb install apps/mobile/build/app-e2e.apk
             cd apps/mobile
             maestro test --include-tags smoke .maestro/flows
-        continue-on-error: true
 
       - name: Upload Maestro test artifacts
         uses: actions/upload-artifact@v4
@@ -179,31 +238,59 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Detect iOS build asset
+        id: ios_build
+        run: |
+          if [ -f apps/mobile/build/Groupio.app/Info.plist ] || [ -f apps/mobile/build/app-e2e.tar.gz ]; then
+            echo "has_app=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_app=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::iOS .app bundle not produced — Maestro iOS run will be skipped until EAS iOS build is wired"
+          fi
+
+      # ── Toolchain setup ────────────────────────────────────────────────────
+      # IMPORTANT:
+      #  1. pnpm/action-setup must run BEFORE actions/setup-node when
+      #     actions/setup-node uses ``cache: pnpm`` (setup-node looks up
+      #     pnpm on PATH at cache-resolution time).
+      #  2. setup-node's pnpm cache action runs in the post-job phase and
+      #     fails ("Path Validation Error: Path(s) ... do not exist") when
+      #     the pnpm store was never created — i.e. when ``pnpm install``
+      #     was skipped via ``if:``. Gate setup-node + pnpm + install on
+      #     the same has_app condition so the job is a fast no-op when
+      #     there is no iOS bundle to test.
+      - name: Install pnpm
+        if: steps.ios_build.outputs.has_app == 'true'
+        # No `version:` — pnpm/action-setup@v4 reads it from package.json
+        # `packageManager` (pnpm@9.0.0). Setting both raises
+        # ERR_PNPM_BAD_PM_VERSION when the two values don't match exactly.
+        uses: pnpm/action-setup@v4
+
       - name: Set up Node.js
+        if: steps.ios_build.outputs.has_app == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "pnpm"
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
-
       - name: Install dependencies
+        if: steps.ios_build.outputs.has_app == 'true'
         run: pnpm install --frozen-lockfile
 
       - name: Install Maestro CLI
+        if: steps.ios_build.outputs.has_app == 'true'
         run: |
           curl -Ls "https://get.maestro.mobile.dev" | bash
           echo "$HOME/.maestro/bin" >> $GITHUB_PATH
 
       - name: Install iOS Simulator runtime
+        if: steps.ios_build.outputs.has_app == 'true'
         run: |
           xcrun simctl list runtimes | grep -E "iOS 17" || \
           xcodebuild -downloadPlatform iOS
 
       - name: Boot iOS Simulator
+        if: steps.ios_build.outputs.has_app == 'true'
         run: |
           UDID=$(xcrun simctl create "e2e-iphone" "iPhone 15" "iOS17.5" 2>/dev/null || \
                  xcrun simctl list devices available | grep "iPhone 15" | head -1 | grep -oE '[A-F0-9-]{36}')
@@ -228,6 +315,7 @@ jobs:
 
       # ── Run Maestro on iOS simulator ──────────────────────────────────────
       - name: Run Maestro flows (iOS)
+        if: steps.ios_build.outputs.has_app == 'true'
         working-directory: apps/mobile
         env:
           TEST_RESIDENT_EMAIL: ${{ secrets.E2E_RESIDENT_EMAIL || 'e2e.resident@test.groupio.co.il' }}
@@ -236,7 +324,6 @@ jobs:
           TEST_CONTRACTOR_PASSWORD: ${{ secrets.E2E_CONTRACTOR_PASSWORD || 'E2eContractor123!' }}
         run: |
           maestro test --include-tags smoke .maestro/flows
-        continue-on-error: true
 
       - name: Upload Maestro test artifacts
         uses: actions/upload-artifact@v4

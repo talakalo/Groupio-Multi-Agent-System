@@ -1,4 +1,5 @@
 import * as ImagePicker from "expo-image-picker";
+import { useRouter } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
 import {
   View,
@@ -8,6 +9,7 @@ import {
   Alert,
   Pressable,
   Linking,
+  TouchableOpacity,
 } from "react-native";
 import {
   Text,
@@ -94,11 +96,13 @@ interface InfoRowProps {
   label: string;
   value: string;
   iconColor?: string;
+  onPress?: () => void;
+  testID?: string;
 }
 
-function InfoRow({ icon, label, value, iconColor }: InfoRowProps) {
+function InfoRow({ icon, label, value, iconColor, onPress, testID }: InfoRowProps) {
   const theme = useTheme();
-  return (
+  const body = (
     <View style={styles.infoRow}>
       <Icon
         name={icon}
@@ -112,15 +116,32 @@ function InfoRow({ icon, label, value, iconColor }: InfoRowProps) {
         >
           {label}
         </Text>
-        <Text
-          variant="bodyMedium"
-          style={[styles.infoValue, { color: theme.colors.onSurface }]}
-        >
-          {value}
-        </Text>
+        {value ? (
+          <Text
+            variant="bodyMedium"
+            style={[styles.infoValue, { color: theme.colors.onSurface }]}
+          >
+            {value}
+          </Text>
+        ) : null}
       </View>
+      {onPress ? (
+        <Icon
+          name="chevron-right"
+          size={20}
+          color={theme.colors.onSurfaceVariant}
+        />
+      ) : null}
     </View>
   );
+  if (onPress) {
+    return (
+      <TouchableOpacity onPress={onPress} testID={testID} accessibilityRole="button">
+        {body}
+      </TouchableOpacity>
+    );
+  }
+  return <View testID={testID}>{body}</View>;
 }
 
 // ---------------------------------------------------------------------------
@@ -173,6 +194,7 @@ function SettingToggle({
 
 export default function ProfileScreen() {
   const theme = useTheme();
+  const router = useRouter();
   const { logout } = useAuth();
 
   // Determine user role
@@ -528,6 +550,28 @@ export default function ProfileScreen() {
                 />
               </View>
             </Section>
+
+            <Section title={i18n.t("contractor.manage") || "Manage"} icon="cog">
+              <View style={styles.infoList}>
+                <InfoRow
+                  icon="account-edit-outline"
+                  label={i18n.t("contractor.editProfile") || "Edit business profile"}
+                  value=""
+                  onPress={() => router.push("/contractor-profile")}
+                  iconColor={theme.colors.primary}
+                  testID="profile-tab-link-contractor-profile"
+                />
+                <Divider style={styles.infoDivider} />
+                <InfoRow
+                  icon="cash-multiple"
+                  label={i18n.t("contractor.viewEarnings") || "View earnings"}
+                  value=""
+                  onPress={() => router.push("/contractor-earnings")}
+                  iconColor={theme.colors.primary}
+                  testID="profile-tab-link-contractor-earnings"
+                />
+              </View>
+            </Section>
           </>
         )}
 
@@ -536,6 +580,17 @@ export default function ProfileScreen() {
           title={i18n.t("profile.notifications")}
           icon="bell-outline"
         >
+          <View style={styles.infoList}>
+            <InfoRow
+              icon="inbox-outline"
+              label={i18n.t("notifications.inbox") || "Notification inbox"}
+              value=""
+              onPress={() => router.push("/notifications")}
+              iconColor={theme.colors.primary}
+              testID="profile-tab-link-notifications"
+            />
+            <Divider style={styles.infoDivider} />
+          </View>
           <View style={styles.settingsList}>
             <SettingToggle
               icon="bell-ring-outline"

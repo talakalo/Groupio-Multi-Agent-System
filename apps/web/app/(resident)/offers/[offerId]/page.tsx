@@ -616,35 +616,12 @@ export default function OfferDetailPage(props: PageParamsProps) {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Detail column - takes 2 cols */}
         <div className="lg:col-span-2">
-          {/* Pricing rationale (Task 3.4) */}
           <details className="mt-4 text-sm text-gray-500">
             <summary className="cursor-pointer font-medium text-primary-600 hover:text-primary-700">
               כיצד חושב המחיר?
             </summary>
             <p className="mt-2 leading-relaxed">
-              {(offer as { pricingRationale?: string }).pricingRationale ||
-                'המחיר חושב על ידי AI על בסיס מספר משתתפים, קטגוריה, ומחירי שוק.'}
-            </p>
-          </details>
-
-          {/* Pricing rationale (Task 3.4) */}
-          <details className="mt-4 text-sm text-gray-500">
-            <summary className="cursor-pointer font-medium text-primary-600 hover:text-primary-700">
-              כיצד חושב המחיר?
-            </summary>
-            <p className="mt-2 leading-relaxed">
-              {(offer as { pricingRationale?: string }).pricingRationale ||
-                'המחיר חושב על ידי AI על בסיס מספר משתתפים, קטגוריה, ומחירי שוק.'}
-            </p>
-          </details>
-
-          {/* Pricing rationale (Task 3.4) */}
-          <details className="mt-4 text-sm text-gray-500">
-            <summary className="cursor-pointer font-medium text-primary-600 hover:text-primary-700">
-              כיצד חושב המחיר?
-            </summary>
-            <p className="mt-2 leading-relaxed">
-              {(offer as { pricingRationale?: string }).pricingRationale ||
+              {offer.pricingRationale ||
                 'המחיר חושב על ידי AI על בסיס מספר משתתפים, קטגוריה, ומחירי שוק.'}
             </p>
           </details>

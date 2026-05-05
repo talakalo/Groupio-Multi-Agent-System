@@ -7,8 +7,18 @@ from neo4j import AsyncDriver, AsyncGraphDatabase
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from src.config.settings import get_settings
+from src.databases.cache import cached
 
 logger = logging.getLogger(__name__)
+
+# TTLs for read-heavy Neo4j queries. These are all append-only aggregations
+# (completed projects, reviews, suspicious-pattern rollups) that change on
+# the order of hours — not minutes — so a medium-length TTL yields high
+# hit-rates without meaningful staleness risk. If a mutation needs to be
+# reflected immediately, callers can bust the cache via cache_delete().
+_GRAPH_MATCH_TTL = 600  # 10 min — matching hot path; trades freshness for latency
+_GRAPH_REPUTATION_TTL = 3600  # 1h — reputation accumulates slowly
+_GRAPH_HISTORY_TTL = 1800  # 30 min — completed-project history is append-only
 
 
 class GraphStore:
@@ -38,6 +48,13 @@ class GraphStore:
             records = [dict(record) for record in await result.data()]
             return records
 
+    @cached(
+        prefix="graph:match_cntr",
+        ttl=_GRAPH_MATCH_TTL,
+        key_fn=lambda self, building_type, region, category=None, min_success_rate=0.85, min_projects=3, limit=10: (
+            f"{building_type}:{region}:{category or ''}:{min_success_rate}:{min_projects}:{limit}"
+        ),
+    )
     async def find_matching_contractors(
         self,
         building_type: str,
@@ -47,7 +64,13 @@ class GraphStore:
         min_projects: int = 3,
         limit: int = 10,
     ) -> list[dict[str, Any]]:
-        """Find contractors with proven track records in similar buildings."""
+        """Find contractors with proven track records in similar buildings.
+
+        Cached for 10 minutes keyed by the full filter tuple. This is the
+        matching-agent hot path — every user contractor request executes
+        a graph traversal, so even a 10-minute TTL produces a high hit
+        rate on popular (region, building_type, category) combinations.
+        """
         query = """
         MATCH (c:Contractor)-[comp:COMPLETED]->(b:Building)
         WHERE b.type = $building_type
@@ -87,8 +110,19 @@ class GraphStore:
         """
         return await self.execute(query, {"offer_id": offer_id})
 
+    @cached(
+        prefix="graph:rep",
+        ttl=_GRAPH_REPUTATION_TTL,
+        key_fn=lambda self, contractor_id: contractor_id,
+    )
     async def get_contractor_reputation(self, contractor_id: str) -> dict[str, Any]:
-        """Calculate contractor reputation from graph patterns."""
+        """Calculate contractor reputation from graph patterns.
+
+        Cached for 1h keyed by contractor_id. Reputation is an aggregate
+        over slowly-changing signals (completed projects, reviews), so
+        hour-level staleness is acceptable and the cache hit rate is high
+        because the same contractors are re-surfaced across sessions.
+        """
         query = """
         MATCH (c:Contractor {id: $contractor_id})
         OPTIONAL MATCH (c)-[comp:COMPLETED]->(b:Building)
@@ -112,8 +146,18 @@ class GraphStore:
         results = await self.execute(query, {"contractor_id": contractor_id})
         return results[0]["reputation"] if results else {}
 
+    @cached(
+        prefix="graph:suspicious",
+        ttl=_GRAPH_REPUTATION_TTL,
+        key_fn=lambda self, contractor_id: contractor_id,
+    )
     async def detect_suspicious_patterns(self, contractor_id: str) -> list[dict[str, Any]]:
-        """Detect suspicious patterns for fraud detection."""
+        """Detect suspicious patterns for fraud detection.
+
+        Cached for 1h — fraud signals (failed projects, 1-star reviews,
+        cancelled offers) accumulate slowly and are safe to serve
+        slightly stale for vetting decisions.
+        """
         query = """
         MATCH (c:Contractor {id: $contractor_id})
         OPTIONAL MATCH (c)-[comp:COMPLETED]->(b:Building)
@@ -139,8 +183,18 @@ class GraphStore:
         results = await self.execute(query, {"contractor_id": contractor_id})
         return results[0]["patterns"] if results else {}
 
+    @cached(
+        prefix="graph:history",
+        ttl=_GRAPH_HISTORY_TTL,
+        key_fn=lambda self, contractor_id, limit=10: f"{contractor_id}:{limit}",
+    )
     async def get_contractor_building_history(self, contractor_id: str, limit: int = 10) -> list[dict[str, Any]]:
-        """Get a contractor's past project history with buildings."""
+        """Get a contractor's past project history with buildings.
+
+        Cached for 30 min keyed by (contractor_id, limit). Project history
+        is append-only; a completed project added within the TTL window
+        will only delay its appearance until the next refresh.
+        """
         query = """
         MATCH (c:Contractor {id: $contractor_id})-[comp:COMPLETED]->(b:Building)
         RETURN b {.*,
