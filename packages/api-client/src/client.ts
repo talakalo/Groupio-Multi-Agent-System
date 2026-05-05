@@ -278,8 +278,11 @@ export class GroupioApiClient {
     return this.get<Offer[]>(`/offers?buildingId=${encodeURIComponent(buildingId)}`);
   }
 
-  async joinOffer(offerId: string, userId: string): Promise<void> {
-    await this.post<void>(`/offers/${encodeURIComponent(offerId)}/join`, { userId });
+  async joinOffer(offerId: string, unitCount: number = 1, inviteToken?: string): Promise<void> {
+    await this.post<void>(`/offers/${encodeURIComponent(offerId)}/join`, {
+      unit_count: unitCount,
+      ...(inviteToken ? { invite_token: inviteToken } : {}),
+    });
   }
 
   // ---- Contractor Methods ----

@@ -744,6 +744,8 @@ class PostgresClient:
                 q = q.eq("region", filters["region"])
             if filters.get("user_id"):
                 q = q.eq("admin_user_id", filters["user_id"])
+            if filters.get("search"):
+                q = q.ilike("address", f"%{filters['search']}%")
             q = q.order("created_at", desc=True).range((page - 1) * page_size, page * page_size - 1)
             result = await q.execute()
             total = result.count if hasattr(result, "count") and result.count is not None else len(result.data or [])
@@ -756,6 +758,11 @@ class PostgresClient:
         if filters.get("region"):
             args.append(filters["region"])
             where_parts.append("region = $%d" % len(args))
+        if filters.get("search"):
+            args.append(f"%{filters['search']}%")
+            where_parts.append(
+                "(address ILIKE $%d OR city ILIKE $%d)" % (len(args), len(args))
+            )
         if filters.get("user_id"):
             args.append(filters["user_id"])
             args.append(filters["user_id"])
@@ -1218,13 +1225,16 @@ class PostgresClient:
             pool = await self._get_client()
             async with pool.acquire() as conn:
                 async with conn.transaction():
-                    await conn.execute(
-                        "INSERT INTO offer_participants (id, offer_id, user_id, unit_count) VALUES ($1, $2, $3, $4)",
+                    insert_result = await conn.execute(
+                        "INSERT INTO offer_participants (id, offer_id, user_id, unit_count) "
+                        "VALUES ($1, $2, $3, $4) ON CONFLICT (user_id, offer_id) DO NOTHING",
                         pid,
                         offer_id,
                         user_id,
                         unit_count,
                     )
+                    if insert_result == "INSERT 0 0":
+                        raise ValueError("Already joined this offer")
                     result = await conn.execute(
                         "UPDATE offers SET current_participants = current_participants + $1 "
                         "WHERE id = $2 AND status IN ('pending', 'matching') "
@@ -3337,6 +3347,7 @@ class PostgresClient:
                     "transaction_id",
                     "payment_method",
                     "payment_method_id",
+                    "idempotency_key",
                     "created_at",
                 }
             }
@@ -3345,8 +3356,8 @@ class PostgresClient:
             return result.data[0] if result.data else data
         sql_pay = """INSERT INTO payments
                (id, invoice_id, user_id, offer_id, amount, currency, status,
-                transaction_id, payment_method, provider_data, created_at)
-               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)"""
+                transaction_id, payment_method, provider_data, idempotency_key, created_at)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)"""
         pay_args = (
             data["id"],
             data.get("invoice_id"),
@@ -3358,6 +3369,7 @@ class PostgresClient:
             data.get("transaction_id"),
             data.get("payment_method"),
             json.dumps(merged_provider_data),
+            data.get("idempotency_key"),
             data.get("created_at"),
         )
         if conn is not None:
@@ -3373,6 +3385,27 @@ class PostgresClient:
             result = await client.table("payments").select("*").eq("id", payment_id).limit(1).execute()
             return result.data[0] if result.data else None
         return await self._pg_fetch_one("SELECT * FROM payments WHERE id = $1", payment_id)
+
+    async def get_payment_by_idempotency_key(
+        self, user_id: str, idempotency_key: str
+    ) -> dict[str, Any] | None:
+        """Return an existing payment matching (user_id, idempotency_key), or None."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            result = (
+                await client.table("payments")
+                .select("*")
+                .eq("user_id", user_id)
+                .eq("idempotency_key", idempotency_key)
+                .limit(1)
+                .execute()
+            )
+            return result.data[0] if result.data else None
+        return await self._pg_fetch_one(
+            "SELECT * FROM payments WHERE user_id = $1 AND idempotency_key = $2",
+            user_id,
+            idempotency_key,
+        )
 
     async def update_payment(self, payment_id: str, update_data: dict[str, Any]) -> dict[str, Any]:
         """Update a payment record."""

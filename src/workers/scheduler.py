@@ -98,6 +98,125 @@ scheduler = TaskScheduler()
 # ------------------------------------------------------------------
 
 
+@scheduler.register("reconcile_stale_payments", interval_seconds=1800)  # Every 30 minutes
+async def reconcile_stale_payments() -> None:
+    """Detect payments stuck in 'processing' or 'pending' and reconcile against Stripe.
+
+    A payment is considered stale if:
+    - status='processing' for > 15 minutes (Stripe should have responded by then)
+    - status='pending' for > 24 hours (user abandoned or webhook was missed)
+
+    For each stale payment that has a provider_transaction_id (Stripe PaymentIntent),
+    we fetch the live intent and align our local status.  Any transition is written
+    to audit_logs so the escrow release path has a reliable trail.
+    """
+    import stripe as stripe_lib
+
+    from src.config.settings import get_settings
+
+    db = get_postgres_client()
+    settings = get_settings()
+
+    if not settings.STRIPE_SECRET_KEY:
+        logger.warning("reconcile_stale_payments: STRIPE_SECRET_KEY not configured, skipping")
+        return
+
+    stripe_lib.api_key = settings.STRIPE_SECRET_KEY
+
+    now = datetime.now(UTC)
+
+    try:
+        stale_rows = await db._pg_fetch(
+            """
+            SELECT id, user_id, offer_id, provider_transaction_id, status, amount, currency
+            FROM payments
+            WHERE (
+                (status = 'processing' AND updated_at < NOW() - INTERVAL '15 minutes')
+                OR (status = 'pending' AND updated_at < NOW() - INTERVAL '24 hours')
+            )
+            AND provider = 'stripe'
+            AND provider_transaction_id IS NOT NULL
+            LIMIT 100
+            """,
+        )
+    except Exception as exc:
+        logger.error("reconcile_stale_payments: failed to query stale payments: %s", exc)
+        return
+
+    if not stale_rows:
+        logger.info("reconcile_stale_payments: no stale payments found")
+        return
+
+    logger.info("reconcile_stale_payments: found %d stale payment(s)", len(stale_rows))
+    reconciled = 0
+
+    for row in stale_rows:
+        payment_id = row["id"]
+        intent_id = row["provider_transaction_id"]
+        old_status = row["status"]
+
+        try:
+            intent = await stripe_lib.PaymentIntent.retrieve_async(intent_id)
+        except stripe_lib.error.StripeError as exc:
+            logger.warning(
+                "reconcile_stale_payments: Stripe error for payment %s (intent %s): %s",
+                payment_id,
+                intent_id,
+                exc,
+            )
+            continue
+
+        stripe_status = intent.get("status", "")
+        # Map Stripe intent status → our payment status
+        stripe_to_local: dict[str, str] = {
+            "succeeded": "succeeded",
+            "canceled": "failed",
+            "requires_payment_method": "failed",
+            "payment_failed": "failed",
+        }
+        new_status = stripe_to_local.get(stripe_status)
+        if new_status is None or new_status == old_status:
+            continue  # No actionable change
+
+        try:
+            await db._pg_execute(
+                "UPDATE payments SET status = $1, updated_at = NOW() WHERE id = $2",
+                new_status,
+                payment_id,
+            )
+            await db.create_audit_log(
+                {
+                    "user_id": row["user_id"],
+                    "action": "payment_reconciled",
+                    "resource_type": "payment",
+                    "resource_id": payment_id,
+                    "details": {
+                        "old_status": old_status,
+                        "new_status": new_status,
+                        "stripe_intent_status": stripe_status,
+                        "intent_id": intent_id,
+                        "reconciled_at": now.isoformat(),
+                    },
+                }
+            )
+            logger.info(
+                "reconcile_stale_payments: payment %s %s → %s (Stripe: %s)",
+                payment_id,
+                old_status,
+                new_status,
+                stripe_status,
+            )
+            reconciled += 1
+        except Exception as exc:
+            logger.error(
+                "reconcile_stale_payments: failed to update payment %s: %s",
+                payment_id,
+                exc,
+            )
+
+    logger.info("reconcile_stale_payments: reconciled %d / %d payments", reconciled, len(stale_rows))
+
+
 @scheduler.register("check_expired_offers", interval_seconds=3600)  # Hourly
 async def check_expired_offers():
     """Close offers past their deadline and notify participants."""

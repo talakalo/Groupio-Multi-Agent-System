@@ -185,6 +185,32 @@ async def list_buildings(
     )
 
 
+@router.get("/search", response_model=BuildingListResponse)
+async def search_buildings(
+    q: str = Query(..., min_length=1, description="Search by address or city"),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    current_user: UserInDB = Depends(get_current_user),
+) -> BuildingListResponse:
+    """Search buildings by address or city substring."""
+    db = get_postgres_client()
+    filters: dict = {"search": q}
+    if not is_admin(current_user):
+        filters["user_id"] = current_user.id
+    buildings, total = await db.list_buildings(
+        filters=filters,
+        page=page,
+        page_size=page_size,
+    )
+    return BuildingListResponse(
+        items=buildings,
+        total=total,
+        page=page,
+        page_size=page_size,
+        has_more=(page * page_size) < total,
+    )
+
+
 @router.get("/{building_id}", response_model=BuildingResponse)
 async def get_building(
     building_id: str,
