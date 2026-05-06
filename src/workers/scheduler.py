@@ -126,7 +126,7 @@ async def reconcile_stale_payments() -> None:
     now = datetime.now(UTC)
 
     try:
-        stale_rows = await db._pg_fetch(
+        stale_rows = await db._pg_fetch_all(
             """
             SELECT id, user_id, offer_id, provider_transaction_id, status, amount, currency
             FROM payments
