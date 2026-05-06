@@ -201,3 +201,250 @@ Claude may spawn these specialized agents from `.claude/agents/`:
 - `frontend-ux` — React patterns, RTL, React Query, Zustand
 - `security-auditor` — JWT, RLS gaps, webhook signatures, OWASP
 - `code-reviewer` — Code quality, conventions, TypeScript types
+
+<!-- GSD:project-start source:PROJECT.md -->
+## Project
+
+**Groupio — City MVP Launch Readiness**
+
+Groupio is a marketplace where Israeli apartment building residents group together to hire contractors for home services (AC, plumbing, electrical, renovations) at discounted rates via dynamic tier pricing. Residents in the same building join an "offer" collectively; the more who join, the lower the price drops.
+
+The platform already has a full-stack codebase (FastAPI + Next.js + 11 LangGraph agents). This milestone is about getting it **launch-ready** for a multi-city Israeli MVP — hardening, completing unfinished flows, and shipping to production so real residents and contractors can transact.
+
+**Core Value:** **The first real transaction** — a resident pays for a contractor service through escrow, the work gets done, the contractor gets paid. Everything else is scaffolding for that moment.
+
+**Launch success = 10 active buildings** with residents browsing and joining offers.
+<!-- GSD:project-end -->
+
+<!-- GSD:stack-start source:codebase/STACK.md -->
+## Technology Stack
+
+## Languages & Runtime
+| Layer | Language | Version |
+|-------|----------|---------|
+| Backend | Python | 3.11+ |
+| Frontend | TypeScript | 5.x |
+| Frontend runtime | Node.js | >=20 |
+| Migrations | Python / Alembic | — |
+## Backend Framework
+| Component | Technology | Notes |
+|-----------|-----------|-------|
+| API server | FastAPI + Uvicorn | `src/api/` — REST + WebSocket |
+| Async ORM | asyncpg (raw) | No ORM — explicit SQL in `src/databases/postgres.py` |
+| LLM orchestration | LangGraph 0.0.30 | 11 specialist agents in `src/agents/` |
+| LLM primary | Anthropic Claude (claude-sonnet-4-6) | `anthropic>=0.39.0` |
+| LLM fallback | OpenAI GPT-4o | `openai>=1.6.0` |
+| Validation | Pydantic v2 | `pydantic>=2.5.0`, `pydantic-settings` |
+## Frontend Framework
+| App | Technology | Port |
+|-----|-----------|------|
+| `apps/web` | Next.js 15 + React 19 | :3000 |
+| `apps/admin` | Next.js 15 + React 19 | :3001 |
+| `apps/mobile` | React Native / Expo | — |
+### Frontend Key Libraries
+| Library | Version | Purpose |
+|---------|---------|---------|
+| `@tanstack/react-query` | v5 | Server state / data fetching |
+| `zustand` | ^4.5 | Client-only state (auth, UI, notifications) |
+| `react-hook-form` | ^7.52 | Form management |
+| `zod` | ^3.23 | Schema validation |
+| `next-intl` | ^3.15 | i18n — Hebrew RTL + English |
+| `tailwind-merge` + `clsx` | — | Styling utilities |
+| `lucide-react` | ^0.400 | Icons |
+| `@stripe/react-stripe-js` | ^2.7 | Stripe Elements |
+| `posthog-js` | ^1.200 | Product analytics |
+| `@sentry/nextjs` | ^8 | Error tracking |
+| `recharts` | — | Charts (admin only) |
+## Databases
+| Database | Technology | Version | Purpose |
+|----------|-----------|---------|---------|
+| Primary DB | PostgreSQL via Supabase | postgres:15-alpine | All relational data |
+| Cache / Queues | Redis | redis:7-alpine | Session cache, rate limiting, queues |
+| Vector DB | Qdrant | qdrant/qdrant:latest | Contractor/building/conversation embeddings |
+| Vector DB (alt) | Pinecone | — | Optional alternative to Qdrant |
+| Graph DB | Neo4j | neo4j:5-community | Contractor reputation & relationships |
+| Message Queue | RabbitMQ | rabbitmq:3-management-alpine | Outbox pattern, async workers |
+## Monorepo & Build Tools
+| Tool | Config |
+|------|-------|
+| pnpm workspaces | `pnpm-workspace.yaml` — `apps/*`, `packages/*` |
+| Turbo | Root `turbo.json` — parallel builds |
+| TypeScript | Root `tsconfig.json` + per-app configs |
+| ESLint | `eslint-plugin-react`, `eslint-plugin-jsx-a11y`, `@typescript-eslint` |
+| Prettier | Root `.prettierrc` |
+| Ruff | Python linter |
+| mypy | Python type checker |
+## Shared Packages
+| Package | Path | Purpose |
+|---------|------|---------|
+| `@groupio/types` | `packages/types/src/index.ts` | Single source of truth for TypeScript interfaces |
+| `@groupio/api-client` | `packages/api-client/` | Generated API client (auth, retries, dedup) |
+| `@groupio/ui` | `packages/ui/` | Design system components |
+| `@groupio/utils` | `packages/utils/` | Shared formatters and helpers |
+## Testing Stack
+| Layer | Tool | Config |
+|-------|------|-------|
+| Frontend unit | Vitest + React Testing Library | `apps/web/__tests__/` |
+| Frontend E2E | Playwright | `apps/web/e2e/` — includes Hebrew locale project |
+| Backend unit | pytest + pytest-asyncio | `tests/unit/` |
+| Backend integration | pytest (needs Docker) | `tests/integration/` |
+| Coverage | pytest-cov | 50% minimum — `pyproject.toml` |
+## Observability
+| Tool | Purpose |
+|------|---------|
+| Sentry | Error tracking (FE + BE — `sentry-sdk[fastapi]`) |
+| Prometheus | Metrics (`prometheus-client>=0.19`) |
+| Grafana | Dashboards (grafana:10.4.1 in Docker) |
+| structlog | Structured logging |
+| PostHog | Product analytics (FE) |
+## DB Migrations
+- Alembic — 44 migration versions in `alembic/versions/`
+- `alembic upgrade head` / `alembic revision --autogenerate -m "desc"`
+## Key Config Files
+- `.env.example` — 170+ documented environment variables
+- `docker/docker-compose.yml` — All services (Postgres, Redis, Qdrant, Neo4j, RabbitMQ, Prometheus, Grafana)
+- `pyproject.toml` — Python deps, test config, coverage (50% min)
+- `pnpm-workspace.yaml` — Monorepo workspace packages
+<!-- GSD:stack-end -->
+
+<!-- GSD:conventions-start source:CONVENTIONS.md -->
+## Conventions
+
+## Python (Backend)
+### Style
+- **Linter:** Ruff (`python -m ruff check src/`)
+- **Type checker:** mypy (`python -m mypy src/`)
+- **Formatting:** Ruff formatter (Black-compatible)
+- No `SELECT *` — always use named column lists defined at top of `src/databases/postgres.py`
+### Naming
+- Files: `snake_case.py`
+- Classes: `PascalCase`
+- Functions/methods: `snake_case`
+- Constants: `UPPER_SNAKE_CASE`
+- Private helpers: `_leading_underscore`
+### Async Patterns
+- All DB calls and external API calls must be `await`ed
+- Never `time.sleep()` — use `asyncio.sleep()`
+- All service methods are `async def`
+- Use `asynccontextmanager` for connection management
+### FastAPI Route Pattern
+### Service Pattern (business logic)
+### DB Query Pattern (asyncpg)
+### Pydantic Models
+- All request/response bodies use Pydantic v2 models in `src/models/`
+- Use `Field(...)` with constraints: `min_length`, `ge`, `le`
+- Never validate manually in route handlers
+### Error Handling
+- `HTTPException` for client errors (4xx)
+- Log + return 500 for unexpected errors
+- Never expose stack traces to API responses
+- Input sanitization before DB writes: `src/utils/validators.py`
+### JWT / Auth Pattern
+## TypeScript / React (Frontend)
+### Style
+- ESLint: `@typescript-eslint`, `eslint-plugin-react`, `eslint-plugin-jsx-a11y`
+- Prettier for formatting
+- No `any` types — use types from `@groupio/types` or define locally
+- All component props must be typed
+### State Management Rules
+### Component Pattern
+### Forms
+### API Client
+### i18n
+- All user-facing strings use `next-intl`
+- Translation files in `apps/web/messages/`
+- Hebrew (he) is primary — English (en) is secondary
+- RTL support required for all UI components
+### Layout Test Pattern
+## Database Conventions
+### Column Lists
+- `_USER_COLS` — excludes `hashed_password` for security
+- `_OFFER_COLS`
+- `_CONTRACTOR_COLS`
+- `_PAYMENT_COLS`
+### Migrations (Alembic)
+### JSONB Columns (must validate before write)
+- `pricing_tiers` on offers
+- `trust_score_breakdown` on contractors
+- `notification_settings` on users
+- `provider_data` on contractors (Stripe subscription data)
+## Security Conventions
+- Never skip Stripe webhook signature verification (`stripe.Webhook.construct_event()`)
+- Rate limiting configured globally — never bypass
+- All protected endpoints verify JWT via auth middleware
+- Never rely on RLS alone for business-level access control
+- Input sanitization: `sanitize_input()` and `validate_message_request()` in `src/utils/validators.py`
+- RLS policies defined in Alembic migrations — never ad-hoc in SQL editors
+<!-- GSD:conventions-end -->
+
+<!-- GSD:architecture-start source:ARCHITECTURE.md -->
+## Architecture
+
+## Pattern
+### Backend: FastAPI + LangGraph Multi-Agent System
+```
+```
+### Frontend Architecture
+```
+```
+## Layers (strict separation)
+```
+```
+- Routes call services only — never hit DB directly
+- Services contain business logic — no DB imports in routes
+- Agents do LLM orchestration only — no direct DB writes
+- All column lists defined at top of `postgres.py` — never `SELECT *`
+## Data Flow
+### Offer Lifecycle
+```
+```
+### Payment / Escrow Lifecycle
+```
+```
+### Agent Request Flow
+```
+```
+## Entry Points
+| Entry point | File |
+|-------------|------|
+| FastAPI app | `src/api/main.py` |
+| Agent orchestrator | `src/orchestration/graph.py` |
+| Next.js web | `apps/web/app/layout.tsx` |
+| Next.js admin | `apps/admin/app/layout.tsx` |
+| Worker startup | `src/workers/scheduler.py` |
+## Auth & Authorization
+## Key Abstractions
+| Abstraction | Location | What it does |
+|-------------|----------|--------------|
+| `BaseAgent` | `src/agents/base.py` | Retry logic, RAG pipeline access, LLM client, state management |
+| `AgentState` | `src/models/agent_state.py` | Shared state passed between LangGraph nodes |
+| Postgres helpers | `src/databases/postgres.py` | Named column lists, connection pool, `RETURNING id` pattern |
+| `get_payment_provider()` | `src/services/payment.py` | Factory for Stripe / Bit / Paybox, fail-closed at startup |
+| `@groupio/api-client` | `packages/api-client/` | Frontend API client with auth headers, retry, deduplication |
+<!-- GSD:architecture-end -->
+
+<!-- GSD:skills-start source:skills/ -->
+## Project Skills
+
+No project skills found. Add skills to any of: `.claude/skills/`, `.agents/skills/`, `.cursor/skills/`, `.github/skills/`, or `.codex/skills/` with a `SKILL.md` index file.
+<!-- GSD:skills-end -->
+
+<!-- GSD:workflow-start source:GSD defaults -->
+## GSD Workflow Enforcement
+
+Before using Edit, Write, or other file-changing tools, start work through a GSD command so planning artifacts and execution context stay in sync.
+
+Use these entry points:
+- `/gsd-quick` for small fixes, doc updates, and ad-hoc tasks
+- `/gsd-debug` for investigation and bug fixing
+- `/gsd-execute-phase` for planned phase work
+
+Do not make direct repo edits outside a GSD workflow unless the user explicitly asks to bypass it.
+<!-- GSD:workflow-end -->
+
+<!-- GSD:profile-start -->
+## Developer Profile
+
+> Profile not yet configured. Run `/gsd-profile-user` to generate your developer profile.
+> This section is managed by `generate-claude-profile` -- do not edit manually.
+<!-- GSD:profile-end -->

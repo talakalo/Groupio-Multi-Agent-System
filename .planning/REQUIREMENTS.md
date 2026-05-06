@@ -84,30 +84,30 @@
 
 | REQ-ID | Phase | Status |
 |--------|-------|--------|
-| SEC-01 | TBD | — |
-| SEC-02 | TBD | — |
-| SEC-03 | TBD | — |
-| SEC-04 | TBD | — |
-| AUTH-01 | TBD | — |
-| AUTH-02 | TBD | — |
-| AUTH-03 | TBD | — |
-| PAY-01 | TBD | — |
-| PAY-02 | TBD | — |
-| PAY-03 | TBD | — |
-| PAY-04 | TBD | — |
-| INFRA-01 | TBD | — |
-| INFRA-02 | TBD | — |
-| INFRA-03 | TBD | — |
-| INFRA-04 | TBD | — |
-| UX-01 | TBD | — |
-| UX-02 | TBD | — |
-| UX-03 | TBD | — |
-| UX-04 | TBD | — |
-| AGENT-01 | TBD | — |
-| AGENT-02 | TBD | — |
-| AGENT-03 | TBD | — |
-| AGENT-04 | TBD | — |
-| OPS-01 | TBD | — |
-| OPS-02 | TBD | — |
-| OPS-03 | TBD | — |
-| OPS-04 | TBD | — |
+| SEC-01 | Phase 2: Security Foundations | — |
+| SEC-02 | Phase 2: Security Foundations | — |
+| SEC-03 | Phase 2: Security Foundations | — |
+| SEC-04 | Phase 2: Security Foundations | — |
+| AUTH-01 | Phase 4: Auth & Identity | — |
+| AUTH-02 | Phase 4: Auth & Identity | — |
+| AUTH-03 | Phase 4: Auth & Identity | — |
+| PAY-01 | Phase 5: Payment Hardening | — |
+| PAY-02 | Phase 5: Payment Hardening | — |
+| PAY-03 | Phase 5: Payment Hardening | — |
+| PAY-04 | Phase 5: Payment Hardening | — |
+| INFRA-01 | Phase 1: External Dependencies Unblocked | — |
+| INFRA-02 | Phase 3: Infrastructure & Secrets | — |
+| INFRA-03 | Phase 3: Infrastructure & Secrets | — |
+| INFRA-04 | Phase 3: Infrastructure & Secrets | — |
+| UX-01 | Phase 7: Resident & Contractor UX | — |
+| UX-02 | Phase 7: Resident & Contractor UX | — |
+| UX-03 | Phase 7: Resident & Contractor UX | — |
+| UX-04 | Phase 7: Resident & Contractor UX | — |
+| AGENT-01 | Phase 6: AI Agent Hardening | — |
+| AGENT-02 | Phase 6: AI Agent Hardening | — |
+| AGENT-03 | Phase 6: AI Agent Hardening | — |
+| AGENT-04 | Phase 6: AI Agent Hardening | — |
+| OPS-01 | Phase 1: External Dependencies Unblocked | — |
+| OPS-02 | Phase 7: Resident & Contractor UX | — |
+| OPS-03 | Phase 10: Staging Smoke Tests & Launch Gate | — |
+| OPS-04 | Phase 8: Building Manager & Admin Ops | — |
