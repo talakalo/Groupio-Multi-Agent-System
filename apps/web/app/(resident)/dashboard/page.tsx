@@ -21,6 +21,7 @@ import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 
 import { EmptyState } from '@/components/shared/EmptyState';
+import { apiClient, ApiError } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
 
@@ -200,25 +201,34 @@ export default function ResidentDashboardPage() {
 
   const accessToken = useAuthStore((s) => s.accessToken);
   const userName = useAuthStore((s) => s.user?.fullName) ?? '';
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-  const headers: Record<string, string> = {};
-  if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
 
-  // Fetch dashboard stats from building endpoint
+  // Fetch dashboard stats from building endpoint. A 404 is the expected
+  // shape for users who haven't joined a building yet — render the empty
+  // dashboard rather than surfacing it as an error.
   const statsQuery = useQuery<DashboardStats>({
     queryKey: ['resident', 'dashboard', 'stats'],
     queryFn: async () => {
-      const res = await fetch(`${apiBase}/api/v1/buildings/me`, { headers });
-      if (!res.ok) {
-        return { activeOffers: 0, neighborsJoined: 0, totalSavings: 0, buildingName: '-' };
+      try {
+        const data = (await apiClient.getMyBuilding()) as Record<string, unknown> & {
+          activeOffers?: unknown[];
+          residents?: unknown[];
+          totalSavings?: number;
+          total_savings?: number;
+          name?: string;
+          address?: string;
+        };
+        return {
+          activeOffers: Array.isArray(data.activeOffers) ? data.activeOffers.length : 0,
+          neighborsJoined: Array.isArray(data.residents) ? data.residents.length : 0,
+          totalSavings: data.totalSavings ?? data.total_savings ?? 0,
+          buildingName: data.name ?? data.address ?? '-',
+        };
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 404) {
+          return { activeOffers: 0, neighborsJoined: 0, totalSavings: 0, buildingName: '-' };
+        }
+        throw err;
       }
-      const data = await res.json();
-      return {
-        activeOffers: data.activeOffers?.length ?? 0,
-        neighborsJoined: data.residents?.length ?? 0,
-        totalSavings: data.totalSavings ?? data.total_savings ?? 0,
-        buildingName: data.name ?? data.address ?? '-',
-      };
     },
     enabled: !!accessToken,
   });
@@ -226,21 +236,26 @@ export default function ResidentDashboardPage() {
   // Fetch active offers
   const offersQuery = useQuery<{ items: Offer[] }>({
     queryKey: ['resident', 'offers', 'active'],
-    queryFn: async () => {
-      const res = await fetch(`${apiBase}/api/v1/offers?status=active&page_size=4`, { headers });
-      if (!res.ok) throw new Error('Failed to fetch offers');
-      return res.json();
-    },
+    queryFn: () =>
+      apiClient.getOffers({ status: 'active', page_size: 4 }) as Promise<{ items: Offer[] }>,
     enabled: !!accessToken,
   });
 
-  // Recent activity from the backend
+  // Recent activity from the backend. Empty for fresh accounts is fine —
+  // surface 404 / empty as the empty state, not an error.
   const activityQuery = useQuery<{ activities: RecentActivity[] }>({
     queryKey: ['resident', 'dashboard', 'activity'],
     queryFn: async () => {
-      const res = await fetch(`${apiBase}/api/v1/activity/recent`, { headers });
-      if (!res.ok) return { activities: [] };
-      return res.json();
+      try {
+        const data = (await apiClient.getRecentActivity()) as unknown as {
+          activities?: RecentActivity[];
+          items?: RecentActivity[];
+        };
+        return { activities: data.activities ?? data.items ?? [] };
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 404) return { activities: [] };
+        throw err;
+      }
     },
     enabled: !!accessToken,
   });

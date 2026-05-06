@@ -1,0 +1,40 @@
+# Flow: Resident — browse contractors + open a detail page (M6)
+# Uses the home tab quick-action "find_contractor" which now routes
+# directly to /contractors. Then taps the first row to land on
+# /contractor-detail and verifies the reviews section heading rendered.
+#
+# Run: maestro test .maestro/flows/04-resident-extras/contractors-browse.yaml
+
+appId: ${APP_ID}
+tags:
+  - resident
+  - contractors
+---
+
+- runFlow: ../../subflows/launch-fresh.yaml
+- runFlow: ../../subflows/login-resident.yaml
+
+# Navigate via the existing home-tab quick action.
+- assertVisible:
+    text: "Find Contractor|home.findContractor"
+    timeout: 8000
+- tapOn:
+    text: "Find Contractor|home.findContractor"
+
+# Search bar should be visible on the new /contractors screen.
+- assertVisible:
+    id: "contractors-search"
+    timeout: 8000
+
+# Tap the first contractor row (any row whose testID starts with
+# "contractor-row-"). If the directory is empty the flow ends gracefully.
+- runFlow:
+    when:
+      visible:
+        id: ".*contractor-row-.*"
+    commands:
+      - tapOn:
+          id: ".*contractor-row-.*"
+      - assertVisible:
+          text: "Reviews|contractor.reviewsHeading"
+          timeout: 8000

@@ -18,6 +18,8 @@ import {
 } from "react-native-paper";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
+import { StripeProvider } from "@stripe/stripe-react-native";
+
 import { loadAuthToken, clearAuthSession } from "../lib/api";
 import {
   registerForPushNotifications,
@@ -245,6 +247,12 @@ export default function RootLayout() {
   return (
     <AuthContext.Provider value={authContextValue}>
       <QueryClientProvider client={queryClient}>
+        <StripeProvider
+          publishableKey={
+            (process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY as string) ?? ""
+          }
+          urlScheme="groupio"
+        >
         <PaperProvider theme={paperTheme}>
           <SafeAreaProvider>
             <ThemeProvider value={navigationTheme}>
@@ -320,6 +328,7 @@ export default function RootLayout() {
           </ThemeProvider>
         </SafeAreaProvider>
       </PaperProvider>
+        </StripeProvider>
     </QueryClientProvider>
     </AuthContext.Provider>
   );

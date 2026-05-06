@@ -20,11 +20,14 @@ report() {
 
 echo "--- Code review validation ---"
 
-# 1. Resident building page must call backend (not relative /api/v1/resident/building)
-if grep -q "NEXT_PUBLIC_API_URL\|apiBase\|api/v1/buildings/me" "$REPO_ROOT/apps/web/app/(resident)/building/page.tsx" 2>/dev/null; then
-  report "ok" "Resident building page uses backend URL and /buildings/me"
+# 1. Resident building page goes through the typed apiClient (or, on legacy
+#    branches, direct fetch with the backend URL). The intent is "uses the
+#    real backend, not a placeholder" — apiClient.getMyBuilding satisfies it.
+if grep -qE "apiClient\.getMyBuilding|api/v1/buildings/me|NEXT_PUBLIC_API_URL|apiBase" \
+     "$REPO_ROOT/apps/web/app/(resident)/building/page.tsx" 2>/dev/null; then
+  report "ok" "Resident building page calls the backend (apiClient.getMyBuilding or /buildings/me)"
 else
-  report "fail" "Resident building page should use NEXT_PUBLIC_API_URL and /api/v1/buildings/me"
+  report "fail" "Resident building page should call apiClient.getMyBuilding (or /api/v1/buildings/me)"
 fi
 
 # 2. Backend logout must clear refresh_token cookie with path=/
@@ -80,22 +83,25 @@ else
   report "fail" "apps/web/lib/auth/setAuthCookie.ts should exist for login/signup"
 fi
 
-# 9. Resident offers page uses backend URL (not relative /api/v1/offers)
-if grep -q "apiBase\|NEXT_PUBLIC_API_URL" "$REPO_ROOT/apps/web/app/(resident)/offers/page.tsx" 2>/dev/null; then
-  report "ok" "Resident offers page uses backend URL"
+# 9. Resident offers page calls backend (via apiClient or direct fetch)
+if grep -qE "apiClient\.getOffers|apiBase|NEXT_PUBLIC_API_URL" \
+     "$REPO_ROOT/apps/web/app/(resident)/offers/page.tsx" 2>/dev/null; then
+  report "ok" "Resident offers page calls the backend"
 else
-  report "fail" "Resident offers page should use NEXT_PUBLIC_API_URL"
+  report "fail" "Resident offers page should call apiClient.getOffers"
 fi
 
 # 10. Resident offers page reads items (not offers) from response
-if grep -q 'data?.items' "$REPO_ROOT/apps/web/app/(resident)/offers/page.tsx" 2>/dev/null; then
+if grep -q 'data?.items\|data\.items\|items: Offer\[\]' \
+     "$REPO_ROOT/apps/web/app/(resident)/offers/page.tsx" 2>/dev/null; then
   report "ok" "Resident offers page reads items from response"
 else
   report "fail" "Resident offers page should read .items (not .offers) from backend response"
 fi
 
 # 11. Resident contractors page reads items (not contractors) from response
-if grep -q 'data?.items' "$REPO_ROOT/apps/web/app/(resident)/contractors/page.tsx" 2>/dev/null; then
+if grep -q 'data?.items\|data\.items\|items: Contractor\[\]' \
+     "$REPO_ROOT/apps/web/app/(resident)/contractors/page.tsx" 2>/dev/null; then
   report "ok" "Resident contractors page reads items from response"
 else
   report "fail" "Resident contractors page should read .items (not .contractors) from backend response"
@@ -108,32 +114,36 @@ else
   report "fail" "Admin escalation page should use API_BASE (not API_URL with double /api/v1)"
 fi
 
-# 13. Contractor dashboard uses real backend URLs
-if grep -q "NEXT_PUBLIC_API_URL\|apiBase\|api/v1" "$REPO_ROOT/apps/web/app/contractor/dashboard/page.tsx" 2>/dev/null; then
-  report "ok" "Contractor dashboard uses backend URL"
+# 13. Contractor dashboard calls backend (via apiClient or direct fetch)
+if grep -qE "apiClient\.|NEXT_PUBLIC_API_URL|apiBase|api/v1" \
+     "$REPO_ROOT/apps/web/app/contractor/dashboard/page.tsx" 2>/dev/null; then
+  report "ok" "Contractor dashboard calls the backend"
 else
-  report "fail" "Contractor dashboard should use backend API URL"
+  report "fail" "Contractor dashboard should call apiClient (or use the backend API URL)"
 fi
 
-# 14. Contractor profile uses real backend URLs
-if grep -q "NEXT_PUBLIC_API_URL\|apiBase\|api/v1" "$REPO_ROOT/apps/web/app/contractor/profile/page.tsx" 2>/dev/null; then
-  report "ok" "Contractor profile uses backend URL"
+# 14. Contractor profile calls backend (via apiClient or direct fetch)
+if grep -qE "apiClient\.|NEXT_PUBLIC_API_URL|apiBase|api/v1" \
+     "$REPO_ROOT/apps/web/app/contractor/profile/page.tsx" 2>/dev/null; then
+  report "ok" "Contractor profile calls the backend"
 else
-  report "fail" "Contractor profile should use backend API URL"
+  report "fail" "Contractor profile should call apiClient (or use the backend API URL)"
 fi
 
-# 15. Resident profile uses /api/v1/auth/me (not /api/v1/resident/profile)
-if grep -q "api/v1/auth/me" "$REPO_ROOT/apps/web/app/(resident)/profile/page.tsx" 2>/dev/null; then
-  report "ok" "Resident profile uses /api/v1/auth/me"
+# 15. Resident profile uses /api/v1/auth/me (apiClient.getMe wraps this)
+if grep -qE "apiClient\.getMe|api/v1/auth/me" \
+     "$REPO_ROOT/apps/web/app/(resident)/profile/page.tsx" 2>/dev/null; then
+  report "ok" "Resident profile reads /auth/me"
 else
-  report "fail" "Resident profile should use /api/v1/auth/me (not /api/v1/resident/profile)"
+  report "fail" "Resident profile should call apiClient.getMe (or /api/v1/auth/me)"
 fi
 
-# 16. Resident dashboard uses /buildings/me (not /resident/dashboard/stats)
-if grep -q "buildings/me" "$REPO_ROOT/apps/web/app/(resident)/dashboard/page.tsx" 2>/dev/null; then
-  report "ok" "Resident dashboard uses /buildings/me for stats"
+# 16. Resident dashboard reads /buildings/me (apiClient.getMyBuilding wraps it)
+if grep -qE "apiClient\.getMyBuilding|buildings/me" \
+     "$REPO_ROOT/apps/web/app/(resident)/dashboard/page.tsx" 2>/dev/null; then
+  report "ok" "Resident dashboard reads /buildings/me"
 else
-  report "fail" "Resident dashboard should use /api/v1/buildings/me"
+  report "fail" "Resident dashboard should call apiClient.getMyBuilding (or /api/v1/buildings/me)"
 fi
 
 # 17. Admin dashboard uses useAdminAnalyticsDashboard for real data

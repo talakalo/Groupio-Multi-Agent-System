@@ -11,6 +11,7 @@ from src.agents.analytics import AnalyticsAgent
 from src.agents.architecture import ArchitectureAgent
 from src.agents.influencer import InfluencerAgent
 from src.agents.matching import MatchingAgent
+from src.agents.notification import NotificationAgent
 from src.agents.outreach import OutreachAgent
 from src.agents.pricing import PricingAgent
 from src.agents.router import RouterAgent
@@ -78,6 +79,7 @@ INTENT_AGENT_MAP = {
     "technical_support": "support",
     "architecture_analysis": "architecture",
     "payment_query": "payment",
+    "notification_query": "notification",
     # Graph-powered GMV features
     "viral_invite_query": "outreach",
     "building_social_proof": "pricing",
@@ -105,6 +107,7 @@ class GroupioOrchestrator:
             "analytics": AnalyticsAgent(),
             "architecture": ArchitectureAgent(),
             "influencer": InfluencerAgent(),
+            "notification": NotificationAgent(),
         }
         # Payment agent imported lazily to avoid circular imports during Phase 3
         try:
@@ -166,6 +169,7 @@ class GroupioOrchestrator:
         workflow.add_node("analytics", self._run_agent_safe("analytics"))
         workflow.add_node("architecture", self._run_agent_safe("architecture"))
         workflow.add_node("influencer", self._run_agent_safe("influencer"))
+        workflow.add_node("notification", self._run_agent_safe("notification"))
         if "payment" in self.agents:
             workflow.add_node("payment", self._run_agent_safe("payment"))
         workflow.add_node("human_handoff", self._handoff_to_human)
@@ -184,6 +188,7 @@ class GroupioOrchestrator:
             "analytics": "analytics",
             "architecture": "architecture",
             "influencer": "influencer",
+            "notification": "notification",
             "human": "human_handoff",
             "end": "final_response",
         }
@@ -205,6 +210,7 @@ class GroupioOrchestrator:
             "analytics",
             "architecture",
             "influencer",
+            "notification",
         ]
         if "payment" in self.agents:
             specialist_agents.append("payment")

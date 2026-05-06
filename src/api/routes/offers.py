@@ -365,7 +365,10 @@ async def join_offer(
     if current_count >= offer.get("max_participants", 50):
         raise HTTPException(status_code=400, detail="Offer is at maximum capacity")
 
-    await db.join_offer(current_user.id, offer_id, request.unit_count)
+    try:
+        await db.join_offer(current_user.id, offer_id, request.unit_count)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     # Record viral invite conversion in the graph (fire-and-forget)
     if request.invite_token:

@@ -93,7 +93,7 @@ def upgrade() -> None:
               SELECT 1 FROM users u
               WHERE u.id = auth.uid()::text
                 AND u.contractor_id IS NOT NULL
-                AND u.contractor_id = offers.contractor_id
+                AND u.contractor_id = offers.matched_contractor_id
             )
             OR EXISTS (
               SELECT 1 FROM users u

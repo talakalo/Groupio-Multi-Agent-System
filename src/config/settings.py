@@ -299,9 +299,20 @@ class Settings(BaseSettings):
                 "invalidating all active user sessions. "
                 'Generate a persistent key with: python -c "import secrets; print(secrets.token_urlsafe(64))"'
             )
-        if is_prod and len(self.JWT_SECRET_KEY) < 32:
+        # Enforce minimum length in all non-dev environments (staging and prod).
+        # 32 chars = 256-bit HMAC key minimum; 64 chars (512-bit) recommended.
+        _min_jwt_len = 32
+        if self.ENVIRONMENT not in ("development", "test") and self.JWT_SECRET_KEY not in _INSECURE_JWT_DEFAULTS:
+            if len(self.JWT_SECRET_KEY) < _min_jwt_len:
+                raise ValueError(
+                    f"JWT_SECRET_KEY must be at least {_min_jwt_len} characters in "
+                    f"{self.ENVIRONMENT}. Current length: {len(self.JWT_SECRET_KEY)}. "
+                    'Generate a secure key with: python -c "import secrets; print(secrets.token_urlsafe(64))"'
+                )
+        if is_prod and len(self.JWT_SECRET_KEY) < _min_jwt_len:
             raise ValueError(
-                f"JWT_SECRET_KEY must be at least 32 characters in {self.ENVIRONMENT} for adequate security."
+                f"JWT_SECRET_KEY must be at least {_min_jwt_len} characters"
+                f" in {self.ENVIRONMENT} for adequate security."
             )
         if self.JWT_SECRET_KEY in _INSECURE_JWT_DEFAULTS:
             if self.ENVIRONMENT in ("development", "test"):
@@ -361,6 +372,22 @@ class Settings(BaseSettings):
                         f"and ENVIRONMENT={self.ENVIRONMENT!r} "
                         "(required for payment + subscription webhook verification)."
                     )
+
+        # --- Data enrichment (staging/production): warn when disabled ---
+        # When ENABLE_DATAGOV_IL is off the enrichment service returns
+        # stub responses (source="stub", confidence=0.0). The frontend
+        # already hides stubs on the onboarding address-suggestion flow,
+        # but any downstream consumer treating a stub as a valid result
+        # would persist useless data. Fail the boot so ops fixes the flag.
+        if is_prod:
+            enable_datagov = str(self.ENABLE_DATAGOV_IL or "").lower() in ("1", "true", "yes")
+            if not enable_datagov:
+                raise ValueError(
+                    f"ENABLE_DATAGOV_IL is disabled in {self.ENVIRONMENT}. "
+                    "Address / municipality enrichment would return stub "
+                    "responses (confidence=0.0). Set ENABLE_DATAGOV_IL=1 or "
+                    "remove enrichment UI surfaces before deploying."
+                )
 
         # --- Required secrets in production ---
         if is_prod:

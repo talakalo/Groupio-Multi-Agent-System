@@ -119,8 +119,9 @@ async def contractor_request_review(
 @router.post("/", response_model=EscalationResponse)
 async def create_escalation(
     request: EscalationCreate,
+    current_user: UserInDB = Depends(get_current_user),
 ) -> EscalationResponse:
-    """Create a new escalation (typically called by agents)."""
+    """Create a new escalation (typically called by agents or admin users)."""
     db = get_postgres_client()
 
     escalation_id = str(uuid4())

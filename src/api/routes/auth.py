@@ -278,7 +278,7 @@ async def login(
         value=refresh_token,
         httponly=True,
         secure=settings.ENVIRONMENT != "development",
-        samesite="lax",
+        samesite="strict" if settings.ENVIRONMENT == "production" else "lax",
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
         path="/",
     )
@@ -288,7 +288,7 @@ async def login(
         value=access_token,
         httponly=True,
         secure=settings.ENVIRONMENT != "development",
-        samesite="lax",
+        samesite="strict" if settings.ENVIRONMENT == "production" else "lax",
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         path="/",
     )
@@ -381,7 +381,7 @@ async def login_json(
         value=refresh_token,
         httponly=True,
         secure=settings.ENVIRONMENT != "development",
-        samesite="lax",
+        samesite="strict" if settings.ENVIRONMENT == "production" else "lax",
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
         path="/",
     )
@@ -390,7 +390,7 @@ async def login_json(
         value=access_token,
         httponly=True,
         secure=settings.ENVIRONMENT != "development",
-        samesite="lax",
+        samesite="strict" if settings.ENVIRONMENT == "production" else "lax",
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         path="/",
     )
@@ -456,7 +456,7 @@ async def refresh_token(
         value=new_refresh_token,
         httponly=True,
         secure=settings.ENVIRONMENT != "development",
-        samesite="lax",
+        samesite="strict" if settings.ENVIRONMENT == "production" else "lax",
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
         path="/",
     )
@@ -465,7 +465,7 @@ async def refresh_token(
         value=new_access_token,
         httponly=True,
         secure=settings.ENVIRONMENT != "development",
-        samesite="lax",
+        samesite="strict" if settings.ENVIRONMENT == "production" else "lax",
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         path="/",
     )

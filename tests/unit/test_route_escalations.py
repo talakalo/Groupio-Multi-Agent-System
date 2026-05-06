@@ -367,8 +367,10 @@ class TestCreateEscalation:
         db.create_escalation = AsyncMock(return_value=esc)
 
         from src.api.main import app
+        from src.api.middleware.auth import get_current_user
 
         app.dependency_overrides.clear()
+        app.dependency_overrides[get_current_user] = lambda: _make_user()
         try:
             with patch("src.api.routes.escalations.get_postgres_client", return_value=db):
                 client = TestClient(app, raise_server_exceptions=False)

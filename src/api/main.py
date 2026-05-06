@@ -44,6 +44,22 @@ async def lifespan(app: FastAPI):
     except Exception:
         logger.warning("Could not verify vector DB collections")
 
+    # Fail-closed probe for the payment provider. Lazy init means a broken
+    # PAYMENT_PROVIDER only surfaces on the first charge; call the factory
+    # here so misconfigured deploys refuse to serve traffic. In staging /
+    # production the process exits; in development we log and continue so
+    # local dev without a provider still works.
+    try:
+        from src.services.payment import get_payment_provider
+
+        get_payment_provider()
+        logger.info("Payment provider initialised")
+    except Exception as exc:
+        if get_settings().ENVIRONMENT in ("production", "staging"):
+            logger.error("Payment provider unavailable at startup: %s", exc)
+            raise
+        logger.warning("Payment provider unavailable (dev): %s", exc)
+
     yield
 
     # Shutdown

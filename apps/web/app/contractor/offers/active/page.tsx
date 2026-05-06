@@ -153,21 +153,13 @@ export default function ContractorActiveOffersPage() {
 
       setIsLoading(true);
       try {
-        const params = new URLSearchParams();
-        if (statusFilter !== 'all') params.set('status', statusFilter);
-        if (categoryFilter !== 'all') params.set('category', categoryFilter);
-        params.set('sort', sortBy);
-
-        const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-        const headers: Record<string, string> = {
-          Authorization: `Bearer ${token}`,
-        };
-
-        const res = await fetch(`${apiBase}/api/v1/offers?${params}`, { headers });
-        if (res.ok) {
-          const data = await res.json();
-          setOffers(data.items ?? data.offers ?? data);
-        }
+        const data = (await apiClient.getOffers({
+          status: statusFilter !== 'all' ? statusFilter : undefined,
+          category: categoryFilter !== 'all' ? categoryFilter : undefined,
+          // sort is not part of the typed signature today; pass through.
+          ...({ sort: sortBy } as { sort?: string }),
+        })) as { items?: Offer[]; offers?: Offer[] };
+        setOffers(data.items ?? data.offers ?? []);
       } catch (error) {
         console.error('Failed to fetch offers:', error);
       } finally {

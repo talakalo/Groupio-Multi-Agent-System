@@ -23,7 +23,7 @@ import { useState, useMemo } from 'react';
 import { CategoryChips } from '@/components/shared/CategoryChips';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { useAuthStore } from '@/lib/stores/authStore';
+import { apiClient } from '@/lib/api/client';
 import { cn } from '@/lib/utils/cn';
 import { useUnwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
 
@@ -224,22 +224,13 @@ export default function OffersListPage(props: PageParamsProps) {
     priceMax: null,
   });
 
-  const accessToken = useAuthStore((s) => s.accessToken);
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-
   const offersQuery = useQuery<{ items: Offer[]; total: number }>({
     queryKey: ['resident', 'offers', filters.category, filters.status],
-    queryFn: async () => {
-      const params: Record<string, string> = {};
-      if (filters.category !== 'all') params.category = filters.category;
-      if (filters.status !== 'all') params.status = filters.status;
-      const searchParams = new URLSearchParams(params);
-      const headers: Record<string, string> = {};
-      if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
-      const res = await fetch(`${apiBase}/api/v1/offers?${searchParams.toString()}`, { headers });
-      if (!res.ok) throw new Error('Failed to fetch offers');
-      return res.json();
-    },
+    queryFn: () =>
+      apiClient.getOffers({
+        category: filters.category !== 'all' ? filters.category : undefined,
+        status: filters.status !== 'all' ? filters.status : undefined,
+      }) as Promise<{ items: Offer[]; total: number }>,
   });
 
   const filteredOffers = useMemo(() => {

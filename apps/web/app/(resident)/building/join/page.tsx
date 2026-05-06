@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 
+import { apiClient, ApiError } from '@/lib/api/client';
 import { cn } from '@/lib/utils/cn';
 import { useUnwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
 
@@ -27,22 +28,17 @@ export default function BuildingJoinPage(props: PageParamsProps) {
     setError(null);
 
     try {
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      const res = await fetch(`${apiBase}/api/v1/buildings/join`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ invite_code: code.trim() }),
-        credentials: 'include',
-      });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        throw new Error(data?.detail ?? 'שגיאה בהצטרפות לבניין');
-      }
-
+      await apiClient.joinBuilding(code.trim());
       setSuccess(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'שגיאה בהצטרפות לבניין');
+      if (err instanceof ApiError) {
+        const detail = (err.body as { detail?: string } | undefined)?.detail;
+        setError(detail ?? 'שגיאה בהצטרפות לבניין');
+      } else if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('שגיאה בהצטרפות לבניין');
+      }
     } finally {
       setLoading(false);
     }

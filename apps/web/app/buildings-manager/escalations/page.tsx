@@ -5,6 +5,7 @@ import { AlertCircle, CheckCircle2, Clock, ChevronDown } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 
+import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
 
@@ -51,34 +52,32 @@ export default function BuildingsManagerEscalationsPage() {
   const [statusFilter, setStatusFilter] = useState<EscalationStatus | 'all'>('open');
   const [priorityFilter, setPriorityFilter] = useState<EscalationPriority | 'all'>('all');
   const [resolvingId, setResolvingId] = useState<string | null>(null);
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-  const authHeaders: Record<string, string> = accessToken
-    ? { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' }
-    : { 'Content-Type': 'application/json' };
 
   const escalationsQuery = useQuery<{ items: Escalation[]; total: number }>({
     queryKey: ['buildings-manager', 'escalations', statusFilter, priorityFilter],
     queryFn: async () => {
-      const params = new URLSearchParams({ page_size: '50' });
-      if (statusFilter !== 'all') params.set('status', statusFilter);
-      if (priorityFilter !== 'all') params.set('priority', priorityFilter);
-      const res = await fetch(`${apiBase}/api/v1/escalations?${params}`, { headers: authHeaders });
-      if (!res.ok) return { items: [], total: 0 };
-      return res.json();
+      const data = await apiClient.listEscalations({
+        status: statusFilter !== 'all' ? statusFilter : undefined,
+        // priority is not part of the typed listEscalations signature today —
+        // pass through via cast until the contract grows.
+        ...({ priority: priorityFilter !== 'all' ? priorityFilter : undefined } as {
+          priority?: string;
+        }),
+        page_size: 50,
+      });
+      return {
+        items: (data.items ?? []) as unknown as Escalation[],
+        total: data.total ?? 0,
+      };
     },
     enabled: !!accessToken,
   });
 
   const resolveMutation = useMutation({
-    mutationFn: async (escalationId: string) => {
-      const res = await fetch(`${apiBase}/api/v1/escalations/${escalationId}/resolve`, {
-        method: 'POST',
-        headers: authHeaders,
-        body: JSON.stringify({ resolution_notes: 'Resolved by buildings manager' }),
-      });
-      if (!res.ok) throw new Error('Failed to resolve');
-      return res.json();
-    },
+    mutationFn: (escalationId: string) =>
+      apiClient.resolveEscalation(escalationId, {
+        resolution_notes: 'Resolved by buildings manager',
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['buildings-manager', 'escalations'] });
       setResolvingId(null);

@@ -327,6 +327,12 @@ async def initiate_payment(
     except PaymentProviderUnavailableError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
+    # Idempotency: return existing payment if this key was already processed
+    if request.idempotency_key:
+        existing = await db.get_payment_by_idempotency_key(current_user.id, request.idempotency_key)
+        if existing:
+            return PaymentResponse(**existing)
+
     # Verify the offer exists and the user is associated with it
     offer = await db.get_offer(request.offer_id)
     if not offer:
@@ -429,6 +435,7 @@ async def initiate_payment(
         "currency": "ILS",
         "status": "processing",
         "payment_method_id": request.payment_method_id,
+        "idempotency_key": request.idempotency_key,
         "created_at": datetime.now(UTC).isoformat(),
     }
 
@@ -614,12 +621,33 @@ async def stripe_webhook(request: Request) -> dict:
             invoice_status = "paid"
         elif new_status == "refunded":
             invoice_status = "refunded"
+    old_payment_status = payment.get("status", "unknown")
     await db.update_payment_and_invoice_for_webhook(
         payment["id"],
         invoice_id if invoice_status else None,
         new_status,
         invoice_status,
     )
+
+    # Audit log — payment rules mandate all status transitions are recorded.
+    try:
+        await db.create_audit_log(
+            {
+                "user_id": payment.get("user_id"),
+                "action": "payment_status_transition",
+                "resource_type": "payment",
+                "resource_id": payment["id"],
+                "details": {
+                    "old_status": old_payment_status,
+                    "new_status": new_status,
+                    "trigger": "stripe_webhook",
+                    "stripe_event_type": event_type,
+                    "offer_id": payment.get("offer_id"),
+                },
+            }
+        )
+    except Exception:
+        logger.exception("Failed to write payment audit log (non-fatal)")
 
     try:
         from src.messaging.envelope import EventEnvelope
@@ -938,6 +966,55 @@ async def request_refund(
         "amount": refund_amount,
         "reason": body.reason,
     }
+
+
+@router.get("/invoices/my", response_model=list[InvoiceResponse])
+async def get_my_invoices(
+    current_user: UserInDB = Depends(get_current_user),
+) -> list[InvoiceResponse]:
+    """List all invoices for the current user (via payment_splits)."""
+    db = get_postgres_client()
+    invoices = await db.list_invoices_for_user(current_user.id)
+    result = []
+    for inv in invoices:
+        subtotal = inv.get("subtotal", 0) or 0
+        tax_amount = inv.get("tax_amount", inv.get("tax", round(subtotal * VAT_RATE, 2))) or 0
+        result.append(
+            InvoiceResponse(
+                id=inv.get("id", ""),
+                offer_id=inv.get("offer_id", ""),
+                subtotal=float(subtotal),
+                tax_rate=float(inv.get("tax_rate", VAT_RATE) or VAT_RATE),
+                tax_amount=float(tax_amount),
+                amount=float(inv.get("total", inv.get("amount", subtotal + tax_amount)) or 0),
+                currency=inv.get("currency", "ILS"),
+                status=inv.get("status", "pending"),
+                payment_type=inv.get("payment_type", "direct"),
+                issued_at=_iso_utc(inv.get("created_at")) or "",
+                due_date=_iso_utc(inv.get("due_date")),
+                items=inv.get("items") or [],
+            )
+        )
+    return result
+
+
+@router.get("/methods")
+async def get_payment_methods(
+    current_user: UserInDB = Depends(get_current_user),
+) -> dict:
+    """Return available payment methods for the current environment."""
+    settings = get_settings()
+    provider = settings.PAYMENT_PROVIDER.lower()
+    methods = []
+    if provider in ("stripe", "mock"):
+        methods.append({"type": "card", "provider": provider, "currencies": ["ILS"]})
+    if provider == "bit":
+        methods.append({"type": "bit", "provider": "bit", "currencies": ["ILS"]})
+    if provider == "paybox":
+        methods.append({"type": "paybox", "provider": "paybox", "currencies": ["ILS"]})
+    if not methods:
+        methods.append({"type": "card", "provider": "stripe", "currencies": ["ILS"]})
+    return {"methods": methods, "default": methods[0]["type"] if methods else None}
 
 
 @router.get("/invoices/{invoice_id}", response_model=InvoiceResponse)
@@ -1426,10 +1503,17 @@ async def release_escrow(
         raise HTTPException(status_code=404, detail="No invoice found for this offer")
 
     current_status = invoice.get("status")
-    if current_status not in ("paid", "pending"):
+    # Escrow lifecycle: collecting → held (== "paid") → released.
+    # Only allow release from "paid" (all participants have paid, funds are held).
+    # "pending" means collection is still in progress — releasing from pending skips
+    # the collection-verification step and violates the payment rules.
+    if current_status != "paid":
         raise HTTPException(
             status_code=400,
-            detail=f"Cannot release escrow: invoice status is '{current_status}'",
+            detail=(
+                f"Cannot release escrow: invoice status is '{current_status}'. "
+                "Escrow can only be released when status is 'paid' (all funds collected)."
+            ),
         )
 
     # Mark as released
@@ -1451,6 +1535,26 @@ async def release_escrow(
         invoice["id"],
         invoice.get("total"),
     )
+
+    # Audit log — escrow release is a payment lifecycle transition.
+    try:
+        await db.create_audit_log(
+            {
+                "user_id": admin_user.id if hasattr(admin_user, "id") else None,
+                "action": "escrow_released",
+                "resource_type": "invoice",
+                "resource_id": invoice["id"],
+                "details": {
+                    "old_status": current_status,
+                    "new_status": "released",
+                    "offer_id": offer_id,
+                    "amount": invoice.get("total", 0),
+                    "released_by": admin_user.email,
+                },
+            }
+        )
+    except Exception:
+        logger.exception("Failed to write escrow release audit log (non-fatal)")
 
     return {
         "status": "released",

@@ -161,23 +161,35 @@ class BaseAgent(ABC):
     async def run(self, state: AgentState) -> AgentState:
         """Execute agent logic with timing and audit persistence.
 
-        Wraps _run_impl with timing and calls _persist_audit on completion.
+        Wraps _run_impl with timing and calls _persist_audit on completion,
+        including when _run_impl raises so exceptions are always audited.
         """
         start = time.perf_counter()
-        result = await self._run_impl(state)
+        exc_caught: BaseException | None = None
+        result: AgentState = state
+        try:
+            result = await self._run_impl(state)
+        except Exception as exc:
+            exc_caught = exc
+            self._metrics["errors"] += 1
+
         latency_ms = int((time.perf_counter() - start) * 1000)
-
         input_summary = self._get_last_user_message(state)
-        actions = result.get("actions_taken", [])
-        last_action = actions[-1] if actions else {}
-        action = last_action.get("action", "run")
-        resp = last_action.get("response") or {}
-        msg = resp.get("message", "") if isinstance(resp.get("message"), str) else ""
-        output_summary = msg or last_action.get("summary_for_next_agent", "") or ""
-        if not output_summary and result.get("intent"):
-            output_summary = f"intent={result.get('intent')}"
-        tokens_used = self._metrics.get("tokens", 0)
 
+        if exc_caught is not None:
+            action = "error"
+            output_summary = f"ERROR: {type(exc_caught).__name__}: {exc_caught}"
+        else:
+            actions = result.get("actions_taken", [])
+            last_action = actions[-1] if actions else {}
+            action = last_action.get("action", "run")
+            resp = last_action.get("response") or {}
+            msg = resp.get("message", "") if isinstance(resp.get("message"), str) else ""
+            output_summary = msg or last_action.get("summary_for_next_agent", "") or ""
+            if not output_summary and result.get("intent"):
+                output_summary = f"intent={result.get('intent')}"
+
+        tokens_used = self._metrics.get("tokens", 0)
         self._persist_audit(
             state=result,
             action=action,
@@ -186,6 +198,9 @@ class BaseAgent(ABC):
             latency_ms=latency_ms,
             tokens_used=tokens_used,
         )
+
+        if exc_caught is not None:
+            raise exc_caught
         return result
 
     @abstractmethod

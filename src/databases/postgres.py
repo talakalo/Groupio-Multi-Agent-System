@@ -4,6 +4,7 @@ import ipaddress
 import json
 import logging
 import re
+import secrets
 import socket
 from collections.abc import AsyncIterator as _AsyncIterator
 from contextlib import asynccontextmanager as _acm
@@ -20,6 +21,18 @@ from src.models.user import UserInDB
 
 # Regex for safe SQL column names (letters, digits, underscores)
 _SAFE_COLUMN_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
+
+# Building invite codes — uppercase alphanumerics, no ambiguous chars
+# (no 0/O, no 1/I/L). 8 chars from a 30-char alphabet ≈ 6.5e11 combinations,
+# which gives plenty of room for collisions to be vanishingly unlikely while
+# the code stays readable in WhatsApp / SMS shares.
+_INVITE_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+
+
+def generate_invite_code(length: int = 8) -> str:
+    """Generate a building invite code (uppercase, unambiguous characters)."""
+    return "".join(secrets.choice(_INVITE_CODE_ALPHABET) for _ in range(length))
+
 
 # Explicit user columns — excludes hashed_password so password hashes are
 # never silently pulled into memory on paths that don't need them.
@@ -438,6 +451,41 @@ class PostgresClient:
             async with conn.transaction():
                 yield conn
 
+    @_acm
+    async def tenant_scope(self, user_id: str) -> "_AsyncIterator[Any]":
+        """Run a block with the per-request app.current_user_id session
+        variable installed.
+
+        The RLS policies introduced in migration 037 read this variable via
+        ``current_setting('app.current_user_id', true)`` to decide whether
+        a given row belongs to the caller. This helper sets it on a dedicated
+        connection inside a transaction so it is automatically reset when the
+        block exits (``set_config(..., is_local=true)`` is transaction-scoped).
+
+        Usage::
+
+            async with db.tenant_scope(current_user.id) as conn:
+                rows = await conn.fetch("SELECT * FROM offers WHERE ...")
+
+        For the Supabase client path the helper yields ``None``; the
+        Supabase RLS chain (migrations 032 / 033 / 034) relies on ``auth.uid()``
+        from the JWT instead of this session variable, so there is nothing to
+        install.
+        """
+        if self._use_supabase_client():
+            yield None
+            return
+
+        pool = await self._get_client()
+        async with pool.acquire() as conn:
+            async with conn.transaction():
+                # is_local=true (third arg) = setting lives only for this tx
+                await conn.execute(
+                    "SELECT set_config('app.current_user_id', $1, true)",
+                    str(user_id),
+                )
+                yield conn
+
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=10),
@@ -691,7 +739,18 @@ class PostgresClient:
         return [str(r["id"]) for r in (rows or []) if r.get("id")]
 
     async def create_building(self, building_data: dict[str, Any]) -> dict[str, Any]:
-        """Create a new building."""
+        """Create a new building.
+
+        Allocates a fresh invite_code if the caller hasn't supplied one. The
+        invite_code column is populated explicitly here (rather than relying
+        on a DB trigger) so both the asyncpg and Supabase paths set it the
+        same way.
+        """
+        # Auto-generate a stored invite code unless the caller pre-set one
+        # (tests and migrations sometimes provide a deterministic value).
+        if not building_data.get("invite_code"):
+            building_data["invite_code"] = generate_invite_code()
+
         if self._use_supabase_client():
             client = await self._get_client()
             result = await client.table("buildings").insert(building_data).execute()
@@ -700,11 +759,12 @@ class PostgresClient:
             "id, name, address, city, region, total_units, floors, year_built, admin_user_id, "
             "resident_count, active_offers, completed_offers, total_savings, whatsapp_group_id, "
             "municipality_code, municipality_name, address_normalized, enrichment_confidence, "
-            "enrichment_source, enriched_at"
+            "enrichment_source, enriched_at, invite_code"
         )
         await self._pg_execute(
             f"""INSERT INTO buildings ({cols})
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)""",
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
+               $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)""",
             building_data["id"],
             building_data["name"],
             building_data["address"],
@@ -725,8 +785,27 @@ class PostgresClient:
             building_data.get("enrichment_confidence"),
             building_data.get("enrichment_source"),
             building_data.get("enriched_at"),
+            building_data["invite_code"],
         )
         return await self.get_building(building_data["id"]) or building_data
+
+    async def regenerate_building_invite_code(self, building_id: str, new_code: str | None = None) -> str:
+        """Rotate the invite code for a building. Returns the new code.
+
+        Pass an explicit ``new_code`` to make the operation deterministic in
+        tests; otherwise a fresh one is generated.
+        """
+        code = new_code or generate_invite_code()
+        if self._use_supabase_client():
+            client = await self._get_client()
+            await client.table("buildings").update({"invite_code": code}).eq("id", building_id).execute()
+        else:
+            await self._pg_execute(
+                "UPDATE buildings SET invite_code = $1 WHERE id = $2",
+                code,
+                building_id,
+            )
+        return code
 
     async def list_buildings(
         self,
@@ -744,6 +823,8 @@ class PostgresClient:
                 q = q.eq("region", filters["region"])
             if filters.get("user_id"):
                 q = q.eq("admin_user_id", filters["user_id"])
+            if filters.get("search"):
+                q = q.ilike("address", f"%{filters['search']}%")
             q = q.order("created_at", desc=True).range((page - 1) * page_size, page * page_size - 1)
             result = await q.execute()
             total = result.count if hasattr(result, "count") and result.count is not None else len(result.data or [])
@@ -756,6 +837,9 @@ class PostgresClient:
         if filters.get("region"):
             args.append(filters["region"])
             where_parts.append("region = $%d" % len(args))
+        if filters.get("search"):
+            args.append(f"%{filters['search']}%")
+            where_parts.append("(address ILIKE $%d OR city ILIKE $%d)" % (len(args), len(args)))
         if filters.get("user_id"):
             args.append(filters["user_id"])
             args.append(filters["user_id"])
@@ -1218,13 +1302,16 @@ class PostgresClient:
             pool = await self._get_client()
             async with pool.acquire() as conn:
                 async with conn.transaction():
-                    await conn.execute(
-                        "INSERT INTO offer_participants (id, offer_id, user_id, unit_count) VALUES ($1, $2, $3, $4)",
+                    insert_result = await conn.execute(
+                        "INSERT INTO offer_participants (id, offer_id, user_id, unit_count) "
+                        "VALUES ($1, $2, $3, $4) ON CONFLICT (user_id, offer_id) DO NOTHING",
                         pid,
                         offer_id,
                         user_id,
                         unit_count,
                     )
+                    if insert_result == "INSERT 0 0":
+                        raise ValueError("Already joined this offer")
                     result = await conn.execute(
                         "UPDATE offers SET current_participants = current_participants + $1 "
                         "WHERE id = $2 AND status IN ('pending', 'matching') "
@@ -3337,6 +3424,7 @@ class PostgresClient:
                     "transaction_id",
                     "payment_method",
                     "payment_method_id",
+                    "idempotency_key",
                     "created_at",
                 }
             }
@@ -3345,8 +3433,8 @@ class PostgresClient:
             return result.data[0] if result.data else data
         sql_pay = """INSERT INTO payments
                (id, invoice_id, user_id, offer_id, amount, currency, status,
-                transaction_id, payment_method, provider_data, created_at)
-               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)"""
+                transaction_id, payment_method, provider_data, idempotency_key, created_at)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)"""
         pay_args = (
             data["id"],
             data.get("invoice_id"),
@@ -3358,6 +3446,7 @@ class PostgresClient:
             data.get("transaction_id"),
             data.get("payment_method"),
             json.dumps(merged_provider_data),
+            data.get("idempotency_key"),
             data.get("created_at"),
         )
         if conn is not None:
@@ -3373,6 +3462,25 @@ class PostgresClient:
             result = await client.table("payments").select("*").eq("id", payment_id).limit(1).execute()
             return result.data[0] if result.data else None
         return await self._pg_fetch_one("SELECT * FROM payments WHERE id = $1", payment_id)
+
+    async def get_payment_by_idempotency_key(self, user_id: str, idempotency_key: str) -> dict[str, Any] | None:
+        """Return an existing payment matching (user_id, idempotency_key), or None."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            result = (
+                await client.table("payments")
+                .select("*")
+                .eq("user_id", user_id)
+                .eq("idempotency_key", idempotency_key)
+                .limit(1)
+                .execute()
+            )
+            return result.data[0] if result.data else None
+        return await self._pg_fetch_one(
+            "SELECT * FROM payments WHERE user_id = $1 AND idempotency_key = $2",
+            user_id,
+            idempotency_key,
+        )
 
     async def update_payment(self, payment_id: str, update_data: dict[str, Any]) -> dict[str, Any]:
         """Update a payment record."""
