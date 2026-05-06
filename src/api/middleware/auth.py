@@ -286,6 +286,18 @@ async def get_current_user_optional(
     payload = verify_access_token(token)
     if not payload:
         return None
+
+    # Optional auth must still honor denylisted/revoked tokens.
+    if payload.jti:
+        try:
+            from src.databases.redis_client import get_redis_client
+
+            redis = get_redis_client()
+            if await redis.is_token_denylisted(payload.jti):
+                return None
+        except Exception as exc:
+            logger.warning("Redis unavailable for optional-auth denylist check: %s", exc)
+
     from src.databases.postgres import get_postgres_client
 
     db = get_postgres_client()
