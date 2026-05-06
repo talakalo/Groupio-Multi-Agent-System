@@ -40,11 +40,11 @@ export default function ContractorDashboardPage() {
         if (contractorId) {
           const [statsResult, offersResult] = await Promise.allSettled([
             apiClient.getContractorStats(contractorId),
-            apiClient.getOffers({ status: 'active' }),
+            apiClient.getOffers(undefined, { status: 'active' }),
           ]);
 
           if (statsResult.status === 'fulfilled') {
-            setStats(statsResult.value as ContractorStats);
+            setStats(statsResult.value);
           }
           if (offersResult.status === 'fulfilled') {
             const data = offersResult.value as { items?: Offer[]; offers?: Offer[] };

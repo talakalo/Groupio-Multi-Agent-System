@@ -1,6 +1,6 @@
 'use client';
 
-import type { Offer, ServiceCategory } from '@groupio/types';
+import type { Building, Offer, ServiceCategory } from '@groupio/types';
 import { formatPrice } from '@groupio/utils';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -209,7 +209,8 @@ export default function ResidentDashboardPage() {
     queryKey: ['resident', 'dashboard', 'stats'],
     queryFn: async () => {
       try {
-        const data = (await apiClient.getMyBuilding()) as Record<string, unknown> & {
+        const base = await apiClient.getMyBuilding();
+        const data = base as unknown as Building & {
           activeOffers?: unknown[];
           residents?: unknown[];
           totalSavings?: number;
@@ -236,8 +237,20 @@ export default function ResidentDashboardPage() {
   // Fetch active offers
   const offersQuery = useQuery<{ items: Offer[] }>({
     queryKey: ['resident', 'offers', 'active'],
-    queryFn: () =>
-      apiClient.getOffers({ status: 'active', page_size: 4 }) as Promise<{ items: Offer[] }>,
+    queryFn: async () => {
+      try {
+        const building = await apiClient.getMyBuilding();
+        return await apiClient.getOffers(building.id, {
+          status: 'active',
+          page_size: 4,
+        });
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 404) {
+          return { items: [], total: 0, page: 1, page_size: 4, has_more: false };
+        }
+        throw err;
+      }
+    },
     enabled: !!accessToken,
   });
 

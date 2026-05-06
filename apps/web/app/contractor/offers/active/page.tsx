@@ -153,13 +153,26 @@ export default function ContractorActiveOffersPage() {
 
       setIsLoading(true);
       try {
-        const data = (await apiClient.getOffers({
+        const data = await apiClient.getOffers(undefined, {
           status: statusFilter !== 'all' ? statusFilter : undefined,
           category: categoryFilter !== 'all' ? categoryFilter : undefined,
-          // sort is not part of the typed signature today; pass through.
-          ...({ sort: sortBy } as { sort?: string }),
-        })) as { items?: Offer[]; offers?: Offer[] };
-        setOffers(data.items ?? data.offers ?? []);
+        });
+        let list = [...(data.items ?? [])];
+        if (sortBy === 'date') {
+          list.sort(
+            (a, b) =>
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+          );
+        } else if (sortBy === 'price') {
+          list.sort((a, b) => {
+            const pa = a.tiers[a.currentTier]?.price ?? a.basePrice;
+            const pb = b.tiers[b.currentTier]?.price ?? b.basePrice;
+            return pa - pb;
+          });
+        } else if (sortBy === 'participants') {
+          list.sort((a, b) => (b.participants ?? 0) - (a.participants ?? 0));
+        }
+        setOffers(list);
       } catch (error) {
         console.error('Failed to fetch offers:', error);
       } finally {

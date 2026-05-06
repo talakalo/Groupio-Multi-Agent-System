@@ -133,7 +133,8 @@ export default function BuildingPage(props: PageParamsProps) {
     queryKey: ['building', 'profile'],
     queryFn: async () => {
       try {
-        const data = (await apiClient.getMyBuilding()) as Record<string, unknown> & {
+        const base = await apiClient.getMyBuilding();
+        const data = base as unknown as Building & {
           residents?: unknown[];
           activeOffers?: unknown[];
           totalSavings?: number;
@@ -142,7 +143,7 @@ export default function BuildingPage(props: PageParamsProps) {
           invite_code?: string;
         };
         return {
-          ...(data as object),
+          ...base,
           residents: Array.isArray(data.residents) ? data.residents : [],
           activeOffers: Array.isArray(data.activeOffers) ? data.activeOffers : [],
           totalSavings: data.totalSavings ?? data.total_savings ?? 0,

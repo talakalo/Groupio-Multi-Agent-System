@@ -20,9 +20,7 @@ class BuildingBase(BaseModel):
 
 
 class BuildingCreate(BuildingBase):
-    """Create building request."""
-
-    admin_user_id: str
+    """Create building request body (``admin_user_id`` is set server-side)."""
 
 
 class BuildingUpdate(BaseModel):

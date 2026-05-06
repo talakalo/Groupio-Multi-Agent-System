@@ -71,8 +71,15 @@ export function BuildingCreateModal({
     onSuccess: (created) => {
       queryClient.invalidateQueries({ queryKey: ['buildings-manager', 'buildings'] });
       queryClient.invalidateQueries({ queryKey: ['buildings-manager', 'stats'] });
-      const c = created as { id: string; name: string; invite_code?: string };
-      onCreated?.({ id: c.id, name: c.name, invite_code: c.invite_code });
+      const row = created as unknown as import('@groupio/types').Building & {
+        invite_code?: string;
+        name?: string;
+      };
+      onCreated?.({
+        id: row.id,
+        name: row.name ?? form.name.trim(),
+        invite_code: row.invite_code,
+      });
       onClose();
       setForm({
         name: '',

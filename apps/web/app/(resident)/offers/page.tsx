@@ -23,7 +23,8 @@ import { useState, useMemo } from 'react';
 import { CategoryChips } from '@/components/shared/CategoryChips';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { apiClient } from '@/lib/api/client';
+import { apiClient, ApiError } from '@/lib/api/client';
+import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
 import { useUnwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
 
@@ -226,11 +227,24 @@ export default function OffersListPage(props: PageParamsProps) {
 
   const offersQuery = useQuery<{ items: Offer[]; total: number }>({
     queryKey: ['resident', 'offers', filters.category, filters.status],
-    queryFn: () =>
-      apiClient.getOffers({
+    queryFn: async () => {
+      let buildingId = useAuthStore.getState().user?.buildingId;
+      if (!buildingId) {
+        try {
+          const b = await apiClient.getMyBuilding();
+          buildingId = b.id;
+        } catch (e) {
+          if (e instanceof ApiError && e.status === 404) {
+            return { items: [], total: 0, page: 1, page_size: 20, has_more: false };
+          }
+          throw e;
+        }
+      }
+      return apiClient.getOffers(buildingId, {
         category: filters.category !== 'all' ? filters.category : undefined,
         status: filters.status !== 'all' ? filters.status : undefined,
-      }) as Promise<{ items: Offer[]; total: number }>,
+      });
+    },
   });
 
   const filteredOffers = useMemo(() => {

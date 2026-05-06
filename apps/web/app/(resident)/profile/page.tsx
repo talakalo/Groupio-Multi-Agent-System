@@ -37,6 +37,8 @@ interface ResidentProfile extends Resident {
   fullName?: string;
   language: 'he' | 'en';
   preferredLanguage?: string;
+  buildingName?: string;
+  apartmentNumber?: string;
   notification_settings?: Record<string, boolean>;
 }
 
@@ -210,32 +212,52 @@ export default function ResidentProfilePage() {
   const profileQuery = useQuery<ResidentProfile>({
     queryKey: ['resident', 'profile'],
     queryFn: async () => {
-      const data = (await apiClient.getMe()) as Record<string, unknown> & {
-        full_name?: string;
-        fullName?: string;
-        preferred_language?: string;
-        preferredLanguage?: string;
-        avatar_url?: string;
-        avatarUrl?: string;
-        building_name?: string;
-        buildingName?: string;
-        apartment_number?: string;
-        apartmentNumber?: string;
-        notification_settings?: Record<string, boolean>;
+      const data = (await apiClient.getMe()) as Record<string, unknown>;
+      const fullName =
+        (typeof data.full_name === 'string' && data.full_name) ||
+        (typeof data.fullName === 'string' && data.fullName) ||
+        '';
+      const preferredLanguage =
+        (typeof data.preferred_language === 'string' && data.preferred_language) ||
+        (typeof data.preferredLanguage === 'string' && data.preferredLanguage) ||
+        'he';
+      const language: 'he' | 'en' = preferredLanguage === 'en' ? 'en' : 'he';
+      const notification_settings =
+        data.notification_settings && typeof data.notification_settings === 'object'
+          ? (data.notification_settings as Record<string, boolean>)
+          : undefined;
+
+      const profile: ResidentProfile = {
+        id: typeof data.id === 'string' ? data.id : '',
+        name: fullName,
+        email: typeof data.email === 'string' ? data.email : '',
+        phone: typeof data.phone === 'string' ? data.phone : '',
+        buildingId:
+          (typeof data.building_id === 'string' && data.building_id) ||
+          (typeof data.buildingId === 'string' && data.buildingId) ||
+          '',
+        createdAt:
+          (typeof data.created_at === 'string' && data.created_at) ||
+          (typeof data.createdAt === 'string' && data.createdAt) ||
+          new Date().toISOString(),
+        fullName,
+        language,
+        preferredLanguage,
+        avatarUrl:
+          (typeof data.avatar_url === 'string' && data.avatar_url) ||
+          (typeof data.avatarUrl === 'string' && data.avatarUrl) ||
+          '',
+        buildingName:
+          (typeof data.building_name === 'string' && data.building_name) ||
+          (typeof data.buildingName === 'string' && data.buildingName) ||
+          '',
+        apartmentNumber:
+          (typeof data.apartment_number === 'string' && data.apartment_number) ||
+          (typeof data.apartmentNumber === 'string' && data.apartmentNumber) ||
+          '',
+        notification_settings,
       };
-      return {
-        ...(data as object),
-        fullName: data.full_name ?? data.fullName ?? '',
-        phone: (data as { phone?: string }).phone ?? '',
-        preferredLanguage: data.preferred_language ?? data.preferredLanguage ?? 'he',
-        avatarUrl: data.avatar_url ?? data.avatarUrl ?? '',
-        buildingName: data.building_name ?? data.buildingName ?? '',
-        apartmentNumber: data.apartment_number ?? data.apartmentNumber ?? '',
-        notification_settings:
-          data.notification_settings && typeof data.notification_settings === 'object'
-            ? data.notification_settings
-            : undefined,
-      } as ResidentProfile;
+      return profile;
     },
     enabled: !!accessToken,
   });

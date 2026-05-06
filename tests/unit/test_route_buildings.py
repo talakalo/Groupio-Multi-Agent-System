@@ -160,7 +160,6 @@ class TestCreateBuilding:
                         "total_units": 20,
                         "floors": 5,
                         "year_built": 2000,
-                        "admin_user_id": "user-1",
                     },
                 )
             assert resp.status_code == 200

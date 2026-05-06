@@ -208,7 +208,7 @@ export default function ContractorProfilePage() {
           notification_settings?: unknown;
         };
         const cid = me.contractor_id;
-        setContractorId(cid);
+        setContractorId(cid ?? null);
 
         if (!notifDirtyRef.current) {
           setNotifPrefs(mergeContractorNotifPrefs(me.notification_settings));
@@ -220,9 +220,9 @@ export default function ContractorProfilePage() {
             apiClient.getMyContractorDocRequests(),
           ]);
           if (contractorResult.status === 'fulfilled') {
-            const data = contractorResult.value as Record<string, unknown>;
-            setContractor(data);
-            reset(data);
+            const contractor = contractorResult.value;
+            setContractor(contractor);
+            reset(contractor as unknown as ProfileForm);
           }
           if (docReqResult.status === 'fulfilled') {
             const dr = docReqResult.value;
@@ -254,7 +254,7 @@ export default function ContractorProfilePage() {
         data as unknown as Record<string, unknown>,
       );
       setContractor(updated);
-      reset(updated);
+      reset(updated as unknown as ProfileForm);
       alert(t('saveSuccess'));
     } catch (error) {
       console.error('Failed to save profile:', error);
