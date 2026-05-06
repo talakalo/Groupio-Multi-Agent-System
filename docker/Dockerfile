@@ -46,7 +46,10 @@ USER appuser
 
 EXPOSE 8000
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+# start_period=60s: production CMD starts uvicorn directly (no migrations), so 60 s is
+# generous but safe. When running via docker-compose.yml (dev), the compose `healthcheck:`
+# override sets start_period=60s explicitly to cover `alembic upgrade head` runtime.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health/live')" || exit 1
 
 # Production: 4 workers for multi-core utilisation.

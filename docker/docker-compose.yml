@@ -1,4 +1,4 @@
-version: "3.8"
+# Removed deprecated `version` key (Docker Compose v2 ignores it and warns).
 
 services:
   postgres:
@@ -39,6 +39,7 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
     env_file:
+      # Resolves to docker/staging-minimal.env (relative to this compose file).
       - staging-minimal.env
     ports:
       - "8000:8000"
@@ -65,7 +66,7 @@ services:
       postgres:
         condition: service_healthy
       # API does not wait on RabbitMQ: core routes work with messaging flags off.
-      # Start rabbitmq separately when enabling ENABLE_RABBITMQ / workers.
+      # Add rabbitmq here (condition: service_healthy) when enabling ENABLE_RABBITMQ.
       qdrant:
         condition: service_started
       neo4j:
@@ -74,6 +75,14 @@ services:
         condition: service_started
     volumes:
       - ../src:/app/src
+    # Override Dockerfile HEALTHCHECK start_period: `alembic upgrade head` can take
+    # 15–45 s on a cold DB before uvicorn starts. 60 s gives comfortable headroom.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health/live')"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
     command: >
       sh -c "alembic upgrade head &&
       uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload"
@@ -92,7 +101,8 @@ services:
       - "7687:7687"
     environment:
       - NEO4J_AUTH=neo4j/${NEO4J_PASSWORD:?Set NEO4J_PASSWORD in .env}
-      - NEO4J_PLUGINS=["apoc"]
+      # Quoted to prevent YAML from misinterpreting [ as an inline sequence.
+      - "NEO4J_PLUGINS=[\"apoc\"]"
     volumes:
       - neo4j_data:/data
 
@@ -115,6 +125,7 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
     env_file:
+      # Resolves to docker/staging-minimal.env (relative to this compose file).
       - staging-minimal.env
     command: python -m src.workers.agent_worker
     environment:
@@ -143,11 +154,17 @@ services:
         condition: service_started
       neo4j:
         condition: service_started
+    restart: unless-stopped
 
   scheduler:
     build:
       context: ..
       dockerfile: docker/Dockerfile
+    env_file:
+      # Resolves to docker/staging-minimal.env (relative to this compose file).
+      # Required: provides JWT_SECRET_KEY, API_KEYS, PAYMENT_PROVIDER, and all
+      # other Settings fields that scheduler.py loads via src/config/settings.py.
+      - staging-minimal.env
     command: python -m src.workers.scheduler
     environment:
       - REDIS_URL=redis://:${REDIS_PASSWORD:-groupio-redis-dev}@redis:6379
