@@ -54,7 +54,7 @@ export default function ContractorProfileScreen() {
     let cancelled = false;
     (async () => {
       try {
-        const me = (await getProfile()) as Record<string, unknown> & {
+        const me = (await getProfile()) as unknown as Record<string, unknown> & {
           contractor_id?: string;
           contractorId?: string;
         };

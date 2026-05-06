@@ -14,8 +14,9 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ApiError, getContractors } from "../lib/api";
-import type { Contractor } from "../lib/api";
+import type { Contractor } from "@groupio/types";
 import i18n from "../lib/i18n";
+import { S } from "vitest/dist/reporters-w_64AS5f.js";
 
 /**
  * Mobile contractor browse — parity with apps/web/app/(resident)/contractors.
@@ -38,7 +39,7 @@ export default function ContractorsScreen() {
     setError(null);
     try {
       const data = await getContractors();
-      setItems(data.items ?? []);
+      setItems((data.data ?? []) as Contractor[]);
     } catch (err: unknown) {
       setError(
         err instanceof ApiError
@@ -72,7 +73,7 @@ export default function ContractorsScreen() {
       (c) =>
         c.businessName?.toLowerCase().includes(q) ||
         c.description?.toLowerCase().includes(q) ||
-        c.categories?.some((cat) => cat.toLowerCase().includes(q)),
+        c.categories?.some((cat:string) => cat.toLowerCase().includes(q)),
     );
   }, [items, query]);
 
