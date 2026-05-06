@@ -74,8 +74,8 @@ jobs:
       - name: Assert exactly one head revision
         env:
           # Offline mode — no DB connection needed, we only inspect the file graph.
-          SQLALCHEMY_URL: sqlite:///:memory:
-          DATABASE_URL: sqlite:///:memory:
+          SQLALCHEMY_URL: 'sqlite:///:memory:'
+          DATABASE_URL: 'sqlite:///:memory:'
           USE_LOCAL_POSTGRES: 'true'
           TESTING: 'true'
           ENVIRONMENT: 'testing'
