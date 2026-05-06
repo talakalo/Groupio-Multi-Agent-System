@@ -105,7 +105,8 @@ export default function LoginPage() {
       const role = user?.role ?? "";
       if (["admin", "super_admin", "buildings_manager"].includes(role)) {
         const adminUrl = process.env.NEXT_PUBLIC_ADMIN_URL || "http://localhost:3001";
-        window.location.href = `${adminUrl}/dashboard#token=${encodeURIComponent(response.token)}`;
+        window.location.href = `${adminUrl}/dashboard`;
+        // Admin app rehydrates via secure cookie/session refresh; never expose JWT in URL.
         return;
       }
       if (role === "contractor") {
