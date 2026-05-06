@@ -378,7 +378,7 @@ class TestReleaseEscrow:
         assert "Cannot release" in response.json()["detail"]
 
     def test_release_escrow_pending_invoice(self, admin_client, mock_db):
-        """Admin can release escrow even when invoice is pending (early release)."""
+        """Escrow cannot be released until invoice is ``paid`` (funds held)."""
         pending_invoice = {
             "id": "inv-pending",
             "offer_id": "offer-pending",
@@ -391,5 +391,6 @@ class TestReleaseEscrow:
 
         response = admin_client.post("/api/v1/admin/payments/escrow/offer-pending/release")
 
-        assert response.status_code == 200
-        assert response.json()["status"] == "released"
+        assert response.status_code == 400
+        assert "paid" in response.json()["detail"]
+        mock_db.update_invoice.assert_not_called()

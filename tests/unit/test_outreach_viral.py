@@ -106,8 +106,11 @@ class TestDetermineCampaignType:
         assert agent._determine_campaign_type(state) == "new_building_onboarding"
 
     def test_default_returns_offer_momentum(self, agent):
+        """Outside seasonal windows (May–Jul AC promo / Nov–Jan heating), default is momentum."""
         state = _state(message="hello")
-        assert agent._determine_campaign_type(state) == "offer_momentum"
+        with patch("src.agents.outreach.datetime") as mock_dt:
+            mock_dt.now.return_value = datetime(2025, 10, 15, tzinfo=UTC)
+            assert agent._determine_campaign_type(state) == "offer_momentum"
 
     def test_seasonal_summer_month(self, agent):
         """In summer months, seasonal campaign should take priority (after viral checks)."""

@@ -48,14 +48,12 @@ export default function ContractorProjectsPage() {
 
       setIsLoading(true);
       try {
-        const data = (await apiClient.getOffers({
+        const data = await apiClient.getOffers(undefined, {
           status: statusFilter !== 'all' ? statusFilter : undefined,
-          // year is not part of the typed signature today; pass through via cast
-          // until the server contract grows a typed param. Mirrors the previous
-          // direct-fetch behaviour exactly.
-          ...({ year: year.toString() } as { year?: string }),
-        })) as { items?: Offer[]; offers?: Offer[] };
-        setProjects(data.items ?? data.offers ?? []);
+        });
+        let items = [...(data.items ?? [])];
+        items = items.filter((o) => new Date(o.createdAt).getFullYear() === year);
+        setProjects(items as ProjectWithStats[]);
       } catch (error) {
         console.error('Failed to fetch projects:', error);
       } finally {

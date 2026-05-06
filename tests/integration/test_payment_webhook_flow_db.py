@@ -50,8 +50,14 @@ async def _connect_or_skip(dsn: str):
 
 
 async def _ensure_table(conn, name: str) -> None:
-    reg = await conn.fetchval(f"SELECT to_regclass('public.{name}')")
-    if reg is None:
+    exists = await conn.fetchval(
+        """
+        SELECT 1 FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = $1
+        """,
+        name,
+    )
+    if exists is None:
         pytest.skip(
             f"Table public.{name} missing — apply alembic upgrade head before "
             "running the payment-flow integration test."

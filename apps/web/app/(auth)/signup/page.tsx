@@ -19,7 +19,7 @@ import { StepIndicator } from "@/components/shared/StepIndicator";
 import { Analytics } from "@/lib/analytics";
 import { apiClient, ApiError } from "@/lib/api/client";
 import { setAuthCookie } from "@/lib/auth/setAuthCookie";
-import { useAuthStore } from "@/lib/stores/authStore";
+import { useAuthStore, type User as AuthUser } from "@/lib/stores/authStore";
 import { cn } from "@/lib/utils/cn";
 import { useUnwrapPageParams, PageParamsProps } from "@/lib/utils/unwrapPageParams";
 
@@ -43,6 +43,19 @@ const signupSchema = z.object({
 type SignupFormData = z.infer<typeof signupSchema>;
 
 type UserRole = "resident" | "contractor" | "buildings_manager";
+
+function coerceAuthStoreRole(role: string): AuthUser["role"] {
+  const allowed: AuthUser["role"][] = [
+    "resident",
+    "contractor",
+    "buildings_manager",
+    "admin",
+    "super_admin",
+  ];
+  return (allowed as readonly string[]).includes(role)
+    ? (role as AuthUser["role"])
+    : "resident";
+}
 
 const ROLE_OPTIONS = [
   {
@@ -145,7 +158,7 @@ export default function SignupPage(props: PageParamsProps) {
           email: meData.email,
           fullName: meData.full_name ?? meData.fullName ?? "",
           phone: meData.phone ?? "",
-          role: meData.role,
+          role: coerceAuthStoreRole(meData.role),
           preferredLanguage: (meData.preferred_language ?? meData.preferredLanguage ?? "he") as "he" | "en",
           avatarUrl: meData.avatar_url ?? meData.avatarUrl,
           buildingId: meData.building_id ?? meData.buildingId,

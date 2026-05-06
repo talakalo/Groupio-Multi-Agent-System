@@ -1,4 +1,10 @@
-import type { MessageRequest, MessageResponse, Payment } from "@groupio/types";
+import type {
+  Contractor,
+  ContractorStats,
+  MessageRequest,
+  MessageResponse,
+  Payment,
+} from "@groupio/types";
 
 import { useAuthStore } from "@/lib/stores/authStore";
 
@@ -237,12 +243,13 @@ class ApiClient {
 
   // ---- Offers endpoints ----
 
+  /** When `buildingId` is omitted, the backend scopes offers by the authenticated user's role (e.g. contractor-wide listing). */
   async getOffers(
-    buildingId: string,
+    buildingId?: string | null,
     params?: { category?: string; status?: string; page?: number; page_size?: number }
   ) {
     const searchParams = new URLSearchParams();
-    searchParams.set("building_id", buildingId);
+    if (buildingId) searchParams.set("building_id", buildingId);
     if (params?.category) searchParams.set("category", params.category);
     if (params?.status) searchParams.set("status", params.status);
     if (params?.page != null) searchParams.set("page", String(params.page));
@@ -373,9 +380,7 @@ class ApiClient {
 
   /** Fetch the current authenticated user's profile (`GET /auth/me`). */
   async getMe() {
-    return this.request<import("@groupio/types").User & Record<string, unknown>>(
-      `/api/v1/auth/me`
-    );
+    return this.request<Record<string, unknown>>(`/api/v1/auth/me`);
   }
 
   /** GDPR deletion of the current user (`DELETE /auth/me`). */
@@ -658,7 +663,7 @@ class ApiClient {
 
   /** Update a contractor profile (PUT /contractors/{id}). */
   async updateContractor(contractorId: string, body: Record<string, unknown>) {
-    return this.request<Record<string, unknown>>(
+    return this.request<Contractor>(
       `/api/v1/contractors/${encodeURIComponent(contractorId)}`,
       { method: "PUT", body },
     );
@@ -683,10 +688,34 @@ class ApiClient {
   }
 
   /** Aggregate stats for a contractor (active offers, completed jobs, revenue, …). */
-  async getContractorStats(contractorId: string) {
-    return this.request<Record<string, unknown>>(
+  async getContractorStats(contractorId: string): Promise<ContractorStats> {
+    const raw = await this.request<Record<string, unknown>>(
       `/api/v1/contractors/${encodeURIComponent(contractorId)}/stats`,
     );
+    const num = (v: unknown): number => {
+      const n = typeof v === "number" ? v : Number(v);
+      return Number.isFinite(n) ? n : 0;
+    };
+    const optNum = (v: unknown): number | undefined => {
+      const n = typeof v === "number" ? v : Number(v);
+      return Number.isFinite(n) ? n : undefined;
+    };
+    return {
+      activeOffers: num(raw.active_offers ?? raw.activeOffers),
+      completedProjects: num(raw.completed_projects ?? raw.completedProjects),
+      totalRevenue: num(raw.total_revenue ?? raw.totalRevenue),
+      averageRating: num(raw.average_rating ?? raw.averageRating),
+      trustScore: num(raw.trust_score ?? raw.trustScore),
+      offersTrend: optNum(raw.offers_trend ?? raw.offersTrend),
+      projectsTrend: optNum(raw.projects_trend ?? raw.projectsTrend),
+      revenueTrend: optNum(raw.revenue_trend ?? raw.revenueTrend),
+      trustBreakdown: (() => {
+        const tb = raw.trust_breakdown ?? raw.trustBreakdown;
+        return typeof tb === "object" && tb !== null
+          ? (tb as ContractorStats["trustBreakdown"])
+          : undefined;
+      })(),
+    };
   }
 
   /** Resident joins a building via an invite code. */

@@ -114,6 +114,10 @@ def test_login_json_set_cookie_samesite_matches_environment(env, expected, monke
     monkeypatch.setattr(auth_route, "create_access_token", lambda *_a, **_k: "atoken")
     monkeypatch.setattr(auth_route, "create_refresh_token", lambda *_a, **_k: "rtoken")
     redis = AsyncMock()
+    redis.is_temporarily_locked = AsyncMock(return_value=0)
+    redis.clear_login_failures = AsyncMock()
+    redis.clear_temporary_lockout = AsyncMock()
+    redis.set = AsyncMock()
     monkeypatch.setattr(auth_route, "get_redis_client", lambda: redis)
 
     settings_stub = AsyncMock()

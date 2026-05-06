@@ -97,6 +97,18 @@ async def test_app_role_cannot_read_other_users_rows() -> None:
         if not policy_using or "current_setting" not in policy_using:
             pytest.skip("Tightened RLS policies not present — apply alembic migration 037")
 
+        users_table = await super_conn.fetchval(
+            """
+            SELECT 1 FROM information_schema.tables
+            WHERE table_schema = 'public' AND table_name = 'users'
+            """
+        )
+        if users_table is None:
+            pytest.skip(
+                "public.users missing — apply full alembic upgrade head "
+                "before running the RLS isolation integration test."
+            )
+
         # Seed two users owned by distinct ids. The superuser path bypasses
         # RLS, so we can insert freely here.
         user_a = uuid.uuid4().hex
