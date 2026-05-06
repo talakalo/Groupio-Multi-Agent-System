@@ -47,9 +47,7 @@ async def test_service_skips_when_crm_disabled() -> None:
     fake_settings = MagicMock()
     fake_settings.ENABLE_CRM_SYNC = False
     with patch("src.integrations.espocrm.service.get_settings", return_value=fake_settings):
-        await svc.handle_envelope(
-            {"event_name": "crm.contractor.registered", "entity_id": "c1"}
-        )
+        await svc.handle_envelope({"event_name": "crm.contractor.registered", "entity_id": "c1"})
 
     db.get_contractor.assert_not_called()
     client.create_entity.assert_not_called()
@@ -64,9 +62,7 @@ async def test_service_skips_when_client_not_configured() -> None:
     svc = EspoCRMService(db=db, client=client, schema=_schema())
 
     with patch("src.integrations.espocrm.service.get_settings", return_value=_enabled_settings()):
-        await svc.handle_envelope(
-            {"event_name": "crm.contractor.registered", "entity_id": "c1"}
-        )
+        await svc.handle_envelope({"event_name": "crm.contractor.registered", "entity_id": "c1"})
 
     client.create_entity.assert_not_called()
 
@@ -86,24 +82,18 @@ async def test_service_creates_contractor_and_upserts_ref_when_no_existing_ref()
     svc = EspoCRMService(db=db, client=client, schema=_schema())
 
     with patch("src.integrations.espocrm.service.get_settings", return_value=_enabled_settings()):
-        await svc.handle_envelope(
-            {"event_name": "crm.contractor.registered", "entity_id": "c1"}
-        )
+        await svc.handle_envelope({"event_name": "crm.contractor.registered", "entity_id": "c1"})
 
     client.create_entity.assert_awaited_once()
     client.update_entity.assert_not_called()
-    db.upsert_crm_external_ref.assert_awaited_once_with(
-        "contractor", "c1", "GroupioContractor", "crm-42"
-    )
+    db.upsert_crm_external_ref.assert_awaited_once_with("contractor", "c1", "GroupioContractor", "crm-42")
 
 
 @pytest.mark.asyncio
 async def test_service_updates_contractor_when_ref_exists() -> None:
     db = AsyncMock()
     db.get_contractor = AsyncMock(return_value={"id": "c1", "name": "Acme"})
-    db.get_crm_external_ref = AsyncMock(
-        return_value={"crm_entity_type": "GroupioContractor", "crm_id": "crm-old"}
-    )
+    db.get_crm_external_ref = AsyncMock(return_value={"crm_entity_type": "GroupioContractor", "crm_id": "crm-old"})
 
     client = MagicMock()
     client.is_configured = MagicMock(return_value=True)
@@ -113,9 +103,7 @@ async def test_service_updates_contractor_when_ref_exists() -> None:
     svc = EspoCRMService(db=db, client=client, schema=_schema())
 
     with patch("src.integrations.espocrm.service.get_settings", return_value=_enabled_settings()):
-        await svc.handle_envelope(
-            {"event_name": "crm.contractor.status_changed", "entity_id": "c1"}
-        )
+        await svc.handle_envelope({"event_name": "crm.contractor.status_changed", "entity_id": "c1"})
 
     client.update_entity.assert_awaited_once()
     client.create_entity.assert_not_called()
@@ -130,9 +118,7 @@ async def test_service_ignores_unknown_event_without_crashing() -> None:
     svc = EspoCRMService(db=db, client=client, schema=_schema())
 
     with patch("src.integrations.espocrm.service.get_settings", return_value=_enabled_settings()):
-        await svc.handle_envelope(
-            {"event_name": "crm.totally.unknown", "entity_id": "whatever"}
-        )
+        await svc.handle_envelope({"event_name": "crm.totally.unknown", "entity_id": "whatever"})
 
     client.create_entity.assert_not_called()
 
@@ -148,9 +134,7 @@ async def test_service_skips_missing_contractor() -> None:
     svc = EspoCRMService(db=db, client=client, schema=_schema())
 
     with patch("src.integrations.espocrm.service.get_settings", return_value=_enabled_settings()):
-        await svc.handle_envelope(
-            {"event_name": "crm.contractor.registered", "entity_id": "missing"}
-        )
+        await svc.handle_envelope({"event_name": "crm.contractor.registered", "entity_id": "missing"})
 
     client.create_entity.assert_not_called()
 
@@ -159,9 +143,7 @@ async def test_service_skips_missing_contractor() -> None:
 async def test_worker_wrapper_increments_ok_on_success() -> None:
     svc = MagicMock()
     svc.handle_envelope = AsyncMock()
-    with patch(
-        "src.workers.worker_crm_sync.messaging_consumer_messages_total"
-    ) as metric:
+    with patch("src.workers.worker_crm_sync.messaging_consumer_messages_total") as metric:
         metric.labels = MagicMock(return_value=MagicMock(inc=MagicMock()))
         await _process_envelope(svc, {"event_name": "crm.contractor.registered"})
 

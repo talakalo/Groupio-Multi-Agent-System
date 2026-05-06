@@ -74,9 +74,7 @@ async def test_tenant_scope_sets_session_variable_in_a_transaction() -> None:
 
     assert conn._tx.entered == 1, "must wrap in a tx so the setting is local"
     assert conn._tx.exited == 1, "tx must exit (resets the setting)"
-    conn.execute.assert_awaited_once_with(
-        "SELECT set_config('app.current_user_id', $1, true)", "user-123"
-    )
+    conn.execute.assert_awaited_once_with("SELECT set_config('app.current_user_id', $1, true)", "user-123")
 
 
 @pytest.mark.asyncio
@@ -142,9 +140,9 @@ def test_migration_037_uses_session_variable_everywhere() -> None:
     for table, using, check in m._POLICIES:
         assert m._APP_USER in using, f"{table} USING clause skips session variable"
         assert m._APP_USER in check, f"{table} WITH CHECK skips session variable"
-        assert "true" not in using.lower().replace(
-            "current_setting('app.current_user_id', true)", ""
-        ), f"{table} USING still contains a bare TRUE — policy would be permissive"
+        assert "true" not in using.lower().replace("current_setting('app.current_user_id', true)", ""), (
+            f"{table} USING still contains a bare TRUE — policy would be permissive"
+        )
 
 
 def test_migration_037_covers_the_critical_tenant_tables() -> None:
@@ -169,6 +167,5 @@ def test_migration_037_covers_the_critical_tenant_tables() -> None:
     }
     actual = {t for t, _u, _c in m._POLICIES}
     assert actual == expected, (
-        f"migration 037 policy set drift: missing={expected - actual} "
-        f"unexpected={actual - expected}"
+        f"migration 037 policy set drift: missing={expected - actual} unexpected={actual - expected}"
     )

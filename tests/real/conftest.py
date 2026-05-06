@@ -77,8 +77,10 @@ async def db_conn(db_pool: asyncpg.Pool) -> AsyncGenerator[asyncpg.Connection, N
 # Seed helpers
 # ---------------------------------------------------------------------------
 
+
 async def _insert_user(conn: asyncpg.Connection, *, role: str = "resident") -> dict:
     import uuid
+
     uid = str(uuid.uuid4())
     row = await conn.fetchrow(
         """
@@ -96,6 +98,7 @@ async def _insert_user(conn: asyncpg.Connection, *, role: str = "resident") -> d
 
 async def _insert_building(conn: asyncpg.Connection, *, admin_id: str) -> dict:
     import uuid
+
     bid = str(uuid.uuid4())
     row = await conn.fetchrow(
         """
@@ -115,6 +118,7 @@ async def _insert_building(conn: asyncpg.Connection, *, admin_id: str) -> dict:
 
 async def _insert_offer(conn: asyncpg.Connection, *, building_id: str, admin_id: str) -> dict:
     import uuid
+
     oid = str(uuid.uuid4())
     row = await conn.fetchrow(
         """

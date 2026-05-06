@@ -9,7 +9,6 @@ column that was never created by any migration, which would cause
 'column does not exist' errors at runtime.
 """
 
-import ast
 import re
 from pathlib import Path
 
@@ -21,7 +20,7 @@ MIGRATIONS_DIR = REPO_ROOT / "alembic" / "versions"
 def _read_payment_cols() -> set[str]:
     """Extract column names from _PAYMENT_COLS in postgres.py."""
     src = POSTGRES_PY.read_text()
-    match = re.search(r'_PAYMENT_COLS\s*=\s*\((.*?)\)', src, re.DOTALL)
+    match = re.search(r"_PAYMENT_COLS\s*=\s*\((.*?)\)", src, re.DOTALL)
     assert match, "_PAYMENT_COLS not found in postgres.py"
     raw = match.group(1).replace('"', "").replace("'", "").replace("\n", "").replace("\\", "")
     return {c.strip() for c in raw.split(",") if c.strip()}
@@ -67,9 +66,7 @@ def _columns_added_to_table(table: str, migration_text: str) -> set[str]:
 
     # Columns from op.create_table("table", ...) — use balanced-paren extraction
     # so deeply-nested sa.Column(...) args don't truncate the block.
-    header_re = re.compile(
-        r'op\.create_table\s*\(\s*["\']' + re.escape(table) + r'["\']'
-    )
+    header_re = re.compile(r'op\.create_table\s*\(\s*["\']' + re.escape(table) + r'["\']')
     for hm in header_re.finditer(migration_text):
         block = _extract_balanced(migration_text, hm.start())
         cols.update(m.group(1) for m in col_re.finditer(block))
@@ -112,9 +109,7 @@ def test_create_payment_asyncpg_uses_only_known_columns() -> None:
     db_cols.update({"id", "created_at", "updated_at"})
 
     missing = insert_cols - db_cols
-    assert not missing, (
-        f"create_payment INSERT uses columns not in any migration: {sorted(missing)}"
-    )
+    assert not missing, f"create_payment INSERT uses columns not in any migration: {sorted(missing)}"
 
 
 def test_create_invoice_asyncpg_uses_only_known_columns() -> None:
@@ -135,16 +130,14 @@ def test_create_invoice_asyncpg_uses_only_known_columns() -> None:
     db_cols.update({"id", "created_at", "updated_at"})
 
     missing = insert_cols - db_cols
-    assert not missing, (
-        f"create_invoice INSERT uses columns not in any migration: {sorted(missing)}"
-    )
+    assert not missing, f"create_invoice INSERT uses columns not in any migration: {sorted(missing)}"
 
 
 def test_create_payment_split_asyncpg_uses_only_known_columns() -> None:
     """The asyncpg INSERT in create_payment_split must not reference phantom columns."""
     src = POSTGRES_PY.read_text()
     match = re.search(
-        r'INSERT INTO payment_splits\s*\((.*?)\)',
+        r"INSERT INTO payment_splits\s*\((.*?)\)",
         src,
         re.DOTALL,
     )
@@ -158,6 +151,4 @@ def test_create_payment_split_asyncpg_uses_only_known_columns() -> None:
     db_cols.update({"id", "created_at"})
 
     missing = insert_cols - db_cols
-    assert not missing, (
-        f"create_payment_split INSERT uses columns not in any migration: {sorted(missing)}"
-    )
+    assert not missing, f"create_payment_split INSERT uses columns not in any migration: {sorted(missing)}"

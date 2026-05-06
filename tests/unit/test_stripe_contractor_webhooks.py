@@ -12,7 +12,6 @@ from src.services.stripe_contractor_webhooks import (
     handle_stripe_subscription_event,
 )
 
-
 # ---------------------------------------------------------------------------
 # Pure helpers
 # ---------------------------------------------------------------------------
@@ -94,9 +93,7 @@ async def test_checkout_session_completed_binds_contractor() -> None:
 @pytest.mark.asyncio
 async def test_checkout_completed_skips_non_subscription_mode() -> None:
     db = _db()
-    result = await handle_stripe_subscription_event(
-        db, "checkout.session.completed", {"mode": "payment"}
-    )
+    result = await handle_stripe_subscription_event(db, "checkout.session.completed", {"mode": "payment"})
     assert result == {"status": "ignored", "reason": "not_subscription_checkout"}
     db.admin_update_contractor_membership.assert_not_called()
 
@@ -168,9 +165,7 @@ async def test_subscription_event_ignored_when_contractor_not_found() -> None:
 async def test_subscription_deleted_marks_canceled() -> None:
     db = _db()
     db.get_contractor_by_stripe_subscription_id = AsyncMock(return_value={"id": "c1"})
-    result = await handle_stripe_subscription_event(
-        db, "customer.subscription.deleted", {"id": "sub_a"}
-    )
+    result = await handle_stripe_subscription_event(db, "customer.subscription.deleted", {"id": "sub_a"})
     assert result == {"status": "subscription_canceled", "contractor_id": "c1"}
     patch = db.admin_update_contractor_membership.await_args.args[1]
     assert patch["membership_status"] == "canceled"
@@ -180,9 +175,7 @@ async def test_subscription_deleted_marks_canceled() -> None:
 @pytest.mark.asyncio
 async def test_subscription_deleted_ignored_when_contractor_missing() -> None:
     db = _db()
-    result = await handle_stripe_subscription_event(
-        db, "customer.subscription.deleted", {"id": "sub_missing"}
-    )
+    result = await handle_stripe_subscription_event(db, "customer.subscription.deleted", {"id": "sub_missing"})
     assert result == {"status": "ignored", "reason": "contractor_not_found"}
 
 
@@ -258,9 +251,7 @@ async def test_invoice_paid_ignored_when_contractor_not_resolvable() -> None:
 @pytest.mark.asyncio
 async def test_invoice_payment_failed_sets_past_due() -> None:
     db = _db()
-    db.get_contractor_by_stripe_subscription_id = AsyncMock(
-        return_value={"id": "c9", "billing_failure_count": 1}
-    )
+    db.get_contractor_by_stripe_subscription_id = AsyncMock(return_value={"id": "c9", "billing_failure_count": 1})
     inv = {"subscription": "sub_x", "customer": "cus_x"}
     out = await handle_stripe_subscription_event(db, "invoice.payment_failed", inv)
     assert out["status"] == "invoice_failed"
@@ -272,13 +263,9 @@ async def test_invoice_payment_failed_sets_past_due() -> None:
 @pytest.mark.asyncio
 async def test_invoice_payment_failed_computes_grace_window() -> None:
     db = _db()
-    db.get_contractor_by_stripe_subscription_id = AsyncMock(
-        return_value={"id": "c1", "billing_failure_count": 0}
-    )
+    db.get_contractor_by_stripe_subscription_id = AsyncMock(return_value={"id": "c1", "billing_failure_count": 0})
     before = datetime.now(UTC)
-    out = await handle_stripe_subscription_event(
-        db, "invoice.payment_failed", {"subscription": "sub_a"}
-    )
+    out = await handle_stripe_subscription_event(db, "invoice.payment_failed", {"subscription": "sub_a"})
     assert out["status"] == "invoice_failed"
     grace = db.admin_update_contractor_membership.await_args.args[1]["membership_grace_until"]
     assert isinstance(grace, datetime)
@@ -297,9 +284,7 @@ async def test_invoice_payment_failed_ignored_without_sub_id() -> None:
 @pytest.mark.asyncio
 async def test_invoice_payment_failed_ignored_when_contractor_not_found() -> None:
     db = _db()
-    result = await handle_stripe_subscription_event(
-        db, "invoice.payment_failed", {"subscription": "sub_missing"}
-    )
+    result = await handle_stripe_subscription_event(db, "invoice.payment_failed", {"subscription": "sub_missing"})
     assert result == {"status": "ignored", "reason": "contractor_not_found"}
 
 

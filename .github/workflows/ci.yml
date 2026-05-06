@@ -69,7 +69,7 @@ jobs:
       - name: Install Alembic
         run: |
           python -m pip install --upgrade pip
-          pip install -e .
+          pip install alembic
 
       - name: Assert exactly one head revision
         env:
@@ -83,9 +83,9 @@ jobs:
           OPENAI_API_KEY: 'test-key'
           JWT_SECRET_KEY: 'test-secret-key-for-ci-testing-only'
         run: |
-          heads="$(alembic heads 2>/dev/null | grep -c '(head)' || true)"
+          heads="$(python -m alembic heads 2>/dev/null | grep -c '(head)' || true)"
           echo "Alembic heads count: $heads"
-          alembic heads
+          python -m alembic heads
           if [ "$heads" -ne 1 ]; then
             echo "::error::Alembic has $heads heads. Run 'alembic merge heads' and commit the merge revision."
             exit 1
@@ -337,7 +337,7 @@ jobs:
       - name: Install backend runtime (for openapi schema export)
         run: |
           python -m pip install --upgrade pip
-          pip install -e .
+          pip install -e . && pip install alembic
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile

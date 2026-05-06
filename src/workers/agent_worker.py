@@ -99,7 +99,12 @@ class AgentWorker:
                 "active_offers": context.get("active_offers") or [],
                 "entities": context.get("entities"),
                 "last_agent_handoff": None,
-                "context_for_next_agent": {k: v for k, v in context.items() if k not in {"building_id", "user_profile", "building_context", "active_offers", "entities"}} or None,
+                "context_for_next_agent": {
+                    k: v
+                    for k, v in context.items()
+                    if k not in {"building_id", "user_profile", "building_context", "active_offers", "entities"}
+                }
+                or None,
                 "rag_results": [],
                 "actions_taken": [],
                 "needs_human": False,

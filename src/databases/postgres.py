@@ -6,22 +6,9 @@ import logging
 import re
 import secrets
 import socket
-import string
 from collections.abc import AsyncIterator as _AsyncIterator
 from contextlib import asynccontextmanager as _acm
 from datetime import UTC, date, datetime
-
-
-# Building invite codes — uppercase alphanumerics, no ambiguous chars
-# (no 0/O, no 1/I/L). 8 chars from a 30-char alphabet ≈ 6.5e11 combinations,
-# which gives plenty of room for collisions to be vanishingly unlikely while
-# the code stays readable in WhatsApp / SMS shares.
-_INVITE_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
-
-
-def generate_invite_code(length: int = 8) -> str:
-    """Generate a building invite code (uppercase, unambiguous characters)."""
-    return "".join(secrets.choice(_INVITE_CODE_ALPHABET) for _ in range(length))
 from enum import Enum
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
@@ -34,6 +21,18 @@ from src.models.user import UserInDB
 
 # Regex for safe SQL column names (letters, digits, underscores)
 _SAFE_COLUMN_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
+
+# Building invite codes — uppercase alphanumerics, no ambiguous chars
+# (no 0/O, no 1/I/L). 8 chars from a 30-char alphabet ≈ 6.5e11 combinations,
+# which gives plenty of room for collisions to be vanishingly unlikely while
+# the code stays readable in WhatsApp / SMS shares.
+_INVITE_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+
+
+def generate_invite_code(length: int = 8) -> str:
+    """Generate a building invite code (uppercase, unambiguous characters)."""
+    return "".join(secrets.choice(_INVITE_CODE_ALPHABET) for _ in range(length))
+
 
 # Explicit user columns — excludes hashed_password so password hashes are
 # never silently pulled into memory on paths that don't need them.
@@ -764,7 +763,8 @@ class PostgresClient:
         )
         await self._pg_execute(
             f"""INSERT INTO buildings ({cols})
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)""",
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
+               $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)""",
             building_data["id"],
             building_data["name"],
             building_data["address"],
@@ -789,9 +789,7 @@ class PostgresClient:
         )
         return await self.get_building(building_data["id"]) or building_data
 
-    async def regenerate_building_invite_code(
-        self, building_id: str, new_code: str | None = None
-    ) -> str:
+    async def regenerate_building_invite_code(self, building_id: str, new_code: str | None = None) -> str:
         """Rotate the invite code for a building. Returns the new code.
 
         Pass an explicit ``new_code`` to make the operation deterministic in
@@ -800,12 +798,7 @@ class PostgresClient:
         code = new_code or generate_invite_code()
         if self._use_supabase_client():
             client = await self._get_client()
-            await (
-                client.table("buildings")
-                .update({"invite_code": code})
-                .eq("id", building_id)
-                .execute()
-            )
+            await client.table("buildings").update({"invite_code": code}).eq("id", building_id).execute()
         else:
             await self._pg_execute(
                 "UPDATE buildings SET invite_code = $1 WHERE id = $2",
@@ -846,9 +839,7 @@ class PostgresClient:
             where_parts.append("region = $%d" % len(args))
         if filters.get("search"):
             args.append(f"%{filters['search']}%")
-            where_parts.append(
-                "(address ILIKE $%d OR city ILIKE $%d)" % (len(args), len(args))
-            )
+            where_parts.append("(address ILIKE $%d OR city ILIKE $%d)" % (len(args), len(args)))
         if filters.get("user_id"):
             args.append(filters["user_id"])
             args.append(filters["user_id"])
@@ -3472,9 +3463,7 @@ class PostgresClient:
             return result.data[0] if result.data else None
         return await self._pg_fetch_one("SELECT * FROM payments WHERE id = $1", payment_id)
 
-    async def get_payment_by_idempotency_key(
-        self, user_id: str, idempotency_key: str
-    ) -> dict[str, Any] | None:
+    async def get_payment_by_idempotency_key(self, user_id: str, idempotency_key: str) -> dict[str, Any] | None:
         """Return an existing payment matching (user_id, idempotency_key), or None."""
         if self._use_supabase_client():
             client = await self._get_client()

@@ -329,9 +329,7 @@ async def initiate_payment(
 
     # Idempotency: return existing payment if this key was already processed
     if request.idempotency_key:
-        existing = await db.get_payment_by_idempotency_key(
-            current_user.id, request.idempotency_key
-        )
+        existing = await db.get_payment_by_idempotency_key(current_user.id, request.idempotency_key)
         if existing:
             return PaymentResponse(**existing)
 
@@ -623,12 +621,33 @@ async def stripe_webhook(request: Request) -> dict:
             invoice_status = "paid"
         elif new_status == "refunded":
             invoice_status = "refunded"
+    old_payment_status = payment.get("status", "unknown")
     await db.update_payment_and_invoice_for_webhook(
         payment["id"],
         invoice_id if invoice_status else None,
         new_status,
         invoice_status,
     )
+
+    # Audit log — payment rules mandate all status transitions are recorded.
+    try:
+        await db.create_audit_log(
+            {
+                "user_id": payment.get("user_id"),
+                "action": "payment_status_transition",
+                "resource_type": "payment",
+                "resource_id": payment["id"],
+                "details": {
+                    "old_status": old_payment_status,
+                    "new_status": new_status,
+                    "trigger": "stripe_webhook",
+                    "stripe_event_type": event_type,
+                    "offer_id": payment.get("offer_id"),
+                },
+            }
+        )
+    except Exception:
+        logger.exception("Failed to write payment audit log (non-fatal)")
 
     try:
         from src.messaging.envelope import EventEnvelope
@@ -1484,10 +1503,17 @@ async def release_escrow(
         raise HTTPException(status_code=404, detail="No invoice found for this offer")
 
     current_status = invoice.get("status")
-    if current_status not in ("paid", "pending"):
+    # Escrow lifecycle: collecting → held (== "paid") → released.
+    # Only allow release from "paid" (all participants have paid, funds are held).
+    # "pending" means collection is still in progress — releasing from pending skips
+    # the collection-verification step and violates the payment rules.
+    if current_status != "paid":
         raise HTTPException(
             status_code=400,
-            detail=f"Cannot release escrow: invoice status is '{current_status}'",
+            detail=(
+                f"Cannot release escrow: invoice status is '{current_status}'. "
+                "Escrow can only be released when status is 'paid' (all funds collected)."
+            ),
         )
 
     # Mark as released
@@ -1509,6 +1535,26 @@ async def release_escrow(
         invoice["id"],
         invoice.get("total"),
     )
+
+    # Audit log — escrow release is a payment lifecycle transition.
+    try:
+        await db.create_audit_log(
+            {
+                "user_id": admin_user.id if hasattr(admin_user, "id") else None,
+                "action": "escrow_released",
+                "resource_type": "invoice",
+                "resource_id": invoice["id"],
+                "details": {
+                    "old_status": current_status,
+                    "new_status": "released",
+                    "offer_id": offer_id,
+                    "amount": invoice.get("total", 0),
+                    "released_by": admin_user.email,
+                },
+            }
+        )
+    except Exception:
+        logger.exception("Failed to write escrow release audit log (non-fatal)")
 
     return {
         "status": "released",

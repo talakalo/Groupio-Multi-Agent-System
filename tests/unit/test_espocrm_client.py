@@ -43,9 +43,7 @@ async def test_create_entity_posts_to_correct_url_with_headers(monkeypatch) -> N
         captured["body"] = request.content
         return httpx.Response(200, json={"id": "crm-1", "name": "Acme"})
 
-    client, patched = _make_client_with_transport(
-        "https://crm.example.com/", "secret-key", handler
-    )
+    client, patched = _make_client_with_transport("https://crm.example.com/", "secret-key", handler)
     monkeypatch.setattr("src.integrations.espocrm.client.httpx.AsyncClient", patched)
 
     result = await client.create_entity("GroupioContractor", {"name": "Acme"})
@@ -67,9 +65,7 @@ async def test_update_entity_uses_patch_and_includes_id_in_url(monkeypatch) -> N
         captured["method"] = request.method
         return httpx.Response(200, json={"id": "crm-42", "status": "active"})
 
-    client, patched = _make_client_with_transport(
-        "https://crm.example.com", "secret-key", handler
-    )
+    client, patched = _make_client_with_transport("https://crm.example.com", "secret-key", handler)
     monkeypatch.setattr("src.integrations.espocrm.client.httpx.AsyncClient", patched)
 
     result = await client.update_entity("GroupioContractor", "crm-42", {"status": "active"})
@@ -112,9 +108,7 @@ async def test_4xx_raises_via_raise_for_status(monkeypatch) -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(401, json={"error": "Unauthorized"})
 
-    client, patched = _make_client_with_transport(
-        "https://crm.example.com", "k", handler
-    )
+    client, patched = _make_client_with_transport("https://crm.example.com", "k", handler)
     monkeypatch.setattr("src.integrations.espocrm.client.httpx.AsyncClient", patched)
 
     with pytest.raises(httpx.HTTPStatusError):
@@ -126,9 +120,7 @@ async def test_5xx_raises_via_raise_for_status(monkeypatch) -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(503, text="upstream down")
 
-    client, patched = _make_client_with_transport(
-        "https://crm.example.com", "k", handler
-    )
+    client, patched = _make_client_with_transport("https://crm.example.com", "k", handler)
     monkeypatch.setattr("src.integrations.espocrm.client.httpx.AsyncClient", patched)
 
     with pytest.raises(httpx.HTTPStatusError):

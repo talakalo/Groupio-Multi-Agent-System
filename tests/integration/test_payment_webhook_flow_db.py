@@ -107,12 +107,8 @@ async def test_webhook_transitions_payment_to_succeeded() -> None:
             invoice_status=None,
         )
 
-        status = await conn.fetchval(
-            "SELECT status FROM payments WHERE id = $1", payment_id
-        )
-        assert status == "succeeded", (
-            f"webhook handler must update DB row to 'succeeded'; got {status!r}"
-        )
+        status = await conn.fetchval("SELECT status FROM payments WHERE id = $1", payment_id)
+        assert status == "succeeded", f"webhook handler must update DB row to 'succeeded'; got {status!r}"
 
     finally:
         try:
@@ -120,9 +116,7 @@ async def test_webhook_transitions_payment_to_succeeded() -> None:
                 "DELETE FROM payments WHERE user_id IN ("
                 "SELECT id FROM users WHERE email LIKE '%@payment-test.example.com')"
             )
-            await conn.execute(
-                "DELETE FROM users WHERE email LIKE '%@payment-test.example.com'"
-            )
+            await conn.execute("DELETE FROM users WHERE email LIKE '%@payment-test.example.com'")
         finally:
             await conn.close()
 
@@ -187,12 +181,8 @@ async def test_webhook_atomic_payment_and_invoice_transition() -> None:
             invoice_status="paid",
         )
 
-        pay_status = await conn.fetchval(
-            "SELECT status FROM payments WHERE id = $1", payment_id
-        )
-        inv_status = await conn.fetchval(
-            "SELECT status FROM invoices WHERE id = $1", invoice_id
-        )
+        pay_status = await conn.fetchval("SELECT status FROM payments WHERE id = $1", payment_id)
+        inv_status = await conn.fetchval("SELECT status FROM invoices WHERE id = $1", invoice_id)
         assert pay_status == "succeeded", f"payment row not transitioned: {pay_status!r}"
         assert inv_status == "paid", f"invoice row not transitioned: {inv_status!r}"
 
@@ -203,8 +193,6 @@ async def test_webhook_atomic_payment_and_invoice_transition() -> None:
                 "SELECT id FROM users WHERE email LIKE '%@payment-test.example.com')"
             )
             await conn.execute("DELETE FROM invoices WHERE id = $1", invoice_id)
-            await conn.execute(
-                "DELETE FROM users WHERE email LIKE '%@payment-test.example.com'"
-            )
+            await conn.execute("DELETE FROM users WHERE email LIKE '%@payment-test.example.com'")
         finally:
             await conn.close()

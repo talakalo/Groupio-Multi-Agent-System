@@ -65,9 +65,7 @@ async def get_my_building(
     # Shareable invite code: prefer the stored column populated by migration
     # 038. Fall back to the legacy id-derived form so existing share links
     # keep working during the deploy window before the column is backfilled.
-    invite_code = building.get("invite_code") or (
-        building_id.replace("-", "")[:8].upper() if building_id else ""
-    )
+    invite_code = building.get("invite_code") or (building_id.replace("-", "")[:8].upper() if building_id else "")
 
     return {
         **building,
@@ -423,10 +421,7 @@ async def regenerate_building_invite(
         raise HTTPException(status_code=404, detail="Building not found")
 
     # BM users can rotate only their own buildings; admin/super_admin can rotate any.
-    if (
-        current_user.role == UserRole.BUILDINGS_MANAGER
-        and building.get("admin_user_id") != current_user.id
-    ):
+    if current_user.role == UserRole.BUILDINGS_MANAGER and building.get("admin_user_id") != current_user.id:
         raise HTTPException(
             status_code=403,
             detail="Buildings managers can only rotate codes for their own buildings",

@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import os
 import uuid
-from urllib.parse import urlparse, urlunparse, ParseResult
+from urllib.parse import ParseResult, urlparse, urlunparse
 
 import pytest
 
@@ -65,7 +65,6 @@ async def _connect_or_skip(dsn: str, *, role: str):
 
 @pytest.mark.asyncio
 async def test_app_role_cannot_read_other_users_rows() -> None:
-    import asyncpg
 
     from src.config.settings import get_settings
 
@@ -84,9 +83,7 @@ async def test_app_role_cannot_read_other_users_rows() -> None:
 
     try:
         # Gate on the presence of the app role and the tightened policy.
-        has_role = await super_conn.fetchval(
-            "SELECT 1 FROM pg_roles WHERE rolname = 'groupio_app'"
-        )
+        has_role = await super_conn.fetchval("SELECT 1 FROM pg_roles WHERE rolname = 'groupio_app'")
         if not has_role:
             pytest.skip("groupio_app role not provisioned — migration 021 skipped")
 
@@ -98,9 +95,7 @@ async def test_app_role_cannot_read_other_users_rows() -> None:
             """
         )
         if not policy_using or "current_setting" not in policy_using:
-            pytest.skip(
-                "Tightened RLS policies not present — apply alembic migration 037"
-            )
+            pytest.skip("Tightened RLS policies not present — apply alembic migration 037")
 
         # Seed two users owned by distinct ids. The superuser path bypasses
         # RLS, so we can insert freely here.
@@ -122,9 +117,7 @@ async def test_app_role_cannot_read_other_users_rows() -> None:
         # placeholder — it is reset here explicitly so the test doesn't
         # depend on the deployer's secret.
         test_password = "rls-test-" + uuid.uuid4().hex
-        await super_conn.execute(
-            f"ALTER ROLE groupio_app WITH LOGIN PASSWORD '{test_password}'"
-        )
+        await super_conn.execute(f"ALTER ROLE groupio_app WITH LOGIN PASSWORD '{test_password}'")
 
         app_dsn = _rewrite_user(superuser_dsn, "groupio_app", test_password)
         app_conn = await _connect_or_skip(app_dsn, role="groupio_app")
@@ -134,53 +127,45 @@ async def test_app_role_cannot_read_other_users_rows() -> None:
                 # Session variable missing → no rows visible.
                 visible_unset = await app_conn.fetchval(
                     "SELECT COUNT(*) FROM users WHERE id IN ($1, $2)",
-                    user_a, user_b,
+                    user_a,
+                    user_b,
                 )
                 assert visible_unset == 0, (
-                    "users table must deny all reads when app.current_user_id "
-                    f"is unset (saw {visible_unset})"
+                    f"users table must deny all reads when app.current_user_id is unset (saw {visible_unset})"
                 )
 
                 # Scope to user A → only user A visible.
-                await app_conn.execute(
-                    "SELECT set_config('app.current_user_id', $1, true)", user_a
-                )
+                await app_conn.execute("SELECT set_config('app.current_user_id', $1, true)", user_a)
                 visible_as_a = await app_conn.fetch(
                     "SELECT id FROM users WHERE id IN ($1, $2)",
-                    user_a, user_b,
+                    user_a,
+                    user_b,
                 )
                 ids = {r["id"] for r in visible_as_a}
-                assert ids == {user_a}, (
-                    f"user A session must see only A; saw {ids}"
-                )
+                assert ids == {user_a}, f"user A session must see only A; saw {ids}"
 
                 # Write attempt scoped to A trying to UPDATE B must affect 0 rows.
                 updated = await app_conn.execute(
                     "UPDATE users SET full_name = 'hacked' WHERE id = $1",
                     user_b,
                 )
-                assert updated.endswith("UPDATE 0"), (
-                    f"user A must not be able to UPDATE user B; got {updated!r}"
-                )
+                assert updated.endswith("UPDATE 0"), f"user A must not be able to UPDATE user B; got {updated!r}"
 
             # Session variable resets after the tx; another query without
             # re-setting must again be empty.
             async with app_conn.transaction():
                 visible_after = await app_conn.fetchval(
                     "SELECT COUNT(*) FROM users WHERE id IN ($1, $2)",
-                    user_a, user_b,
+                    user_a,
+                    user_b,
                 )
-                assert visible_after == 0, (
-                    "set_config(is_local=true) must not leak across transactions"
-                )
+                assert visible_after == 0, "set_config(is_local=true) must not leak across transactions"
         finally:
             await app_conn.close()
 
     finally:
         # Clean up seed data.
         try:
-            await super_conn.execute(
-                "DELETE FROM users WHERE email LIKE '%@rls-test.example.com'"
-            )
+            await super_conn.execute("DELETE FROM users WHERE email LIKE '%@rls-test.example.com'")
         finally:
             await super_conn.close()

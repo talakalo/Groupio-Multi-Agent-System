@@ -21,7 +21,6 @@ from pathlib import Path
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Static source-level invariant — no imports of the backend stack so this
 # test runs in any Python environment, even one without bcrypt / asyncpg.
@@ -29,9 +28,7 @@ import pytest
 
 
 _AUTH_SRC = Path(__file__).resolve().parents[2] / "src" / "api" / "routes" / "auth.py"
-_SAMESITE_EXPR = (
-    'samesite="strict" if settings.ENVIRONMENT == "production" else "lax"'
-)
+_SAMESITE_EXPR = 'samesite="strict" if settings.ENVIRONMENT == "production" else "lax"'
 
 
 def test_all_set_cookie_sites_use_environment_aware_samesite() -> None:
@@ -58,7 +55,7 @@ def test_no_unconditional_samesite_lax_remains_in_auth_routes() -> None:
     # samesite="lax" hard-codes.
     stripped = text.replace(_SAMESITE_EXPR, "")
     assert 'samesite="lax"' not in stripped, (
-        "auth.py contains an unconditional samesite=\"lax\" — every "
+        'auth.py contains an unconditional samesite="lax" — every '
         "set_cookie call must use the env-aware ternary instead"
     )
 
@@ -114,12 +111,8 @@ def test_login_json_set_cookie_samesite_matches_environment(env, expected, monke
 
     monkeypatch.setattr(auth_route, "get_postgres_client", lambda: db)
     monkeypatch.setattr(auth_route, "verify_password", lambda *_: True)
-    monkeypatch.setattr(
-        auth_route, "create_access_token", lambda *_a, **_k: "atoken"
-    )
-    monkeypatch.setattr(
-        auth_route, "create_refresh_token", lambda *_a, **_k: "rtoken"
-    )
+    monkeypatch.setattr(auth_route, "create_access_token", lambda *_a, **_k: "atoken")
+    monkeypatch.setattr(auth_route, "create_refresh_token", lambda *_a, **_k: "rtoken")
     redis = AsyncMock()
     monkeypatch.setattr(auth_route, "get_redis_client", lambda: redis)
 

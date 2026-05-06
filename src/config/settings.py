@@ -299,9 +299,20 @@ class Settings(BaseSettings):
                 "invalidating all active user sessions. "
                 'Generate a persistent key with: python -c "import secrets; print(secrets.token_urlsafe(64))"'
             )
-        if is_prod and len(self.JWT_SECRET_KEY) < 32:
+        # Enforce minimum length in all non-dev environments (staging and prod).
+        # 32 chars = 256-bit HMAC key minimum; 64 chars (512-bit) recommended.
+        _min_jwt_len = 32
+        if self.ENVIRONMENT not in ("development", "test") and self.JWT_SECRET_KEY not in _INSECURE_JWT_DEFAULTS:
+            if len(self.JWT_SECRET_KEY) < _min_jwt_len:
+                raise ValueError(
+                    f"JWT_SECRET_KEY must be at least {_min_jwt_len} characters in "
+                    f"{self.ENVIRONMENT}. Current length: {len(self.JWT_SECRET_KEY)}. "
+                    'Generate a secure key with: python -c "import secrets; print(secrets.token_urlsafe(64))"'
+                )
+        if is_prod and len(self.JWT_SECRET_KEY) < _min_jwt_len:
             raise ValueError(
-                f"JWT_SECRET_KEY must be at least 32 characters in {self.ENVIRONMENT} for adequate security."
+                f"JWT_SECRET_KEY must be at least {_min_jwt_len} characters"
+                f" in {self.ENVIRONMENT} for adequate security."
             )
         if self.JWT_SECRET_KEY in _INSECURE_JWT_DEFAULTS:
             if self.ENVIRONMENT in ("development", "test"):

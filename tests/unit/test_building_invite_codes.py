@@ -8,10 +8,9 @@ B2: ``buildings.invite_code`` is a stored, rotatable column generated via
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
 
 # ---------------------------------------------------------------------------
 # generate_invite_code

@@ -82,7 +82,7 @@ async def test_process_rows_publishes_empty_dict_when_payload_missing() -> None:
 async def test_process_rows_handles_non_dict_decoded_payload() -> None:
     """If a string payload JSON-decodes to a non-dict (e.g. a list), the
     publisher must receive an empty dict instead of the unexpected value."""
-    row = {"id": "ob-list", "routing_key": "rk", "payload": '[1, 2, 3]'}
+    row = {"id": "ob-list", "routing_key": "rk", "payload": "[1, 2, 3]"}
     db = AsyncMock()
 
     with patch(
@@ -103,8 +103,10 @@ async def test_run_loop_exits_immediately_when_outbox_disabled() -> None:
     fake_settings = MagicMock()
     fake_settings.ENABLE_OUTBOX = False
 
-    with patch("src.config.settings.get_settings", return_value=fake_settings), \
-         patch("src.workers.outbox_dispatcher.get_postgres_client") as db_getter:
+    with (
+        patch("src.config.settings.get_settings", return_value=fake_settings),
+        patch("src.workers.outbox_dispatcher.get_postgres_client") as db_getter,
+    ):
         await run_loop()
 
     db_getter.assert_not_called()

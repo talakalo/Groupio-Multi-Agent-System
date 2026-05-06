@@ -104,9 +104,7 @@ async def test_different_users_can_reuse_same_idempotency_key(db_conn: asyncpg.C
             shared_key,
         )
 
-    count = await db_conn.fetchval(
-        "SELECT COUNT(*) FROM payments WHERE idempotency_key = $1", shared_key
-    )
+    count = await db_conn.fetchval("SELECT COUNT(*) FROM payments WHERE idempotency_key = $1", shared_key)
     assert count == 2
 
 
@@ -124,7 +122,9 @@ async def test_payment_status_transitions(db_conn: asyncpg.Connection) -> None:
                               provider, created_at, updated_at)
         VALUES ($1, $2, $3, 1000, 'ILS', 'pending', 'stripe', NOW(), NOW())
         """,
-        pid, user["id"], offer["id"],
+        pid,
+        user["id"],
+        offer["id"],
     )
 
     await db_conn.execute(

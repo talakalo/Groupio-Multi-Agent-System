@@ -16,7 +16,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # aio_pika fake
 # ---------------------------------------------------------------------------
@@ -53,7 +52,10 @@ class _FakeChannel:
         return self.exchanges[name]
 
     async def declare_queue(
-        self, name: str, durable: bool = False, arguments: dict[str, Any] | None = None,
+        self,
+        name: str,
+        durable: bool = False,
+        arguments: dict[str, Any] | None = None,
         passive: bool = False,
     ) -> _FakeQueue:
         if name not in self.queues:
@@ -69,7 +71,7 @@ class _FakeConnection:
         self._channel = _FakeChannel()
         self.closed = False
 
-    async def __aenter__(self) -> "_FakeConnection":
+    async def __aenter__(self) -> _FakeConnection:
         return self
 
     async def __aexit__(self, *_: object) -> bool:

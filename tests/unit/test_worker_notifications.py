@@ -55,11 +55,11 @@ async def test_dispatches_each_event_to_matching_email_method(event_name, email_
     fake_email.send_offer_at_risk = AsyncMock(return_value=True)
     fake_email.send_offer_approved = AsyncMock(return_value=True)
 
-    with patch("src.services.email.get_email_service", return_value=fake_email), \
-         patch.object(worker_notifications, "_inc") as mock_inc:
-        await worker_notifications._handle_envelope(
-            {"event_name": event_name, "payload": _payload()}
-        )
+    with (
+        patch("src.services.email.get_email_service", return_value=fake_email),
+        patch.object(worker_notifications, "_inc") as mock_inc,
+    ):
+        await worker_notifications._handle_envelope({"event_name": event_name, "payload": _payload()})
 
     method = getattr(fake_email, email_method)
     assert method.await_count == 1, f"{event_name} did not call {email_method}"
@@ -70,11 +70,11 @@ async def test_dispatches_each_event_to_matching_email_method(event_name, email_
 async def test_unknown_event_is_counted_as_ignored_not_dropped_silently():
     from src.workers import worker_notifications
 
-    with patch("src.services.email.get_email_service") as get_svc, \
-         patch.object(worker_notifications, "_inc") as mock_inc:
-        await worker_notifications._handle_envelope(
-            {"event_name": "notifications.something_new", "payload": {}}
-        )
+    with (
+        patch("src.services.email.get_email_service") as get_svc,
+        patch.object(worker_notifications, "_inc") as mock_inc,
+    ):
+        await worker_notifications._handle_envelope({"event_name": "notifications.something_new", "payload": {}})
 
     # No email service should be touched when the event is unknown.
     get_svc.assert_not_called()
@@ -88,11 +88,11 @@ async def test_missing_to_email_does_not_raise_and_is_counted_as_ignored():
     fake_email = AsyncMock()
     fake_email.send_offer_joined = AsyncMock(return_value=True)
 
-    with patch("src.services.email.get_email_service", return_value=fake_email), \
-         patch.object(worker_notifications, "_inc") as mock_inc:
-        await worker_notifications._handle_envelope(
-            {"event_name": "notifications.offer_joined_email", "payload": {}}
-        )
+    with (
+        patch("src.services.email.get_email_service", return_value=fake_email),
+        patch.object(worker_notifications, "_inc") as mock_inc,
+    ):
+        await worker_notifications._handle_envelope({"event_name": "notifications.offer_joined_email", "payload": {}})
 
     fake_email.send_offer_joined.assert_not_called()
     mock_inc.assert_called_once_with("ignored")
@@ -102,8 +102,10 @@ async def test_missing_to_email_does_not_raise_and_is_counted_as_ignored():
 async def test_non_dict_payload_is_coerced_to_empty_dict():
     from src.workers import worker_notifications
 
-    with patch("src.services.email.get_email_service") as get_svc, \
-         patch.object(worker_notifications, "_inc") as mock_inc:
+    with (
+        patch("src.services.email.get_email_service") as get_svc,
+        patch.object(worker_notifications, "_inc") as mock_inc,
+    ):
         # A malformed envelope must never crash the consumer — that would
         # requeue the message into an infinite loop.
         await worker_notifications._handle_envelope(
