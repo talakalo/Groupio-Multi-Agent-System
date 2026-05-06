@@ -1,5 +1,4 @@
-version: "3.8"
-
+# Removed deprecated `version` key (Docker Compose v2 ignores it and warns).
 # Lightweight test compose — PostgreSQL only.
 # Usage:
 #   docker compose -f docker/docker-compose.test.yml up -d

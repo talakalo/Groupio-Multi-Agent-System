@@ -6,6 +6,12 @@
 #     prom/prometheus
 #
 # Or via docker-compose (see docker/docker-compose.prod.yml).
+#
+# NOTE: The scrape jobs for frontend, redis-exporter, node-exporter, and
+# postgres-exporter are commented out because those services are NOT in
+# docker/docker-compose.yml. Prometheus would log scrape errors every 15 s
+# for each missing target. Uncomment each block when you add the corresponding
+# sidecar to the compose file.
 
 global:
   scrape_interval: 15s      # How often to scrape targets
@@ -50,28 +56,34 @@ scrape_configs:
         target_label: instance
         replacement: groupio-api
 
-  # Next.js frontend — exposes /api/metrics if next-prometheus is configured.
-  # Remove this block if the frontend does not export metrics.
-  - job_name: groupio-frontend
-    metrics_path: /api/metrics
-    static_configs:
-      - targets: ["frontend:3000"]
-    relabel_configs:
-      - source_labels: [__address__]
-        target_label: instance
-        replacement: groupio-frontend
+  # ── Optional scrape jobs (not in current compose) ────────────────────────────
+  # Add the corresponding sidecar service to docker-compose.yml before enabling.
+
+  # Next.js frontend — uncomment when `frontend` service is added to compose and
+  # next-prometheus (or similar) is configured to export /api/metrics.
+  # - job_name: groupio-frontend
+  #   metrics_path: /api/metrics
+  #   static_configs:
+  #     - targets: ["frontend:3000"]
+  #   relabel_configs:
+  #     - source_labels: [__address__]
+  #       target_label: instance
+  #       replacement: groupio-frontend
 
   # Redis exporter — https://github.com/oliver006/redis_exporter
-  - job_name: redis
-    static_configs:
-      - targets: ["redis-exporter:9121"]
+  # Add `redis-exporter` service to compose before enabling.
+  # - job_name: redis
+  #   static_configs:
+  #     - targets: ["redis-exporter:9121"]
 
   # Node exporter — host-level CPU, memory, disk, network metrics.
-  - job_name: node
-    static_configs:
-      - targets: ["node-exporter:9100"]
+  # Add `node-exporter` service to compose before enabling.
+  # - job_name: node
+  #   static_configs:
+  #     - targets: ["node-exporter:9100"]
 
   # PostgreSQL exporter — https://github.com/prometheus-community/postgres_exporter
-  - job_name: postgres
-    static_configs:
-      - targets: ["postgres-exporter:9187"]
+  # Add `postgres-exporter` service to compose before enabling.
+  # - job_name: postgres
+  #   static_configs:
+  #     - targets: ["postgres-exporter:9187"]
