@@ -823,7 +823,7 @@ export async function uploadArchitecturePlan(
     } catch {
       // ignore
     }
-    throw new ApiError(detail ?? `HTTP ${res.status}`, res.status);
+    throw new ApiError(detail ?? `HTTP ${res.status}`, res.status,"upload_error");
   }
   return res.json();
 }
@@ -910,7 +910,7 @@ export async function uploadContractorDoc(
     } catch {
       // ignore
     }
-    throw new ApiError(detail ?? `HTTP ${res.status}`, res.status);
+    throw new ApiError(detail ?? `HTTP ${res.status}`, res.status, "upload_error");
   }
   return res.json();
 }

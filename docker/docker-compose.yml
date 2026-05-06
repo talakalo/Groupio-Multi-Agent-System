@@ -233,7 +233,32 @@ services:
       rabbitmq:
         condition: service_healthy
     restart: unless-stopped
+  web:
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+      - NEXT_PUBLIC_ADMIN_URL=${NEXT_PUBLIC_ADMIN_URL:-http://localhost:3001}
+    depends_on:
+      api:
+        condition: service_started
 
+  admin:
+    build:
+      context: ..
+      dockerfile: apps/admin/Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+      - NEXT_PUBLIC_ADMIN_URL=${NEXT_PUBLIC_ADMIN_URL:-http://localhost:3001}
+    depends_on:
+      api:
+        condition: service_started
+  
   worker_crm_sync:
     build:
       context: ..
@@ -273,7 +298,6 @@ services:
       rabbitmq:
         condition: service_healthy
     restart: unless-stopped
-
 
   web:
     build:

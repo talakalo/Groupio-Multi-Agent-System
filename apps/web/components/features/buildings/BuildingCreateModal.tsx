@@ -111,10 +111,13 @@ export function BuildingCreateModal({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
       role="dialog"
       aria-modal="true"
-      onClick={(e) => {
-        if (dialogRef.current && !dialogRef.current.contains(e.target as Node)) onClose();
-      }}
     >
+      <button
+        type="button"
+        aria-label={t('close') || 'Close modal'}
+        className="absolute inset-0"
+        onClick={onClose}
+      />
       <div
         ref={dialogRef}
         className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl"

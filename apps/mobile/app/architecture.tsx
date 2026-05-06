@@ -49,7 +49,7 @@ export default function ArchitectureScreen() {
     let cancelled = false;
     (async () => {
       try {
-        const me = (await getProfile()) as Record<string, unknown> & {
+        const me = (await getProfile()) as unknown as Record<string, unknown> & {
           building_id?: string;
           buildingId?: string;
         };
