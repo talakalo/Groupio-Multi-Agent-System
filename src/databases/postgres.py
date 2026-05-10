@@ -1748,6 +1748,114 @@ class PostgresClient:
         )
         return rows or []
 
+    async def upsert_contractor_verification(
+        self,
+        contractor_id: str,
+        source: str,
+        verified: bool,
+        confidence: float,
+        raw_response: dict | None,
+    ) -> dict[str, Any]:
+        """Insert or update a verification metadata row for (contractor_id, source).
+
+        If a row for this source already exists it is updated in-place;
+        otherwise a new row is inserted. Returns the persisted row.
+        """
+        import json as _json
+        from datetime import UTC, datetime
+
+        now = datetime.now(UTC)
+        raw_json = _json.dumps(raw_response, default=str) if raw_response else None
+
+        if self._use_supabase_client():
+            client = await self._get_client()
+            existing = (
+                await client.table("contractor_verification_metadata")
+                .select("id")
+                .eq("contractor_id", contractor_id)
+                .eq("source", source)
+                .limit(1)
+                .execute()
+            )
+            if existing.data:
+                row_id = existing.data[0]["id"]
+                result = (
+                    await client.table("contractor_verification_metadata")
+                    .update({
+                        "verified": verified,
+                        "confidence": confidence,
+                        "raw_response": raw_response,
+                        "verified_at": now.isoformat(),
+                    })
+                    .eq("id", row_id)
+                    .execute()
+                )
+                return result.data[0] if result.data else {}
+            else:
+                import uuid as _uuid
+                row = {
+                    "id": str(_uuid.uuid4()),
+                    "contractor_id": contractor_id,
+                    "source": source,
+                    "verified": verified,
+                    "confidence": confidence,
+                    "raw_response": raw_response,
+                    "verified_at": now.isoformat(),
+                }
+                result = await client.table("contractor_verification_metadata").insert(row).execute()
+                return result.data[0] if result.data else row
+
+        # asyncpg path — check then insert/update
+        existing = await self._pg_fetch_one(
+            "SELECT id FROM contractor_verification_metadata WHERE contractor_id = $1 AND source = $2",
+            contractor_id,
+            source,
+        )
+        if existing:
+            await self._pg_execute(
+                """UPDATE contractor_verification_metadata
+                   SET verified = $1, confidence = $2, raw_response = $3::jsonb, verified_at = $4
+                   WHERE id = $5""",
+                verified,
+                confidence,
+                raw_json,
+                now,
+                existing["id"],
+            )
+            return {
+                "id": existing["id"],
+                "contractor_id": contractor_id,
+                "source": source,
+                "verified": verified,
+                "confidence": confidence,
+                "verified_at": now,
+                "raw_response": raw_response,
+            }
+
+        import uuid as _uuid
+        row_id = str(_uuid.uuid4())
+        await self._pg_execute(
+            """INSERT INTO contractor_verification_metadata
+               (id, contractor_id, source, verified, confidence, raw_response, verified_at)
+               VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)""",
+            row_id,
+            contractor_id,
+            source,
+            verified,
+            confidence,
+            raw_json,
+            now,
+        )
+        return {
+            "id": row_id,
+            "contractor_id": contractor_id,
+            "source": source,
+            "verified": verified,
+            "confidence": confidence,
+            "verified_at": now,
+            "raw_response": raw_response,
+        }
+
     async def get_contractors_by_ids(self, contractor_ids: list[str]) -> list[dict[str, Any]]:
         """Get contractors by list of IDs (preserve order)."""
         if not contractor_ids:

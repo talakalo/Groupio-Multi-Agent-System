@@ -151,7 +151,8 @@
     "sortByTrust": "By Trust",
     "sortByExperience": "By Experience",
     "verifiedOnly": "Verified Only",
-    "noContractorsDescription": "No contractors match your search"
+    "noContractorsDescription": "No contractors match your search",
+    "govRegistered": "Gov Registered"
   },
   "profile": {
     "title": "Profile",
@@ -225,7 +226,8 @@
     "city": "City",
     "buildingAge": "Building Age",
     "yearsOld": "years old",
-    "contactCommittee": "Contact Committee"
+    "contactCommittee": "Contact Committee",
+    "municipalityVerified": "Verified Municipality"
   },
   "contractor": {
     "dashboard": {

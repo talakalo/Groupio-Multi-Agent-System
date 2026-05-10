@@ -151,7 +151,8 @@
     "sortByTrust": "לפי אמינות",
     "sortByExperience": "לפי ניסיון",
     "verifiedOnly": "מאומתים בלבד",
-    "noContractorsDescription": "לא נמצאו קבלנים התואמים לחיפוש שלך"
+    "noContractorsDescription": "לא נמצאו קבלנים התואמים לחיפוש שלך",
+    "govRegistered": "רשום בממשלה"
   },
   "profile": {
     "title": "פרופיל",
@@ -225,7 +226,8 @@
     "city": "עיר",
     "buildingAge": "גיל הבניין",
     "yearsOld": "שנים",
-    "contactCommittee": "צור קשר עם ועד הבית"
+    "contactCommittee": "צור קשר עם ועד הבית",
+    "municipalityVerified": "עירייה מאומתת"
   },
   "contractor": {
     "dashboard": {

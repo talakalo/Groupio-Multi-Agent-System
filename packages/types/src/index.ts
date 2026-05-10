@@ -24,6 +24,11 @@ export interface Building {
   age: number;
   type: BuildingType;
   coordinates?: { lat: number; lng: number };
+  /** Populated by server-side enrichment from data.gov.il settlements API */
+  municipality_name?: string;
+  municipality_code?: string;
+  enrichment_confidence?: number;
+  enrichment_source?: string;
 }
 
 export interface Contractor {
@@ -111,6 +116,8 @@ export interface ContractorMatch {
   graphScore: number;
   rating: number;
   description: string;
+  /** True when contractor was found active in the data.gov.il company registry */
+  govRegistered?: boolean;
 }
 
 export interface PricingAnalysis {

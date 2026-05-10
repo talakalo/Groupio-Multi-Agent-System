@@ -22,6 +22,9 @@ import {
   MoreHorizontal,
   Download,
   X,
+  RefreshCw,
+  Globe,
+  UserCheck,
 } from "lucide-react";
 import { MetricCard } from "@/components/features/metrics/MetricCard";
 import { useContractors } from "@/lib/hooks";
@@ -157,23 +160,175 @@ function TrustScoreBar({
 }
 
 // ---------------------------------------------------------------------------
-// Verification Metadata (Phase 2)
+// Verification types & helpers (Phase 3)
 // ---------------------------------------------------------------------------
 
 interface VerificationMetadataItem {
   id: string;
-  contractor_id: string;
+  contractor_id?: string;
   source: string;
   verified: boolean;
   confidence: number;
   verified_at: string;
   raw_response?: Record<string, unknown>;
-  created_at: string;
+  created_at?: string;
 }
 
-function VerificationMetadataSection({ contractorId }: { contractorId: string }) {
+const EXTERNAL_SOURCE_PREFIXES = ["data_gov", "datagov", "data.gov"];
+
+function isExternalSource(source: string): boolean {
+  return EXTERNAL_SOURCE_PREFIXES.some((p) => source.toLowerCase().includes(p));
+}
+
+function sourceLabel(source: string): string {
+  if (source === "data_gov_il_companies") return "data.gov.il — Company Registry";
+  if (source.startsWith("datagov-")) return "data.gov.il (legacy)";
+  return source;
+}
+
+// ---------------------------------------------------------------------------
+// VerificationBadge
+// ---------------------------------------------------------------------------
+
+function VerificationBadge({
+  verified,
+  confidence,
+  source,
+}: {
+  verified: boolean;
+  confidence: number;
+  source: string;
+}) {
+  const pct = Math.round(confidence * 100);
+  const external = isExternalSource(source);
+
+  if (verified) {
+    return (
+      <span
+        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-success-50 text-success-700 border border-success-200"
+        title={`${sourceLabel(source)} — ${pct}% confidence`}
+      >
+        {external ? (
+          <Globe className="w-3 h-3" />
+        ) : (
+          <UserCheck className="w-3 h-3" />
+        )}
+        {external ? "Gov Verified" : "Admin Verified"}
+        <span className="text-success-500 font-normal">{pct}%</span>
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-surface-100 text-surface-600 border border-surface-200"
+      title={`${sourceLabel(source)} — ${pct}% confidence`}
+    >
+      {external ? (
+        <Globe className="w-3 h-3" />
+      ) : (
+        <UserCheck className="w-3 h-3" />
+      )}
+      {external ? "Gov: Not Found" : "Admin: Unverified"}
+      <span className="text-surface-400 font-normal">{pct}%</span>
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ExternalSourcesList — rows from data.gov.il
+// ---------------------------------------------------------------------------
+
+function ExternalSourcesList({ items }: { items: VerificationMetadataItem[] }) {
+  if (items.length === 0) {
+    return (
+      <p className="text-sm text-surface-500 italic">
+        No gov-data records yet. Use &ldquo;Refresh Gov Verification&rdquo; below to look up the
+        business in the ICA company registry.
+      </p>
+    );
+  }
+  return (
+    <div className="space-y-2">
+      {items.map((m) => (
+        <div
+          key={m.id}
+          className="p-3 rounded-lg border border-surface-200 bg-surface-50 text-sm"
+        >
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <VerificationBadge
+              verified={m.verified}
+              confidence={m.confidence}
+              source={m.source}
+            />
+            <span className="text-xs text-surface-400">
+              {new Date(m.verified_at).toLocaleString()}
+            </span>
+          </div>
+          <p className="text-xs text-surface-500 mt-1">{sourceLabel(m.source)}</p>
+          {m.raw_response && (
+            <details className="mt-1">
+              <summary className="text-xs text-surface-400 cursor-pointer select-none">
+                Raw response
+              </summary>
+              <pre className="mt-1 text-[10px] text-surface-500 overflow-x-auto whitespace-pre-wrap">
+                {JSON.stringify(m.raw_response, null, 2)}
+              </pre>
+            </details>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// InternalReviewList — rows set by admin decisions
+// ---------------------------------------------------------------------------
+
+function InternalReviewList({ items }: { items: VerificationMetadataItem[] }) {
+  if (items.length === 0) {
+    return (
+      <p className="text-sm text-surface-500 italic">
+        No internal review records. Use Approve / Suspend actions above.
+      </p>
+    );
+  }
+  return (
+    <div className="space-y-2">
+      {items.map((m) => (
+        <div
+          key={m.id}
+          className="p-3 rounded-lg border border-surface-200 bg-surface-50 text-sm"
+        >
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <VerificationBadge
+              verified={m.verified}
+              confidence={m.confidence}
+              source={m.source}
+            />
+            <span className="text-xs text-surface-400">
+              {new Date(m.verified_at).toLocaleString()}
+            </span>
+          </div>
+          <p className="text-xs text-surface-500 mt-1">{m.source}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// VerificationProvenanceSection (replaces old VerificationMetadataSection)
+// ---------------------------------------------------------------------------
+
+function VerificationProvenanceSection({ contractorId }: { contractorId: string }) {
   const rawApiUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "") || "http://localhost:8000";
   const API_BASE = rawApiUrl.endsWith("/api/v1") ? rawApiUrl : `${rawApiUrl}/api/v1`;
+
+  const queryClient = useQueryClient();
+  const [refreshing, setRefreshing] = React.useState(false);
+  const [refreshMsg, setRefreshMsg] = React.useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin", "contractors", contractorId, "verification-metadata"],
@@ -189,47 +344,73 @@ function VerificationMetadataSection({ contractorId }: { contractorId: string })
   });
 
   const items = data?.items ?? [];
+  const externalItems = items.filter((m) => isExternalSource(m.source));
+  const internalItems = items.filter((m) => !isExternalSource(m.source));
+
+  async function handleRefresh() {
+    setRefreshing(true);
+    setRefreshMsg(null);
+    try {
+      const res = await fetch(
+        `${API_BASE}/admin/contractors/${encodeURIComponent(contractorId)}/refresh-verification`,
+        { method: "POST", credentials: "include" }
+      );
+      const body = await res.json();
+      await queryClient.invalidateQueries({
+        queryKey: ["admin", "contractors", contractorId, "verification-metadata"],
+      });
+      if (body.found) {
+        setRefreshMsg(
+          `Found in gov registry — ${body.verified ? "active" : "inactive"} (${Math.round((body.confidence ?? 0) * 100)}% confidence)`
+        );
+      } else {
+        setRefreshMsg(body.error ?? "Not found in gov registry");
+      }
+    } catch {
+      setRefreshMsg("Refresh failed. Check backend logs.");
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
+  if (isLoading) {
+    return <p className="text-sm text-surface-400">Loading verification data...</p>;
+  }
 
   return (
-    <div className="space-y-2">
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-surface-500">
-        External Verification Records
-      </h3>
-      {isLoading && (
-        <p className="text-sm text-surface-400">Loading verification data...</p>
-      )}
-      {!isLoading && items.length === 0 && (
-        <p className="text-sm text-surface-500 italic">
-          No external verification records. Status above reflects internal/admin review only.
-        </p>
-      )}
-      {!isLoading && items.length > 0 && (
-        <div className="space-y-2">
-          {items.map((m) => (
-            <div
-              key={m.id}
-              className="p-3 rounded-lg border border-surface-200 bg-surface-50 text-sm"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span
-                  className={clsx(
-                    "font-medium",
-                    m.verified ? "text-success-700" : "text-surface-600"
-                  )}
-                >
-                  {m.verified ? "Verified" : "Not verified"} — {m.source}
-                </span>
-                <span className="text-xs text-surface-500">
-                  {(m.confidence * 100).toFixed(0)}% confidence
-                </span>
-              </div>
-              <p className="text-xs text-surface-500 mt-1">
-                Verified at: {new Date(m.verified_at).toLocaleString()}
-              </p>
-            </div>
-          ))}
+    <div className="space-y-4">
+      {/* External (gov-data) sources */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-surface-500 flex items-center gap-1.5">
+            <Globe className="w-3.5 h-3.5" />
+            Gov Data Sources
+          </h3>
+          <button
+            type="button"
+            className="btn-ghost btn-sm text-xs"
+            disabled={refreshing}
+            onClick={handleRefresh}
+            title="Re-run data.gov.il lookup and persist result"
+          >
+            <RefreshCw className={clsx("w-3 h-3", refreshing && "animate-spin")} />
+            {refreshing ? "Refreshing…" : "Refresh Gov"}
+          </button>
         </div>
-      )}
+        <ExternalSourcesList items={externalItems} />
+        {refreshMsg && (
+          <p className="text-xs text-surface-500 italic">{refreshMsg}</p>
+        )}
+      </div>
+
+      {/* Internal (admin decision) sources */}
+      <div className="space-y-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-surface-500 flex items-center gap-1.5">
+          <UserCheck className="w-3.5 h-3.5" />
+          Internal Review Records
+        </h3>
+        <InternalReviewList items={internalItems} />
+      </div>
     </div>
   );
 }
@@ -963,8 +1144,8 @@ export default function ContractorsPage() {
                 </div>
               </div>
 
-              {/* Verification Metadata (Phase 2 - external/official verification) */}
-              <VerificationMetadataSection contractorId={detailContractor.id} />
+              {/* Verification Provenance (Phase 3 - gov data + internal review) */}
+              <VerificationProvenanceSection contractorId={detailContractor.id} />
 
               {/* Trust Score Breakdown */}
               <div className="space-y-3">

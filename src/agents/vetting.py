@@ -7,6 +7,7 @@ from src.agents.base import AgentConfig, BaseAgent
 from src.config.prompts.vetting import VETTING_SYSTEM_PROMPT
 from src.databases.graph_store import get_graph_store
 from src.databases.postgres import get_postgres_client
+from src.integrations.gov.client import get_gov_client
 from src.models.agent_state import AgentState
 from src.services.agent_config import get_agent_mode
 from src.utils.monitoring import track_agent_execution
@@ -20,14 +21,15 @@ THRESHOLDS = {
     "auto_reject": 50,
 }
 
-# Trust score weights
+# Trust score weights (must sum to 100)
 TRUST_WEIGHTS = {
     "license_valid": 25,
     "insurance_valid": 20,
     "years_in_business": 15,
     "online_reputation_score": 15,
     "completion_rate": 15,
-    "response_rate": 10,
+    "response_rate": 5,
+    "gov_registration": 5,  # bonus for ICA registry hit — absence is not negative
 }
 
 # Minimum insurance coverage (in ILS)
@@ -52,7 +54,7 @@ class VettingAgent(BaseAgent):
             system_prompt=VETTING_SYSTEM_PROMPT,
             tools=[
                 "document_classifier",
-                "check_license_api",
+                "verify_contractor_registration",  # replaces dangling check_license_api (never existed)
                 "web_search",
                 "calculate_trust_score",
             ],
@@ -99,11 +101,15 @@ class VettingAgent(BaseAgent):
         # Step 4: Get historical performance from graph
         history = await self._get_performance_history(contractor_id)
 
+        # Step 4b: Gov registration lookup — persists to contractor_verification_metadata
+        gov_registration = await self._check_gov_registration(contractor_id, doc_analysis)
+
         # Step 5: Calculate trust score
         trust_score = self._calculate_trust_score(
             validations=doc_analysis,
             reputation=reputation,
             history=history,
+            gov_registration=gov_registration,
         )
 
         # Step 6: Make decision
@@ -118,6 +124,7 @@ class VettingAgent(BaseAgent):
             doc_analysis=doc_analysis,
             reputation=reputation,
             history=history,
+            gov_registration=gov_registration,
         )
 
         state["actions_taken"] = [
@@ -130,6 +137,7 @@ class VettingAgent(BaseAgent):
                     "decision": decision,
                     "doc_analysis": doc_analysis,
                     "reputation": reputation,
+                    "gov_registration": gov_registration,
                 },
                 "response": {
                     "type": "vetting_result",
@@ -290,6 +298,7 @@ class VettingAgent(BaseAgent):
         validations: dict[str, Any],
         reputation: dict[str, Any],
         history: dict[str, Any],
+        gov_registration: dict[str, Any] | None = None,
     ) -> float:
         """Calculate 0-100 trust score from all signals."""
         scores: dict[str, float] = {}
@@ -308,6 +317,12 @@ class VettingAgent(BaseAgent):
         # Years in business (normalize: 0 years=0, 10+=1)
         years = reputation.get("graph_reputation", {}).get("total_projects", 0)
         scores["years_in_business"] = min(years / 10, 1.0)
+
+        # Gov registration bonus — absence is 0, not negative (no evidence ≠ bad evidence)
+        if gov_registration and gov_registration.get("found"):
+            scores["gov_registration"] = gov_registration.get("confidence", 0.0)
+        else:
+            scores["gov_registration"] = 0.0
 
         # Weighted sum
         total = sum(scores.get(key, 0.5) * weight for key, weight in TRUST_WEIGHTS.items())
@@ -338,6 +353,7 @@ class VettingAgent(BaseAgent):
         doc_analysis: dict[str, Any],
         reputation: dict[str, Any],
         history: dict[str, Any],
+        gov_registration: dict[str, Any] | None = None,
     ) -> str:
         """Generate a human-readable vetting report."""
         response = await self._call_llm(
@@ -350,7 +366,8 @@ class VettingAgent(BaseAgent):
                         f"Decision: {decision}\n\n"
                         f"Document Analysis: {doc_analysis}\n"
                         f"Reputation: {reputation}\n"
-                        f"History: {history}\n\n"
+                        f"History: {history}\n"
+                        f"ICA Registry: {gov_registration}\n\n"
                         f"Provide a concise summary with key findings."
                     ),
                 }
@@ -359,6 +376,74 @@ class VettingAgent(BaseAgent):
         )
         content = response.get("content", [])
         return content[0].get("text", "") if content else ""
+
+    async def _check_gov_registration(
+        self,
+        contractor_id: str,
+        doc_analysis: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Look up contractor in the ICA companies registry via GovDataClient.
+
+        Persists the result to contractor_verification_metadata.
+        Falls back gracefully so the vetting pipeline is never blocked by a
+        gov integration failure.
+        """
+        from datetime import UTC, datetime
+
+        try:
+            contractor = await self._db.get_contractor(contractor_id)
+            if not contractor:
+                return {"found": False, "confidence": 0.0}
+
+            business_name = contractor.get("business_name", "")
+            license_number = contractor.get("license_number", "")
+            if not business_name:
+                return {"found": False, "confidence": 0.0}
+
+            gov = get_gov_client()
+            company_id = license_number if license_number and str(license_number).isdigit() else None
+            result = gov.lookup_company(name=business_name, company_id=company_id, limit=5)
+
+            verified = False
+            confidence = 0.0
+            raw_response: dict | None = None
+            found = result.ok and bool(result.value)
+
+            if found and result.value:
+                best = result.value[0]
+                verified = best.is_active
+                confidence = 0.75 if best.is_active else 0.4
+                raw_response = {
+                    "company_id": best.company_id,
+                    "name": best.name,
+                    "status": best.status,
+                    "city": best.city,
+                    "address": best.address,
+                    "cache_hit": result.cache_hit,
+                }
+
+            try:
+                await self._db.upsert_contractor_verification(
+                    contractor_id=contractor_id,
+                    source="data_gov_il_companies",
+                    verified=verified,
+                    confidence=confidence,
+                    raw_response=raw_response,
+                )
+            except Exception as db_exc:
+                logger.warning("Failed to persist gov verification for %s: %s", contractor_id, db_exc)
+
+            return {
+                "found": found,
+                "verified": verified,
+                "confidence": confidence,
+                "source": "data_gov_il_companies",
+                "verified_at": datetime.now(UTC).isoformat(),
+                "raw_response": raw_response,
+            }
+        except Exception as exc:
+            logger.warning("Gov registration check failed for contractor %s: %s", contractor_id, exc)
+            return {"found": False, "confidence": 0.0}
 
     def _extract_contractor_id(self, state: AgentState) -> str | None:
         """Extract contractor ID from state (entities, then actions_taken)."""

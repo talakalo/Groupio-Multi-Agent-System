@@ -194,6 +194,18 @@ class Settings(BaseSettings):
     GOV_MUNICIPALITY_API_URL: str = ""
     # Phase 3: data.gov.il integration. Set to "1" or "true" to enable.
     ENABLE_DATAGOV_IL: str = "1"
+    # Gov cache TTLs (seconds)
+    GOV_CACHE_TTL_COMPANIES_SEC: int = 86_400    # 24h
+    GOV_CACHE_TTL_MUNICIPALITIES_SEC: int = 604_800  # 7d
+    # Gov HTTP timeouts (seconds)
+    GOV_HTTP_CONNECT_TIMEOUT_SEC: float = 5.0
+    GOV_HTTP_READ_TIMEOUT_SEC: float = 10.0
+    # Gov circuit breaker
+    GOV_CIRCUIT_FAIL_THRESHOLD: int = 5
+    GOV_CIRCUIT_COOLDOWN_SEC: float = 60.0
+    # Confidence thresholds (replaces hard-coded 0.5)
+    ENRICHMENT_MIN_CONFIDENCE_ACCEPT: float = 0.5
+    ENRICHMENT_MIN_CONFIDENCE_HIGH: float = 0.8
 
     # Email Settings (for verification emails)
     SMTP_HOST: str = ""

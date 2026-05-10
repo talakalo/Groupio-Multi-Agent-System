@@ -9,6 +9,7 @@ import {
   Tag,
   Phone,
   ChevronLeft,
+  Building2,
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils/cn';
@@ -209,6 +210,17 @@ export function ContractorCard({
           <BadgeCheck className="h-4 w-4" />
           <span className="text-xs font-medium">מאומת</span>
         </div>
+
+        {/* Gov registration badge — only shown when confirmed in ICA registry */}
+        {match.govRegistered && (
+          <div
+            className="flex items-center gap-1 text-blue-600"
+            title="רשום בממשלה | Gov Registered"
+          >
+            <Building2 className="h-4 w-4" />
+            <span className="text-xs font-medium">✔ רשום</span>
+          </div>
+        )}
       </div>
 
       {/* ---- Actions ---- */}

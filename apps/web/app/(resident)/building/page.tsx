@@ -17,6 +17,7 @@ import {
   Settings,
   TrendingUp,
   Sparkles,
+  Landmark,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
@@ -232,6 +233,15 @@ export default function BuildingPage(props: PageParamsProps) {
                   <MapPin className="h-4 w-4" />
                   {building.city}
                 </p>
+                {building.municipality_name && (building.enrichment_confidence ?? 0) >= 0.8 && (
+                  <span
+                    className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200"
+                    title={t('municipalityVerified')}
+                  >
+                    <Landmark className="h-3 w-3" />
+                    {building.municipality_name}
+                  </span>
+                )}
               </div>
               <Badge variant="primary" size="sm">
                 {building.residents?.length ?? 0} דיירים

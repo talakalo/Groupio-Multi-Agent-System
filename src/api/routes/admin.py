@@ -1414,6 +1414,93 @@ async def get_contractor_documents(
     return {"items": items, "total": len(items)}
 
 
+# --------------- Refresh gov verification ---------------
+
+
+@router.post("/contractors/{contractor_id}/refresh-verification")
+async def refresh_contractor_gov_verification(
+    contractor_id: str,
+    admin: UserInDB = Depends(require_admin_only),
+    request: Request = None,
+) -> dict[str, Any]:
+    """Trigger a fresh gov-data lookup for a contractor and persist the result.
+
+    Re-runs the same lookup that the vetting agent performs during onboarding:
+    calls data.gov.il company registry, writes to contractor_verification_metadata,
+    and returns the new record. On failure the error is returned as a 200 with
+    found=False so the caller can show a graceful message.
+    """
+    db = get_postgres_client()
+    contractor = await db.get_contractor(contractor_id)
+    if not contractor:
+        raise HTTPException(status_code=404, detail="Contractor not found")
+
+    from src.integrations.gov.client import get_gov_client
+
+    business_name = (contractor.get("business_name") or "").strip()
+    license_number = (contractor.get("license_number") or "").strip()
+
+    if not business_name:
+        return {"found": False, "confidence": 0.0, "message": "No business name on record"}
+
+    try:
+        gov = get_gov_client()
+        company_id = license_number if license_number and license_number.isdigit() else None
+        result = gov.lookup_company(name=business_name, company_id=company_id, limit=5)
+
+        verified = False
+        confidence = 0.0
+        raw_response = None
+        found = result.ok and bool(result.value)
+
+        if found and result.value:
+            best = result.value[0]
+            verified = best.is_active
+            confidence = 0.75 if best.is_active else 0.4
+            raw_response = {
+                "company_id": best.company_id,
+                "name": best.name,
+                "status": best.status,
+                "city": best.city,
+                "address": best.address,
+                "cache_hit": result.cache_hit,
+            }
+
+        row = await db.upsert_contractor_verification(
+            contractor_id=contractor_id,
+            source="data_gov_il_companies",
+            verified=verified,
+            confidence=confidence,
+            raw_response=raw_response,
+        )
+
+        await db.create_audit_log(
+            {
+                "user_id": admin.id,
+                "action": "contractor_gov_refresh",
+                "resource_type": "contractor",
+                "resource_id": contractor_id,
+                "details": {"found": found, "verified": verified, "confidence": confidence},
+                "ip_address": request.client.host if request and request.client else None,
+            }
+        )
+
+        logger.info(
+            "Admin %s refreshed gov verification for contractor %s: found=%s verified=%s",
+            admin.id, contractor_id, found, verified,
+        )
+        return {
+            "found": found,
+            "verified": verified,
+            "confidence": confidence,
+            "source": "data_gov_il_companies",
+            "row": row,
+        }
+    except Exception as exc:
+        logger.warning("Gov refresh failed for contractor %s: %s", contractor_id, exc)
+        return {"found": False, "confidence": 0.0, "error": str(exc)}
+
+
 # --------------- Request contractor documents ---------------
 
 
