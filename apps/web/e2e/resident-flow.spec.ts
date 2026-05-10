@@ -700,10 +700,12 @@ test.describe("Critical User Journey — Register → Login → Join Offer", () 
     await page.fill("#password", "SecurePass123!");
     // Check the required ToS checkbox — without it the browser blocks form submit
     await page.check("#tos");
+    const signupResponse = page.waitForResponse(
+      (r) => r.request().method() === "POST" && r.url().includes("/auth/"),
+      { timeout: 10_000 },
+    ).catch(() => null);
     await page.click('[type="submit"]');
-
-    // Wait briefly for the network request
-    await page.waitForTimeout(2000);
+    await signupResponse;
 
     if (registrationUrl) {
       // Client uses /auth/signup (not legacy /auth/register)

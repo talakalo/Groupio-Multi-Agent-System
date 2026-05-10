@@ -317,10 +317,11 @@ test("8. Admin users page loads without error", async ({ page }) => {
   // Web app admin-facing pages (may redirect to admin subdomain in production)
   await page.goto("/");
   await expect(page.locator("body")).toBeVisible({ timeout: 5_000 });
-  // Validate no unhandled JS errors surfaced
+  // Validate no unhandled JS errors surfaced; wait for load state instead of
+  // a fixed timeout so we don't miss errors that arrive before the timer fires
   const errors: string[] = [];
   page.on("pageerror", (err) => errors.push(err.message));
-  await page.waitForTimeout(500);
+  await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => null);
   // Only fail on critical runtime errors
   const criticalErrors = errors.filter(
     (e) => !e.includes("ResizeObserver") && !e.includes("Non-Error")

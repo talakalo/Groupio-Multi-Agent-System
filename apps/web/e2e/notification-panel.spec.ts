@@ -235,7 +235,22 @@ test.describe("NotificationPanel (mock API)", () => {
       await route.fulfill(createMockResponse({ status: "ok" }));
     });
 
+    // The mount useEffect calls refresh() immediately; if it is still in-flight
+    // when we click the trigger, its finally{setLoading(false)} races with the
+    // panel-open refresh()'s setLoading(true) and the skeleton never appears.
+    // Wait for the mount fetch to resolve before opening the panel.
+    const mountDone = page.waitForResponse(
+      (r) =>
+        r.request().method() === "GET" &&
+        r.url().includes("/api/v1/notifications") &&
+        !r.url().includes("unread-count"),
+      { timeout: 30_000 },
+    );
     await page.goto("/dashboard");
+    await expect(page.getByTestId("notification-panel-trigger")).toBeVisible({
+      timeout: 30_000,
+    });
+    await mountDone;
     await page.getByTestId("notification-panel-trigger").click();
     await expect(page.getByTestId("notification-panel-loading")).toBeVisible({
       timeout: 5000,

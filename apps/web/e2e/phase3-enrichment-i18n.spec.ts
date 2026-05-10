@@ -88,9 +88,9 @@ test.describe("Phase 3: Address suggestion flow", () => {
 
     await page.fill("#buildingAddress", "רחוב לא ידוע 1");
     await page.fill("#city", "עיר לא קיימת");
+    const lowConfidenceRes = page.waitForResponse("**/api/v1/enrichment/normalize-address**", { timeout: 10_000 });
     await page.getByRole("button", { name: /הצע כתובת|Suggest address/ }).click();
-
-    await page.waitForTimeout(2000);
+    await lowConfidenceRes;
     await expect(page.getByText(/השתמש בהצעה|Use suggested/)).not.toBeVisible();
   });
 
@@ -106,9 +106,9 @@ test.describe("Phase 3: Address suggestion flow", () => {
 
     await page.fill("#buildingAddress", "רוטשילד 15");
     await page.fill("#city", "תל אביב");
+    const errorRes = page.waitForResponse("**/api/v1/enrichment/normalize-address**", { timeout: 10_000 });
     await page.getByRole("button", { name: /הצע כתובת|Suggest address/ }).click();
-
-    await page.waitForTimeout(2000);
+    await errorRes;
     await expect(page.getByText(/השתמש בהצעה|Use suggested/)).not.toBeVisible();
   });
 });
@@ -121,8 +121,7 @@ test.describe("Phase 3: Language toggle persistence", () => {
     const englishBtn = page.getByRole("button", { name: "English" });
     if (await englishBtn.isVisible()) {
       await englishBtn.click();
-      await page.waitForTimeout(800);
-      await expect(page.locator("html")).toHaveAttribute("dir", "ltr");
+      await expect(page.locator("html")).toHaveAttribute("dir", "ltr", { timeout: 5_000 });
     }
   });
 
@@ -131,10 +130,9 @@ test.describe("Phase 3: Language toggle persistence", () => {
     const englishBtn = page.getByRole("button", { name: "English" });
     if (await englishBtn.isVisible()) {
       await englishBtn.click();
-      await page.waitForTimeout(500);
+      await expect(page.locator("html")).toHaveAttribute("dir", "ltr", { timeout: 5_000 });
     }
     await page.goto("/signup");
-    await page.waitForTimeout(500);
     const dir = await page.locator("html").getAttribute("dir");
     expect(["ltr", "rtl"]).toContain(dir);
   });
@@ -202,14 +200,11 @@ test.describe("Phase 3: Language toggle persistence", () => {
     });
 
     await page.goto("/onboarding");
-    await page.waitForTimeout(800);
     const englishBtn = page.getByRole("button", { name: "English" });
-    await expect(englishBtn).toBeVisible();
+    await expect(englishBtn).toBeVisible({ timeout: 10_000 });
     await englishBtn.click();
-    await page.waitForTimeout(1200);
-
     // UI must switch to ltr when clicking English
-    await expect(page.locator("html")).toHaveAttribute("dir", "ltr");
+    await expect(page.locator("html")).toHaveAttribute("dir", "ltr", { timeout: 5_000 });
     // When accessToken is in store (e.g. after real login), profile PUT is sent
     if (putMePayload != null) {
       expect(putMePayload["preferred_language"] === "en").toBe(true);
