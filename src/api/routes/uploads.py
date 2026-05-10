@@ -75,8 +75,8 @@ async def _run_architecture_analysis(file_id: str, user_id: str, building_id: st
 
 @router.post("/architecture")
 async def upload_architecture_plan(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-    background_tasks: BackgroundTasks = None,
     building_id: str | None = Query(None),
     current_user: UserInDB = Depends(get_current_user),
 ) -> dict:

@@ -344,8 +344,7 @@ jobs:
         run: |
           # Start the backend briefly in the background to expose the schema.
           # Uses stub env vars — no real DB or LLM connections are made.
-          TESTING=true ENVIRONMENT=testing JWT_SECRET_KEY=ci-test-key \
-            python -m uvicorn src.api.main:app --host 127.0.0.1 --port 8099 &
+          python -m uvicorn src.api.main:app --host 127.0.0.1 --port 8099 &
           BACKEND_PID=$!
           # Poll /openapi.json for readiness (max 30s). Fail fast if backend never comes up.
           for i in $(seq 1 30); do
@@ -360,6 +359,9 @@ jobs:
           kill $BACKEND_PID || true
         env:
           PYTHONPATH: .
+          TESTING: 'true'
+          ENVIRONMENT: testing
+          JWT_SECRET_KEY: ci-test-secret-key-for-openapi-schema-export-only
 
       - name: Build all packages
         run: pnpm build

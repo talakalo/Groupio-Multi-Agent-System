@@ -39,8 +39,8 @@ class BuildingInDB(BuildingBase):
 
     # Override base required fields as optional — DB rows may omit them for
     # older records or when populated via partial mocks/migrations.
-    total_units: int | None = Field(None, ge=1)
-    floors: int | None = Field(None, ge=1)
+    total_units: int | None = Field(None, ge=1)  # type: ignore[assignment]
+    floors: int | None = Field(None, ge=1)  # type: ignore[assignment]
 
     id: str
     admin_user_id: str

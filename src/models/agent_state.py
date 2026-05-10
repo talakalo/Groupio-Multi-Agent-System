@@ -2,7 +2,7 @@
 
 from typing import Annotated, Any, Literal
 
-from typing_extensions import TypedDict
+from typing_extensions import NotRequired, TypedDict
 
 
 def merge_lists(left: list, right: list) -> list:
@@ -71,6 +71,9 @@ class AgentState(TypedDict):
 
     # Response
     final_response: dict[str, Any] | None
+
+    # File upload context (set by architecture upload route, absent otherwise)
+    architecture_file_id: NotRequired[str | None]
 
     # Metadata
     start_time: str
