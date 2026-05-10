@@ -731,22 +731,22 @@ The following CLAUDE.md directives apply to code changes in this phase:
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Stripe entity path (blocking)**
    - What we know: Israel is not a supported Stripe country; test account exists.
    - What's unclear: Does the company already have a US LLC, EU entity, or other Stripe-eligible entity registered?
-   - Recommendation: Planner must add a "confirm Stripe entity" task as the first Stripe task, gated on user answer.
+   - RESOLVED: Plan 01-04 treats this as a user-action blocker with `### Status: BLOCKED — User action required`. Four entity paths documented (US LLC, EU entity, Stripe Atlas, Tranzila fallback). User must fill in the decision record before KYC can proceed.
 
 2. **Admin app domain under D-02**
    - What we know: D-02 says path-based routing, no subdomains. `apps/admin` is a separate Vercel project currently deployed to its own URL.
    - What's unclear: Where does the admin app live on `groupio.co.il`? Is it at `/admin` via a Vercel rewrite, or does it get a separate domain outside scope?
-   - Recommendation: Flag for planner; likely a Vercel rewrite rule from `groupio.co.il/admin` → `apps/admin` Vercel deployment.
+   - RESOLVED: Plan 01-05 documents admin app served from `groupio.co.il/admin` via Vercel rewrite rule, with full setup deferred to Phase 8 (Building Manager & Admin Ops). Placeholder documented in ops runbook.
 
 3. **API backend domain vs D-02**
    - What we know: `deploy.yml` smoke test expects `https://api.groupio.co.il/api/v1/health/live`.
    - What's unclear: How does the backend VPS get traffic under path-based routing? Vercel cannot proxy to arbitrary VPS ports without a rewrite.
-   - Recommendation: D-02 "path-based, no subdomains" likely applies to the *resident-facing* app, not the backend API. Clarify scope. Backend subdomain `api.groupio.co.il` is likely still needed.
+   - RESOLVED: Plan 01-05 clarifies that D-02 "path-based, no subdomains" applies to the resident-facing frontend only. `api.groupio.co.il` is retained for the VPS-hosted FastAPI backend. The CI health check URL in `deploy.yml` line 163 is correct and preserved as-is.
 
 ---
 
