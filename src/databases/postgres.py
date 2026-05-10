@@ -3742,6 +3742,24 @@ class PostgresClient:
             return result.data[0] if result.data else None
         return await self._pg_fetch_one("SELECT * FROM payments WHERE transaction_id = $1", transaction_id)
 
+    async def count_succeeded_payments_for_invoice(self, invoice_id: str) -> int:
+        """Return the number of payments in succeeded/paid status for an invoice."""
+        if self._use_supabase_client():
+            client = await self._get_client()
+            result = (
+                await client.table("payments")
+                .select("id", count="exact")
+                .eq("invoice_id", invoice_id)
+                .in_("status", ["succeeded", "paid", "completed"])
+                .execute()
+            )
+            return result.count or 0
+        row = await self._pg_fetch_one(
+            "SELECT COUNT(*) AS c FROM payments WHERE invoice_id = $1 AND status IN ('succeeded','paid','completed')",
+            invoice_id,
+        )
+        return int(row["c"]) if row else 0
+
     # ------------------------------------------------------------------
     # Payment Splits
     # ------------------------------------------------------------------

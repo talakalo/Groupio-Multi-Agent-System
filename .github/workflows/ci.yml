@@ -234,11 +234,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
 
+      - name: Apply database migrations
+        run: |
+          alembic upgrade head
+
       - name: Run tests with coverage enforcement
         run: |
-          # 75% — aligns with current measured aggregate (~75%) across ``src/``;
-          # restore toward 82% by extending targeted unit tests (workers/payments).
-
+          # 75% — unit tests alone reach ~72%; integration tests (which need the
+          # migrated schema) push the aggregate above 75%.
           pytest tests/ --cov=src --cov-fail-under=75 --cov-report=xml --cov-report=term-missing
 
       - name: Run integration tests

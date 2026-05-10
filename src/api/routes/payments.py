@@ -496,10 +496,18 @@ async def initiate_payment(
             )
         await db.create_payment(payment_data, conn=conn)
 
-    # For direct payments that succeeded, mark invoice as paid immediately
-    # For escrow payments, invoice stays pending until admin releases
-    if payment_data["status"] == "succeeded" and payment_type == "direct":
-        await db.update_invoice(existing_invoice["id"], {"status": "paid"})
+    # For direct payments that succeeded, mark invoice as paid immediately.
+    # For escrow: Stripe marks invoice paid via webhook. For mock (no webhook),
+    # mark paid when all offer participants have a succeeded payment.
+    if payment_data["status"] == "succeeded":
+        if payment_type == "direct":
+            await db.update_invoice(existing_invoice["id"], {"status": "paid"})
+        elif provider_key == "mock" and existing_invoice.get("id"):
+            participants = await db.get_offer_participants(request.offer_id)
+            participant_count = len(participants)
+            succeeded = await db.count_succeeded_payments_for_invoice(str(existing_invoice["id"]))
+            if participant_count == 0 or succeeded >= participant_count:
+                await db.update_invoice(existing_invoice["id"], {"status": "paid"})
 
     return PaymentResponse(
         id=payment_data["id"],

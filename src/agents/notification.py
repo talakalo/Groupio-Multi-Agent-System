@@ -144,14 +144,36 @@ class NotificationAgent(BaseAgent):
         return "offer_update"
 
     def _resolve_channels(self, state: AgentState) -> list[str]:
-        """Determine which channels to use for this notification."""
-        # Explicit channels override
+        """Determine which channels to use, respecting user notification_settings."""
+        # Explicit caller override always wins
         explicit = state.get("notification_channels")  # type: ignore[arg-type]
         if explicit and isinstance(explicit, list):
             return [ch for ch in explicit if ch in CHANNELS]
 
-        # Default: in-app always, plus email
-        return ["in_app", "email"]
+        # Read user preferences from profile (saved as notification_settings JSONB)
+        prefs: dict = {}
+        user_profile = state.get("user_profile") or {}
+        raw_settings = user_profile.get("notification_settings")
+        if isinstance(raw_settings, dict):
+            prefs = raw_settings
+
+        # in_app is always on — residents can't opt out of in-app alerts
+        channels = ["in_app"]
+
+        # Map frontend preference keys to channel names
+        # Both camelCase (resident) and snake_case (contractor) variants supported
+        email_on = prefs.get("emailEnabled", prefs.get("email_offers", True))
+        push_on = prefs.get("pushEnabled", True)
+        whatsapp_on = prefs.get("whatsappEnabled", prefs.get("whatsapp_offers", False))
+
+        if email_on:
+            channels.append("email")
+        if push_on:
+            channels.append("push")
+        if whatsapp_on:
+            channels.append("whatsapp")
+
+        return channels
 
     async def _craft_message(
         self,
