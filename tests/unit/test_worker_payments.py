@@ -16,7 +16,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.workers.worker_payments import _handle
+from src.workers.worker_payments import _handle, run_consumer
 
 
 @pytest.mark.asyncio
@@ -86,3 +86,34 @@ async def test_handle_accepts_missing_event_name() -> None:
         await _handle({"payload": {}})
 
     metric.labels.assert_called_with(worker="payments", result="ok")
+
+
+@pytest.mark.asyncio
+async def test_run_consumer_exits_when_rabbitmq_disabled() -> None:
+    fake_settings = MagicMock()
+    fake_settings.ENABLE_RABBITMQ = False
+    with patch("src.workers.worker_payments.get_settings", return_value=fake_settings):
+        await run_consumer()
+
+
+@pytest.mark.asyncio
+async def test_run_consumer_exits_when_rabbitmq_url_empty() -> None:
+    fake_settings = MagicMock()
+    fake_settings.ENABLE_RABBITMQ = True
+    fake_settings.RABBITMQ_URL = ""
+    with patch("src.workers.worker_payments.get_settings", return_value=fake_settings):
+        await run_consumer()
+
+
+def test_main_runs_consumer() -> None:
+    import src.workers.worker_payments as mod
+
+    def _close_coro(coro: object) -> None:
+        if hasattr(coro, "close"):
+            coro.close()  # type: ignore[union-attr]
+
+    with patch.object(mod, "asyncio") as mock_asyncio:
+        mock_asyncio.run = MagicMock(side_effect=_close_coro)
+        mod.main()
+
+    mock_asyncio.run.assert_called_once()

@@ -8,7 +8,7 @@ event type except ``notifications.offer_joined_email`` was silently dropped.
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -114,3 +114,75 @@ async def test_non_dict_payload_is_coerced_to_empty_dict():
 
     get_svc.assert_called_once()
     mock_inc.assert_called_once_with("ignored")
+
+
+def test_inc_delegates_to_prometheus_counter() -> None:
+    from src.workers.worker_notifications import _inc
+
+    with patch("src.workers.worker_notifications.messaging_consumer_messages_total") as metric:
+        counter = MagicMock()
+        metric.labels = MagicMock(return_value=counter)
+        _inc("ok")
+
+    metric.labels.assert_called_once_with(worker="notifications", result="ok")
+    counter.inc.assert_called_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "event_name",
+    [
+        "notifications.offer_left_email",
+        "notifications.offer_threshold_reached_email",
+        "notifications.offer_cancelled_email",
+        "notifications.offer_matched_email",
+        "notifications.offer_at_risk_email",
+        "notifications.offer_approved_email",
+    ],
+)
+async def test_missing_to_email_returns_ignored_for_every_dispatcher(event_name: str) -> None:
+    from src.workers import worker_notifications
+
+    fake_email = AsyncMock()
+    with (
+        patch("src.services.email.get_email_service", return_value=fake_email),
+        patch.object(worker_notifications, "_inc") as mock_inc,
+    ):
+        await worker_notifications._handle_envelope({"event_name": event_name, "payload": {}})
+
+    mock_inc.assert_called_once_with("ignored")
+
+
+@pytest.mark.asyncio
+async def test_run_consumer_exits_immediately_when_rabbitmq_disabled() -> None:
+    from src.workers.worker_notifications import run_consumer
+
+    fake_settings = MagicMock()
+    fake_settings.ENABLE_RABBITMQ = False
+    with patch("src.workers.worker_notifications.get_settings", return_value=fake_settings):
+        await run_consumer()
+
+
+@pytest.mark.asyncio
+async def test_run_consumer_exits_when_rabbitmq_url_empty() -> None:
+    from src.workers.worker_notifications import run_consumer
+
+    fake_settings = MagicMock()
+    fake_settings.ENABLE_RABBITMQ = True
+    fake_settings.RABBITMQ_URL = ""
+    with patch("src.workers.worker_notifications.get_settings", return_value=fake_settings):
+        await run_consumer()
+
+
+def test_main_runs_consumer() -> None:
+    from src.workers import worker_notifications
+
+    def _close_coro(coro: object) -> None:
+        if hasattr(coro, "close"):
+            coro.close()  # type: ignore[union-attr]
+
+    with patch.object(worker_notifications, "asyncio") as mock_asyncio:
+        mock_asyncio.run = MagicMock(side_effect=_close_coro)
+        worker_notifications.main()
+
+    mock_asyncio.run.assert_called_once()

@@ -110,3 +110,50 @@ async def test_run_loop_exits_immediately_when_outbox_disabled() -> None:
         await run_loop()
 
     db_getter.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_run_loop_warns_and_sleeps_when_rabbitmq_disabled() -> None:
+    """ENABLE_OUTBOX=True but ENABLE_RABBITMQ=False: loop warns and sleeps.
+    The test breaks the loop by raising on the first asyncio.sleep call."""
+    import asyncio as real_asyncio
+
+    fake_settings = MagicMock()
+    fake_settings.ENABLE_OUTBOX = True
+    fake_settings.ENABLE_RABBITMQ = False
+    fake_settings.OUTBOX_POLL_INTERVAL_MS = 100
+
+    db = AsyncMock()
+    db.close = AsyncMock()
+
+    sleep_calls: list[float] = []
+
+    async def _fake_sleep(delay: float) -> None:
+        sleep_calls.append(delay)
+        raise real_asyncio.CancelledError
+
+    with (
+        patch("src.workers.outbox_dispatcher.get_settings", return_value=fake_settings),
+        patch("src.workers.outbox_dispatcher.get_postgres_client", return_value=db),
+        patch("src.workers.outbox_dispatcher.asyncio") as mock_asyncio,
+    ):
+        mock_asyncio.sleep = _fake_sleep
+        with pytest.raises(real_asyncio.CancelledError):
+            await run_loop()
+
+    assert sleep_calls == [5.0]
+    db.fetch_pending_outbox_events.assert_not_called()
+
+
+def test_outbox_main_runs_loop() -> None:
+    import src.workers.outbox_dispatcher as mod
+
+    def _close_coro(coro: object) -> None:
+        if hasattr(coro, "close"):
+            coro.close()  # type: ignore[union-attr]
+
+    with patch.object(mod, "asyncio") as mock_asyncio:
+        mock_asyncio.run = MagicMock(side_effect=_close_coro)
+        mod.main()
+
+    mock_asyncio.run.assert_called_once()

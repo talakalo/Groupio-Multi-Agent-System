@@ -14,7 +14,7 @@ import pytest
 
 from src.integrations.espocrm.schema import EspoSchema
 from src.integrations.espocrm.service import EspoCRMService
-from src.workers.worker_crm_sync import _process_envelope
+from src.workers.worker_crm_sync import _process_envelope, run_consumer
 
 
 def _schema() -> EspoSchema:
@@ -158,3 +158,41 @@ async def test_worker_wrapper_reraises_on_handler_exception() -> None:
 
     with pytest.raises(RuntimeError, match="boom"):
         await _process_envelope(svc, {"event_name": "crm.contractor.registered"})
+
+
+@pytest.mark.asyncio
+async def test_run_consumer_exits_when_rabbitmq_or_crm_disabled() -> None:
+    fake_settings = MagicMock()
+    fake_settings.ENABLE_RABBITMQ = False
+    fake_settings.ENABLE_CRM_SYNC = True
+    with patch("src.workers.worker_crm_sync.get_settings", return_value=fake_settings):
+        await run_consumer()
+
+    fake_settings.ENABLE_RABBITMQ = True
+    fake_settings.ENABLE_CRM_SYNC = False
+    with patch("src.workers.worker_crm_sync.get_settings", return_value=fake_settings):
+        await run_consumer()
+
+
+@pytest.mark.asyncio
+async def test_run_consumer_exits_when_rabbitmq_url_empty() -> None:
+    fake_settings = MagicMock()
+    fake_settings.ENABLE_RABBITMQ = True
+    fake_settings.ENABLE_CRM_SYNC = True
+    fake_settings.RABBITMQ_URL = ""
+    with patch("src.workers.worker_crm_sync.get_settings", return_value=fake_settings):
+        await run_consumer()
+
+
+def test_main_runs_consumer() -> None:
+    import src.workers.worker_crm_sync as mod
+
+    def _close_coro(coro: object) -> None:
+        if hasattr(coro, "close"):
+            coro.close()  # type: ignore[union-attr]
+
+    with patch.object(mod, "asyncio") as mock_asyncio:
+        mock_asyncio.run = MagicMock(side_effect=_close_coro)
+        mod.main()
+
+    mock_asyncio.run.assert_called_once()
