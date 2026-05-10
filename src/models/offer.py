@@ -97,6 +97,7 @@ class OfferResponse(OfferInDB):
     building_name: str | None = None
     current_price: float | None = None
     current_discount: float | None = None
+    user_is_participant: bool = False
 
 
 class OfferListResponse(BaseModel):

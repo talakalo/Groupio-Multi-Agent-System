@@ -64,6 +64,8 @@ export interface Offer {
   expiresAt: string;
   /** Agent-generated explanation; API may expose as snake_case `pricing_rationale` */
   pricingRationale?: string;
+  /** True when the authenticated caller has already joined this offer. API returns snake_case. */
+  user_is_participant?: boolean;
 }
 
 export interface PricingTier {

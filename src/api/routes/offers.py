@@ -256,6 +256,11 @@ async def get_offer(
 
     await _assert_can_view_offer(db, current_user, offer)
 
+    # Annotate whether this caller is already a participant so the UI can
+    # show the correct state without waiting for a failed join attempt.
+    offer = dict(offer)
+    offer["user_is_participant"] = await db.has_user_joined_offer(current_user.id, offer_id)
+
     return offer
 
 

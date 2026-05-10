@@ -531,41 +531,14 @@ export default function OfferDetailPage(props: PageParamsProps) {
         {!contractor && <EscrowBadge variant="block" className="mb-5" />}
 
         {/* Join button — opens confirmation modal with policy disclosure */}
-        <button
-          ref={joinButtonRef}
-          type="button"
-          onClick={() => setShowJoinModal(true)}
-          disabled={joinMutation.isPending || joinMutation.isSuccess || offer.status !== 'active' || !user?.id}
-          className="btn-primary w-full flex items-center justify-center gap-2 text-lg py-3"
-          data-testid="join-offer-button"
-        >
-          {joinMutation.isPending ? (
-            <>
-              <Loader2 className="h-5 w-5 animate-spin" />
-              <span>{t('joining')}</span>
-            </>
-          ) : joinMutation.isSuccess ? (
-            <>
-              <Check className="h-5 w-5" />
-              <span>{t('joined')}</span>
-            </>
-          ) : (
-            <span>{t('joinOffer')}</span>
-          )}
-        </button>
-
-        {joinMutation.isError && (
-          <p className="text-red-500 text-sm mt-2 text-center">{t('joinError')}</p>
-        )}
-
-        {/* After joining: prompt resident to proceed to payment */}
-        {joinMutation.isSuccess && (
-          <div className="mt-3 bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center justify-between gap-3">
+        {offer.user_is_participant ? (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-semibold text-emerald-800">הצטרפתם בהצלחה!</p>
-              <p className="text-xs text-emerald-700 mt-0.5">
-                כדי להבטיח את מקומכם, יש להשלים את התשלום.
+              <p className="text-sm font-semibold text-emerald-800 flex items-center gap-1.5">
+                <Check className="h-4 w-4" />
+                {t('alreadyJoined')}
               </p>
+              <p className="text-xs text-emerald-700 mt-0.5">{t('alreadyJoinedHint')}</p>
             </div>
             <Link
               href={`/checkout?offerId=${offerId}`}
@@ -575,6 +548,54 @@ export default function OfferDetailPage(props: PageParamsProps) {
               לתשלום →
             </Link>
           </div>
+        ) : (
+          <>
+            <button
+              ref={joinButtonRef}
+              type="button"
+              onClick={() => setShowJoinModal(true)}
+              disabled={joinMutation.isPending || joinMutation.isSuccess || offer.status !== 'active' || !user?.id}
+              className="btn-primary w-full flex items-center justify-center gap-2 text-lg py-3"
+              data-testid="join-offer-button"
+            >
+              {joinMutation.isPending ? (
+                <>
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <span>{t('joining')}</span>
+                </>
+              ) : joinMutation.isSuccess ? (
+                <>
+                  <Check className="h-5 w-5" />
+                  <span>{t('joined')}</span>
+                </>
+              ) : (
+                <span>{t('joinOffer')}</span>
+              )}
+            </button>
+
+            {joinMutation.isError && (
+              <p className="text-red-500 text-sm mt-2 text-center">{t('joinError')}</p>
+            )}
+
+            {/* After joining: prompt resident to proceed to payment */}
+            {joinMutation.isSuccess && (
+              <div className="mt-3 bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-emerald-800">הצטרפתם בהצלחה!</p>
+                  <p className="text-xs text-emerald-700 mt-0.5">
+                    כדי להבטיח את מקומכם, יש להשלים את התשלום.
+                  </p>
+                </div>
+                <Link
+                  href={`/checkout?offerId=${offerId}`}
+                  className="btn-primary text-sm whitespace-nowrap flex-shrink-0"
+                  data-testid="proceed-to-payment-button"
+                >
+                  לתשלום →
+                </Link>
+              </div>
+            )}
+          </>
         )}
 
         {/* Cancellation policy summary — always visible */}
@@ -756,13 +777,15 @@ export default function OfferDetailPage(props: PageParamsProps) {
       </div>
 
       {/* Sticky desktop CTA */}
-      <StickyJoinCTA
-        offerTitle={`${tCat(offer.category)} - ${t('groupOffer')}`}
-        price={formatPrice(currentTier?.price ?? offer.basePrice)}
-        onJoin={() => setShowJoinModal(true)}
-        disabled={joinMutation.isPending || joinMutation.isSuccess || offer.status !== 'active' || !user?.id}
-        targetRef={joinButtonRef}
-      />
+      {!offer.user_is_participant && (
+        <StickyJoinCTA
+          offerTitle={`${tCat(offer.category)} - ${t('groupOffer')}`}
+          price={formatPrice(currentTier?.price ?? offer.basePrice)}
+          onJoin={() => setShowJoinModal(true)}
+          disabled={joinMutation.isPending || joinMutation.isSuccess || offer.status !== 'active' || !user?.id}
+          targetRef={joinButtonRef}
+        />
+      )}
     </div>
   );
 }
