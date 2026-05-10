@@ -528,11 +528,11 @@ export default function OffersListPage(props: PageParamsProps) {
             title={t('noOffers')}
             description={
               activeFilterCount > 0
-                ? t('noOffersDescription') + ' נסו לנקות את הסינון.'
+                ? t('clearFilterHint')
                 : t('noOffersDescription')
             }
             action={
-              activeFilterCount > 0 ? undefined : { label: 'גלו הצעות', href: '/offers' }
+              activeFilterCount > 0 ? undefined : { label: t('discoverOffers'), href: '/offers' }
             }
           />
           {activeFilterCount > 0 && (

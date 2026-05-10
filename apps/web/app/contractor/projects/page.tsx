@@ -217,7 +217,7 @@ export default function ContractorProjectsPage() {
                     {project.building?.name} • {t(`categories.${project.category}`)}
                   </p>
                 </div>
-                <div className="text-left">
+                <div className="text-end">
                   <p className="text-lg font-bold text-gray-900">
                     ₪{(project.actualRevenue || project.finalPrice || 0).toLocaleString()}
                   </p>

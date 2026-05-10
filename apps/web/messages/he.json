@@ -122,6 +122,8 @@
     "priceMax": "מחיר מקסימלי",
     "noLimit": "ללא הגבלה",
     "noOffersDescription": "לא נמצאו הצעות התואמות לחיפוש שלך",
+    "clearFilterHint": "לא נמצאו הצעות התואמות לחיפוש שלך. נסו לנקות את הסינון.",
+    "discoverOffers": "גלו הצעות",
     "errorLoadingOffers": "שגיאה בטעינת ההצעות. נסה שוב.",
     "retry": "נסה שוב"
   },

@@ -122,6 +122,8 @@
     "priceMax": "Max Price",
     "noLimit": "No Limit",
     "noOffersDescription": "No offers match your search",
+    "clearFilterHint": "No offers match your search. Try clearing the filters.",
+    "discoverOffers": "Discover Offers",
     "errorLoadingOffers": "Error loading offers. Please try again.",
     "retry": "Retry"
   },

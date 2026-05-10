@@ -25,17 +25,19 @@ function OfferAnalyticsPanel({ offer }: { offer: Offer }) {
   const [expanded, setExpanded] = useState(false);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [loadingParts, setLoadingParts] = useState(false);
+  const [participantError, setParticipantError] = useState(false);
 
   const revenue = (offer.basePrice ?? 0) * (offer.participants ?? 0);
 
   const fetchParticipants = useCallback(async () => {
     if (participants.length > 0) return; // already loaded
     setLoadingParts(true);
+    setParticipantError(false);
     try {
       const res = await apiClient.getOfferParticipants(offer.id);
       setParticipants((res.items as Participant[]) ?? []);
     } catch {
-      // non-critical
+      setParticipantError(true);
     } finally {
       setLoadingParts(false);
     }
@@ -83,6 +85,8 @@ function OfferAnalyticsPanel({ offer }: { offer: Offer }) {
             <div className="flex items-center gap-2 text-sm text-gray-500 py-2">
               <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />טוען משתתפים...
             </div>
+          ) : participantError ? (
+            <p className="text-sm text-red-500 py-2">שגיאה בטעינת המשתתפים. לחץ שוב לניסיון חוזר.</p>
           ) : participants.length === 0 ? (
             <p className="text-sm text-gray-400 py-2">אין משתתפים עדיין.</p>
           ) : (
