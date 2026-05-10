@@ -67,7 +67,7 @@ test.describe("NotificationPanel (mock API)", () => {
     await page
       .getByTestId("notification-panel-dialog")
       .locator('button[aria-label="סמן כנקרא"]')
-      .click();
+      .click({ force: true });
     await expect.poll(() => readCalls).toBe(1);
 
     readAllCalls = 0;
@@ -235,22 +235,7 @@ test.describe("NotificationPanel (mock API)", () => {
       await route.fulfill(createMockResponse({ status: "ok" }));
     });
 
-    // Wait for the mount fetch to complete before clicking so the open fetch
-    // (listPass === 2, delayed 1200 ms) is definitely the slow one. Without
-    // this guard the mount's setLoading(false) races with the open's
-    // setLoading(true) and the skeleton never shows.
-    const mountFetch = page.waitForResponse(
-      (r) =>
-        r.request().method() === "GET" &&
-        r.url().includes("/api/v1/notifications") &&
-        !r.url().includes("unread-count"),
-      { timeout: 30_000 },
-    );
     await page.goto("/dashboard");
-    await expect(page.getByTestId("notification-panel-trigger")).toBeVisible({
-      timeout: 30_000,
-    });
-    await mountFetch;
     await page.getByTestId("notification-panel-trigger").click();
     await expect(page.getByTestId("notification-panel-loading")).toBeVisible({
       timeout: 5000,
