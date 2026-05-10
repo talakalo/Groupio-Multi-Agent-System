@@ -109,11 +109,23 @@ test.describe("NotificationPanel (mock API)", () => {
       await route.fulfill(createMockResponse({ status: "ok" }));
     });
 
+    // Capture the initial mount fetch before navigating so we can wait for
+    // it to complete before enabling failure mode. waitForTimeout(500) was
+    // flaky on CI — the mount fetch can take >500 ms on slow runners, and
+    // if it is still in-flight when failNextNotificationList is set, the
+    // mount fetch (not the panel-open fetch) consumes the fail flag.
+    const initialFetch = page.waitForResponse(
+      (r) =>
+        r.request().method() === "GET" &&
+        r.url().includes("/api/v1/notifications") &&
+        !r.url().includes("unread-count"),
+      { timeout: 30_000 },
+    );
     await page.goto("/dashboard");
     await expect(page.getByTestId("notification-panel-trigger")).toBeVisible({
       timeout: 30_000,
     });
-    await page.waitForTimeout(500);
+    await initialFetch; // wait for the mount fetch to finish
     ctrl.failNextNotificationList = true;
     const failedList = page.waitForResponse(
       (r) =>
@@ -172,10 +184,13 @@ test.describe("NotificationPanel (mock API)", () => {
     await expect(page.getByText("צריך סימון")).toBeVisible();
 
     await page.getByText("צריך סימון").hover();
+    // force:true bypasses the opacity-0→opacity-100 CSS transition race:
+    // the button is inside a group-hover div and may still be mid-transition
+    // when Playwright's actionability check runs, causing flakiness on CI.
     await page
       .getByTestId("notification-panel-dialog")
       .locator('button[aria-label="סמן כנקרא"]')
-      .click();
+      .click({ force: true });
 
     await expect(
       page.getByTestId("notification-panel-dialog").getByRole("alert"),
