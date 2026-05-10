@@ -1,9 +1,10 @@
 """File upload API routes."""
 
+import asyncio
 import logging
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile
 
 from src.api.middleware.auth import get_current_user
 from src.databases.postgres import get_postgres_client
@@ -48,9 +49,34 @@ async def _check_upload_rate_limit(current_user: UserInDB) -> None:
 # ------------------------------------------------------------------
 
 
+async def _run_architecture_analysis(file_id: str, user_id: str, building_id: str | None) -> None:
+    """Background task: run ArchitectureAgent on an uploaded floor plan."""
+    try:
+        from src.agents.architecture import ArchitectureAgent
+        from src.orchestration.state import create_initial_state
+
+        state = create_initial_state(
+            user_message="Analyze uploaded floor plan",
+            user_id=user_id,
+            building_id=building_id,
+        )
+        state["architecture_file_id"] = file_id
+
+        agent = ArchitectureAgent()
+        await agent.run(state)
+    except Exception as exc:
+        logger.error("Background architecture analysis failed for %s: %s", file_id, exc)
+        try:
+            db = get_postgres_client()
+            await db.update_file_upload(file_id, {"analysis_status": "failed"})
+        except Exception:
+            pass
+
+
 @router.post("/architecture")
 async def upload_architecture_plan(
     file: UploadFile = File(...),
+    background_tasks: BackgroundTasks = None,
     building_id: str | None = Query(None),
     current_user: UserInDB = Depends(get_current_user),
 ) -> dict:
@@ -93,6 +119,16 @@ async def upload_architecture_plan(
         "analysis_status": "pending",
     }
     await db.create_file_upload(record)
+
+    # Kick off analysis in the background so the upload returns immediately
+    if background_tasks is not None:
+        background_tasks.add_task(
+            _run_architecture_analysis, file_id, current_user.id, building_id
+        )
+    else:
+        asyncio.create_task(
+            _run_architecture_analysis(file_id, current_user.id, building_id)
+        )
 
     return {
         "id": file_id,

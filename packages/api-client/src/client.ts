@@ -582,6 +582,29 @@ export class GroupioApiClient {
     return this.get<CreditAward[]>(`/admin/credit-awards${qs ? `?${qs}` : ""}`);
   }
 
+  // ---- Architecture / Floor Plan ----
+
+  async uploadArchitecturePlan(
+    file: File,
+    buildingId?: string,
+  ): Promise<{ id: string; file_name: string; storage_path: string; public_url?: string; analysis_status: string }> {
+    const form = new FormData();
+    form.append("file", file);
+    const qs = buildingId ? `?building_id=${encodeURIComponent(buildingId)}` : "";
+    const url = `${this.baseUrl}/uploads/architecture${qs}`;
+    const headers: Record<string, string> = { Accept: "application/json", ...this.customHeaders };
+    if (this.authToken) headers["Authorization"] = `Bearer ${this.authToken}`;
+    const response = await fetch(url, { method: "POST", headers, credentials: "include", body: form });
+    if (!response.ok) await this.handleErrorResponse(response, "/uploads/architecture");
+    return response.json();
+  }
+
+  async getFileUpload(
+    fileId: string,
+  ): Promise<{ id: string; analysis_status: string; analysis_result?: unknown; download_url?: string }> {
+    return this.get(`/uploads/${encodeURIComponent(fileId)}`);
+  }
+
   // ---- Internal HTTP Helpers ----
 
   private buildHeaders(): Record<string, string> {
