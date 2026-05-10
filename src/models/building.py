@@ -37,6 +37,11 @@ class BuildingInDB(BuildingBase):
 
     model_config = ConfigDict(from_attributes=True)
 
+    # Override base required fields as optional — DB rows may omit them for
+    # older records or when populated via partial mocks/migrations.
+    total_units: int | None = Field(None, ge=1)
+    floors: int | None = Field(None, ge=1)
+
     id: str
     admin_user_id: str
     resident_count: int = 0
@@ -44,8 +49,8 @@ class BuildingInDB(BuildingBase):
     completed_offers: int = 0
     total_savings: float = 0
     whatsapp_group_id: str | None = None
-    created_at: datetime
-    updated_at: datetime
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 class BuildingResponse(BuildingInDB):
