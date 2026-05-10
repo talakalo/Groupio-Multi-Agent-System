@@ -273,6 +273,7 @@ class ApiClient {
     max_participants: number;
     deadline?: string | null;
     building_id: string;
+    pricing_tiers?: Array<{ min_participants: number; price_per_unit: number }>;
   }) {
     return this.request<import("@groupio/types").Offer>("/api/v1/offers", {
       method: "POST",

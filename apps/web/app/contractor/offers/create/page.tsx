@@ -153,6 +153,18 @@ export default function CreateOfferPage(props: PageParamsProps) {
         max_participants: data.maxParticipants,
         deadline,
         building_id: data.buildingId,
+        pricing_tiers: (data.pricingTiers ?? []).map((t, i, arr) => {
+          const nextMin = arr[i + 1]?.minResidents;
+          const discountPercent = data.basePrice > 0
+            ? Math.max(0, ((data.basePrice - t.pricePerUnit) / data.basePrice) * 100)
+            : 0;
+          return {
+            min_participants: t.minResidents,
+            max_participants: nextMin ? nextMin - 1 : data.maxParticipants,
+            price_per_unit: t.pricePerUnit,
+            discount_percent: Math.round(discountPercent * 100) / 100,
+          };
+        }),
       });
       router.push(`/contractor/projects/${offer.id}`);
     } catch (error) {
