@@ -10,12 +10,12 @@
 ### Phase 1: External Dependencies Unblocked
 **Goal:** Kick off every external process that has a multi-week approval or procurement lead time so nothing blocks launch at the finish line.
 **Requirements:** OPS-01, INFRA-01
-**Plans:**
-1. Submit WhatsApp Business message templates to Meta for approval (offer_expiry, payment_reminder, payment_confirmation, offer_joined, contractor_matched) — track in ops runbook.
-2. Open Facebook Business Account verification and gather required identity documents.
-3. Register groupio.co.il via Isoc.org.il / Name.co.il; delegate DNS to Cloudflare with Tel Aviv PoP; configure SSL.
-4. Upgrade Supabase project to Pro tier ($25/month); enable PgBouncer transaction pooler; confirm no inactivity pause.
-5. Initiate Stripe Israel entity KYC and confirm ILS contractor payout account is configured.
+**Plans:** 5 plans
+- [ ] 01-01-PLAN.md — Code changes: asyncpg statement_cache_size=0 for Supavisor, WhatsApp Graph API to v21.0 (3 sites), .env.example updates (Supavisor URL, Stripe live keys, payout delay), staging-minimal.env clarification.
+- [ ] 01-02-PLAN.md — Draft and write all 10 WhatsApp template reference files (5 templates × Hebrew + English) plus submission README under docs/whatsapp-templates/.
+- [ ] 01-03-PLAN.md — Create docs/runbooks/phase1-ops.md scaffold with Submission Tracker and full Supabase Pro upgrade section (placeholders for Stripe and Domain).
+- [ ] 01-04-PLAN.md — Append Stripe Israel KYC section to phase1-ops.md (entity-path blocker, document checklists, env-var rotation, D-12 deferral to Phase 5).
+- [ ] 01-05-PLAN.md — Append Domain & DNS section to phase1-ops.md (ISOC-IL registration, exact DNS records 76.76.21.21 + cname.vercel-dns.com, D-02 routing clarification, admin rewrite, SSL verification).
 
 **Success criteria:**
 1. Meta template submission confirmation email received with ticket IDs for all 5 templates.
