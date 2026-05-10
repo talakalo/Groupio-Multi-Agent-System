@@ -287,6 +287,20 @@ class ApiClient {
     );
   }
 
+  async publishOffer(offerId: string) {
+    return this.request<import("@groupio/types").Offer>(
+      `/api/v1/offers/${encodeURIComponent(offerId)}/publish`,
+      { method: "POST" },
+    );
+  }
+
+  async cancelOffer(offerId: string) {
+    return this.request<{ status: string; offer_id: string }>(
+      `/api/v1/offers/${encodeURIComponent(offerId)}`,
+      { method: "DELETE" },
+    );
+  }
+
   async joinOffer(
     offerId: string,
     body: {

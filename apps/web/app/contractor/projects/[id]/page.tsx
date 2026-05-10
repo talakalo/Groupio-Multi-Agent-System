@@ -61,6 +61,8 @@ export default function ContractorProjectDetailPage() {
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState<'publish' | 'cancel' | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const fetchProject = useCallback(async () => {
     if (!id) {
@@ -103,6 +105,33 @@ export default function ContractorProjectDetailPage() {
   useEffect(() => {
     fetchProject();
   }, [fetchProject]);
+
+  async function handlePublish() {
+    if (!id) return;
+    setActionLoading('publish');
+    setActionError(null);
+    try {
+      const updated = await apiClient.publishOffer(id);
+      setProject(updated as unknown as ProjectDetail);
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : 'פרסום נכשל');
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleCancel() {
+    if (!id || !window.confirm('לביטול ההצעה? פעולה זו אינה הפיכה.')) return;
+    setActionLoading('cancel');
+    setActionError(null);
+    try {
+      await apiClient.cancelOffer(id);
+      router.push('/contractor/projects');
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : 'הביטול נכשל');
+      setActionLoading(null);
+    }
+  }
 
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
@@ -208,6 +237,43 @@ export default function ContractorProjectDetailPage() {
               <p className="text-sm text-gray-500">
                 {displayParticipants} {t('participants')}
               </p>
+              {/* Draft-only actions */}
+              {project.status === 'draft' && (
+                <div className="mt-3 flex gap-2 justify-end">
+                  <button
+                    type="button"
+                    onClick={() => void handlePublish()}
+                    disabled={actionLoading !== null}
+                    className="px-3 py-1.5 bg-sky-600 text-white text-sm font-medium rounded-lg hover:bg-sky-700 disabled:opacity-50"
+                  >
+                    {actionLoading === 'publish' ? '...' : 'פרסם'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleCancel()}
+                    disabled={actionLoading !== null}
+                    className="px-3 py-1.5 bg-white border border-red-300 text-red-600 text-sm font-medium rounded-lg hover:bg-red-50 disabled:opacity-50"
+                  >
+                    {actionLoading === 'cancel' ? '...' : 'בטל'}
+                  </button>
+                </div>
+              )}
+              {/* Pending-only cancel */}
+              {project.status === 'pending' && (
+                <div className="mt-3 flex gap-2 justify-end">
+                  <button
+                    type="button"
+                    onClick={() => void handleCancel()}
+                    disabled={actionLoading !== null}
+                    className="px-3 py-1.5 bg-white border border-red-300 text-red-600 text-sm font-medium rounded-lg hover:bg-red-50 disabled:opacity-50"
+                  >
+                    {actionLoading === 'cancel' ? '...' : 'בטל הצעה'}
+                  </button>
+                </div>
+              )}
+              {actionError && (
+                <p className="mt-2 text-red-600 text-xs">{actionError}</p>
+              )}
             </div>
           </div>
         </div>
