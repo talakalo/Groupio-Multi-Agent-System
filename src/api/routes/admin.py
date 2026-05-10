@@ -1487,7 +1487,10 @@ async def refresh_contractor_gov_verification(
 
         logger.info(
             "Admin %s refreshed gov verification for contractor %s: found=%s verified=%s",
-            admin.id, contractor_id, found, verified,
+            admin.id,
+            contractor_id,
+            found,
+            verified,
         )
         return {
             "found": found,

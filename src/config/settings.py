@@ -195,7 +195,7 @@ class Settings(BaseSettings):
     # Phase 3: data.gov.il integration. Set to "1" or "true" to enable.
     ENABLE_DATAGOV_IL: str = "1"
     # Gov cache TTLs (seconds)
-    GOV_CACHE_TTL_COMPANIES_SEC: int = 86_400    # 24h
+    GOV_CACHE_TTL_COMPANIES_SEC: int = 86_400  # 24h
     GOV_CACHE_TTL_MUNICIPALITIES_SEC: int = 604_800  # 7d
     # Gov HTTP timeouts (seconds)
     GOV_HTTP_CONNECT_TIMEOUT_SEC: float = 5.0

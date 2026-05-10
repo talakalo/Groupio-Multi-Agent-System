@@ -70,9 +70,7 @@ class TestDataGovIlProviderShim:
 
     def test_get_municipality_info_not_found(self):
         p = self._provider()
-        p._client.resolve_municipality = MagicMock(
-            return_value=MagicMock(ok=False, value=None, error="city not found")
-        )
+        p._client.resolve_municipality = MagicMock(return_value=MagicMock(ok=False, value=None, error="city not found"))
         assert p.get_municipality_info("עיר שלא קיימת") is None
 
     def test_get_municipality_info_found_delegates(self):

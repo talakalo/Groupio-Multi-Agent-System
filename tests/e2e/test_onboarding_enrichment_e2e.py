@@ -57,9 +57,9 @@ class TestOnboardingEnrichment:
             nonlocal call_count
             call_count += 1
             resource_id = (json or {}).get("resource_id", "")
-            if "5c78e9fa" in resource_id:   # RESOURCE_SETTLEMENTS
+            if "5c78e9fa" in resource_id:  # RESOURCE_SETTLEMENTS
                 return _mock_ckan_response(SETTLEMENT_RECORDS)
-            if "9ad3862c" in resource_id:   # RESOURCE_STREETS
+            if "9ad3862c" in resource_id:  # RESOURCE_STREETS
                 return _mock_ckan_response(STREET_RECORDS)
             return _mock_ckan_response([])
 
@@ -117,9 +117,7 @@ class TestOnboardingEnrichment:
         """English city name resolves via שם_ישוב_לועזי field."""
         from src.integrations.gov.client import GovDataClient
 
-        mock_cls.return_value.__enter__.return_value.post.return_value = (
-            _mock_ckan_response(SETTLEMENT_RECORDS)
-        )
+        mock_cls.return_value.__enter__.return_value.post.return_value = _mock_ckan_response(SETTLEMENT_RECORDS)
 
         client = GovDataClient(base_url="https://fake.api/action", enabled=True)
         result = client.resolve_municipality("Tel Aviv", locale="en")

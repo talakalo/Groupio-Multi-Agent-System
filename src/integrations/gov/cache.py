@@ -14,10 +14,10 @@ from hashlib import sha1
 from typing import Any, Protocol, runtime_checkable
 
 # Cache key TTLs (seconds)
-TTL_COMPANIES = 86_400      # 24h
-TTL_SETTLEMENTS = 604_800   # 7d
-TTL_STREETS = 604_800       # 7d
-TTL_ADDRESS = 3_600         # 1h
+TTL_COMPANIES = 86_400  # 24h
+TTL_SETTLEMENTS = 604_800  # 7d
+TTL_STREETS = 604_800  # 7d
+TTL_ADDRESS = 3_600  # 1h
 
 
 def cache_key(source: str, **params: Any) -> str:
@@ -73,6 +73,7 @@ class RedisCacheBackend:
 
     def __init__(self, redis_url: str = "redis://localhost:6379/0") -> None:
         import redis as sync_redis
+
         self._redis = sync_redis.from_url(redis_url, decode_responses=False)
 
     def get(self, key: str) -> bytes | None:

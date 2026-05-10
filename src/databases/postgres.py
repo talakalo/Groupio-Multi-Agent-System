@@ -1781,18 +1781,21 @@ class PostgresClient:
                 row_id = existing.data[0]["id"]
                 result = (
                     await client.table("contractor_verification_metadata")
-                    .update({
-                        "verified": verified,
-                        "confidence": confidence,
-                        "raw_response": raw_response,
-                        "verified_at": now.isoformat(),
-                    })
+                    .update(
+                        {
+                            "verified": verified,
+                            "confidence": confidence,
+                            "raw_response": raw_response,
+                            "verified_at": now.isoformat(),
+                        }
+                    )
                     .eq("id", row_id)
                     .execute()
                 )
                 return result.data[0] if result.data else {}
             else:
                 import uuid as _uuid
+
                 row = {
                     "id": str(_uuid.uuid4()),
                     "contractor_id": contractor_id,
@@ -1833,6 +1836,7 @@ class PostgresClient:
             }
 
         import uuid as _uuid
+
         row_id = str(_uuid.uuid4())
         await self._pg_execute(
             """INSERT INTO contractor_verification_metadata

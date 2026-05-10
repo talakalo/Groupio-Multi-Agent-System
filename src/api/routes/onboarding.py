@@ -149,9 +149,7 @@ async def complete_onboarding(
             # call EnrichmentService to resolve it from data.gov.il.
             if not info.municipality_code:
                 try:
-                    enriched = get_enrichment_service().normalize_address(
-                        info.building_address, info.city
-                    )
+                    enriched = get_enrichment_service().normalize_address(info.building_address, info.city)
                     if enriched.municipality_code:
                         building_payload["municipality_code"] = enriched.municipality_code
                         building_payload["municipality_name"] = enriched.municipality
@@ -161,7 +159,9 @@ async def complete_onboarding(
                         building_payload["enriched_at"] = datetime.now(UTC)
                         logger.info(
                             "Server-side enrichment: building %s got municipality_code=%s confidence=%.2f",
-                            building_id, enriched.municipality_code, enriched.confidence,
+                            building_id,
+                            enriched.municipality_code,
+                            enriched.confidence,
                         )
                 except Exception as enrich_exc:
                     logger.warning("Server-side enrichment failed for building %s: %s", building_id, enrich_exc)

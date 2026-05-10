@@ -270,8 +270,11 @@ class TestGovResultModel:
         from src.integrations.gov.models import GovResult
 
         r = GovResult(
-            value="x", confidence=0.0, source=GovSource.INTERNAL_STUB,
-            fetched_at=datetime.now(UTC), error="boom",
+            value="x",
+            confidence=0.0,
+            source=GovSource.INTERNAL_STUB,
+            fetched_at=datetime.now(UTC),
+            error="boom",
         )
         assert r.ok is False
 
@@ -280,31 +283,38 @@ class TestGovResultModel:
 # M3 — locale support + rapidfuzz matching
 # ---------------------------------------------------------------------------
 
+
 class TestFuzzyHelpers:
     """Tests for the M3-added _street_match and _city_match helpers."""
 
     def test_street_match_exact(self):
         from src.integrations.gov.client import _street_match
+
         assert _street_match("דיזנגוף", "דיזנגוף") is True
 
     def test_street_match_prefix(self):
         from src.integrations.gov.client import _street_match
+
         assert _street_match("דיזנגו", "דיזנגוף") is True
 
     def test_street_match_below_threshold(self):
         from src.integrations.gov.client import _street_match
+
         assert _street_match("חיפה", "דיזנגוף", threshold=95) is False
 
     def test_city_match_exact_normalized(self):
         from src.integrations.gov.client import _city_match
+
         assert _city_match("תל אביב", "תל אביב - יפו") is True
 
     def test_city_match_english_close(self):
         from src.integrations.gov.client import _city_match
+
         assert _city_match("Tel Aviv", "Tel-Aviv") is True
 
     def test_city_match_no_match(self):
         from src.integrations.gov.client import _city_match
+
         assert _city_match("Haifa", "Beer Sheva") is False
 
 
@@ -426,8 +436,9 @@ class TestCacheIntegration:
         mock_resp.json.return_value = {
             "success": True,
             "result": {
-                "records": [{"סמל_ישוב": "5000", "שם_ישוב": "תל אביב",
-                              "שם_ישוב_לועזי": None, "שם_נפה": None, "לשכה": None}]
+                "records": [
+                    {"סמל_ישוב": "5000", "שם_ישוב": "תל אביב", "שם_ישוב_לועזי": None, "שם_נפה": None, "לשכה": None}
+                ]
             },
         }
         mock_resp.raise_for_status = MagicMock()

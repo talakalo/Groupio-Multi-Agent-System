@@ -27,6 +27,7 @@ from src.models.agent_state import AgentState
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_state(contractor_id: str = "ctr-001") -> AgentState:
     return AgentState(
         session_id="sess-001",
@@ -53,6 +54,7 @@ def _mock_agent() -> VettingAgent:
 
 def _fake_gov_result(companies: list[Company]) -> GovResult:
     from datetime import UTC, datetime
+
     return GovResult(
         value=companies,
         confidence=0.8 if companies else 0.0,
@@ -65,6 +67,7 @@ def _fake_gov_result(companies: list[Company]) -> GovResult:
 # Tests
 # ---------------------------------------------------------------------------
 
+
 class TestCheckGovRegistration:
     @pytest.mark.asyncio
     async def test_active_company_returns_found_and_persists(self):
@@ -74,11 +77,13 @@ class TestCheckGovRegistration:
         gov_result = _fake_gov_result([active_company])
 
         agent._db = AsyncMock()
-        agent._db.get_contractor = AsyncMock(return_value={
-            "id": "ctr-001",
-            "business_name": "חברת בדיקה",
-            "license_number": "12345",
-        })
+        agent._db.get_contractor = AsyncMock(
+            return_value={
+                "id": "ctr-001",
+                "business_name": "חברת בדיקה",
+                "license_number": "12345",
+            }
+        )
         agent._db.upsert_contractor_verification = AsyncMock(return_value={"id": "row-1"})
 
         with patch("src.agents.vetting.get_gov_client") as mock_gov:
@@ -95,14 +100,17 @@ class TestCheckGovRegistration:
             source="data_gov_il_companies",
             verified=True,
             confidence=0.75,
-            raw_response=pytest.approx({
-                "company_id": "12345",
-                "name": "חברת בדיקה",
-                "status": "פעילה",
-                "city": "תל אביב",
-                "address": "דיזנגוף 1",
-                "cache_hit": False,
-            }, abs=0),
+            raw_response=pytest.approx(
+                {
+                    "company_id": "12345",
+                    "name": "חברת בדיקה",
+                    "status": "פעילה",
+                    "city": "תל אביב",
+                    "address": "דיזנגוף 1",
+                    "cache_hit": False,
+                },
+                abs=0,
+            ),
         )
 
     @pytest.mark.asyncio
@@ -113,11 +121,13 @@ class TestCheckGovRegistration:
         gov_result = _fake_gov_result([inactive])
 
         agent._db = AsyncMock()
-        agent._db.get_contractor = AsyncMock(return_value={
-            "id": "ctr-002",
-            "business_name": "חברה מחוקה",
-            "license_number": "",
-        })
+        agent._db.get_contractor = AsyncMock(
+            return_value={
+                "id": "ctr-002",
+                "business_name": "חברה מחוקה",
+                "license_number": "",
+            }
+        )
         agent._db.upsert_contractor_verification = AsyncMock()
 
         with patch("src.agents.vetting.get_gov_client") as mock_gov:
@@ -133,11 +143,13 @@ class TestCheckGovRegistration:
         agent = _mock_agent()
 
         agent._db = AsyncMock()
-        agent._db.get_contractor = AsyncMock(return_value={
-            "id": "ctr-003",
-            "business_name": "עסק לא רשום",
-            "license_number": "",
-        })
+        agent._db.get_contractor = AsyncMock(
+            return_value={
+                "id": "ctr-003",
+                "business_name": "עסק לא רשום",
+                "license_number": "",
+            }
+        )
         agent._db.upsert_contractor_verification = AsyncMock()
 
         with patch("src.agents.vetting.get_gov_client") as mock_gov:
@@ -155,11 +167,13 @@ class TestCheckGovRegistration:
         gov_result = _fake_gov_result([active_company])
 
         agent._db = AsyncMock()
-        agent._db.get_contractor = AsyncMock(return_value={
-            "id": "ctr-004",
-            "business_name": "חברה טובה",
-            "license_number": "11111",
-        })
+        agent._db.get_contractor = AsyncMock(
+            return_value={
+                "id": "ctr-004",
+                "business_name": "חברה טובה",
+                "license_number": "11111",
+            }
+        )
         # Simulate DB write failure
         agent._db.upsert_contractor_verification = AsyncMock(side_effect=RuntimeError("DB down"))
 
@@ -168,7 +182,7 @@ class TestCheckGovRegistration:
             # Must not raise
             result = await agent._check_gov_registration("ctr-004", {})
 
-        assert result["found"] is True   # gov lookup succeeded despite DB failure
+        assert result["found"] is True  # gov lookup succeeded despite DB failure
 
     @pytest.mark.asyncio
     async def test_missing_contractor_returns_not_found(self):
@@ -183,11 +197,13 @@ class TestCheckGovRegistration:
     async def test_gov_failure_swallowed(self):
         agent = _mock_agent()
         agent._db = AsyncMock()
-        agent._db.get_contractor = AsyncMock(return_value={
-            "id": "ctr-005",
-            "business_name": "עסק",
-            "license_number": "",
-        })
+        agent._db.get_contractor = AsyncMock(
+            return_value={
+                "id": "ctr-005",
+                "business_name": "עסק",
+                "license_number": "",
+            }
+        )
 
         with patch("src.agents.vetting.get_gov_client") as mock_gov:
             mock_gov.return_value.lookup_company.side_effect = RuntimeError("network error")
@@ -216,7 +232,9 @@ class TestTrustScoreGovRegistration:
 
         score_no_gov = agent._calculate_trust_score(validations, reputation, history, gov_registration=None)
         score_with_gov = agent._calculate_trust_score(
-            validations, reputation, history,
+            validations,
+            reputation,
+            history,
             gov_registration={"found": True, "confidence": 0.75},
         )
 
@@ -228,7 +246,9 @@ class TestTrustScoreGovRegistration:
 
         score_no_gov = agent._calculate_trust_score(validations, reputation, history, gov_registration=None)
         score_not_found = agent._calculate_trust_score(
-            validations, reputation, history,
+            validations,
+            reputation,
+            history,
             gov_registration={"found": False, "confidence": 0.0},
         )
 
@@ -247,7 +267,9 @@ class TestTrustScoreGovRegistration:
         history = {"completion_rate": 1.0}
 
         score = agent._calculate_trust_score(
-            validations, reputation, history,
+            validations,
+            reputation,
+            history,
             gov_registration={"found": True, "confidence": 1.0},
         )
         assert 0 <= score <= 100

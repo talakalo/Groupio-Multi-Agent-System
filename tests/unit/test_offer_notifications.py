@@ -160,10 +160,7 @@ class TestJoinNotification:
         assert resp.status_code == 200
         # Threshold broadcast fired for each participant
         assert email_svc.send_offer_threshold_reached.call_count == 3
-        called_emails = {
-            call.kwargs["to_email"]
-            for call in email_svc.send_offer_threshold_reached.call_args_list
-        }
+        called_emails = {call.kwargs["to_email"] for call in email_svc.send_offer_threshold_reached.call_args_list}
         assert called_emails == {"a@example.com", "b@example.com", "c@example.com"}
 
     def test_join_notification_failure_doesnt_block_join(self):
@@ -318,10 +315,7 @@ class TestCancelNotification:
 
         assert resp.status_code == 200
         assert email_svc.send_offer_cancelled.call_count == 2
-        notified = {
-            call.kwargs["to_email"]
-            for call in email_svc.send_offer_cancelled.call_args_list
-        }
+        notified = {call.kwargs["to_email"] for call in email_svc.send_offer_cancelled.call_args_list}
         assert notified == {"p1@example.com", "p2@example.com"}
 
     def test_cancel_skips_participants_without_email(self):

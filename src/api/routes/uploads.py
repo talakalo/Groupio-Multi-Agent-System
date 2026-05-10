@@ -122,13 +122,9 @@ async def upload_architecture_plan(
 
     # Kick off analysis in the background so the upload returns immediately
     if background_tasks is not None:
-        background_tasks.add_task(
-            _run_architecture_analysis, file_id, current_user.id, building_id
-        )
+        background_tasks.add_task(_run_architecture_analysis, file_id, current_user.id, building_id)
     else:
-        asyncio.create_task(
-            _run_architecture_analysis(file_id, current_user.id, building_id)
-        )
+        asyncio.create_task(_run_architecture_analysis(file_id, current_user.id, building_id))
 
     return {
         "id": file_id,

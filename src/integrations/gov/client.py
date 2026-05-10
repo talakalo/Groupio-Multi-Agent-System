@@ -58,13 +58,13 @@ RESOURCE_COMPANIES = "f004176c-b85f-4542-8901-7b3176f9a054"
 
 FLD_SYMBOL_YESHUV = "סמל_ישוב"
 FLD_NAME_YESHUV = "שם_ישוב"
-FLD_NAME_YESHUV_LAAZ = "שם_ישוב_לועזי"   # English transliteration
+FLD_NAME_YESHUV_LAAZ = "שם_ישוב_לועזי"  # English transliteration
 FLD_NAME_NAFA = "שם_נפה"
 FLD_LISHKA = "לשכה"
 FLD_SYMBOL_REHOV = "סמל_רחוב"
 FLD_NAME_REHOV = "שם_רחוב"
 
-STREET_FUZZY_THRESHOLD = 75   # rapidfuzz partial_ratio 0-100
+STREET_FUZZY_THRESHOLD = 75  # rapidfuzz partial_ratio 0-100
 
 # ---------------------------------------------------------------------------
 # Prometheus metrics (registered once at import time)
@@ -116,6 +116,7 @@ def _record_cache_hit(source: str) -> None:
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _normalize_hebrew(s: str | None) -> str:
     if not s or not isinstance(s, str):
         return ""
@@ -161,6 +162,7 @@ def _deserialize(raw: bytes) -> Any:
 # ---------------------------------------------------------------------------
 # GovDataClient
 # ---------------------------------------------------------------------------
+
 
 class GovDataClient:
     """Typed client for data.gov.il CKAN datastore with caching, retries, and circuit breaking.
@@ -376,11 +378,22 @@ class GovDataClient:
         cached = self._cache_get(ck, "settlements")
         if cached is not None:
             if not cached:
-                return GovResult(value=None, confidence=0.0, source=GovSource.DATA_GOV_IL_SETTLEMENTS,
-                                 fetched_at=self._now(), cache_hit=True, error="city not found")
+                return GovResult(
+                    value=None,
+                    confidence=0.0,
+                    source=GovSource.DATA_GOV_IL_SETTLEMENTS,
+                    fetched_at=self._now(),
+                    cache_hit=True,
+                    error="city not found",
+                )
             m = Municipality(**cached[0])
-            return GovResult(value=m, confidence=0.9, source=GovSource.DATA_GOV_IL_SETTLEMENTS,
-                             fetched_at=self._now(), cache_hit=True)
+            return GovResult(
+                value=m,
+                confidence=0.9,
+                source=GovSource.DATA_GOV_IL_SETTLEMENTS,
+                fetched_at=self._now(),
+                cache_hit=True,
+            )
 
         try:
             records = self._datastore_search(
@@ -407,11 +420,17 @@ class GovDataClient:
                         region=_normalize_hebrew(rec.get(FLD_LISHKA)) or None,
                     )
                     self._cache_set(ck, [m.__dict__], TTL_SETTLEMENTS)
-                    return GovResult(value=m, confidence=0.9, source=GovSource.DATA_GOV_IL_SETTLEMENTS,
-                                    fetched_at=self._now())
+                    return GovResult(
+                        value=m, confidence=0.9, source=GovSource.DATA_GOV_IL_SETTLEMENTS, fetched_at=self._now()
+                    )
             self._cache_set(ck, [], TTL_SETTLEMENTS)
-            return GovResult(value=None, confidence=0.0, source=GovSource.DATA_GOV_IL_SETTLEMENTS,
-                             fetched_at=self._now(), error="city not found")
+            return GovResult(
+                value=None,
+                confidence=0.0,
+                source=GovSource.DATA_GOV_IL_SETTLEMENTS,
+                fetched_at=self._now(),
+                error="city not found",
+            )
         except (GovTimeoutError, GovBadResponseError, CircuitOpenError) as e:
             logger.warning("gov resolve_municipality failed: %s", e)
             return self._error_result(GovSource.DATA_GOV_IL_SETTLEMENTS, e)
@@ -439,11 +458,18 @@ class GovDataClient:
         cached = self._cache_get(ck, "streets")
         if cached is not None:
             if not cached:
-                return GovResult(value=None, confidence=0.0, source=GovSource.DATA_GOV_IL_STREETS,
-                                 fetched_at=self._now(), cache_hit=True, error="street not found")
+                return GovResult(
+                    value=None,
+                    confidence=0.0,
+                    source=GovSource.DATA_GOV_IL_STREETS,
+                    fetched_at=self._now(),
+                    cache_hit=True,
+                    error="street not found",
+                )
             s = Street(**cached[0])
-            return GovResult(value=s, confidence=0.85, source=GovSource.DATA_GOV_IL_STREETS,
-                             fetched_at=self._now(), cache_hit=True)
+            return GovResult(
+                value=s, confidence=0.85, source=GovSource.DATA_GOV_IL_STREETS, fetched_at=self._now(), cache_hit=True
+            )
 
         try:
             symbol_int: int | None = None
@@ -476,12 +502,18 @@ class GovDataClient:
                     city=city,
                 )
                 self._cache_set(ck, [s.__dict__], TTL_STREETS)
-                return GovResult(value=s, confidence=confidence, source=GovSource.DATA_GOV_IL_STREETS,
-                                 fetched_at=self._now())
+                return GovResult(
+                    value=s, confidence=confidence, source=GovSource.DATA_GOV_IL_STREETS, fetched_at=self._now()
+                )
 
             self._cache_set(ck, [], TTL_STREETS)
-            return GovResult(value=None, confidence=0.0, source=GovSource.DATA_GOV_IL_STREETS,
-                             fetched_at=self._now(), error="street not found")
+            return GovResult(
+                value=None,
+                confidence=0.0,
+                source=GovSource.DATA_GOV_IL_STREETS,
+                fetched_at=self._now(),
+                error="street not found",
+            )
         except (GovTimeoutError, GovBadResponseError, CircuitOpenError) as e:
             logger.warning("gov resolve_street failed: %s", e)
             return self._error_result(GovSource.DATA_GOV_IL_STREETS, e)
@@ -504,8 +536,9 @@ class GovDataClient:
         if not city_norm:
             return self._error_result(GovSource.DATA_GOV_IL_SETTLEMENTS, ValueError("city required"))
 
-        ck = cache_key("address", city=city_norm, street=street, house_number=house_number,
-                       free_text=free_text, locale=locale)
+        ck = cache_key(
+            "address", city=city_norm, street=street, house_number=house_number, free_text=free_text, locale=locale
+        )
         cached_raw = self._cache.get(ck)
         if cached_raw is not None:
             _record_cache_hit("address")
@@ -521,8 +554,13 @@ class GovDataClient:
 
         muni_result = self.resolve_municipality(city_norm, locale=locale)
         if not muni_result.ok:
-            return GovResult(value=None, confidence=0.0, source=GovSource.DATA_GOV_IL_SETTLEMENTS,
-                             fetched_at=self._now(), error=muni_result.error or "municipality not found")
+            return GovResult(
+                value=None,
+                confidence=0.0,
+                source=GovSource.DATA_GOV_IL_SETTLEMENTS,
+                fetched_at=self._now(),
+                error=muni_result.error or "municipality not found",
+            )
 
         muni = muni_result.value
         assert muni is not None
@@ -530,8 +568,7 @@ class GovDataClient:
         if not muni.municipality_code:
             addr = f"{street or free_text or ''} {city_norm}".strip()
             result = GovResult(
-                value=NormalizedAddressResult(addr, city_norm, street, house_number,
-                                              muni.municipality_name_he, None),
+                value=NormalizedAddressResult(addr, city_norm, street, house_number, muni.municipality_name_he, None),
                 confidence=0.6,
                 source=GovSource.DATA_GOV_IL_SETTLEMENTS,
                 fetched_at=self._now(),
@@ -552,8 +589,14 @@ class GovDataClient:
 
         confidence = 0.85 if street_canon else 0.7
         result = GovResult(
-            value=NormalizedAddressResult(address, city_norm, street_canon or street, house_number,
-                                          muni.municipality_name_he, muni.municipality_code),
+            value=NormalizedAddressResult(
+                address,
+                city_norm,
+                street_canon or street,
+                house_number,
+                muni.municipality_name_he,
+                muni.municipality_code,
+            ),
             confidence=confidence,
             source=GovSource.DATA_GOV_IL_SETTLEMENTS,
             fetched_at=self._now(),
@@ -584,6 +627,7 @@ def get_gov_client(enabled: bool = True) -> GovDataClient:
     if _client is None:
         try:
             from src.config.settings import get_settings
+
             s = get_settings()
             enabled = enabled and str(getattr(s, "ENABLE_DATAGOV_IL", "1")).lower() in ("1", "true", "yes")
             _client = GovDataClient(

@@ -23,6 +23,7 @@ FIXTURES = Path(__file__).parent.parent / "fixtures" / "gov"
 # Fixture loader helpers
 # ---------------------------------------------------------------------------
 
+
 def _load(name: str) -> dict:
     return json.loads((FIXTURES / name).read_text(encoding="utf-8"))
 
@@ -43,6 +44,7 @@ def _mock_post(fixture_name: str):
 # ---------------------------------------------------------------------------
 # Settlements fixture
 # ---------------------------------------------------------------------------
+
 
 class TestSettlementsContract:
     def test_top_level_shape(self):
@@ -94,6 +96,7 @@ class TestSettlementsContract:
 # ---------------------------------------------------------------------------
 # Streets fixture
 # ---------------------------------------------------------------------------
+
 
 class TestStreetsContract:
     def test_top_level_shape(self):
@@ -154,6 +157,7 @@ class TestStreetsContract:
 # ---------------------------------------------------------------------------
 # Companies fixture
 # ---------------------------------------------------------------------------
+
 
 class TestCompaniesContract:
     def test_top_level_shape(self):
@@ -233,6 +237,7 @@ class TestCompaniesContract:
 # ---------------------------------------------------------------------------
 # Cross-fixture: GovResult shape invariants
 # ---------------------------------------------------------------------------
+
 
 class TestGovResultContract:
     def test_ok_property_true_when_value_and_no_error(self):
