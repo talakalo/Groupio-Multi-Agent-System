@@ -216,16 +216,29 @@ class BaseAgent(ABC):
         top_k: int = 10,
         strategy: str = "semantic",
     ) -> list[dict[str, Any]]:
-        """Retrieve relevant context from the RAG pipeline."""
+        """Retrieve relevant context from the RAG pipeline.
+
+        Returns an empty list rather than raising when Qdrant is unreachable
+        or the collection does not yet exist, so agents degrade gracefully.
+        """
         if not self.rag:
             return []
-        return await self.rag.retrieve(
-            query=query,
-            namespace=namespace,
-            filters=filters,
-            top_k=top_k,
-            strategy=strategy,
-        )
+        try:
+            return await self.rag.retrieve(
+                query=query,
+                namespace=namespace,
+                filters=filters,
+                top_k=top_k,
+                strategy=strategy,
+            )
+        except Exception as exc:
+            logger.warning(
+                "RAG retrieve failed (namespace=%s strategy=%s): %s — continuing without context",
+                namespace,
+                strategy,
+                exc,
+            )
+            return []
 
     @retry(
         stop=stop_after_attempt(3),

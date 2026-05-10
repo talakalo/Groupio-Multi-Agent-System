@@ -19,6 +19,10 @@ COLLECTIONS = {
         "vector_size": 1536,
         "distance": models.Distance.COSINE,
     },
+    "offers": {
+        "vector_size": 1536,
+        "distance": models.Distance.COSINE,
+    },
     "knowledge_base": {
         "vector_size": 1536,
         "distance": models.Distance.COSINE,

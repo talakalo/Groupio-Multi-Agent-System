@@ -165,6 +165,31 @@ async def create_building(
         is_owner=True,
     )
 
+    # Index in vector DB for semantic building search
+    try:
+        from src.databases.vector_store import get_vector_store
+        from src.rag.embeddings import get_embedding_client
+
+        parts = [building.get(k, "") for k in ("name", "address", "city", "neighborhood")]
+        text = " ".join(p for p in parts if p)
+        embedding = await get_embedding_client().embed_text(text)
+        vs = get_vector_store()
+        await vs.upsert(
+            collection="buildings",
+            ids=[building_id],
+            vectors=[embedding],
+            payloads=[
+                {
+                    "text": text,
+                    "city": building.get("city", ""),
+                    "neighborhood": building.get("neighborhood", ""),
+                    "address": building.get("address", ""),
+                }
+            ],
+        )
+    except Exception as e:
+        logger.warning("Failed to index building in vector DB: %s", e)
+
     return building
 
 
