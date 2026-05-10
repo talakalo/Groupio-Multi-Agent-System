@@ -2,30 +2,37 @@
 import React from "react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
-// Stub the api module before importing the screen so the mocked
-// joinBuilding is the one the component sees.
-const joinBuildingMock = vi.fn();
-class MockApiError extends Error {
-  status?: number;
-  constructor(message: string, status?: number) {
-    super(message);
-    this.status = status;
-  }
-}
+// vi.mock is hoisted before top-level variable declarations, so anything
+// referenced inside a mock factory must itself be hoisted via vi.hoisted().
+const { joinBuildingMock, MockApiError, pushMock, replaceMock } = vi.hoisted(
+  () => {
+    class MockApiError extends Error {
+      status?: number;
+      constructor(message: string, status?: number) {
+        super(message);
+        this.status = status;
+      }
+    }
+    return {
+      joinBuildingMock: vi.fn(),
+      MockApiError,
+      pushMock: vi.fn(),
+      replaceMock: vi.fn(),
+    };
+  },
+);
+
 vi.mock("../lib/api", () => ({
   joinBuilding: (...args: unknown[]) => joinBuildingMock(...args),
   ApiError: MockApiError,
 }));
 
-// i18n shim: return the key when no override is needed.
 vi.mock("../lib/i18n", () => ({
   default: {
     t: (k: string, _vars?: Record<string, unknown>) => k,
   },
 }));
 
-const pushMock = vi.fn();
-const replaceMock = vi.fn();
 vi.mock("expo-router", () => ({
   useRouter: () => ({ push: pushMock, replace: replaceMock, back: vi.fn() }),
   useLocalSearchParams: () => ({}),
@@ -52,8 +59,6 @@ describe("JoinBuildingScreen", () => {
     const { getByTestId } = render(<JoinBuildingScreen />);
     const input = getByTestId("join-building-code");
     fireEvent.changeText(input, "abcdefgh");
-    // After uppercasing in onChangeText, the next render has the new value;
-    // the test setup re-renders synchronously.
     expect(input.props.value).toBe("ABCDEFGH");
   });
 
@@ -72,7 +77,6 @@ describe("JoinBuildingScreen", () => {
     fireEvent.changeText(getByTestId("join-building-code"), "ABCDEFGH");
     fireEvent.press(getByTestId("join-building-submit"));
     await new Promise((r) => setImmediate(r));
-    // i18n shim returns the key — assert we saw the localised key.
     expect(queryByText(/building.inviteNotFound/)).toBeTruthy();
   });
 
@@ -82,7 +86,6 @@ describe("JoinBuildingScreen", () => {
     fireEvent.changeText(getByTestId("join-building-code"), "ABCDEFGH");
     fireEvent.press(getByTestId("join-building-submit"));
     await new Promise((r) => setImmediate(r));
-    // After success the success-state CTA is what triggers the redirect.
     fireEvent.press(getByTestId("join-building-go-home"));
     expect(replaceMock).toHaveBeenCalledWith("/(tabs)");
   });
