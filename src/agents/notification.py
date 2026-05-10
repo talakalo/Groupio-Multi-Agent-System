@@ -163,7 +163,7 @@ class NotificationAgent(BaseAgent):
         # Map frontend preference keys to channel names
         # Both camelCase (resident) and snake_case (contractor) variants supported
         email_on = prefs.get("emailEnabled", prefs.get("email_offers", True))
-        push_on = prefs.get("pushEnabled", True)
+        push_on = prefs.get("pushEnabled", False)  # opt-in; only send push if user has explicitly enabled it
         whatsapp_on = prefs.get("whatsappEnabled", prefs.get("whatsapp_offers", False))
 
         if email_on:
