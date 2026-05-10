@@ -34,6 +34,7 @@ from .cache import (
     TTL_STREETS,
     CacheBackend,
     InMemoryCacheBackend,
+    RedisCacheBackend,
     cache_key,
 )
 from .circuit import CircuitBreaker, CircuitOpenError
@@ -622,7 +623,7 @@ _client: GovDataClient | None = None
 
 
 def get_gov_client(enabled: bool = True) -> GovDataClient:
-    """Get or create the singleton GovDataClient, wired to settings."""
+    """Get or create the singleton GovDataClient, wired to settings and Redis."""
     global _client
     if _client is None:
         try:
@@ -630,10 +631,25 @@ def get_gov_client(enabled: bool = True) -> GovDataClient:
 
             s = get_settings()
             enabled = enabled and str(getattr(s, "ENABLE_DATAGOV_IL", "1")).lower() in ("1", "true", "yes")
+
+            # Prefer Redis for shared, persistent caching across workers.
+            # Fall back to InMemoryCacheBackend when Redis is unreachable.
+            cache: CacheBackend = InMemoryCacheBackend()
+            redis_url = getattr(s, "REDIS_URL", "redis://localhost:6379")
+            if redis_url:
+                try:
+                    redis_backend = RedisCacheBackend(redis_url=redis_url)
+                    # Smoke-test the connection so we don't silently use a broken backend.
+                    redis_backend.get("gov:ping")
+                    cache = redis_backend
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("Gov client: Redis unavailable (%s) — falling back to in-memory cache", exc)
+
             _client = GovDataClient(
                 connect_timeout=getattr(s, "GOV_HTTP_CONNECT_TIMEOUT_SEC", 5.0),
                 read_timeout=getattr(s, "GOV_HTTP_READ_TIMEOUT_SEC", 10.0),
                 enabled=enabled,
+                cache=cache,
                 circuit_fail_threshold=int(getattr(s, "GOV_CIRCUIT_FAIL_THRESHOLD", 5)),
                 circuit_cooldown_sec=float(getattr(s, "GOV_CIRCUIT_COOLDOWN_SEC", 60.0)),
             )
