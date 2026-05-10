@@ -78,14 +78,16 @@ export default function ContractorProjectsPage() {
     }
   }
 
+  const ratedProjects = projects.filter((p) => p.rating);
   const stats = {
     total: projects.length,
     completed: projects.filter((p) => p.status === 'completed').length,
     inProgress: projects.filter((p) => p.status === 'in_progress').length,
     totalRevenue: projects.reduce((sum, p) => sum + (p.actualRevenue || 0), 0),
     avgRating:
-      projects.filter((p) => p.rating).reduce((sum, p) => sum + (p.rating || 0), 0) /
-        projects.filter((p) => p.rating).length || 0,
+      ratedProjects.length > 0
+        ? ratedProjects.reduce((sum, p) => sum + (p.rating ?? 0), 0) / ratedProjects.length
+        : null,
   };
 
   const getStatusBadge = (status: string) => {
@@ -138,7 +140,7 @@ export default function ContractorProjectsPage() {
         <div className="bg-white rounded-xl shadow-sm border p-4">
           <p className="text-gray-500 text-sm">{t('stats.avgRating')}</p>
           <p className="text-2xl font-bold text-yellow-600">
-            {stats.avgRating.toFixed(1)} ⭐
+            {stats.avgRating !== null ? `${stats.avgRating.toFixed(1)} ⭐` : '--'}
           </p>
         </div>
       </div>
@@ -220,7 +222,7 @@ export default function ContractorProjectsPage() {
                     ₪{(project.actualRevenue || project.finalPrice || 0).toLocaleString()}
                   </p>
                   <p className="text-gray-500 text-sm">
-                    {project.participantCount} {t('participants')}
+                    {project.participantCount ?? 0} {t('participants')}
                   </p>
                 </div>
               </div>

@@ -1002,18 +1002,24 @@ async def get_my_invoices(
 async def get_payment_methods(
     current_user: UserInDB = Depends(get_current_user),
 ) -> dict:
-    """Return available payment methods for the current environment."""
+    """Return available payment methods for the current environment.
+
+    Only includes a method when the required credentials are configured,
+    so the checkout UI never shows an option that would fail at runtime.
+    """
     settings = get_settings()
     provider = settings.PAYMENT_PROVIDER.lower()
     methods = []
-    if provider in ("stripe", "mock"):
-        methods.append({"type": "card", "provider": provider, "currencies": ["ILS"]})
-    if provider == "bit":
-        methods.append({"type": "bit", "provider": "bit", "currencies": ["ILS"]})
-    if provider == "paybox":
-        methods.append({"type": "paybox", "provider": "paybox", "currencies": ["ILS"]})
-    if not methods:
+
+    if provider == "mock":
+        methods.append({"type": "card", "provider": "mock", "currencies": ["ILS"]})
+    elif provider == "stripe" and settings.STRIPE_SECRET_KEY and settings.STRIPE_SECRET_KEY.strip():
         methods.append({"type": "card", "provider": "stripe", "currencies": ["ILS"]})
+    elif provider == "bit" and settings.BIT_API_KEY and settings.BIT_API_KEY.strip():
+        methods.append({"type": "bit", "provider": "bit", "currencies": ["ILS"]})
+    elif provider == "paybox" and settings.PAYBOX_TERMINAL and settings.PAYBOX_API_KEY:
+        methods.append({"type": "paybox", "provider": "paybox", "currencies": ["ILS"]})
+
     return {"methods": methods, "default": methods[0]["type"] if methods else None}
 
 
