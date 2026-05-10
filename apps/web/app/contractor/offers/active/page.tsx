@@ -216,12 +216,13 @@ export default function ContractorActiveOffersPage() {
 
       {/* Filters */}
       <div className="bg-white rounded-xl shadow-sm border p-4 mb-6">
-        <div className="flex flex-wrap gap-4">
-          <div className="flex-1 min-w-[200px]">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+        <div className="flex flex-col sm:flex-row sm:flex-wrap gap-4">
+          <div className="flex-1 sm:min-w-[200px]">
+            <label htmlFor="filter-status" className="block text-sm font-medium text-gray-700 mb-1">
               {t('active.filters.status')}
             </label>
             <select
+              id="filter-status"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as OfferStatus)}
               className="w-full rounded-lg border-gray-300 shadow-sm focus:border-sky-500 focus:ring-sky-500"
@@ -234,11 +235,12 @@ export default function ContractorActiveOffersPage() {
             </select>
           </div>
 
-          <div className="flex-1 min-w-[200px]">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+          <div className="flex-1 sm:min-w-[200px]">
+            <label htmlFor="filter-category" className="block text-sm font-medium text-gray-700 mb-1">
               {t('active.filters.category')}
             </label>
             <select
+              id="filter-category"
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value as ServiceCategory | 'all')}
               className="w-full rounded-lg border-gray-300 shadow-sm focus:border-sky-500 focus:ring-sky-500"
@@ -251,11 +253,12 @@ export default function ContractorActiveOffersPage() {
             </select>
           </div>
 
-          <div className="flex-1 min-w-[200px]">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+          <div className="flex-1 sm:min-w-[200px]">
+            <label htmlFor="filter-sort" className="block text-sm font-medium text-gray-700 mb-1">
               {t('active.filters.sortBy')}
             </label>
             <select
+              id="filter-sort"
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as 'date' | 'price' | 'participants')}
               className="w-full rounded-lg border-gray-300 shadow-sm focus:border-sky-500 focus:ring-sky-500"

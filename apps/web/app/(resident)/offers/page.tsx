@@ -387,10 +387,11 @@ export default function OffersListPage(props: PageParamsProps) {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Category filter */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              <label htmlFor="filter-category" className="block text-sm font-medium text-gray-700 mb-1.5">
                 {t('category')}
               </label>
               <select
+                id="filter-category"
                 value={filters.category}
                 onChange={(e) =>
                   setFilters((prev) => ({
@@ -410,10 +411,11 @@ export default function OffersListPage(props: PageParamsProps) {
 
             {/* Status filter */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              <label htmlFor="filter-status" className="block text-sm font-medium text-gray-700 mb-1.5">
                 {t('status')}
               </label>
               <select
+                id="filter-status"
                 value={filters.status}
                 onChange={(e) =>
                   setFilters((prev) => ({
@@ -433,10 +435,11 @@ export default function OffersListPage(props: PageParamsProps) {
 
             {/* Price range */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              <label htmlFor="filter-price-min" className="block text-sm font-medium text-gray-700 mb-1.5">
                 {t('priceMin')}
               </label>
               <input
+                id="filter-price-min"
                 type="number"
                 min={0}
                 value={filters.priceMin ?? ''}
@@ -451,10 +454,11 @@ export default function OffersListPage(props: PageParamsProps) {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              <label htmlFor="filter-price-max" className="block text-sm font-medium text-gray-700 mb-1.5">
                 {t('priceMax')}
               </label>
               <input
+                id="filter-price-max"
                 type="number"
                 min={0}
                 value={filters.priceMax ?? ''}
