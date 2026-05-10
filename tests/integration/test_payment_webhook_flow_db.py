@@ -123,6 +123,8 @@ async def test_webhook_transitions_payment_to_succeeded() -> None:
                 "SELECT id FROM users WHERE email LIKE '%@payment-test.example.com')"
             )
             await conn.execute("DELETE FROM users WHERE email LIKE '%@payment-test.example.com'")
+        except Exception:
+            pass
         finally:
             await conn.close()
 
@@ -200,5 +202,7 @@ async def test_webhook_atomic_payment_and_invoice_transition() -> None:
             )
             await conn.execute("DELETE FROM invoices WHERE id = $1", invoice_id)
             await conn.execute("DELETE FROM users WHERE email LIKE '%@payment-test.example.com'")
+        except Exception:
+            pass
         finally:
             await conn.close()

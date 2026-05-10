@@ -179,5 +179,7 @@ async def test_app_role_cannot_read_other_users_rows() -> None:
         # Clean up seed data.
         try:
             await super_conn.execute("DELETE FROM users WHERE email LIKE '%@rls-test.example.com'")
+        except Exception:
+            pass
         finally:
             await super_conn.close()
