@@ -42,12 +42,17 @@ vi.mock('@/lib/stores/authStore', () => {
 
 // Must import after mocks
 import ContractorProjectDetailPage from '../app/contractor/projects/[id]/page';
+import { apiClient } from '../lib/api/client';
 
 describe('ContractorProjectDetailPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAccessToken = 'token-123';
     global.fetch = vi.fn();
+    // apiClient is a module-level singleton with an in-flight GET dedup map.
+    // A never-resolving mock in one test poisons subsequent tests that hit the
+    // same endpoint — clear it between tests.
+    apiClient.__resetInternalsForTests();
   });
 
   it('shows loading spinner initially', () => {
@@ -64,6 +69,8 @@ describe('ContractorProjectDetailPage', () => {
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: false,
       status: 404,
+      statusText: 'Not Found',
+      json: async () => null,
     });
     render(<ContractorProjectDetailPage />);
 

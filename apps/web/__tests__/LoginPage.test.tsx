@@ -105,7 +105,7 @@ describe('Web LoginPage — navigation', () => {
     });
   });
 
-  it('redirects admin to NEXT_PUBLIC_ADMIN_URL dashboard with token hash', async () => {
+  it('redirects admin to NEXT_PUBLIC_ADMIN_URL dashboard', async () => {
     mockApiLogin.mockResolvedValueOnce({ token: 'auth-token-123' });
     (global.fetch as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce({
@@ -133,12 +133,12 @@ describe('Web LoginPage — navigation', () => {
     fireEvent.click(screen.getByRole('button', { name: /התחברות/i }));
 
     await waitFor(() => {
-      expect(locationHref).toMatch(/\/dashboard#token=/);
-      expect(locationHref).toContain(encodeURIComponent('auth-token-123'));
+      expect(locationHref).toMatch(/\/dashboard$/);
+      expect(locationHref).not.toContain('#token=');
     });
   });
 
-  it('redirects super_admin to admin app dashboard with token hash', async () => {
+  it('redirects super_admin to admin app dashboard', async () => {
     mockApiLogin.mockResolvedValueOnce({ token: 'auth-token-123' });
     (global.fetch as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce({
@@ -166,12 +166,12 @@ describe('Web LoginPage — navigation', () => {
     fireEvent.click(screen.getByRole('button', { name: /התחברות/i }));
 
     await waitFor(() => {
-      expect(locationHref).toMatch(/\/dashboard#token=/);
-      expect(locationHref).toContain(encodeURIComponent('auth-token-123'));
+      expect(locationHref).toMatch(/\/dashboard$/);
+      expect(locationHref).not.toContain('#token=');
     });
   });
 
-  it('redirects buildings_manager to admin app dashboard with token hash', async () => {
+  it('redirects buildings_manager to admin app dashboard', async () => {
     mockApiLogin.mockResolvedValueOnce({ token: 'auth-token-123' });
     (global.fetch as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce({
@@ -199,8 +199,8 @@ describe('Web LoginPage — navigation', () => {
     fireEvent.click(screen.getByRole('button', { name: /התחברות/i }));
 
     await waitFor(() => {
-      expect(locationHref).toMatch(/\/dashboard#token=/);
-      expect(locationHref).toContain(encodeURIComponent('auth-token-123'));
+      expect(locationHref).toMatch(/\/dashboard$/);
+      expect(locationHref).not.toContain('#token=');
     });
   });
 
