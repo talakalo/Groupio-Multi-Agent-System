@@ -6,9 +6,7 @@ These tests verify the shim correctly delegates to GovDataClient.
 """
 
 import warnings
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import MagicMock
 
 # Import helpers that are still re-exported from the shim
 with warnings.catch_warnings():
@@ -78,8 +76,9 @@ class TestDataGovIlProviderShim:
         assert p.get_municipality_info("עיר שלא קיימת") is None
 
     def test_get_municipality_info_found_delegates(self):
+        from datetime import UTC, datetime
+
         from src.integrations.gov.models import GovResult, GovSource, Municipality
-        from datetime import datetime, UTC
 
         p = self._provider()
         p._client.resolve_municipality = MagicMock(
@@ -100,8 +99,9 @@ class TestDataGovIlProviderShim:
         assert p.normalize_address(city="") is None
 
     def test_normalize_address_no_municipality(self):
+        from datetime import UTC, datetime
+
         from src.integrations.gov.models import GovResult, GovSource
-        from datetime import datetime, UTC
 
         p = self._provider()
         p._client.normalize_address = MagicMock(
@@ -116,8 +116,9 @@ class TestDataGovIlProviderShim:
         assert p.normalize_address(city="nowhere") is None
 
     def test_normalize_address_delegates_result(self):
+        from datetime import UTC, datetime
+
         from src.integrations.gov.models import GovResult, GovSource, NormalizedAddressResult
-        from datetime import datetime, UTC
 
         p = self._provider()
         p._client.normalize_address = MagicMock(
@@ -138,8 +139,9 @@ class TestDataGovIlProviderShim:
         assert p.search_registered_entity("") == []
 
     def test_search_registered_entity_delegates(self):
+        from datetime import UTC, datetime
+
         from src.integrations.gov.models import Company, GovResult, GovSource
-        from datetime import datetime, UTC
 
         p = self._provider()
         p._client.lookup_company = MagicMock(

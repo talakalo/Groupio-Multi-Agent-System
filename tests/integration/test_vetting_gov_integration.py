@@ -15,14 +15,13 @@ The test proves:
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from src.agents.vetting import VettingAgent, TRUST_WEIGHTS
+from src.agents.vetting import TRUST_WEIGHTS, VettingAgent
 from src.integrations.gov.models import Company, GovResult, GovSource
 from src.models.agent_state import AgentState
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -203,7 +202,11 @@ class TestTrustScoreGovRegistration:
 
     def _base_inputs(self):
         validations = {"license_valid": True, "insurance_valid": True}
-        reputation = {"online_reputation_score": 0.8, "graph_reputation": {"total_projects": 5}, "suspicious_patterns": {}}
+        reputation = {
+            "online_reputation_score": 0.8,
+            "graph_reputation": {"total_projects": 5},
+            "suspicious_patterns": {},
+        }
         history = {"completion_rate": 0.9}
         return validations, reputation, history
 
@@ -236,7 +239,11 @@ class TestTrustScoreGovRegistration:
     def test_score_bounded_0_to_100(self):
         agent = self._agent()
         validations = {"license_valid": True, "insurance_valid": True}
-        reputation = {"online_reputation_score": 1.0, "graph_reputation": {"total_projects": 100}, "suspicious_patterns": {}}
+        reputation = {
+            "online_reputation_score": 1.0,
+            "graph_reputation": {"total_projects": 100},
+            "suspicious_patterns": {},
+        }
         history = {"completion_rate": 1.0}
 
         score = agent._calculate_trust_score(

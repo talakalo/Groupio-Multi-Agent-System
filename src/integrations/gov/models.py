@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Generic, TypeVar
 
 T = TypeVar("T")
 
 
-class GovSource(str, Enum):
+class GovSource(StrEnum):
     DATA_GOV_IL_COMPANIES = "data_gov_il_companies"
     DATA_GOV_IL_STREETS = "data_gov_il_streets"
     DATA_GOV_IL_SETTLEMENTS = "data_gov_il_settlements"

@@ -2,8 +2,6 @@
 
 import time
 
-import pytest
-
 from src.integrations.gov.cache import InMemoryCacheBackend, cache_key
 
 

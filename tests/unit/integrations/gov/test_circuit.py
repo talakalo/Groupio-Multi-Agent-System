@@ -2,9 +2,7 @@
 
 import time
 
-import pytest
-
-from src.integrations.gov.circuit import CircuitBreaker, CircuitOpenError, CircuitState
+from src.integrations.gov.circuit import CircuitBreaker, CircuitState
 
 
 class TestCircuitBreaker:

@@ -16,8 +16,6 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 FIXTURES = Path(__file__).parent.parent / "fixtures" / "gov"
 
 
@@ -259,7 +257,8 @@ class TestGovResultContract:
     def test_cache_hit_flag_on_second_call(self):
         from src.integrations.gov.client import GovDataClient
 
-        with patch("src.integrations.gov.client.httpx.Client", return_value=_mock_post("ckan_settlements.json")) as mock_cls:
+        mock_http = _mock_post("ckan_settlements.json")
+        with patch("src.integrations.gov.client.httpx.Client", return_value=mock_http) as mock_cls:
             client = GovDataClient(base_url="https://fake.api/action", enabled=True)
             first = client.resolve_municipality("ירושלים")
             second = client.resolve_municipality("ירושלים")

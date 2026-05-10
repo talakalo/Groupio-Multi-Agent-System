@@ -4,10 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from src.integrations.gov.client import GovDataClient, _fuzzy_match, _normalize_hebrew
-from src.integrations.gov.errors import GovBadResponseError, GovTimeoutError
 from src.integrations.gov.models import GovSource
 
 
@@ -208,8 +205,9 @@ class TestNormalizeAddress:
     @patch.object(GovDataClient, "resolve_municipality")
     @patch.object(GovDataClient, "resolve_street")
     def test_full_match_high_confidence(self, mock_street, mock_muni):
+        from datetime import UTC, datetime
+
         from src.integrations.gov.models import GovResult, Municipality, Street
-        from datetime import datetime, UTC
 
         mock_muni.return_value = GovResult(
             value=Municipality("5000", "תל אביב", None, "תל אביב", "תל אביב"),
@@ -233,8 +231,9 @@ class TestNormalizeAddress:
 
     @patch.object(GovDataClient, "resolve_municipality")
     def test_municipality_not_found_returns_error(self, mock_muni):
+        from datetime import UTC, datetime
+
         from src.integrations.gov.models import GovResult
-        from datetime import datetime, UTC
 
         mock_muni.return_value = GovResult(
             value=None,
@@ -250,24 +249,30 @@ class TestNormalizeAddress:
 
 class TestGovResultModel:
     def test_ok_when_value_and_no_error(self):
+        from datetime import UTC, datetime
+
         from src.integrations.gov.models import GovResult
-        from datetime import datetime, UTC
 
         r = GovResult(value="x", confidence=0.9, source=GovSource.DATA_GOV_IL_COMPANIES, fetched_at=datetime.now(UTC))
         assert r.ok is True
 
     def test_not_ok_when_value_none(self):
+        from datetime import UTC, datetime
+
         from src.integrations.gov.models import GovResult
-        from datetime import datetime, UTC
 
         r = GovResult(value=None, confidence=0.0, source=GovSource.DISABLED, fetched_at=datetime.now(UTC))
         assert r.ok is False
 
     def test_not_ok_when_error_set(self):
-        from src.integrations.gov.models import GovResult
-        from datetime import datetime, UTC
+        from datetime import UTC, datetime
 
-        r = GovResult(value="x", confidence=0.0, source=GovSource.INTERNAL_STUB, fetched_at=datetime.now(UTC), error="boom")
+        from src.integrations.gov.models import GovResult
+
+        r = GovResult(
+            value="x", confidence=0.0, source=GovSource.INTERNAL_STUB,
+            fetched_at=datetime.now(UTC), error="boom",
+        )
         assert r.ok is False
 
 

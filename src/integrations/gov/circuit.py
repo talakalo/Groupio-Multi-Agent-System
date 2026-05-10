@@ -11,10 +11,10 @@ from __future__ import annotations
 
 import threading
 import time
-from enum import Enum
+from enum import StrEnum
 
 
-class CircuitState(str, Enum):
+class CircuitState(StrEnum):
     CLOSED = "closed"
     OPEN = "open"
     HALF_OPEN = "half_open"

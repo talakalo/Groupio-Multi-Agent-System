@@ -7,13 +7,7 @@ No Redis, no real database — building creation and DB upsert are mocked.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
-from unittest.mock import AsyncMock, MagicMock, patch
-
-import pytest
-
-from src.integrations.gov.models import GovResult, GovSource, Municipality, Street
-
+from unittest.mock import MagicMock, patch
 
 # ---------------------------------------------------------------------------
 # Fixtures — realistic CKAN response stubs for Tel Aviv / Dizengoff
@@ -139,7 +133,7 @@ class TestOnboardingEnrichment:
     def test_municipality_code_written_during_onboarding(self, mock_cls):
         """When client omits municipality_code, server-side enrichment fills it in."""
         from src.integrations.gov.client import GovDataClient
-        from src.services.enrichment import EnrichmentService, get_enrichment_service
+        from src.services.enrichment import EnrichmentService
 
         def post_side_effect(url, json=None, **kwargs):
             resource_id = (json or {}).get("resource_id", "")

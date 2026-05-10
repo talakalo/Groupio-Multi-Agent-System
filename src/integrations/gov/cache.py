@@ -13,7 +13,6 @@ import time
 from hashlib import sha1
 from typing import Any, Protocol, runtime_checkable
 
-
 # Cache key TTLs (seconds)
 TTL_COMPANIES = 86_400      # 24h
 TTL_SETTLEMENTS = 604_800   # 7d

@@ -28,16 +28,16 @@ from rapidfuzz import fuzz
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from .cache import (
-    CacheBackend,
-    InMemoryCacheBackend,
     TTL_ADDRESS,
     TTL_COMPANIES,
     TTL_SETTLEMENTS,
     TTL_STREETS,
+    CacheBackend,
+    InMemoryCacheBackend,
     cache_key,
 )
 from .circuit import CircuitBreaker, CircuitOpenError
-from .errors import GovBadResponseError, GovDisabledError, GovTimeoutError
+from .errors import GovBadResponseError, GovTimeoutError
 from .models import (
     Company,
     GovResult,
@@ -235,7 +235,7 @@ class GovDataClient:
             self._circuit.record_success()
             _record_request(source_label, "success", time.perf_counter() - t0)
             return result
-        except (GovTimeoutError, GovBadResponseError) as e:
+        except (GovTimeoutError, GovBadResponseError):
             self._circuit.record_failure()
             _record_request(source_label, "error", time.perf_counter() - t0)
             raise
