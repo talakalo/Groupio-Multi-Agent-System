@@ -1,5 +1,5 @@
 import { Stack } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
 import {
   ActivityIndicator,
@@ -24,26 +24,32 @@ import {
 } from "../lib/api";
 import i18n from "../lib/i18n";
 
-/**
- * Mobile in-app notification inbox.
- *
- * Mirrors the web NotificationPanel: paginated list + unread badge + mark
- * read + mark-all-read + delete. Pull-to-refresh reloads. Tapping a row
- * marks it read.
- */
+const PAGE_SIZE = 20;
+
 export default function NotificationsScreen() {
   const theme = useTheme();
   const [items, setItems] = useState<NotificationItem[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [actioning, setActioning] = useState<string | null>(null);
+  const offsetRef = useRef(0);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (reset = false) => {
     setError(null);
+    const offset = reset ? 0 : offsetRef.current;
     try {
-      const data = await getNotifications({ limit: 50 });
-      setItems(data.items);
+      const data = await getNotifications({ limit: PAGE_SIZE, offset });
+      setTotal(data.total);
+      if (reset) {
+        setItems(data.items);
+        offsetRef.current = data.items.length;
+      } else {
+        setItems((prev) => [...prev, ...data.items]);
+        offsetRef.current = offset + data.items.length;
+      }
     } catch (err: unknown) {
       setError(
         err instanceof ApiError
@@ -56,7 +62,7 @@ export default function NotificationsScreen() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      await load();
+      await load(true);
       if (!cancelled) setLoading(false);
     })();
     return () => {
@@ -66,8 +72,15 @@ export default function NotificationsScreen() {
 
   async function onRefresh() {
     setRefreshing(true);
-    await load();
+    await load(true);
     setRefreshing(false);
+  }
+
+  async function onEndReached() {
+    if (loadingMore || items.length >= total) return;
+    setLoadingMore(true);
+    await load(false);
+    setLoadingMore(false);
   }
 
   async function handleMarkRead(notif: NotificationItem) {
@@ -113,6 +126,7 @@ export default function NotificationsScreen() {
     try {
       await deleteNotification(notif.id);
       setItems((prev) => prev.filter((n) => n.id !== notif.id));
+      setTotal((t) => t - 1);
     } catch (err: unknown) {
       setError(
         err instanceof ApiError
@@ -176,6 +190,15 @@ export default function NotificationsScreen() {
         contentContainerStyle={styles.list}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+        onEndReached={onEndReached}
+        onEndReachedThreshold={0.3}
+        ListFooterComponent={
+          loadingMore ? (
+            <View style={styles.footerLoader}>
+              <ActivityIndicator size="small" />
+            </View>
+          ) : null
         }
         renderItem={({ item }) => (
           <Card
@@ -251,4 +274,5 @@ const styles = StyleSheet.create({
   },
   unreadChip: { alignSelf: "flex-start" },
   emptyWrap: { padding: 24, alignItems: "center" },
+  footerLoader: { paddingVertical: 16, alignItems: "center" },
 });
