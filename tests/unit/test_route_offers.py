@@ -112,6 +112,7 @@ class TestGetOffer:
         db = MagicMock()
         db.get_offer = AsyncMock(return_value=_make_offer())
         db.is_user_in_building = AsyncMock(return_value=True)
+        db.has_user_joined_offer = AsyncMock(return_value=False)
 
         from src.api.main import app
         from src.api.middleware.auth import get_current_user

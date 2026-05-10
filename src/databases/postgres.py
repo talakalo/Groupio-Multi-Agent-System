@@ -73,6 +73,14 @@ _PAYMENT_COLS = (
     "provider_transaction_id, provider_data, metadata, "
     "created_at, updated_at"
 )
+_BUILDING_COLS = (
+    "id, name, address, city, neighborhood, region, total_units, floors, "
+    "year_built, admin_user_id, resident_count, active_offers, "
+    "completed_offers, total_savings, whatsapp_group_id, invite_code, "
+    "municipality_code, municipality_name, address_normalized, "
+    "enrichment_confidence, enrichment_source, enriched_at, "
+    "created_at, updated_at"
+)
 
 logger = logging.getLogger(__name__)
 
@@ -650,7 +658,7 @@ class PostgresClient:
             client = await self._get_client()
             result = await client.table("buildings").select("*").eq("id", building_id).execute()
             return result.data[0] if result.data else None
-        return await self._pg_fetch_one("SELECT * FROM buildings WHERE id = $1", building_id)
+        return await self._pg_fetch_one(f"SELECT {_BUILDING_COLS} FROM buildings WHERE id = $1", building_id)
 
     async def get_building_by_phone(self, phone: str) -> str | None:
         """Look up building ID from a phone number."""
@@ -852,10 +860,11 @@ class PostgresClient:
         total = count_row["c"] if count_row else 0
         args.extend([page_size, (page - 1) * page_size])
         n1, n2 = len(args) - 1, len(args)
-        rows = await self._pg_fetch_all(
-            "SELECT * FROM buildings WHERE " + where_sql + " ORDER BY created_at DESC LIMIT $%d OFFSET $%d" % (n1, n2),
-            *args,
+        query = (
+            f"SELECT {_BUILDING_COLS} FROM buildings WHERE {where_sql}"
+            f" ORDER BY created_at DESC LIMIT ${n1} OFFSET ${n2}"
         )
+        rows = await self._pg_fetch_all(query, *args)
         return (rows or [], total)
 
     async def update_building(self, building_id: str, update_data: dict[str, Any]) -> dict[str, Any]:
@@ -1235,7 +1244,7 @@ class PostgresClient:
             client = await self._get_client()
             result = await client.table("offers").select("*").eq("id", offer_id).limit(1).execute()
             return result.data[0] if result.data else None
-        return await self._pg_fetch_one("SELECT * FROM offers WHERE id = $1", offer_id)
+        return await self._pg_fetch_one(f"SELECT {_OFFER_COLS} FROM offers WHERE id = $1", offer_id)
 
     async def update_offer(self, offer_id: str, update_data: dict[str, Any]) -> dict[str, Any]:
         """Update an offer."""
@@ -1714,7 +1723,7 @@ class PostgresClient:
             client = await self._get_client()
             result = await client.table("contractors").select("*").eq("id", contractor_id).limit(1).execute()
             return result.data[0] if result.data else None
-        return await self._pg_fetch_one("SELECT * FROM contractors WHERE id = $1", contractor_id)
+        return await self._pg_fetch_one(f"SELECT {_CONTRACTOR_COLS} FROM contractors WHERE id = $1", contractor_id)
 
     async def get_user_id_by_contractor_id(self, contractor_id: str) -> str | None:
         """Get the user ID linked to a contractor (users.contractor_id)."""
@@ -1871,7 +1880,10 @@ class PostgresClient:
             order = {cid: i for i, cid in enumerate(contractor_ids)}
             return sorted(data, key=lambda x: order.get(x["id"], 999))
         placeholders = ", ".join("$%d" % (i + 1) for i in range(len(contractor_ids)))
-        rows = await self._pg_fetch_all("SELECT * FROM contractors WHERE id IN (" + placeholders + ")", *contractor_ids)
+        rows = await self._pg_fetch_all(
+            f"SELECT {_CONTRACTOR_COLS} FROM contractors WHERE id IN ({placeholders})",
+            *contractor_ids,
+        )
         order = {cid: i for i, cid in enumerate(contractor_ids)}
         return sorted(rows or [], key=lambda x: order.get(x["id"], 999))
 
@@ -2821,7 +2833,7 @@ class PostgresClient:
         args.extend([page_size, (page - 1) * page_size])
         n1, n2 = len(args) - 1, len(args)
         rows = await self._pg_fetch_all(
-            "SELECT * FROM users WHERE " + where_sql + " ORDER BY created_at DESC LIMIT $%d OFFSET $%d" % (n1, n2),
+            f"SELECT {_USER_COLS} FROM users WHERE {where_sql} ORDER BY created_at DESC LIMIT ${n1} OFFSET ${n2}",
             *args,
         )
         return (rows or [], total)
@@ -2901,7 +2913,7 @@ class PostgresClient:
         args.extend([page_size, (page - 1) * page_size])
         n1, n2 = len(args) - 1, len(args)
         rows = await self._pg_fetch_all(
-            "SELECT * FROM offers WHERE " + where_sql + " ORDER BY created_at DESC LIMIT $%d OFFSET $%d" % (n1, n2),
+            f"SELECT {_OFFER_COLS} FROM offers WHERE {where_sql} ORDER BY created_at DESC LIMIT ${n1} OFFSET ${n2}",
             *args,
         )
         rows = rows or []
