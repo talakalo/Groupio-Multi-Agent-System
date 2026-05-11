@@ -41,6 +41,7 @@ bcrypt>=4.0.0
 
 # Utilities
 numpy>=1.26.0
+rapidfuzz>=3.0.0
 
 # Development
 pytest>=7.4.0
