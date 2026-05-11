@@ -119,10 +119,11 @@ async def test_app_role_cannot_read_other_users_rows() -> None:
                 f"""
                 INSERT INTO users (id, email, full_name, role, is_active, is_verified,
                                    hashed_password, preferred_language, phone, created_at, updated_at)
-                VALUES ($1, $2, 'RLS Test', 'resident', true, true, 'x', 'he', '000-0000000', {now_sql}, {now_sql})
+                VALUES ($1, $2, 'RLS Test', 'resident', true, true, 'x', 'he', $3, {now_sql}, {now_sql})
                 """,
                 uid,
                 f"{uid}@rls-test.example.com",
+                uid[:12],
             )
 
         # Make sure groupio_app can log in. The password set by 021 is a

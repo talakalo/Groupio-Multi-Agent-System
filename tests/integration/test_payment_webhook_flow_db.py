@@ -81,6 +81,9 @@ async def test_webhook_transitions_payment_to_succeeded() -> None:
         await _ensure_table(conn, "users")
 
         user_id = uuid.uuid4().hex
+        building_id = uuid.uuid4().hex
+        offer_id = uuid.uuid4().hex
+        invoice_id = uuid.uuid4().hex
         payment_id = uuid.uuid4().hex
         now_sql = "NOW() AT TIME ZONE 'UTC'"
 
@@ -88,18 +91,50 @@ async def test_webhook_transitions_payment_to_succeeded() -> None:
             f"""
             INSERT INTO users (id, email, full_name, role, is_active, is_verified,
                                hashed_password, preferred_language, phone, created_at, updated_at)
-            VALUES ($1, $2, 'Pay Test', 'resident', true, true, 'x', 'he', '000-0000000', {now_sql}, {now_sql})
+            VALUES ($1, $2, 'Pay Test', 'resident', true, true, 'x', 'he', $3, {now_sql}, {now_sql})
             """,
             user_id,
             f"{user_id}@payment-test.example.com",
+            user_id[:12],
         )
         await conn.execute(
             f"""
-            INSERT INTO payments (id, user_id, amount, currency, status, created_at, updated_at)
-            VALUES ($1, $2, 100, 'ILS', 'pending', {now_sql}, {now_sql})
+            INSERT INTO buildings (id, name, address, city, region, total_units, floors,
+                                   admin_user_id, created_at, updated_at)
+            VALUES ($1, 'Test Building', '1 Test St', 'Tel Aviv', 'center', 10, 3,
+                    $2, {now_sql}, {now_sql})
+            """,
+            building_id,
+            user_id,
+        )
+        await conn.execute(
+            f"""
+            INSERT INTO offers (id, building_id, created_by, title, description, category,
+                                base_price, status, created_at, updated_at)
+            VALUES ($1, $2, $3, 'Test Offer', 'Test', 'ac', 1000, 'active', {now_sql}, {now_sql})
+            """,
+            offer_id,
+            building_id,
+            user_id,
+        )
+        await conn.execute(
+            f"""
+            INSERT INTO invoices (id, offer_id, type, subtotal, tax_amount, total,
+                                  status, created_at, updated_at)
+            VALUES ($1, $2, 'payment', 100, 17, 117, 'draft', {now_sql}, {now_sql})
+            """,
+            invoice_id,
+            offer_id,
+        )
+        await conn.execute(
+            f"""
+            INSERT INTO payments (id, user_id, invoice_id, amount, currency, status,
+                                  created_at, updated_at)
+            VALUES ($1, $2, $3, 100, 'ILS', 'pending', {now_sql}, {now_sql})
             """,
             payment_id,
             user_id,
+            invoice_id,
         )
 
         # Invoke the same DB path the Stripe webhook handler uses.
@@ -120,6 +155,19 @@ async def test_webhook_transitions_payment_to_succeeded() -> None:
         try:
             await conn.execute(
                 "DELETE FROM payments WHERE user_id IN ("
+                "SELECT id FROM users WHERE email LIKE '%@payment-test.example.com')"
+            )
+            await conn.execute(
+                "DELETE FROM invoices WHERE offer_id IN ("
+                "SELECT id FROM offers WHERE created_by IN ("
+                "SELECT id FROM users WHERE email LIKE '%@payment-test.example.com'))"
+            )
+            await conn.execute(
+                "DELETE FROM offers WHERE created_by IN ("
+                "SELECT id FROM users WHERE email LIKE '%@payment-test.example.com')"
+            )
+            await conn.execute(
+                "DELETE FROM buildings WHERE admin_user_id IN ("
                 "SELECT id FROM users WHERE email LIKE '%@payment-test.example.com')"
             )
             await conn.execute("DELETE FROM users WHERE email LIKE '%@payment-test.example.com'")
@@ -144,10 +192,12 @@ async def test_webhook_atomic_payment_and_invoice_transition() -> None:
     conn = await _connect_or_skip(pg_dsn)
 
     try:
-        for tbl in ("payments", "invoices", "users"):
+        for tbl in ("payments", "invoices", "offers", "buildings", "users"):
             await _ensure_table(conn, tbl)
 
         user_id = uuid.uuid4().hex
+        building_id = uuid.uuid4().hex
+        offer_id = uuid.uuid4().hex
         payment_id = uuid.uuid4().hex
         invoice_id = uuid.uuid4().hex
         now_sql = "NOW() AT TIME ZONE 'UTC'"
@@ -156,17 +206,40 @@ async def test_webhook_atomic_payment_and_invoice_transition() -> None:
             f"""
             INSERT INTO users (id, email, full_name, role, is_active, is_verified,
                                hashed_password, preferred_language, phone, created_at, updated_at)
-            VALUES ($1, $2, 'Pay Test', 'resident', true, true, 'x', 'he', '000-0000000', {now_sql}, {now_sql})
+            VALUES ($1, $2, 'Pay Test', 'resident', true, true, 'x', 'he', $3, {now_sql}, {now_sql})
             """,
             user_id,
             f"{user_id}@payment-test.example.com",
+            user_id[:12],
         )
         await conn.execute(
             f"""
-            INSERT INTO invoices (id, status, created_at, updated_at)
-            VALUES ($1, 'open', {now_sql}, {now_sql})
+            INSERT INTO buildings (id, name, address, city, region, total_units, floors,
+                                   admin_user_id, created_at, updated_at)
+            VALUES ($1, 'Test Building', '1 Test St', 'Tel Aviv', 'center', 10, 3,
+                    $2, {now_sql}, {now_sql})
+            """,
+            building_id,
+            user_id,
+        )
+        await conn.execute(
+            f"""
+            INSERT INTO offers (id, building_id, created_by, title, description, category,
+                                base_price, status, created_at, updated_at)
+            VALUES ($1, $2, $3, 'Test Offer', 'Test', 'ac', 1000, 'active', {now_sql}, {now_sql})
+            """,
+            offer_id,
+            building_id,
+            user_id,
+        )
+        await conn.execute(
+            f"""
+            INSERT INTO invoices (id, offer_id, type, subtotal, tax_amount, total,
+                                  status, created_at, updated_at)
+            VALUES ($1, $2, 'payment', 250, 42.5, 292.5, 'open', {now_sql}, {now_sql})
             """,
             invoice_id,
+            offer_id,
         )
         await conn.execute(
             f"""
@@ -200,7 +273,19 @@ async def test_webhook_atomic_payment_and_invoice_transition() -> None:
                 "DELETE FROM payments WHERE user_id IN ("
                 "SELECT id FROM users WHERE email LIKE '%@payment-test.example.com')"
             )
-            await conn.execute("DELETE FROM invoices WHERE id = $1", invoice_id)
+            await conn.execute(
+                "DELETE FROM invoices WHERE offer_id IN ("
+                "SELECT id FROM offers WHERE created_by IN ("
+                "SELECT id FROM users WHERE email LIKE '%@payment-test.example.com'))"
+            )
+            await conn.execute(
+                "DELETE FROM offers WHERE created_by IN ("
+                "SELECT id FROM users WHERE email LIKE '%@payment-test.example.com')"
+            )
+            await conn.execute(
+                "DELETE FROM buildings WHERE admin_user_id IN ("
+                "SELECT id FROM users WHERE email LIKE '%@payment-test.example.com')"
+            )
             await conn.execute("DELETE FROM users WHERE email LIKE '%@payment-test.example.com'")
         except Exception:
             pass
