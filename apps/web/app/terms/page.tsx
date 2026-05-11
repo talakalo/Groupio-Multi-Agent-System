@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
-  title: 'תנאי שימוש | Groupio',
+  title: 'תנאי שימוש',
   description: 'תנאי השימוש של פלטפורמת Groupio לרכישות קבוצתיות',
 };
 

@@ -66,18 +66,20 @@ export default function ResidentLayout({ children }: { children: React.ReactNode
   const [resending, setResending] = useState(false);
 
   useEffect(() => {
-    // Wait for persist to rehydrate before making redirect decisions;
-    // otherwise we race the localStorage restore and bounce authenticated
-    // users to /login on every navigation.
+    // Wait for persist to rehydrate before making redirect decisions.
     if (!hasHydrated) return;
-    if (!token && isAuthenticated) {
+    if (!token) {
+      // Always attempt token refresh when there is no in-memory access token
+      // (e.g. after a full page reload). The HTTP-only refresh cookie is the
+      // authoritative session source — if it's valid the user stays logged in,
+      // if not we send them to /login. This covers both the `isAuthenticated`
+      // true and false cases and avoids the redirect loop that arises when
+      // clearAuth() wiped localStorage while the refresh cookie is still valid.
       refreshAccessToken().then((success) => {
         if (!success) router.replace('/login');
       });
-    } else if (!token && !isAuthenticated) {
-      router.replace('/login');
     }
-  }, [hasHydrated, token, isAuthenticated, router, refreshAccessToken]);
+  }, [hasHydrated, token, router, refreshAccessToken]);
 
   useEffect(() => {
     if (!hasHydrated) return;
@@ -106,8 +108,13 @@ export default function ResidentLayout({ children }: { children: React.ReactNode
     return null;
   }
 
-  if (!token && !isAuthenticated) {
-    return null;
+  if (!token) {
+    // Token is being refreshed — show a loading indicator so the page isn't blank
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
+      </div>
+    );
   }
 
   if (isAuthenticated && user?.role && !ALLOWED_RESIDENT_ROLES.has(user.role)) {

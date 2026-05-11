@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
-  title: 'צור קשר | Groupio',
+  title: 'צור קשר',
   description: 'צרו קשר עם צוות Groupio — נשמח לעזור',
 };
 

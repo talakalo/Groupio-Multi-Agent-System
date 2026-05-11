@@ -64,14 +64,12 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
 
   useEffect(() => {
     if (!hasHydrated) return;
-    if (!token && isAuthenticated) {
+    if (!token) {
       refreshAccessToken().then((success) => {
         if (!success) router.replace('/login');
       });
-    } else if (!token && !isAuthenticated) {
-      router.replace('/login');
     }
-  }, [hasHydrated, token, isAuthenticated, router, refreshAccessToken]);
+  }, [hasHydrated, token, router, refreshAccessToken]);
 
   useEffect(() => {
     if (!hasHydrated) return;
@@ -97,8 +95,12 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
     return null;
   }
 
-  if (!token && !isAuthenticated) {
-    return null;
+  if (!token) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
+      </div>
+    );
   }
 
   if (isAuthenticated && user?.role && !ALLOWED_CONTRACTOR_ROLES.has(user.role)) {

@@ -49,22 +49,16 @@ export default function AdminLayout(props: { children: React.ReactNode } & PageP
 
   useEffect(() => {
     if (!hasHydrated) return;
-    // `accessToken` is in-memory only; rely on the persisted `isAuthenticated`
-    // flag (and the HTTP-only refresh cookie) as the source of truth and
-    // silently refresh if we landed here without a token in memory.
-    if (!isAuthenticated) {
-      router.replace('/login');
-      return;
-    }
     if (!token) {
       refreshAccessToken().then((ok) => {
         if (!ok) router.replace('/login');
       });
+      return;
     }
     if (user && user.role !== 'admin' && user.role !== 'super_admin') {
       router.replace('/dashboard');
     }
-  }, [hasHydrated, token, isAuthenticated, user, router, refreshAccessToken]);
+  }, [hasHydrated, token, user, router, refreshAccessToken]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -81,7 +75,7 @@ export default function AdminLayout(props: { children: React.ReactNode } & PageP
   if (!hasHydrated) {
     return null;
   }
-  if (!isAuthenticated) {
+  if (!token) {
     return null;
   }
 

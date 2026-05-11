@@ -20,7 +20,7 @@ const organizationJsonLd = {
 };
 
 export const metadata: Metadata = {
-  title: "גרופיו | קניות קבוצתיות לבניינים - חסכו עד 40%",
+  title: { absolute: "גרופיו | קניות קבוצתיות לבניינים - חסכו עד 40%" },
   description:
     "הצטרפו לאלפי דיירים שחוסכים בקניות קבוצתיות. קבלנים מאומתים, תשלום מוגן בנאמנות, עד 40% חיסכון.",
   openGraph: {

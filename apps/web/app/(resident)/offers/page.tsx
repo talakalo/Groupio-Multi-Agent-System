@@ -83,11 +83,11 @@ const QUICK_CATEGORIES = [
   { id: 'renovations', label: 'שיפוצים' },
   { id: 'plumbing', label: 'אינסטלציה' },
   { id: 'electrical', label: 'חשמל' },
-  { id: 'waterproofing', label: 'איטום' },
-  { id: 'elevators', label: 'מעליות' },
-  { id: 'cleaning', label: 'ניקיון' },
-  { id: 'gardening', label: 'גינון' },
   { id: 'ac_installation', label: 'מיזוג אוויר' },
+  { id: 'painting', label: 'צביעה' },
+  { id: 'flooring', label: 'ריצוף' },
+  { id: 'windows', label: 'חלונות' },
+  { id: 'heating', label: 'חימום' },
 ];
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [

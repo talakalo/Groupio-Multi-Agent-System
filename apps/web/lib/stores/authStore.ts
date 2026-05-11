@@ -29,6 +29,8 @@ export interface AuthState {
    * they race the rehydration and bounce authenticated users off the page.
    */
   _hasHydrated: boolean;
+  /** In-flight refresh promise — deduplicates concurrent refresh calls. */
+  _refreshPromise: Promise<boolean> | null;
 
   // Actions
   setUser: (user: User | null) => void;
@@ -56,6 +58,23 @@ interface RegisterData {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
+// Maps the snake_case API response to the camelCase User interface.
+// Handles both snake_case (from API) and camelCase (from already-mapped data).
+function mapApiUser(raw: Record<string, unknown>): User {
+  return {
+    id: raw.id as string,
+    email: raw.email as string,
+    fullName: ((raw.full_name ?? raw.fullName) as string) || '',
+    phone: (raw.phone as string) || '',
+    role: raw.role as User['role'],
+    preferredLanguage: ((raw.preferred_language ?? raw.preferredLanguage) as 'he' | 'en') || 'he',
+    avatarUrl: (raw.avatar_url ?? raw.avatarUrl) as string | undefined,
+    buildingId: (raw.building_id ?? raw.buildingId) as string | undefined,
+    contractorId: (raw.contractor_id ?? raw.contractorId) as string | undefined,
+    isVerified: Boolean(raw.is_verified ?? raw.isVerified),
+  };
+}
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
@@ -64,6 +83,7 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       isLoading: false,
       _hasHydrated: false,
+      _refreshPromise: null,
 
       _setHasHydrated: (b) => set({ _hasHydrated: b }),
 
@@ -124,8 +144,8 @@ export const useAuthStore = create<AuthState>()(
           });
 
           if (userResponse.ok) {
-            const user = await userResponse.json();
-            set({ user });
+            const raw = await userResponse.json();
+            set({ user: mapApiUser(raw) });
           }
         } catch (err) {
           // Always re-throw as a proper Error so callers never receive a raw
@@ -158,29 +178,56 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      refreshAccessToken: async () => {
-        // No refresh token in state – the browser sends the HTTP-only
-        // cookie automatically when credentials: 'include' is set.
-        try {
-          const response = await fetch(`${API_URL}/api/v1/auth/refresh`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-          });
+      refreshAccessToken: () => {
+        // Deduplicate: if a refresh is already in-flight, return the same promise
+        // so concurrent callers (e.g. multiple layouts mounting on navigation) share
+        // one request and avoid token-rotation race conditions.
+        const existing = get()._refreshPromise;
+        if (existing) return existing;
 
-          if (!response.ok) {
+        const promise: Promise<boolean> = (async () => {
+          try {
+            const response = await fetch(`${API_URL}/api/v1/auth/refresh`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+            });
+
+            if (!response.ok) {
+              get().clearAuth();
+              return false;
+            }
+
+            const data = await response.json();
+            set({ accessToken: data.access_token, isAuthenticated: true });
+
+            // Fetch user profile if not set or if persisted data is in old snake_case format
+            if (!get().user || !get().user?.fullName) {
+              try {
+                const meRes = await fetch(`${API_URL}/api/v1/auth/me`, {
+                  headers: { Authorization: `Bearer ${data.access_token}` },
+                  credentials: 'include',
+                });
+                if (meRes.ok) {
+                  const raw = await meRes.json();
+                  set({ user: mapApiUser(raw) });
+                }
+              } catch {
+                // Non-fatal: session still valid without user profile
+              }
+            }
+
+            return true;
+          } catch {
             get().clearAuth();
             return false;
+          } finally {
+            set({ _refreshPromise: null });
           }
+        })();
 
-          const data = await response.json();
-          set({ accessToken: data.access_token });
-
-          return true;
-        } catch {
-          get().clearAuth();
-          return false;
-        }
+        set({ _refreshPromise: promise });
+        return promise;
       },
 
       register: async (data) => {
@@ -240,8 +287,8 @@ export const useAuthStore = create<AuthState>()(
             throw new Error(error.detail || 'Update failed');
           }
 
-          const updatedUser = await response.json();
-          set({ user: updatedUser });
+          const raw = await response.json();
+          set({ user: mapApiUser(raw) });
         } catch (err) {
           if (err instanceof Error) throw err;
           throw new Error(String(err));
@@ -259,6 +306,7 @@ export const useAuthStore = create<AuthState>()(
       partialize: (state) => ({
         user: state.user,
         isAuthenticated: state.isAuthenticated,
+        // accessToken and _refreshPromise are intentionally excluded — in-memory only
       }),
       onRehydrateStorage: () => () => {
         // Always flip the flag, even on error or when no persisted state
