@@ -55,13 +55,15 @@ def upgrade() -> None:
     if _is_supabase(conn):
         return  # Supabase: managed roles, skip custom groupio_app/groupio_readonly
 
+    db_name = conn.execute(sa.text("SELECT current_database()")).scalar()
+
     # ── 1. Create application role ─────────────────────────────────────────
     if not _role_exists("groupio_app"):
         op.execute(
             "CREATE ROLE groupio_app WITH LOGIN PASSWORD 'change-me-in-production' "
             "NOSUPERUSER NOCREATEDB NOCREATEROLE"
         )
-    op.execute("GRANT CONNECT ON DATABASE groupio TO groupio_app")
+    op.execute(f'GRANT CONNECT ON DATABASE "{db_name}" TO groupio_app')
     op.execute("GRANT USAGE ON SCHEMA public TO groupio_app")
     op.execute(
         "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO groupio_app"
@@ -79,7 +81,7 @@ def upgrade() -> None:
             "CREATE ROLE groupio_readonly WITH LOGIN PASSWORD 'change-me-readonly' "
             "NOSUPERUSER NOCREATEDB NOCREATEROLE"
         )
-    op.execute("GRANT CONNECT ON DATABASE groupio TO groupio_readonly")
+    op.execute(f'GRANT CONNECT ON DATABASE "{db_name}" TO groupio_readonly')
     op.execute("GRANT USAGE ON SCHEMA public TO groupio_readonly")
     op.execute("GRANT SELECT ON ALL TABLES IN SCHEMA public TO groupio_readonly")
     op.execute(

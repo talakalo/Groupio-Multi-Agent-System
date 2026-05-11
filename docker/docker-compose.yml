@@ -107,8 +107,6 @@ services:
       - "7687:7687"
     environment:
       - NEO4J_AUTH=neo4j/${NEO4J_PASSWORD:?Set NEO4J_PASSWORD in .env}
-      # Quoted to prevent YAML from misinterpreting [ as an inline sequence.
-      - "NEO4J_PLUGINS=[\"apoc\"]"
     volumes:
       - neo4j_data:/data
     healthcheck:
