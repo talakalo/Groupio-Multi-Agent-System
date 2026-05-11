@@ -3,11 +3,9 @@
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from fastapi.testclient import TestClient
 
 from src.models.user import UserInDB, UserRole
-
 
 # ---------------------------------------------------------------------------
 # Helpers

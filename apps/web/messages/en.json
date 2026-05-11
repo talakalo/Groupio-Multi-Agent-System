@@ -142,7 +142,23 @@
     "offerCreated": "Offer created",
     "collectingParticipants": "Collecting participants",
     "contractorConfirmation": "Contractor confirmation",
-    "workBegins": "Work begins"
+    "workBegins": "Work begins",
+    "draft": "Draft",
+    "cancelled": "Cancelled",
+    "details": "Details",
+    "categories": {
+      "ac_installation": "AC Installation",
+      "ac_maintenance": "AC Maintenance",
+      "kitchen": "Kitchen",
+      "electrical": "Electrical",
+      "plumbing": "Plumbing",
+      "heating": "Heating",
+      "renovations": "Renovations",
+      "painting": "Painting",
+      "flooring": "Flooring",
+      "windows": "Windows",
+      "security": "Security"
+    }
   },
   "contractors": {
     "title": "Contractors",

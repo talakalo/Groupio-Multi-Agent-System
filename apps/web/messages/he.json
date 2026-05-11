@@ -142,7 +142,23 @@
     "offerCreated": "הצעה נוצרה",
     "collectingParticipants": "איסוף משתתפים",
     "contractorConfirmation": "אישור קבלן",
-    "workBegins": "תחילת עבודה"
+    "workBegins": "תחילת עבודה",
+    "draft": "טיוטה",
+    "cancelled": "בוטל",
+    "details": "פרטים",
+    "categories": {
+      "ac_installation": "התקנת מזגנים",
+      "ac_maintenance": "תחזוקת מזגנים",
+      "kitchen": "מטבחים",
+      "electrical": "חשמל",
+      "plumbing": "אינסטלציה",
+      "heating": "חימום",
+      "renovations": "שיפוצים",
+      "painting": "צביעה",
+      "flooring": "ריצוף",
+      "windows": "חלונות",
+      "security": "אבטחה"
+    }
   },
   "contractors": {
     "title": "קבלנים",
