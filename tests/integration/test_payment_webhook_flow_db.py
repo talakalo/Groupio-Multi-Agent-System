@@ -87,8 +87,8 @@ async def test_webhook_transitions_payment_to_succeeded() -> None:
         await conn.execute(
             f"""
             INSERT INTO users (id, email, full_name, role, is_active, is_verified,
-                               hashed_password, preferred_language, created_at, updated_at)
-            VALUES ($1, $2, 'Pay Test', 'resident', true, true, 'x', 'he', {now_sql}, {now_sql})
+                               hashed_password, preferred_language, phone, created_at, updated_at)
+            VALUES ($1, $2, 'Pay Test', 'resident', true, true, 'x', 'he', '000-0000000', {now_sql}, {now_sql})
             """,
             user_id,
             f"{user_id}@payment-test.example.com",
@@ -155,8 +155,8 @@ async def test_webhook_atomic_payment_and_invoice_transition() -> None:
         await conn.execute(
             f"""
             INSERT INTO users (id, email, full_name, role, is_active, is_verified,
-                               hashed_password, preferred_language, created_at, updated_at)
-            VALUES ($1, $2, 'Pay Test', 'resident', true, true, 'x', 'he', {now_sql}, {now_sql})
+                               hashed_password, preferred_language, phone, created_at, updated_at)
+            VALUES ($1, $2, 'Pay Test', 'resident', true, true, 'x', 'he', '000-0000000', {now_sql}, {now_sql})
             """,
             user_id,
             f"{user_id}@payment-test.example.com",
