@@ -12,7 +12,10 @@
     "search": "Search",
     "filter": "Filter",
     "share": "Share",
-    "close": "Close"
+    "close": "Close",
+    "closeMenu": "Close menu",
+    "openMenu": "Open menu",
+    "notifications": "Notifications"
   },
   "auth": {
     "login": "Log In",
@@ -38,7 +41,9 @@
     "myAccount": "My Account",
     "myAccountHint": "Profile, notifications & preferences",
     "accountMenu": "Account menu",
-    "logout": "Log out"
+    "logout": "Log out",
+    "orders": "My Orders",
+    "resident": "Resident"
   },
   "contractorNav": {
     "dashboard": "Dashboard",
@@ -52,7 +57,9 @@
     "myBusiness": "My Business",
     "myBusinessHint": "Details, documents & settings",
     "accountMenu": "Account menu",
-    "logout": "Log out"
+    "logout": "Log out",
+    "contractorAccount": "Contractor Account",
+    "contractors": "Contractors"
   },
   "contractorEarnings": {
     "title": "Earnings & payouts",

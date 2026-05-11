@@ -12,7 +12,10 @@
     "search": "חיפוש",
     "filter": "סינון",
     "share": "שתף",
-    "close": "סגור"
+    "close": "סגור",
+    "closeMenu": "סגור תפריט",
+    "openMenu": "פתח תפריט",
+    "notifications": "התראות"
   },
   "auth": {
     "login": "התחברות",
@@ -38,7 +41,9 @@
     "myAccount": "החשבון שלי",
     "myAccountHint": "פרופיל, התראות והעדפות",
     "accountMenu": "תפריט חשבון",
-    "logout": "התנתקות"
+    "logout": "התנתקות",
+    "orders": "ההזמנות שלי",
+    "resident": "דייר"
   },
   "contractorNav": {
     "dashboard": "לוח בקרה",
@@ -52,7 +57,9 @@
     "myBusiness": "העסק שלי",
     "myBusinessHint": "פרטי עסק, מסמכים והגדרות",
     "accountMenu": "תפריט חשבון",
-    "logout": "התנתקות"
+    "logout": "התנתקות",
+    "contractorAccount": "חשבון קבלן",
+    "contractors": "קבלנים"
   },
   "contractorEarnings": {
     "title": "הכנסות ותשלומים",
