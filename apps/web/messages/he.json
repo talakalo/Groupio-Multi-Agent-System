@@ -191,7 +191,15 @@
     "reviewsHeading": "ביקורות",
     "reviewsEmpty": "אין עדיין ביקורות לקבלן זה",
     "reviewsError": "לא ניתן לטעון ביקורות",
-    "reviewNoComment": "דירוג ללא תגובה"
+    "reviewNoComment": "דירוג ללא תגובה",
+    "trustHigh": "מהימנות גבוהה",
+    "trustMedium": "מהימנות בינונית",
+    "trustLow": "מהימנות נמוכה",
+    "priceEstimate": "הערכת מחיר",
+    "available": "זמין",
+    "unavailable": "לא זמין",
+    "requestQuote": "בקש הצעת מחיר",
+    "profile": "פרופיל"
   },
   "profile": {
     "title": "פרופיל",

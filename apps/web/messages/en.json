@@ -191,7 +191,15 @@
     "reviewsHeading": "Reviews",
     "reviewsEmpty": "No reviews yet for this contractor",
     "reviewsError": "Could not load reviews",
-    "reviewNoComment": "Rating without comment"
+    "reviewNoComment": "Rating without comment",
+    "trustHigh": "High Trust",
+    "trustMedium": "Medium Trust",
+    "trustLow": "Low Trust",
+    "priceEstimate": "Price estimate",
+    "available": "Available",
+    "unavailable": "Unavailable",
+    "requestQuote": "Request Quote",
+    "profile": "Profile"
   },
   "profile": {
     "title": "Profile",
