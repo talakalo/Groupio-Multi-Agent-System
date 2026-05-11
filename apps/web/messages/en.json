@@ -143,6 +143,13 @@
     "collectingParticipants": "Collecting participants",
     "contractorConfirmation": "Contractor confirmation",
     "workBegins": "Work begins",
+    "currentStage": "Current Tier",
+    "perUnit": "per unit",
+    "savingsPerUnit": "Save {amount} per unit",
+    "neighborsToNextTier": "{count} more neighbors to next tier!",
+    "maxTierReached": "You've reached the highest discount tier!",
+    "totalGroupSavings": "Total group savings",
+    "units": "units",
     "draft": "Draft",
     "cancelled": "Cancelled",
     "details": "Details",
@@ -860,7 +867,12 @@
       "paid": "Payment held in escrow",
       "scheduled": "Work scheduled",
       "done": "Work completed",
-      "released": "Payment released to contractor"
+      "released": "Payment released to contractor",
+      "orderCreated": "Order created",
+      "paymentReceived": "Payment received",
+      "contractorApproved": "Contractor approved",
+      "workInProgress": "Work in progress",
+      "workCompleted": "Work completed"
     },
     "status": {
       "pending": "Awaiting payment",

@@ -143,6 +143,13 @@
     "collectingParticipants": "איסוף משתתפים",
     "contractorConfirmation": "אישור קבלן",
     "workBegins": "תחילת עבודה",
+    "currentStage": "שלב נוכחי",
+    "perUnit": "ליחידה",
+    "savingsPerUnit": "חיסכון {amount} ליחידה",
+    "neighborsToNextTier": "עוד {count} שכנים לרמה הבאה!",
+    "maxTierReached": "הגעתם לרמת ההנחה הגבוהה ביותר!",
+    "totalGroupSavings": "חיסכון כולל לקבוצה",
+    "units": "דירות",
     "draft": "טיוטה",
     "cancelled": "בוטל",
     "details": "פרטים",
@@ -860,7 +867,12 @@
       "paid": "תשלום נשמר בנאמנות",
       "scheduled": "עבודה תוזמנה",
       "done": "עבודה הושלמה",
-      "released": "תשלום שוחרר לקבלן"
+      "released": "תשלום שוחרר לקבלן",
+      "orderCreated": "הזמנה נוצרה",
+      "paymentReceived": "תשלום התקבל",
+      "contractorApproved": "קבלן אושר",
+      "workInProgress": "עבודה בביצוע",
+      "workCompleted": "עבודה הושלמה"
     },
     "status": {
       "pending": "ממתין לתשלום",
