@@ -13,14 +13,21 @@ down_revision = "035"
 branch_labels = None
 depends_on = None
 
+# IDs in the original schema are VARCHAR(36) (migration 001), not UUID.
+_ID = sa.String(36)
+
+
+def _is_supabase(conn) -> bool:
+    return conn.execute(sa.text("SELECT current_database()")).scalar() == "postgres"
+
 
 def upgrade() -> None:
     op.create_table(
         "orders",
-        sa.Column("id", sa.UUID(as_uuid=False), primary_key=True),
-        sa.Column("user_id", sa.UUID(as_uuid=False), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("offer_id", sa.UUID(as_uuid=False), sa.ForeignKey("offers.id", ondelete="SET NULL"), nullable=True),
-        sa.Column("building_id", sa.UUID(as_uuid=False), sa.ForeignKey("buildings.id", ondelete="SET NULL"), nullable=True),
+        sa.Column("id", _ID, primary_key=True),
+        sa.Column("user_id", _ID, sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column("offer_id", _ID, sa.ForeignKey("offers.id", ondelete="SET NULL"), nullable=True),
+        sa.Column("building_id", _ID, sa.ForeignKey("buildings.id", ondelete="SET NULL"), nullable=True),
         sa.Column("status", sa.String(50), nullable=False, server_default="pending"),
         sa.Column("total_amount", sa.Numeric(12, 2), nullable=True),
         sa.Column("currency", sa.String(3), nullable=False, server_default="ILS"),
@@ -35,14 +42,14 @@ def upgrade() -> None:
 
     op.create_table(
         "support_tickets",
-        sa.Column("id", sa.UUID(as_uuid=False), primary_key=True),
-        sa.Column("user_id", sa.UUID(as_uuid=False), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column("id", _ID, primary_key=True),
+        sa.Column("user_id", _ID, sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
         sa.Column("conversation_id", sa.String(255), nullable=True),
         sa.Column("reason", sa.Text(), nullable=False),
         sa.Column("priority", sa.String(20), nullable=False, server_default="normal"),
         sa.Column("context", sa.JSON(), nullable=True),
         sa.Column("status", sa.String(20), nullable=False, server_default="open"),
-        sa.Column("assigned_to", sa.UUID(as_uuid=False), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
+        sa.Column("assigned_to", _ID, sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
         sa.Column("resolved_at", sa.TIMESTAMP(timezone=True), nullable=True),
         sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.Column("updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.func.now(), nullable=False),
@@ -53,13 +60,13 @@ def upgrade() -> None:
 
     op.create_table(
         "contractor_documents",
-        sa.Column("id", sa.UUID(as_uuid=False), primary_key=True),
-        sa.Column("contractor_id", sa.UUID(as_uuid=False), sa.ForeignKey("contractors.id", ondelete="CASCADE"), nullable=False),
+        sa.Column("id", _ID, primary_key=True),
+        sa.Column("contractor_id", _ID, sa.ForeignKey("contractors.id", ondelete="CASCADE"), nullable=False),
         sa.Column("doc_type", sa.String(50), nullable=False),
         sa.Column("file_url", sa.Text(), nullable=False),
         sa.Column("extracted_text", sa.Text(), nullable=True),
         sa.Column("verified", sa.Boolean(), nullable=False, server_default="false"),
-        sa.Column("verified_by", sa.UUID(as_uuid=False), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
+        sa.Column("verified_by", _ID, sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
         sa.Column("verified_at", sa.TIMESTAMP(timezone=True), nullable=True),
         sa.Column("uploaded_at", sa.TIMESTAMP(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.func.now(), nullable=False),
@@ -67,11 +74,14 @@ def upgrade() -> None:
     op.create_index("ix_contractor_documents_contractor_id", "contractor_documents", ["contractor_id"])
     op.create_index("ix_contractor_documents_doc_type", "contractor_documents", ["doc_type"])
 
-    # Enable RLS on all three tables
     for table in ("orders", "support_tickets", "contractor_documents"):
         op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
 
-    # RLS: orders — users see their own rows; admins see all
+    # RLS policies use auth.uid() — Supabase only. Skip on local/CI Postgres.
+    conn = op.get_bind()
+    if not _is_supabase(conn):
+        return
+
     op.execute("""
         CREATE POLICY orders_select_own ON orders
         FOR SELECT USING (
@@ -86,7 +96,6 @@ def upgrade() -> None:
         FOR INSERT WITH CHECK (user_id = auth.uid())
     """)
 
-    # RLS: support_tickets — users see their own; admins see all
     op.execute("""
         CREATE POLICY support_tickets_select ON support_tickets
         FOR SELECT USING (
@@ -101,7 +110,6 @@ def upgrade() -> None:
         FOR INSERT WITH CHECK (user_id = auth.uid())
     """)
 
-    # RLS: contractor_documents — contractor owner or admin
     op.execute("""
         CREATE POLICY contractor_documents_select ON contractor_documents
         FOR SELECT USING (
