@@ -68,9 +68,9 @@ services:
       # API does not wait on RabbitMQ: core routes work with messaging flags off.
       # Add rabbitmq here (condition: service_healthy) when enabling ENABLE_RABBITMQ.
       qdrant:
-        condition: service_started
+        condition: service_healthy
       neo4j:
-        condition: service_started
+        condition: service_healthy
       redis:
         condition: service_started
     volumes:
@@ -93,6 +93,12 @@ services:
       - "6333:6333"
     volumes:
       - qdrant_data:/qdrant/storage
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:6333/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   neo4j:
     image: neo4j:5-community
@@ -105,6 +111,12 @@ services:
       - "NEO4J_PLUGINS=[\"apoc\"]"
     volumes:
       - neo4j_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:7474 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
   redis:
     image: redis:7-alpine
@@ -151,9 +163,9 @@ services:
       redis:
         condition: service_started
       qdrant:
-        condition: service_started
+        condition: service_healthy
       neo4j:
-        condition: service_started
+        condition: service_healthy
     restart: unless-stopped
 
   scheduler:
@@ -181,9 +193,9 @@ services:
       redis:
         condition: service_started
       qdrant:
-        condition: service_started
+        condition: service_healthy
       neo4j:
-        condition: service_started
+        condition: service_healthy
     restart: unless-stopped
 
   outbox_dispatcher:
@@ -233,6 +245,7 @@ services:
       rabbitmq:
         condition: service_healthy
     restart: unless-stopped
+
   web:
     build:
       context: ..
@@ -299,32 +312,6 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  web:
-    build:
-      context: ..
-      dockerfile: apps/web/Dockerfile
-    ports:
-      - "3000:3000"
-    environment:
-      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
-      - NEXT_PUBLIC_ADMIN_URL=${NEXT_PUBLIC_ADMIN_URL:-http://localhost:3001}
-    depends_on:
-      api:
-        condition: service_started
-
-  admin:
-    build:
-      context: ..
-      dockerfile: apps/admin/Dockerfile
-    ports:
-      - "3001:3001"
-    environment:
-      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
-      - NEXT_PUBLIC_ADMIN_URL=${NEXT_PUBLIC_ADMIN_URL:-http://localhost:3001}
-    depends_on:
-      api:
-        condition: service_started
-
   prometheus:
     image: prom/prometheus:v2.51.0
     volumes:
@@ -355,7 +342,7 @@ services:
     ports:
       - "3010:3000"
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD:?Set GF_SECURITY_ADMIN_PASSWORD in .env}
       - GF_USERS_ALLOW_SIGN_UP=false
     volumes:
       - grafana_data:/var/lib/grafana

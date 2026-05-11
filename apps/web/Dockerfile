@@ -17,8 +17,13 @@ RUN pnpm --filter @groupio/web build
 FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
 RUN addgroup -S nodejs && adduser -S nextjs -G nodejs
-COPY --from=builder /app .
+# Standalone output bundles all needed deps — no pnpm required at runtime.
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/public ./apps/web/public
 USER nextjs
 EXPOSE 3000
-CMD ["pnpm", "--filter", "@groupio/web", "start", "--", "-p", "3000"]
+CMD ["node", "apps/web/server.js"]

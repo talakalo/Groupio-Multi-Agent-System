@@ -48,6 +48,7 @@ const adminSecurityHeaders = [
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: "standalone",
   transpilePackages: [
     "@groupio/types",
     "@groupio/api-client",
