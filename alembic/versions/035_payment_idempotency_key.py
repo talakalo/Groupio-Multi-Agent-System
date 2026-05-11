@@ -47,6 +47,11 @@ def upgrade() -> None:
         )
 
     # ── 2. join_offer_atomic — handle unique constraint gracefully ──────────
+    # DROP first: return type changed from VOID (008) to BOOLEAN, and
+    # CREATE OR REPLACE cannot change the return type in PostgreSQL.
+    op.execute(
+        "DROP FUNCTION IF EXISTS join_offer_atomic(VARCHAR, VARCHAR, VARCHAR, INT)"
+    )
     op.execute("""
         CREATE OR REPLACE FUNCTION join_offer_atomic(
             p_id VARCHAR,
