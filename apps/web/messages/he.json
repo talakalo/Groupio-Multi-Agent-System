@@ -995,5 +995,29 @@
     },
     "tryAgain": "נסה שוב",
     "uploadAnother": "העלה תוכנית נוספת"
+  },
+  "notificationPanel": {
+    "title": "התראות",
+    "panel": "לוח התראות",
+    "markAllRead": "סמן הכל כנקרא",
+    "markAllReadButton": "סמן",
+    "clearAll": "נקה את כל ההתראות",
+    "clearAllButton": "נקה",
+    "markAsRead": "סמן כנקרא",
+    "deleteNotification": "מחק התראה",
+    "loginToSee": "התחברו כדי לראות התראות מהשרת",
+    "loading": "טוען…",
+    "retry": "נסו שוב",
+    "empty": "אין התראות",
+    "emptyHint": "עדכונים על הצעות ופעילות יופיעו כאן",
+    "count": "{count} התראות",
+    "networkError": "שגיאת רשת",
+    "markAllError": "לא ניתן לסמן הכל כנקרא. נסו שוב.",
+    "markOneError": "לא ניתן לעדכן התראה. נסו שוב.",
+    "deleteError": "לא ניתן למחוק התראה. נסו שוב.",
+    "clearError": "לא ניתן לנקות התראות. נסו שוב.",
+    "timeNow": "עכשיו",
+    "timeMinutesAgo": "לפני {minutes} דקות",
+    "timeHoursAgo": "לפני {hours} שעות"
   }
 }

@@ -995,5 +995,29 @@
     },
     "tryAgain": "Try again",
     "uploadAnother": "Upload another plan"
+  },
+  "notificationPanel": {
+    "title": "Notifications",
+    "panel": "Notification panel",
+    "markAllRead": "Mark all as read",
+    "markAllReadButton": "Mark",
+    "clearAll": "Clear all notifications",
+    "clearAllButton": "Clear",
+    "markAsRead": "Mark as read",
+    "deleteNotification": "Delete notification",
+    "loginToSee": "Log in to see server notifications",
+    "loading": "Loading…",
+    "retry": "Retry",
+    "empty": "No notifications",
+    "emptyHint": "Updates on offers and activity will appear here",
+    "count": "{count} notifications",
+    "networkError": "Network error",
+    "markAllError": "Could not mark all as read. Try again.",
+    "markOneError": "Could not update notification. Try again.",
+    "deleteError": "Could not delete notification. Try again.",
+    "clearError": "Could not clear notifications. Try again.",
+    "timeNow": "Just now",
+    "timeMinutesAgo": "{minutes} minutes ago",
+    "timeHoursAgo": "{hours} hours ago"
   }
 }

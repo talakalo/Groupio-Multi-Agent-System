@@ -2,6 +2,7 @@
 
 import { Bell, CheckCircle, XCircle, AlertTriangle, Info, CheckCheck, Trash2, Loader2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
@@ -47,16 +48,18 @@ function mapApiType(raw: string): NotificationType {
   return 'info';
 }
 
-function formatTime(date: Date): string {
+type TFunc = ReturnType<typeof useTranslations<'notificationPanel'>>;
+
+function formatTime(date: Date, t: TFunc): string {
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffSec = Math.floor(diffMs / 1000);
   const diffMin = Math.floor(diffSec / 60);
   const diffHr = Math.floor(diffMin / 60);
 
-  if (diffSec < 60) return 'עכשיו';
-  if (diffMin < 60) return `לפני ${diffMin} דקות`;
-  if (diffHr < 24) return `לפני ${diffHr} שעות`;
+  if (diffSec < 60) return t('timeNow');
+  if (diffMin < 60) return t('timeMinutesAgo', { minutes: diffMin });
+  if (diffHr < 24) return t('timeHoursAgo', { hours: diffHr });
   return date.toLocaleDateString('he-IL', { day: 'numeric', month: 'short' });
 }
 
@@ -104,6 +107,7 @@ function NotificationItem({
   onMarkRead: (id: string) => void;
   onDelete: (id: string) => void;
 }) {
+  const t = useTranslations('notificationPanel');
   const Icon = ICON_MAP[row.type];
 
   return (
@@ -121,7 +125,7 @@ function NotificationItem({
         {row.message && (
           <p className="text-xs text-gray-500 mt-0.5 leading-snug">{row.message}</p>
         )}
-        <p className="text-[11px] text-gray-400 mt-1">{formatTime(row.createdAt)}</p>
+        <p className="text-[11px] text-gray-400 mt-1">{formatTime(row.createdAt, t)}</p>
       </div>
       <div className="shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
         {!row.read && (
@@ -129,8 +133,8 @@ function NotificationItem({
             type="button"
             onClick={() => onMarkRead(row.id)}
             className="p-1 rounded-lg hover:bg-gray-200 transition-all"
-            aria-label="סמן כנקרא"
-            title="סמן כנקרא"
+            aria-label={t('markAsRead')}
+            title={t('markAsRead')}
           >
             <CheckCheck className="h-3.5 w-3.5 text-gray-400" />
           </button>
@@ -139,8 +143,8 @@ function NotificationItem({
           type="button"
           onClick={() => onDelete(row.id)}
           className="p-1 rounded-lg hover:bg-red-50 transition-all"
-          aria-label="מחק התראה"
-          title="מחק התראה"
+          aria-label={t('deleteNotification')}
+          title={t('deleteNotification')}
         >
           <Trash2 className="h-3.5 w-3.5 text-gray-400 hover:text-red-500" />
         </button>
@@ -160,6 +164,7 @@ function NotificationItem({
 // ---------------------------------------------------------------------------
 
 export function NotificationPanel() {
+  const t = useTranslations('notificationPanel');
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const accessToken = useAuthStore((s) => s.accessToken);
@@ -199,7 +204,7 @@ export function NotificationPanel() {
       setRows(mapRows(list.items as unknown[]));
       setUnreadCount(uc.count);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'שגיאת רשת';
+      const msg = e instanceof Error ? e.message : t('networkError');
       setError(msg);
     } finally {
       setLoading(false);
@@ -254,7 +259,7 @@ export function NotificationPanel() {
     } catch {
       setRows(prev);
       setUnreadCount(prevUnread);
-      setError('לא ניתן לסמן הכל כנקרא. נסו שוב.');
+      setError(t('markAllError'));
     }
   };
 
@@ -269,7 +274,7 @@ export function NotificationPanel() {
     } catch {
       setRows(prev);
       if (wasUnread) setUnreadCount((c) => c + 1);
-      setError('לא ניתן לעדכן התראה. נסו שוב.');
+      setError(t('markOneError'));
     }
   };
 
@@ -285,7 +290,7 @@ export function NotificationPanel() {
     } catch {
       setRows(prev);
       setUnreadCount(prevUnread);
-      setError('לא ניתן למחוק התראה. נסו שוב.');
+      setError(t('deleteError'));
     }
   };
 
@@ -300,7 +305,7 @@ export function NotificationPanel() {
     } catch {
       setRows(prev);
       setUnreadCount(prevUnread);
-      setError('לא ניתן לנקות התראות. נסו שוב.');
+      setError(t('clearError'));
     }
   };
 
@@ -313,7 +318,7 @@ export function NotificationPanel() {
         data-testid="notification-panel-trigger"
         onClick={() => setOpen((prev) => !prev)}
         className="relative p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
-        aria-label="התראות"
+        aria-label={t('title')}
         aria-expanded={open}
         aria-haspopup="true"
       >
@@ -335,10 +340,10 @@ export function NotificationPanel() {
             'animate-fade-in',
           )}
           role="dialog"
-          aria-label="לוח התראות"
+          aria-label={t('panel')}
         >
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-            <h3 className="text-sm font-semibold text-gray-900">התראות</h3>
+            <h3 className="text-sm font-semibold text-gray-900">{t('title')}</h3>
             {signedIn && rows.length > 0 && (
               <div className="flex items-center gap-3">
                 <button
@@ -346,20 +351,20 @@ export function NotificationPanel() {
                   data-testid="notification-mark-all-read"
                   onClick={() => void handleMarkAllRead()}
                   className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 transition-colors"
-                  title="סמן הכל כנקרא"
+                  title={t('markAllRead')}
                 >
                   <CheckCheck className="h-3.5 w-3.5" />
-                  <span>סמן</span>
+                  <span>{t('markAllReadButton')}</span>
                 </button>
                 <button
                   type="button"
                   data-testid="notification-clear-all"
                   onClick={() => void handleClearAll()}
                   className="flex items-center gap-1 text-xs text-gray-500 hover:text-red-600 transition-colors"
-                  title="נקה את כל ההתראות"
+                  title={t('clearAll')}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
-                  <span>נקה</span>
+                  <span>{t('clearAllButton')}</span>
                 </button>
               </div>
             )}
@@ -368,7 +373,7 @@ export function NotificationPanel() {
           <div className="max-h-80 overflow-y-auto divide-y divide-gray-50">
             {!signedIn && (
               <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
-                <p className="text-sm text-gray-600">התחברו כדי לראות התראות מהשרת</p>
+                <p className="text-sm text-gray-600">{t('loginToSee')}</p>
               </div>
             )}
             {signedIn && loading && rows.length === 0 && (
@@ -377,7 +382,7 @@ export function NotificationPanel() {
                 className="flex items-center justify-center gap-2 py-10 text-gray-500 text-sm"
               >
                 <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
-                טוען…
+                {t('loading')}
               </div>
             )}
             {signedIn && error && (
@@ -389,7 +394,7 @@ export function NotificationPanel() {
                   className="block mx-auto mt-2 text-xs text-primary-600 underline"
                   onClick={() => void refresh()}
                 >
-                  נסו שוב
+                  {t('retry')}
                 </button>
               </div>
             )}
@@ -401,9 +406,9 @@ export function NotificationPanel() {
                 <div className="h-12 w-12 rounded-full bg-gray-100 flex items-center justify-center mb-3">
                   <Bell className="h-6 w-6 text-gray-300" />
                 </div>
-                <p className="text-sm font-medium text-gray-600">אין התראות</p>
+                <p className="text-sm font-medium text-gray-600">{t('empty')}</p>
                 <p className="text-xs text-gray-400 mt-1">
-                  עדכונים על הצעות ופעילות יופיעו כאן
+                  {t('emptyHint')}
                 </p>
               </div>
             )}
@@ -420,7 +425,7 @@ export function NotificationPanel() {
 
           {signedIn && rows.length > 0 && (
             <div className="border-t border-gray-100 px-4 py-2.5">
-              <p className="text-xs text-center text-gray-400">{rows.length} התראות</p>
+              <p className="text-xs text-center text-gray-400">{t('count', { count: rows.length })}</p>
             </div>
           )}
         </div>
