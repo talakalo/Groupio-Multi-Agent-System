@@ -64,6 +64,119 @@ async def _ensure_table(conn, name: str) -> None:
         )
 
 
+async def _seed_hierarchy(conn, *, email_tag: str) -> tuple[str, str, str, str, str]:
+    """Insert user → building → offer → invoice → payment and return their IDs."""
+    user_id = uuid.uuid4().hex
+    building_id = uuid.uuid4().hex
+    offer_id = uuid.uuid4().hex
+    invoice_id = uuid.uuid4().hex
+    payment_id = uuid.uuid4().hex
+
+    await conn.execute(
+        """
+        INSERT INTO users
+            (id, email, full_name, role, is_active, is_verified,
+             hashed_password, preferred_language, phone)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        """,
+        user_id,
+        f"{user_id}@{email_tag}.example.com",
+        "Pay Test",
+        "resident",
+        True,
+        True,
+        "x",
+        "he",
+        user_id[:12],
+    )
+    await conn.execute(
+        """
+        INSERT INTO buildings
+            (id, name, address, city, region, total_units, floors, admin_user_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        """,
+        building_id,
+        "Test Building",
+        "1 Test St",
+        "Tel Aviv",
+        "center",
+        10,
+        3,
+        user_id,
+    )
+    await conn.execute(
+        """
+        INSERT INTO offers
+            (id, building_id, created_by, title, description, category,
+             base_price, status)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        """,
+        offer_id,
+        building_id,
+        user_id,
+        "Test Offer",
+        "Test description",
+        "ac",
+        1000,
+        "active",
+    )
+    await conn.execute(
+        """
+        INSERT INTO invoices
+            (id, offer_id, type, subtotal, tax_amount, total, status, currency)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        """,
+        invoice_id,
+        offer_id,
+        "payment",
+        100,
+        17,
+        117,
+        "draft",
+        "ILS",
+    )
+    await conn.execute(
+        """
+        INSERT INTO payments
+            (id, user_id, invoice_id, amount, currency, status)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        """,
+        payment_id,
+        user_id,
+        invoice_id,
+        100,
+        "ILS",
+        "pending",
+    )
+    return user_id, building_id, offer_id, invoice_id, payment_id
+
+
+async def _cleanup(conn, email_tag: str) -> None:
+    try:
+        await conn.execute(
+            f"DELETE FROM payments WHERE user_id IN "
+            f"(SELECT id FROM users WHERE email LIKE '%@{email_tag}.example.com')"
+        )
+        await conn.execute(
+            f"DELETE FROM invoices WHERE offer_id IN "
+            f"(SELECT id FROM offers WHERE created_by IN "
+            f"(SELECT id FROM users WHERE email LIKE '%@{email_tag}.example.com'))"
+        )
+        await conn.execute(
+            f"DELETE FROM offers WHERE created_by IN "
+            f"(SELECT id FROM users WHERE email LIKE '%@{email_tag}.example.com')"
+        )
+        await conn.execute(
+            f"DELETE FROM buildings WHERE admin_user_id IN "
+            f"(SELECT id FROM users WHERE email LIKE '%@{email_tag}.example.com')"
+        )
+        await conn.execute(
+            f"DELETE FROM users WHERE email LIKE '%@{email_tag}.example.com'"
+        )
+    except Exception:  # noqa: BLE001
+        pass
+
+
 @pytest.mark.asyncio
 async def test_webhook_transitions_payment_to_succeeded() -> None:
     from src.config.settings import get_settings
@@ -77,67 +190,13 @@ async def test_webhook_transitions_payment_to_succeeded() -> None:
     conn = await _connect_or_skip(pg_dsn)
 
     try:
-        await _ensure_table(conn, "payments")
-        await _ensure_table(conn, "users")
+        for tbl in ("payments", "invoices", "offers", "buildings", "users"):
+            await _ensure_table(conn, tbl)
 
-        user_id = uuid.uuid4().hex
-        building_id = uuid.uuid4().hex
-        offer_id = uuid.uuid4().hex
-        invoice_id = uuid.uuid4().hex
-        payment_id = uuid.uuid4().hex
-        now_sql = "NOW() AT TIME ZONE 'UTC'"
-
-        await conn.execute(
-            f"""
-            INSERT INTO users (id, email, full_name, role, is_active, is_verified,
-                               hashed_password, preferred_language, phone, created_at, updated_at)
-            VALUES ($1, $2, 'Pay Test', 'resident', true, true, 'x', 'he', $3, {now_sql}, {now_sql})
-            """,
-            user_id,
-            f"{user_id}@payment-test.example.com",
-            user_id[:12],
-        )
-        await conn.execute(
-            f"""
-            INSERT INTO buildings (id, name, address, city, region, total_units, floors,
-                                   admin_user_id, created_at, updated_at)
-            VALUES ($1, 'Test Building', '1 Test St', 'Tel Aviv', 'center', 10, 3,
-                    $2, {now_sql}, {now_sql})
-            """,
-            building_id,
-            user_id,
-        )
-        await conn.execute(
-            f"""
-            INSERT INTO offers (id, building_id, created_by, title, description, category,
-                                base_price, status, created_at, updated_at)
-            VALUES ($1, $2, $3, 'Test Offer', 'Test', 'ac', 1000, 'active', {now_sql}, {now_sql})
-            """,
-            offer_id,
-            building_id,
-            user_id,
-        )
-        await conn.execute(
-            f"""
-            INSERT INTO invoices (id, offer_id, type, subtotal, tax_amount, total,
-                                  status, created_at, updated_at)
-            VALUES ($1, $2, 'payment', 100, 17, 117, 'draft', {now_sql}, {now_sql})
-            """,
-            invoice_id,
-            offer_id,
-        )
-        await conn.execute(
-            f"""
-            INSERT INTO payments (id, user_id, invoice_id, amount, currency, status,
-                                  created_at, updated_at)
-            VALUES ($1, $2, $3, 100, 'ILS', 'pending', {now_sql}, {now_sql})
-            """,
-            payment_id,
-            user_id,
-            invoice_id,
+        _u, _b, _o, _inv, payment_id = await _seed_hierarchy(
+            conn, email_tag="payment-test"
         )
 
-        # Invoke the same DB path the Stripe webhook handler uses.
         from src.databases.postgres import PostgresClient
 
         db = PostgresClient()
@@ -148,33 +207,16 @@ async def test_webhook_transitions_payment_to_succeeded() -> None:
             invoice_status=None,
         )
 
-        status = await conn.fetchval("SELECT status FROM payments WHERE id = $1", payment_id)
-        assert status == "succeeded", f"webhook handler must update DB row to 'succeeded'; got {status!r}"
+        status = await conn.fetchval(
+            "SELECT status FROM payments WHERE id = $1", payment_id
+        )
+        assert status == "succeeded", (
+            f"webhook handler must update DB row to 'succeeded'; got {status!r}"
+        )
 
     finally:
-        try:
-            await conn.execute(
-                "DELETE FROM payments WHERE user_id IN ("
-                "SELECT id FROM users WHERE email LIKE '%@payment-test.example.com')"
-            )
-            await conn.execute(
-                "DELETE FROM invoices WHERE offer_id IN ("
-                "SELECT id FROM offers WHERE created_by IN ("
-                "SELECT id FROM users WHERE email LIKE '%@payment-test.example.com'))"
-            )
-            await conn.execute(
-                "DELETE FROM offers WHERE created_by IN ("
-                "SELECT id FROM users WHERE email LIKE '%@payment-test.example.com')"
-            )
-            await conn.execute(
-                "DELETE FROM buildings WHERE admin_user_id IN ("
-                "SELECT id FROM users WHERE email LIKE '%@payment-test.example.com')"
-            )
-            await conn.execute("DELETE FROM users WHERE email LIKE '%@payment-test.example.com'")
-        except Exception:
-            pass
-        finally:
-            await conn.close()
+        await _cleanup(conn, "payment-test")
+        await conn.close()
 
 
 @pytest.mark.asyncio
@@ -195,61 +237,22 @@ async def test_webhook_atomic_payment_and_invoice_transition() -> None:
         for tbl in ("payments", "invoices", "offers", "buildings", "users"):
             await _ensure_table(conn, tbl)
 
-        user_id = uuid.uuid4().hex
-        building_id = uuid.uuid4().hex
-        offer_id = uuid.uuid4().hex
-        payment_id = uuid.uuid4().hex
-        invoice_id = uuid.uuid4().hex
-        now_sql = "NOW() AT TIME ZONE 'UTC'"
+        _u, _b, _o, invoice_id, payment_id = await _seed_hierarchy(
+            conn, email_tag="payment-atomic-test"
+        )
 
+        # update invoice amount for the atomic test
         await conn.execute(
-            f"""
-            INSERT INTO users (id, email, full_name, role, is_active, is_verified,
-                               hashed_password, preferred_language, phone, created_at, updated_at)
-            VALUES ($1, $2, 'Pay Test', 'resident', true, true, 'x', 'he', $3, {now_sql}, {now_sql})
-            """,
-            user_id,
-            f"{user_id}@payment-test.example.com",
-            user_id[:12],
-        )
-        await conn.execute(
-            f"""
-            INSERT INTO buildings (id, name, address, city, region, total_units, floors,
-                                   admin_user_id, created_at, updated_at)
-            VALUES ($1, 'Test Building', '1 Test St', 'Tel Aviv', 'center', 10, 3,
-                    $2, {now_sql}, {now_sql})
-            """,
-            building_id,
-            user_id,
-        )
-        await conn.execute(
-            f"""
-            INSERT INTO offers (id, building_id, created_by, title, description, category,
-                                base_price, status, created_at, updated_at)
-            VALUES ($1, $2, $3, 'Test Offer', 'Test', 'ac', 1000, 'active', {now_sql}, {now_sql})
-            """,
-            offer_id,
-            building_id,
-            user_id,
-        )
-        await conn.execute(
-            f"""
-            INSERT INTO invoices (id, offer_id, type, subtotal, tax_amount, total,
-                                  status, created_at, updated_at)
-            VALUES ($1, $2, 'payment', 250, 42.5, 292.5, 'open', {now_sql}, {now_sql})
-            """,
+            "UPDATE invoices SET subtotal = $1, tax_amount = $2, total = $3 WHERE id = $4",
+            250,
+            42.5,
+            292.5,
             invoice_id,
-            offer_id,
         )
         await conn.execute(
-            f"""
-            INSERT INTO payments (id, user_id, invoice_id, amount, currency, status,
-                                  created_at, updated_at)
-            VALUES ($1, $2, $3, 250, 'ILS', 'pending', {now_sql}, {now_sql})
-            """,
+            "UPDATE payments SET amount = $1 WHERE id = $2",
+            250,
             payment_id,
-            user_id,
-            invoice_id,
         )
 
         from src.databases.postgres import PostgresClient
@@ -262,32 +265,15 @@ async def test_webhook_atomic_payment_and_invoice_transition() -> None:
             invoice_status="paid",
         )
 
-        pay_status = await conn.fetchval("SELECT status FROM payments WHERE id = $1", payment_id)
-        inv_status = await conn.fetchval("SELECT status FROM invoices WHERE id = $1", invoice_id)
+        pay_status = await conn.fetchval(
+            "SELECT status FROM payments WHERE id = $1", payment_id
+        )
+        inv_status = await conn.fetchval(
+            "SELECT status FROM invoices WHERE id = $1", invoice_id
+        )
         assert pay_status == "succeeded", f"payment row not transitioned: {pay_status!r}"
         assert inv_status == "paid", f"invoice row not transitioned: {inv_status!r}"
 
     finally:
-        try:
-            await conn.execute(
-                "DELETE FROM payments WHERE user_id IN ("
-                "SELECT id FROM users WHERE email LIKE '%@payment-test.example.com')"
-            )
-            await conn.execute(
-                "DELETE FROM invoices WHERE offer_id IN ("
-                "SELECT id FROM offers WHERE created_by IN ("
-                "SELECT id FROM users WHERE email LIKE '%@payment-test.example.com'))"
-            )
-            await conn.execute(
-                "DELETE FROM offers WHERE created_by IN ("
-                "SELECT id FROM users WHERE email LIKE '%@payment-test.example.com')"
-            )
-            await conn.execute(
-                "DELETE FROM buildings WHERE admin_user_id IN ("
-                "SELECT id FROM users WHERE email LIKE '%@payment-test.example.com')"
-            )
-            await conn.execute("DELETE FROM users WHERE email LIKE '%@payment-test.example.com'")
-        except Exception:
-            pass
-        finally:
-            await conn.close()
+        await _cleanup(conn, "payment-atomic-test")
+        await conn.close()

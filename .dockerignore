@@ -57,11 +57,8 @@ apps/**/.turbo
 packages/**/dist
 packages/**/.turbo
 
-# Lockfiles and config not needed for pip install
-package.json
+# Lockfiles and config not needed at runtime
 package-lock.json
-pnpm-lock.yaml
-turbo.json
 uv.lock
 .eslintrc.js
 .prettierrc
