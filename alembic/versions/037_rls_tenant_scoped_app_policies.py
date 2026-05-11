@@ -185,6 +185,12 @@ def _column_exists(conn, table: str, column: str) -> bool:
 
 
 def upgrade() -> None:
+    # alembic_version.version_num defaults to VARCHAR(32); this revision ID is
+    # 35 chars. Widen it here so Alembic can record this version after upgrade.
+    op.execute(
+        "ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(64)"
+    )
+
     conn = op.get_bind()
     if _is_supabase(conn):
         return  # Supabase uses its own RLS chain (032 / 033 / 034).
