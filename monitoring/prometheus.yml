@@ -42,15 +42,15 @@ scrape_configs:
     static_configs:
       - targets: ["localhost:9090"]
 
-  # FastAPI backend — /metrics requires X-API-Key or Authorization: Bearer.
-  # Set bearer_token to one of API_KEYS, or use bearer_token_file for secrets.
-  # For local dev with API_KEYS=[], auth is skipped and no bearer_token needed.
+  # FastAPI backend — /metrics accepts Authorization: Bearer <key> or X-API-Key.
+  # bearer_token must match one of API_KEYS in staging-minimal.env.
+  # For production replace with bearer_token_file pointing to a mounted secret.
   - job_name: groupio-api
     metrics_path: /metrics
+    authorization:
+      credentials: "rK7qP1hZVfN3xYbL2Qe8tTw9sUaBcDeFgHiJkLmNoP"
     static_configs:
       - targets: ["api:8000"]
-    # bearer_token: "<one-of-API_KEYS>"  # Uncomment and set for auth
-    # bearer_token_file: /run/secrets/metrics_api_key  # Or use file
     relabel_configs:
       - source_labels: [__address__]
         target_label: instance

@@ -138,6 +138,8 @@ services:
       # Resolves to docker/staging-minimal.env (relative to this compose file).
       - staging-minimal.env
     command: python -m src.workers.agent_worker
+    healthcheck:
+      disable: true
     environment:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
@@ -176,6 +178,8 @@ services:
       # other Settings fields that scheduler.py loads via src/config/settings.py.
       - staging-minimal.env
     command: python -m src.workers.scheduler
+    healthcheck:
+      disable: true
     environment:
       - REDIS_URL=redis://:${REDIS_PASSWORD:-groupio-redis-dev}@redis:6379
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-groupio}
@@ -203,6 +207,8 @@ services:
     env_file:
       - staging-minimal.env
     command: python -m src.workers.outbox_dispatcher
+    healthcheck:
+      disable: true
     environment:
       - USE_LOCAL_POSTGRES=${USE_LOCAL_POSTGRES:-1}
       - DOCKER_POSTGRES_HOST=postgres
@@ -229,6 +235,8 @@ services:
     env_file:
       - staging-minimal.env
     command: python -m src.workers.worker_notifications
+    healthcheck:
+      disable: true
     environment:
       - USE_LOCAL_POSTGRES=${USE_LOCAL_POSTGRES:-1}
       - DOCKER_POSTGRES_HOST=postgres
@@ -277,6 +285,8 @@ services:
     env_file:
       - staging-minimal.env
     command: python -m src.workers.worker_crm_sync
+    healthcheck:
+      disable: true
     environment:
       - USE_LOCAL_POSTGRES=${USE_LOCAL_POSTGRES:-1}
       - DOCKER_POSTGRES_HOST=postgres
@@ -302,6 +312,8 @@ services:
     env_file:
       - staging-minimal.env
     command: python -m src.workers.worker_payments
+    healthcheck:
+      disable: true
     environment:
       - RABBITMQ_URL=${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
       - ENABLE_RABBITMQ=${ENABLE_RABBITMQ:-false}
@@ -324,10 +336,6 @@ services:
     image: prom/alertmanager:v0.27.0
     command:
       - --config.file=/etc/alertmanager/alertmanager.yml
-      - --config.expand-env=true
-    environment:
-      # Valid URL required at parse time; override with a real Slack webhook in prod.
-      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-https://example.com/alertmanager-noop}
     volumes:
       - ../monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml
     ports:

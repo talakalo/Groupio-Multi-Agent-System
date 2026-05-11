@@ -363,11 +363,16 @@ async def db_pool_health() -> dict:
 @app.get("/metrics")
 async def prometheus_metrics(
     x_api_key: str | None = Header(None, alias="X-API-Key"),
+    authorization: str | None = Header(None),
 ) -> Response:
-    """Expose Prometheus metrics — requires a valid X-API-Key header."""
+    """Expose Prometheus metrics — accepts X-API-Key or Authorization: Bearer <key>."""
     _settings = get_settings()
     if _settings.API_KEYS:
-        if not x_api_key or x_api_key not in _settings.API_KEYS:
+        bearer = None
+        if authorization and authorization.startswith("Bearer "):
+            bearer = authorization[7:]
+        key = x_api_key or bearer
+        if not key or key not in _settings.API_KEYS:
             raise HTTPException(status_code=403, detail="Invalid or missing API key")
 
     from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
