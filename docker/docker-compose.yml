@@ -322,11 +322,11 @@ services:
 
   alertmanager:
     image: prom/alertmanager:v0.27.0
+    # Image ENTRYPOINT is alertmanager; override so we can sed-inject SLACK_WEBHOOK_URL before starting.
+    entrypoint: ["/bin/sh", "-c"]
     command:
-      - --config.file=/etc/alertmanager/alertmanager.yml
-      - --config.expand-env=true
+      - sed "s|SLACK_WEBHOOK_URL_PLACEHOLDER|$$SLACK_WEBHOOK_URL|g" /etc/alertmanager/alertmanager.yml > /tmp/alertmanager.yml && exec /bin/alertmanager --config.file=/tmp/alertmanager.yml
     environment:
-      # Valid URL required at parse time; override with a real Slack webhook in prod.
       - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-https://example.com/alertmanager-noop}
     volumes:
       - ../monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml
