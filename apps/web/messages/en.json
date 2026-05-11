@@ -89,7 +89,8 @@
     "noActiveOffers": "No active offers",
     "browseOffers": "Browse Offers",
     "recentActivity": "Recent Activity",
-    "noRecentActivity": "No recent activity"
+    "noRecentActivity": "No recent activity",
+    "errorLoadingActivity": "Error loading activity. Please try again."
   },
   "offers": {
     "title": "Offers",
@@ -129,7 +130,19 @@
     "clearFilterHint": "No offers match your search. Try clearing the filters.",
     "discoverOffers": "Discover Offers",
     "errorLoadingOffers": "Error loading offers. Please try again.",
-    "retry": "Retry"
+    "retry": "Retry",
+    "backToOffers": "Back to Offers",
+    "offerNotFound": "Offer not found",
+    "currentTier": "Current tier",
+    "residents": "residents",
+    "participantsLabel": "Participants",
+    "daysRemaining": "Days remaining",
+    "currentDiscount": "Current discount",
+    "timeline": "Timeline",
+    "offerCreated": "Offer created",
+    "collectingParticipants": "Collecting participants",
+    "contractorConfirmation": "Contractor confirmation",
+    "workBegins": "Work begins"
   },
   "contractors": {
     "title": "Contractors",
@@ -158,7 +171,11 @@
     "sortByExperience": "By Experience",
     "verifiedOnly": "Verified Only",
     "noContractorsDescription": "No contractors match your search",
-    "govRegistered": "Gov Registered"
+    "govRegistered": "Gov Registered",
+    "reviewsHeading": "Reviews",
+    "reviewsEmpty": "No reviews yet for this contractor",
+    "reviewsError": "Could not load reviews",
+    "reviewNoComment": "Rating without comment"
   },
   "profile": {
     "title": "Profile",
@@ -208,7 +225,11 @@
     "logout": "Log Out",
     "saved": "Saved successfully",
     "notificationsUnsaved": "You have unsaved notification changes. Tap Save to apply.",
-    "saveFailed": "Could not save. Please try again."
+    "saveFailed": "Could not save. Please try again.",
+    "passwordUpdated": "Password updated successfully",
+    "passwordUpdateFailed": "Failed to update password. Please try again.",
+    "passwordMismatch": "Passwords do not match",
+    "updating": "Updating..."
   },
   "building": {
     "title": "Building",
@@ -233,7 +254,22 @@
     "buildingAge": "Building Age",
     "yearsOld": "years old",
     "contactCommittee": "Contact Committee",
-    "municipalityVerified": "Verified Municipality"
+    "municipalityVerified": "Verified Municipality",
+    "joinCodeRequired": "Please enter an invite code",
+    "noBuilding": "You are not assigned to a building yet",
+    "share": "Share",
+    "joinTitle": "Join a building",
+    "joinSubtitle": "Enter the invite code you received from the building committee.",
+    "joinCodeLabel": "Invite code",
+    "joinCodePlaceholder": "e.g. ABC12345",
+    "joinSubmit": "Join",
+    "joining": "Joining...",
+    "joinSuccess": "Joined successfully!",
+    "joinSuccessSubtitle": "You can now browse your building's group offers.",
+    "joinGoToBuilding": "Go to building",
+    "joinNoCode": "Don't have a code?",
+    "joinBack": "Back to building",
+    "joinErrorGeneric": "Failed to join building"
   },
   "contractor": {
     "dashboard": {
@@ -403,7 +439,10 @@
           "profile": "Complete your profile",
           "response": "Reply quickly to customers",
           "reviews": "Collect positive reviews"
-        }
+        },
+        "yourTrustScore": "Your Trust Score",
+        "scoreBreakdown": "Score Breakdown",
+        "improvementTips": "Improvement Tips"
       },
       "sections": {
         "business": "Business Details",
@@ -588,7 +627,9 @@
       "noResults": "No buildings match your search",
       "empty": "No buildings to show",
       "units": "{count, plural, one {# unit} other {# units}}",
-      "activeOffers": "{count, plural, =0 {No active offers} one {# active offer} other {# active offers}}"
+      "activeOffers": "{count, plural, =0 {No active offers} one {# active offer} other {# active offers}}",
+      "createCta": "Create building",
+      "inviteCta": "Share invite code"
     },
     "escalations": {
       "title": "Escalations",
@@ -616,6 +657,31 @@
       "role": "Role",
       "signOut": "Sign out",
       "backToDashboard": "Back to dashboard"
+    },
+    "invite": {
+      "label": "Invite code",
+      "copy": "Copy",
+      "copied": "Copied!",
+      "share": "Share",
+      "shareMessage": "Join {buildingName} with code: {code}",
+      "rotate": "Rotate code",
+      "rotateHint": "Rotating the code will immediately invalidate the previous one.",
+      "rotateError": "Failed to rotate invite code"
+    },
+    "create": {
+      "title": "Create a building",
+      "subtitle": "Once created, you can share the invite code with residents.",
+      "nameLabel": "Building name",
+      "addressLabel": "Address",
+      "cityLabel": "City",
+      "regionLabel": "Region",
+      "totalUnitsLabel": "Total units",
+      "floorsLabel": "Floors",
+      "submit": "Create",
+      "close": "Close",
+      "errorForbidden": "Buildings manager / admin role required",
+      "errorGeneric": "Failed to create building",
+      "errorMissingFields": "Name, address and city are required"
     }
   },
   "adminNav": {
@@ -731,6 +797,82 @@
     "escrowProtection": "Payment held in escrow until work completion",
     "payNow": "Pay Now",
     "total": "Total"
+  },
+  "orders": {
+    "title": "My Orders",
+    "subtitle": "Track your orders, payments and work",
+    "refresh": "Refresh",
+    "refreshAriaLabel": "Refresh orders",
+    "tabActive": "Active",
+    "tabCompleted": "Completed",
+    "tabAll": "All",
+    "loading": "Loading orders...",
+    "loadError": "Could not load orders. Please try again.",
+    "retry": "Try again",
+    "emptyActive": "No active orders",
+    "emptyCompleted": "No completed orders",
+    "emptyAll": "No orders yet",
+    "emptyHint": "Orders will appear after joining an offer and paying",
+    "discoverOffers": "Discover offers",
+    "offerFallback": "Offer #{id}",
+    "escrowBadge": "Your payments are escrow-protected.",
+    "escrowExplainer": "Groupio holds the funds until the work is done. Money is released to the contractor only after admin approval.",
+    "escrowActive": "Your payment is held in escrow. Funds will be released to the contractor after work completion and admin approval.",
+    "escrowSupport": "If there's an issue, contact support",
+    "reportProblem": "Report a problem",
+    "invoices": "Invoices",
+    "writeReview": "Write a review",
+    "reviewSent": "Review submitted!",
+    "reviewTitle": "Rate {name}",
+    "reviewPlaceholder": "Share your experience (optional)...",
+    "reviewSubmit": "Submit review",
+    "reviewCancel": "Cancel",
+    "reviewSelectRating": "Please select a rating",
+    "reviewError": "Failed to submit review",
+    "starAriaLabel": "{n} stars",
+    "ratingAriaLabel": "Rating",
+    "timeline": {
+      "joined": "Joined offer",
+      "paid": "Payment held in escrow",
+      "scheduled": "Work scheduled",
+      "done": "Work completed",
+      "released": "Payment released to contractor"
+    },
+    "status": {
+      "pending": "Awaiting payment",
+      "processing": "Processing",
+      "succeeded": "Paid — in escrow",
+      "released": "Completed",
+      "failed": "Failed",
+      "refunded": "Refunded"
+    },
+    "detail": {
+      "breadcrumbHome": "Home",
+      "breadcrumbOrders": "Orders",
+      "defaultTitle": "Order",
+      "orderStatus": "Order Status",
+      "category": "Category: {value}",
+      "transactionId": "Transaction ID: {id}",
+      "contractorDetails": "Contractor Details",
+      "approveTitle": "Approve Work Completion",
+      "approveDescription": "Once you confirm work completion, funds will be released from escrow to the contractor. This action is irreversible.",
+      "approveButton": "Approve Work & Release Payment",
+      "approving": "Approving...",
+      "approveError": "Error approving work. Please try again.",
+      "approvedBanner": "Work approved! Funds will be released to the contractor.",
+      "invoiceDownload": "Download invoice (HTML for PDF print)",
+      "invoiceDownloading": "Downloading…",
+      "invoiceError": "Could not download the invoice",
+      "loadError": "Could not load order details",
+      "backToOrders": "← Back to Orders",
+      "backToPayments": "Back to Payments",
+      "escrow": {
+        "held": "Funds held in escrow",
+        "released": "Funds released to contractor",
+        "refunded": "Funds refunded to you",
+        "pending": "Pending"
+      }
+    }
   },
   "payments": {
     "title": "My Payments",

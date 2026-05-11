@@ -89,7 +89,8 @@
     "noActiveOffers": "אין הצעות פעילות",
     "browseOffers": "עיין בהצעות",
     "recentActivity": "פעילות אחרונה",
-    "noRecentActivity": "אין פעילות אחרונה"
+    "noRecentActivity": "אין פעילות אחרונה",
+    "errorLoadingActivity": "שגיאה בטעינת הפעילות. נסה שוב."
   },
   "offers": {
     "title": "הצעות",
@@ -129,7 +130,19 @@
     "clearFilterHint": "לא נמצאו הצעות התואמות לחיפוש שלך. נסו לנקות את הסינון.",
     "discoverOffers": "גלו הצעות",
     "errorLoadingOffers": "שגיאה בטעינת ההצעות. נסה שוב.",
-    "retry": "נסה שוב"
+    "retry": "נסה שוב",
+    "backToOffers": "חזרה להצעות",
+    "offerNotFound": "ההצעה לא נמצאה",
+    "currentTier": "מדרגה נוכחית",
+    "residents": "דיירים",
+    "participantsLabel": "משתתפים",
+    "daysRemaining": "ימים נותרים",
+    "currentDiscount": "הנחה נוכחית",
+    "timeline": "לוח זמנים",
+    "offerCreated": "הצעה נוצרה",
+    "collectingParticipants": "איסוף משתתפים",
+    "contractorConfirmation": "אישור קבלן",
+    "workBegins": "תחילת עבודה"
   },
   "contractors": {
     "title": "קבלנים",
@@ -158,7 +171,11 @@
     "sortByExperience": "לפי ניסיון",
     "verifiedOnly": "מאומתים בלבד",
     "noContractorsDescription": "לא נמצאו קבלנים התואמים לחיפוש שלך",
-    "govRegistered": "רשום בממשלה"
+    "govRegistered": "רשום בממשלה",
+    "reviewsHeading": "ביקורות",
+    "reviewsEmpty": "אין עדיין ביקורות לקבלן זה",
+    "reviewsError": "לא ניתן לטעון ביקורות",
+    "reviewNoComment": "דירוג ללא תגובה"
   },
   "profile": {
     "title": "פרופיל",
@@ -208,7 +225,11 @@
     "logout": "התנתקות",
     "saved": "נשמר בהצלחה",
     "notificationsUnsaved": "יש שינויים בהעדפות ההתראות שלא נשמרו. לחצו על שמירה כדי לעדכן.",
-    "saveFailed": "לא ניתן לשמור. נסו שוב."
+    "saveFailed": "לא ניתן לשמור. נסו שוב.",
+    "passwordUpdated": "הסיסמה עודכנה בהצלחה",
+    "passwordUpdateFailed": "עדכון הסיסמה נכשל. נסו שוב.",
+    "passwordMismatch": "הסיסמאות אינן תואמות",
+    "updating": "מעדכן..."
   },
   "building": {
     "title": "הבניין",
@@ -233,7 +254,22 @@
     "buildingAge": "גיל הבניין",
     "yearsOld": "שנים",
     "contactCommittee": "צור קשר עם ועד הבית",
-    "municipalityVerified": "עירייה מאומתת"
+    "municipalityVerified": "עירייה מאומתת",
+    "joinCodeRequired": "נא להזין קוד הזמנה",
+    "noBuilding": "אינכם שייכים לבניין עדיין",
+    "share": "שיתוף",
+    "joinTitle": "הצטרפות לבניין",
+    "joinSubtitle": "הזינו את קוד ההזמנה שקיבלתם מוועד הבניין.",
+    "joinCodeLabel": "קוד הזמנה",
+    "joinCodePlaceholder": "לדוגמה: ABC12345",
+    "joinSubmit": "הצטרפות",
+    "joining": "מצטרפים...",
+    "joinSuccess": "הצטרפתם בהצלחה!",
+    "joinSuccessSubtitle": "כעת תוכלו לצפות בהצעות הקבוצתיות של הבניין שלכם.",
+    "joinGoToBuilding": "לדף הבניין",
+    "joinNoCode": "אין לכם קוד?",
+    "joinBack": "חזרה לדף הבניין",
+    "joinErrorGeneric": "שגיאה בהצטרפות לבניין"
   },
   "contractor": {
     "dashboard": {
@@ -403,7 +439,10 @@
           "profile": "השלימו את הפרופיל",
           "response": "הגיבו במהירות ללקוחות",
           "reviews": "אספו ביקורות חיוביות"
-        }
+        },
+        "yourTrustScore": "ציון האמינות שלך",
+        "scoreBreakdown": "פירוט הציון",
+        "improvementTips": "טיפים לשיפור"
       },
       "sections": {
         "business": "פרטי העסק",
@@ -588,7 +627,9 @@
       "noResults": "לא נמצאו בניינים",
       "empty": "אין בניינים להצגה",
       "units": "{count, plural, one {יחידת דיור אחת} other {# יח״ד}}",
-      "activeOffers": "{count, plural, =0 {אין הצעות פעילות} one {הצעה פעילה אחת} other {# הצעות פעילות}}"
+      "activeOffers": "{count, plural, =0 {אין הצעות פעילות} one {הצעה פעילה אחת} other {# הצעות פעילות}}",
+      "createCta": "יצירת בניין",
+      "inviteCta": "שיתוף קוד הזמנה"
     },
     "escalations": {
       "title": "אסקלציות",
@@ -616,6 +657,31 @@
       "role": "תפקיד",
       "signOut": "התנתקות",
       "backToDashboard": "חזרה ללוח הבקרה"
+    },
+    "invite": {
+      "label": "קוד הזמנה",
+      "copy": "העתק",
+      "copied": "הועתק!",
+      "share": "שיתוף",
+      "shareMessage": "הצטרפו ל-{buildingName} עם קוד: {code}",
+      "rotate": "חדש קוד",
+      "rotateHint": "חידוש הקוד ימחק מיידית את הקוד הקודם.",
+      "rotateError": "שגיאה בחידוש קוד ההזמנה"
+    },
+    "create": {
+      "title": "יצירת בניין",
+      "subtitle": "לאחר היצירה תוכלו לשתף את קוד ההזמנה עם הדיירים.",
+      "nameLabel": "שם הבניין",
+      "addressLabel": "כתובת",
+      "cityLabel": "עיר",
+      "regionLabel": "אזור",
+      "totalUnitsLabel": "סה\"כ דירות",
+      "floorsLabel": "קומות",
+      "submit": "יצירה",
+      "close": "סגירה",
+      "errorForbidden": "נדרשת הרשאת מנהל בניין",
+      "errorGeneric": "שגיאה ביצירת הבניין",
+      "errorMissingFields": "שם, כתובת ועיר הם שדות חובה"
     }
   },
   "adminNav": {
@@ -731,6 +797,82 @@
     "escrowProtection": "התשלום מוחזק ב-Escrow עד סיום העבודה",
     "payNow": "שלם עכשיו",
     "total": "סה\"כ"
+  },
+  "orders": {
+    "title": "ההזמנות שלי",
+    "subtitle": "מעקב אחר הזמנות, תשלומים ועבודות",
+    "refresh": "רענן",
+    "refreshAriaLabel": "רענן הזמנות",
+    "tabActive": "פעילות",
+    "tabCompleted": "הושלמו",
+    "tabAll": "הכל",
+    "loading": "טוען הזמנות...",
+    "loadError": "לא ניתן לטעון את ההזמנות. נסו שוב.",
+    "retry": "נסה שוב",
+    "emptyActive": "אין הזמנות פעילות",
+    "emptyCompleted": "אין הזמנות שהושלמו",
+    "emptyAll": "אין הזמנות עדיין",
+    "emptyHint": "הזמנות יופיעו לאחר הצטרפות להצעה ותשלום",
+    "discoverOffers": "גלה הצעות",
+    "offerFallback": "הצעה #{id}",
+    "escrowBadge": "התשלומים שלך מוגנים בנאמנות.",
+    "escrowExplainer": "Groupio מחזיקה את הכסף עד להשלמת העבודה. הכסף משוחרר לקבלן רק לאחר אישור מנהל המערכת.",
+    "escrowActive": "התשלום שלך מוגן בנאמנות. הכסף ישוחרר לקבלן לאחר השלמת העבודה ואישור מנהל המערכת.",
+    "escrowSupport": "אם יש בעיה, פנו לתמיכה",
+    "reportProblem": "דיווח על בעיה",
+    "invoices": "חשבוניות",
+    "writeReview": "כתוב ביקורת",
+    "reviewSent": "ביקורת נשלחה!",
+    "reviewTitle": "דירוג {name}",
+    "reviewPlaceholder": "ספרו על החוויה שלכם (אופציונלי)...",
+    "reviewSubmit": "שלח ביקורת",
+    "reviewCancel": "ביטול",
+    "reviewSelectRating": "נא לבחור דירוג",
+    "reviewError": "שגיאה בשליחת הביקורת",
+    "starAriaLabel": "{n} כוכבים",
+    "ratingAriaLabel": "דירוג",
+    "timeline": {
+      "joined": "הצטרפות להצעה",
+      "paid": "תשלום נשמר בנאמנות",
+      "scheduled": "עבודה תוזמנה",
+      "done": "עבודה הושלמה",
+      "released": "תשלום שוחרר לקבלן"
+    },
+    "status": {
+      "pending": "ממתין לתשלום",
+      "processing": "בעיבוד",
+      "succeeded": "שולם — בנאמנות",
+      "released": "הושלם",
+      "failed": "נכשל",
+      "refunded": "הוחזר"
+    },
+    "detail": {
+      "breadcrumbHome": "ראשי",
+      "breadcrumbOrders": "הזמנות",
+      "defaultTitle": "הזמנה",
+      "orderStatus": "מצב ההזמנה",
+      "category": "קטגוריה: {value}",
+      "transactionId": "מזהה עסקה: {id}",
+      "contractorDetails": "פרטי הקבלן",
+      "approveTitle": "אישור השלמת עבודה",
+      "approveDescription": "לאחר שתאשרו שהעבודה הושלמה, הכסף ישוחרר מהנאמנות לקבלן. פעולה זו אינה ניתנת לביטול.",
+      "approveButton": "אישור השלמת עבודה ושחרור תשלום",
+      "approving": "מאשר...",
+      "approveError": "שגיאה באישור העבודה. נסו שוב.",
+      "approvedBanner": "העבודה אושרה! הכסף ישוחרר לקבלן.",
+      "invoiceDownload": "הורד חשבונית (HTML להדפסה ל-PDF)",
+      "invoiceDownloading": "מוריד…",
+      "invoiceError": "לא ניתן להוריד את החשבונית",
+      "loadError": "לא ניתן לטעון את פרטי ההזמנה",
+      "backToOrders": "← חזרה להזמנות",
+      "backToPayments": "חזרה לתשלומים",
+      "escrow": {
+        "held": "הכסף מוחזק בנאמנות",
+        "released": "הכסף שוחרר לקבלן",
+        "refunded": "הכסף הוחזר אליך",
+        "pending": "ממתין"
+      }
+    }
   },
   "payments": {
     "title": "התשלומים שלי",

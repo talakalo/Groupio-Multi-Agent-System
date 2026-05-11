@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { Building2, Users, AlertCircle, Plus, Search } from 'lucide-react';
+import { Building2, Users, AlertCircle, Plus, Search, Share2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 
@@ -22,6 +22,7 @@ interface Building {
   activeOffers?: number;
   openEscalations?: number;
   admin_user_id?: string;
+  invite_code?: string;
 }
 
 export default function BuildingsManagerBuildingsPage() {
@@ -163,7 +164,25 @@ export default function BuildingsManagerBuildingsPage() {
                 )}
               </div>
 
-              <div className="mt-4 flex items-center gap-4 text-sm text-gray-500">
+              <div className="mt-3 flex justify-end">
+                <button
+                  type="button"
+                  data-testid={`invite-btn-${building.id}`}
+                  onClick={() =>
+                    setHighlight({
+                      id: building.id,
+                      name: building.name ?? building.address,
+                      invite_code: building.invite_code,
+                    })
+                  }
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100 transition-colors"
+                >
+                  <Share2 className="h-3.5 w-3.5" />
+                  {t('inviteCta') || 'Share invite'}
+                </button>
+              </div>
+
+              <div className="mt-3 flex items-center gap-4 text-sm text-gray-500">
                 <span className="flex items-center gap-1.5">
                   <Users className="h-4 w-4" />
                   {t('units', { count: building.units })}

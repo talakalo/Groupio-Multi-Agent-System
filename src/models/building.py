@@ -49,6 +49,8 @@ class BuildingInDB(BuildingBase):
     completed_offers: int = 0
     total_savings: float = 0
     whatsapp_group_id: str | None = None
+    invite_code: str | None = None
+    neighborhood: str | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
 

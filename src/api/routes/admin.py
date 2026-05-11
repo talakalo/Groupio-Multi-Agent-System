@@ -142,8 +142,8 @@ async def get_metrics() -> dict[str, Any]:
     try:
         rag = get_rag_pipeline()
         rag_metrics = await rag.get_metrics()
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("RAG metrics unavailable: %s", exc)
 
     return {
         "agents": agent_metrics,

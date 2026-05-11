@@ -69,8 +69,8 @@ async def _run_architecture_analysis(file_id: str, user_id: str, building_id: st
         try:
             db = get_postgres_client()
             await db.update_file_upload(file_id, {"analysis_status": "failed"})
-        except Exception:
-            pass
+        except Exception as status_exc:
+            logger.error("Failed to update upload status to failed for %s: %s", file_id, status_exc)
 
 
 @router.post("/architecture")
