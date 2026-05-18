@@ -635,7 +635,7 @@ test.describe("Critical User Journey — Register → Login → Join Offer", () 
     ]);
     await page.addInitScript(() => {
       localStorage.setItem('groupio-auth', JSON.stringify({
-        state: { user: { id: 'user_e2e', email: 'e2e-resident@groupio-test.co.il', fullName: 'Test Resident', phone: '0501234567', role: 'resident', preferredLanguage: 'he', isVerified: true }, isAuthenticated: true, accessToken: null },
+        state: { user: { id: 'user_e2e', email: 'e2e-resident@groupio-test.co.il', fullName: 'Test Resident', phone: '0501234567', role: 'resident', preferredLanguage: 'he', isVerified: true }, isAuthenticated: true, accessToken: 'e2e-token' },
         version: 0,
       }));
     });

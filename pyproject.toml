@@ -48,6 +48,8 @@ dependencies = [
     "stripe>=7.0.0",
     "typing-extensions>=4.15.0",
     "rapidfuzz>=3.0.0",
+    "urllib3>=2.7.0",
+    "langchain-classic>=1.0.7",
 ]
 
 [project.optional-dependencies]
