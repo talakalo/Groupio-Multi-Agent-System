@@ -117,6 +117,14 @@ async function setupCommonMocks(page: Page) {
       body: JSON.stringify({ access_token: 'e2e-access-token' }),
     })
   );
+
+  await page.route('**/api/v1/buildings/me', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ id: 'bld_001', address: 'רוטשילד 15', city: 'תל אביב', region: 'center', units: 24 }),
+    })
+  );
 }
 
 // ============================================================================
@@ -635,7 +643,7 @@ test.describe("Critical User Journey — Register → Login → Join Offer", () 
     ]);
     await page.addInitScript(() => {
       localStorage.setItem('groupio-auth', JSON.stringify({
-        state: { user: { id: 'user_e2e', email: 'e2e-resident@groupio-test.co.il', fullName: 'Test Resident', phone: '0501234567', role: 'resident', preferredLanguage: 'he', isVerified: true }, isAuthenticated: true, accessToken: 'e2e-token' },
+        state: { user: { id: 'user_e2e', email: 'e2e-resident@groupio-test.co.il', fullName: 'Test Resident', phone: '0501234567', role: 'resident', preferredLanguage: 'he', isVerified: true, buildingId: 'bld_001' }, isAuthenticated: true, accessToken: 'e2e-token' },
         version: 0,
       }));
     });
