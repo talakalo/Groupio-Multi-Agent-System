@@ -23,10 +23,12 @@ vi.mock('@/components/shared/NotificationPanel', () => ({
 // ---- Auth store — token controlled per-test ----
 let mockAccessToken: string | null = 'contractor-token';
 const mockLogout = vi.fn(() => Promise.resolve());
+// refreshAccessToken succeeds only when a token exists (mirrors real behaviour)
+const mockRefreshAccessToken = vi.fn(() => Promise.resolve(!!mockAccessToken));
 
 vi.mock('@/lib/stores/authStore', () => ({
   useAuthStore: vi.fn((selector: (s: Record<string, unknown>) => unknown) =>
-    selector({ accessToken: mockAccessToken, logout: mockLogout, user: { role: 'contractor' } })
+    selector({ accessToken: mockAccessToken, logout: mockLogout, refreshAccessToken: mockRefreshAccessToken, isAuthenticated: !!mockAccessToken, user: { role: 'contractor' } })
   ),
   useAuthHasHydrated: vi.fn(() => true),
 }));

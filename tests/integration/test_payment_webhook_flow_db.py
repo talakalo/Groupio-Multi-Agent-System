@@ -154,8 +154,7 @@ async def _seed_hierarchy(conn, *, email_tag: str) -> tuple[str, str, str, str, 
 async def _cleanup(conn, email_tag: str) -> None:
     try:
         await conn.execute(
-            f"DELETE FROM payments WHERE user_id IN "
-            f"(SELECT id FROM users WHERE email LIKE '%@{email_tag}.example.com')"
+            f"DELETE FROM payments WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@{email_tag}.example.com')"
         )
         await conn.execute(
             f"DELETE FROM invoices WHERE offer_id IN "
@@ -170,9 +169,7 @@ async def _cleanup(conn, email_tag: str) -> None:
             f"DELETE FROM buildings WHERE admin_user_id IN "
             f"(SELECT id FROM users WHERE email LIKE '%@{email_tag}.example.com')"
         )
-        await conn.execute(
-            f"DELETE FROM users WHERE email LIKE '%@{email_tag}.example.com'"
-        )
+        await conn.execute(f"DELETE FROM users WHERE email LIKE '%@{email_tag}.example.com'")
     except Exception:  # noqa: BLE001
         pass
 
@@ -193,9 +190,7 @@ async def test_webhook_transitions_payment_to_succeeded() -> None:
         for tbl in ("payments", "invoices", "offers", "buildings", "users"):
             await _ensure_table(conn, tbl)
 
-        _u, _b, _o, _inv, payment_id = await _seed_hierarchy(
-            conn, email_tag="payment-test"
-        )
+        _u, _b, _o, _inv, payment_id = await _seed_hierarchy(conn, email_tag="payment-test")
 
         from src.databases.postgres import PostgresClient
 
@@ -207,12 +202,8 @@ async def test_webhook_transitions_payment_to_succeeded() -> None:
             invoice_status=None,
         )
 
-        status = await conn.fetchval(
-            "SELECT status FROM payments WHERE id = $1", payment_id
-        )
-        assert status == "succeeded", (
-            f"webhook handler must update DB row to 'succeeded'; got {status!r}"
-        )
+        status = await conn.fetchval("SELECT status FROM payments WHERE id = $1", payment_id)
+        assert status == "succeeded", f"webhook handler must update DB row to 'succeeded'; got {status!r}"
 
     finally:
         await _cleanup(conn, "payment-test")
@@ -237,9 +228,7 @@ async def test_webhook_atomic_payment_and_invoice_transition() -> None:
         for tbl in ("payments", "invoices", "offers", "buildings", "users"):
             await _ensure_table(conn, tbl)
 
-        _u, _b, _o, invoice_id, payment_id = await _seed_hierarchy(
-            conn, email_tag="payment-atomic-test"
-        )
+        _u, _b, _o, invoice_id, payment_id = await _seed_hierarchy(conn, email_tag="payment-atomic-test")
 
         # update invoice amount for the atomic test
         await conn.execute(
@@ -265,12 +254,8 @@ async def test_webhook_atomic_payment_and_invoice_transition() -> None:
             invoice_status="paid",
         )
 
-        pay_status = await conn.fetchval(
-            "SELECT status FROM payments WHERE id = $1", payment_id
-        )
-        inv_status = await conn.fetchval(
-            "SELECT status FROM invoices WHERE id = $1", invoice_id
-        )
+        pay_status = await conn.fetchval("SELECT status FROM payments WHERE id = $1", payment_id)
+        inv_status = await conn.fetchval("SELECT status FROM invoices WHERE id = $1", invoice_id)
         assert pay_status == "succeeded", f"payment row not transitioned: {pay_status!r}"
         assert inv_status == "paid", f"invoice row not transitioned: {inv_status!r}"
 
