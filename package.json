@@ -31,7 +31,7 @@
       "rollup": ">=4.59.0",
       "@xmldom/xmldom": ">=0.8.13",
       "protobufjs": ">=8.0.2",
-      "next": ">=15.5.18",
+      "next": ">=15.5.18 <16",
       "eslint-plugin-jsx-a11y>minimatch": "3.1.5",
       "@eslint/eslintrc>minimatch": "3.1.5",
       "glob>minimatch": "10.2.4",

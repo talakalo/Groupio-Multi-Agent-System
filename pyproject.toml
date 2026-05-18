@@ -50,6 +50,7 @@ dependencies = [
     "rapidfuzz>=3.0.0",
     "urllib3>=2.7.0",
     "langchain-classic>=1.0.7",
+    "langsmith>=0.8.0",
 ]
 
 [project.optional-dependencies]
