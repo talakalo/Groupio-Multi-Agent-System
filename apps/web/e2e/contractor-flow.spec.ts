@@ -287,7 +287,8 @@ test.describe("Contractor Create Offer Flow", () => {
     // attempting the publish click.  The button can briefly detach during
     // React Hook Form's re-render cycle that follows trigger(), so we anchor
     // on stable text first, then click with an extended action timeout.
-    await expect(page.getByText("תצוגה מקדימה")).toBeVisible({ timeout: 15000 });
+    // Use .first() because the step label renders "תצוגה מקדימה" in multiple places.
+    await expect(page.getByText("תצוגה מקדימה").first()).toBeVisible({ timeout: 15000 });
     const publishBtn = page.locator('[data-testid="publish-offer-btn"]');
     await expect(publishBtn).toBeVisible({ timeout: 10000 });
     await Promise.all([
@@ -334,10 +335,11 @@ test.describe("Contractor Manage Offers", () => {
     await page.waitForLoadState("domcontentloaded");
 
     await expect(page.locator("main")).toBeVisible({ timeout: 15000 });
-    // Wait for data/route ready: heading indicates content loaded (prefer over animate-spin)
+    // The page uses next-intl; heading text is "הצעות פעילות" (he) or "Active Offers" (en).
+    // Use a broad locator with a longer timeout to survive the loading.tsx Suspense phase.
     await expect(
-      page.locator("main").getByRole("heading", { name: /הצעות פעילות|הצעות/ })
-    ).toBeVisible({ timeout: 15000 });
+      page.locator("h1, h2").filter({ hasText: /הצעות|Active Offers/ }).first()
+    ).toBeVisible({ timeout: 30000 });
   });
 
   test("should have filter controls", async ({ page }) => {

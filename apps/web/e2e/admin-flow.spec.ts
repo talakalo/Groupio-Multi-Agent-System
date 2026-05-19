@@ -87,7 +87,8 @@ test.describe("Admin Account – /admin/account", () => {
   test("has link back to admin dashboard", async ({ page }) => {
     await page.goto("/admin/account");
     await expect(page.locator("h1").first()).toBeVisible({ timeout: 15_000 });
-    const backLink = page.locator('a[href="/admin/dashboard"]');
+    // Use the link's translated text to avoid matching the hidden sidebar nav item.
+    const backLink = page.getByRole("link", { name: /חזרה ללוח הבקרה|Back to Dashboard/i });
     await expect(backLink.first()).toBeVisible({ timeout: 10_000 });
   });
 });
