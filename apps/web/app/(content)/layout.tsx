@@ -1,3 +1,4 @@
+import { getLocale } from "next-intl/server";
 import { Building2 } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -11,6 +12,8 @@ type ContentLayoutProps = {
 export default async function ContentLayout({ children, params, searchParams }: ContentLayoutProps) {
   if (params) await params;
   if (searchParams) await searchParams;
+  const locale = await getLocale();
+  const dir = locale === "he" ? "rtl" : "ltr";
 
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: "var(--color-canvas, #f7f8f6)" }}>
@@ -70,7 +73,7 @@ export default async function ContentLayout({ children, params, searchParams }: 
       </header>
 
       {/* Content */}
-      <main className="flex-1">
+      <main className="flex-1" dir={dir}>
         {children}
       </main>
 

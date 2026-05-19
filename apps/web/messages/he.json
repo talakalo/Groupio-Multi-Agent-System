@@ -97,7 +97,17 @@
     "browseOffers": "עיין בהצעות",
     "recentActivity": "פעילות אחרונה",
     "noRecentActivity": "אין פעילות אחרונה",
-    "errorLoadingActivity": "שגיאה בטעינת הפעילות. נסה שוב."
+    "errorLoadingActivity": "שגיאה בטעינת הפעילות. נסה שוב.",
+    "messages": "הודעות",
+    "contractorInquiries": "פניות לקבלנים",
+    "upcomingInstallations": "התקנות קרובות",
+    "documentsOffers": "מסמכים / הצעות מחיר",
+    "recentCommunications": "תקשורת אחרונה",
+    "upcoming": "בקרוב",
+    "popularOffers": "הצעות פופולריות עכשיו",
+    "startChat": "התחל שיחה",
+    "noUpcoming": "אין אירועים קרובים",
+    "view": "צפה"
   },
   "offers": {
     "title": "הצעות",

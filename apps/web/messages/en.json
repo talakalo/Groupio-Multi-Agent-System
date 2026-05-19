@@ -97,7 +97,17 @@
     "browseOffers": "Browse Offers",
     "recentActivity": "Recent Activity",
     "noRecentActivity": "No recent activity",
-    "errorLoadingActivity": "Error loading activity. Please try again."
+    "errorLoadingActivity": "Error loading activity. Please try again.",
+    "messages": "Messages",
+    "contractorInquiries": "Contractor Inquiries",
+    "upcomingInstallations": "Upcoming Installations",
+    "documentsOffers": "Documents / Quotes",
+    "recentCommunications": "Recent Communications",
+    "upcoming": "Upcoming",
+    "popularOffers": "Popular Offers Now",
+    "startChat": "Start a conversation",
+    "noUpcoming": "No upcoming events",
+    "view": "View"
   },
   "offers": {
     "title": "Offers",

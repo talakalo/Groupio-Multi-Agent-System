@@ -283,13 +283,15 @@ test.describe("Contractor Create Offer Flow", () => {
     await page.getByRole("button", { name: /^הבא/ }).click();
 
     // Step 4 — preview + publish.
-    await expect(page.getByRole("button", { name: /פרסום הצעה/ })).toBeVisible({ timeout: 10000 });
+    const publishBtn = page.locator('[data-testid="publish-offer-btn"]');
+    await expect(publishBtn).toBeVisible({ timeout: 15000 });
+    await expect(publishBtn).toBeEnabled({ timeout: 5000 });
     await Promise.all([
       page.waitForResponse(
         (r) => r.url().includes("/api/v1/offers") && r.request().method() === "POST",
         { timeout: 20000 },
       ),
-      page.getByRole("button", { name: /פרסום הצעה/ }).click(),
+      publishBtn.click(),
     ]);
     // router.push lands on /contractor/projects/{id}; dev server may need to
     // compile this route lazily, so give the URL change a generous window.

@@ -640,6 +640,7 @@ export default function CreateOfferPage(props: PageParamsProps) {
           ) : (
             <button
               type="submit"
+              data-testid="publish-offer-btn"
               disabled={isSubmitting}
               className="flex-1 flex items-center justify-center gap-2 py-3 px-6 bg-accent-500 hover:bg-accent-600 disabled:bg-accent-300 text-white rounded-xl font-bold transition-colors"
             >
