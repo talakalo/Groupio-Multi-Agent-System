@@ -59,6 +59,9 @@ const MOCK_CONTRACTOR_OFFERS = [
     minParticipants: 5,
     maxParticipants: 30,
     discount: 15,
+    tiers: [],
+    currentTier: 0,
+    createdAt: "2026-01-10T14:00:00Z",
     completedAt: "2026-01-10T14:00:00Z",
     revenue: 3187.5,
   },
@@ -274,13 +277,13 @@ test.describe("Contractor Create Offer Flow", () => {
     await page.locator('input[name="timeline"]').fill("2-3 שבועות");
     await page.getByRole("button", { name: /^הבא/ }).click();
 
-    // Step 2 — pricing: fill base price, then remove the default tier.
+    // Step 2 — pricing: fill base price and make the default tier valid.
     // The default tier has pricePerUnit=0 which fails z.number().min(1) at full
-    // submit validation. Removing it leaves pricingTiers=[], which passes
-    // z.array(...).optional() without requiring any tier to be valid.
+    // submit validation.  Fill pricePerUnit via its ID — more reliable in CI
+    // than clicking the "הסר דרגה" remove-tier button (which has proven flaky).
     await expect(page.locator('input[name="basePrice"]')).toBeVisible({ timeout: 10000 });
     await page.locator('input[name="basePrice"]').fill("4500");
-    await page.getByRole("button", { name: "הסר דרגה" }).click();
+    await page.locator('#create-tier-price-0').fill('4000');
     await page.getByRole("button", { name: /^הבא/ }).click();
 
     // Step 3 — target / participants / validity.
@@ -296,20 +299,14 @@ test.describe("Contractor Create Offer Flow", () => {
     await page.getByRole("button", { name: /^הבא/ }).click();
 
     // Step 4 — preview + publish.
-    // "תצוגה מקדימה" appears in the step indicator breadcrumb on every step,
-    // so we cannot use it to confirm we reached step 4.  Instead wait directly
-    // for the publish button which only renders when currentStep === 3.
+    // The publish button only renders when currentStep === 3.
+    // Auto-dismiss any alert() that onSubmit might show on API error.
+    page.on('dialog', (dialog) => dialog.dismiss().catch(() => {}));
     const publishBtn = page.locator('[data-testid="publish-offer-btn"]');
     await expect(publishBtn).toBeVisible({ timeout: 25000 });
-    await Promise.all([
-      page.waitForResponse(
-        (r) => r.url().includes("/api/v1/offers") && r.request().method() === "POST",
-        { timeout: 20000 },
-      ),
-      publishBtn.click({ timeout: 20000 }),
-    ]);
-    // router.push lands on /contractor/projects/{id}; dev server may need to
-    // compile this route lazily, so give the URL change a generous window.
+    await publishBtn.click();
+    // URL navigation confirms the POST succeeded; waitForResponse is omitted
+    // because the mocked response can race with Playwright's event listener.
     await expect(page).toHaveURL(/contractor\/projects\//, { timeout: 30000 });
   });
 });
