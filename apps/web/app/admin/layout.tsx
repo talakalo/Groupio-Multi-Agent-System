@@ -15,6 +15,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 
+import { LanguageToggle } from '@/components/shared/LanguageToggle';
 import { NotificationPanel } from '@/components/shared/NotificationPanel';
 import { useAuthHasHydrated, useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
@@ -96,8 +97,8 @@ export default function AdminLayout(props: { children: React.ReactNode } & PageP
       {/* Logo */}
       <div className="flex flex-col gap-2 px-6 py-5 border-b border-gray-100">
         <div className="flex items-center gap-2">
-          <Shield className="h-8 w-8 text-indigo-500" />
-          <span className="text-xl font-bold text-indigo-600">Groupio Admin</span>
+          <Shield className="h-8 w-8 text-primary-500" />
+          <span className="text-xl font-bold text-primary-600">Groupio Admin</span>
         </div>
         <p className="text-xs text-gray-400 leading-none">
           {user?.role === 'super_admin' ? t('roleSuperAdmin') : t('roleAdmin')}
@@ -117,11 +118,11 @@ export default function AdminLayout(props: { children: React.ReactNode } & PageP
               className={cn(
                 'flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors',
                 active
-                  ? 'bg-indigo-50 text-indigo-700'
+                  ? 'bg-primary-50 text-primary-700'
                   : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
               )}
             >
-              <Icon className={cn('h-5 w-5 flex-shrink-0', active ? 'text-indigo-500' : 'text-gray-400')} />
+              <Icon className={cn('h-5 w-5 flex-shrink-0', active ? 'text-primary-500' : 'text-gray-400')} />
               <span>{t(item.labelKey)}</span>
             </Link>
           );
@@ -136,7 +137,7 @@ export default function AdminLayout(props: { children: React.ReactNode } & PageP
           className={cn(
             'flex items-center gap-3 w-full text-start text-sm transition-colors rounded-xl px-2 py-2 -mx-2',
             accountActive
-              ? 'bg-indigo-50 text-indigo-700 hover:bg-indigo-50'
+              ? 'bg-primary-50 text-primary-700 hover:bg-primary-50'
               : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
           )}
           aria-label={t('myAccount')}
@@ -145,11 +146,11 @@ export default function AdminLayout(props: { children: React.ReactNode } & PageP
           <div
             className={cn(
               'w-8 h-8 rounded-full flex items-center justify-center shrink-0',
-              accountActive ? 'bg-indigo-200' : 'bg-indigo-100'
+              accountActive ? 'bg-primary-200' : 'bg-primary-100'
             )}
           >
             <UserCircle
-              className={cn('h-5 w-5', accountActive ? 'text-indigo-700' : 'text-indigo-600')}
+              className={cn('h-5 w-5', accountActive ? 'text-primary-700' : 'text-primary-600')}
               aria-hidden
             />
           </div>
@@ -207,6 +208,7 @@ export default function AdminLayout(props: { children: React.ReactNode } & PageP
             <div className="flex-1" />
 
             <div className="flex items-center gap-3">
+              <LanguageToggle />
               <NotificationPanel />
 
               <div className="relative" ref={userMenuRef}>
@@ -214,11 +216,12 @@ export default function AdminLayout(props: { children: React.ReactNode } & PageP
                   type="button"
                   onClick={() => setUserMenuOpen((o) => !o)}
                   className="flex items-center gap-2 ps-3 pe-2 py-1.5 rounded-xl hover:bg-gray-100 transition-colors"
+                  aria-label={t('accountMenu')}
                   aria-expanded={userMenuOpen}
                   aria-haspopup="true"
                 >
-                  <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
-                    <UserCircle className="h-5 w-5 text-indigo-600" />
+                  <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center">
+                    <UserCircle className="h-5 w-5 text-primary-600" />
                   </div>
                   <ChevronDown
                     className={cn('h-4 w-4 text-gray-400 transition-transform', userMenuOpen && 'rotate-180')}
@@ -229,7 +232,7 @@ export default function AdminLayout(props: { children: React.ReactNode } & PageP
                     <div className="px-4 py-2 border-b border-gray-100">
                       <p className="font-medium text-gray-900 truncate">{user?.fullName ?? t('myAccount')}</p>
                       <p className="text-xs text-gray-500 truncate">{user?.email}</p>
-                      <p className="text-xs text-indigo-600 mt-1">
+                      <p className="text-xs text-primary-600 mt-1">
                         {user?.role === 'super_admin' ? t('roleSuperAdmin') : t('roleAdmin')}
                       </p>
                     </div>

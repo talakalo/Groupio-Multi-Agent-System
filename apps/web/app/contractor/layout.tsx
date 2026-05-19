@@ -20,6 +20,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 
+import { LanguageToggle } from '@/components/shared/LanguageToggle';
 import { NotificationPanel } from '@/components/shared/NotificationPanel';
 import { apiClient } from '@/lib/api/client';
 import { useAuthHasHydrated, useAuthStore } from '@/lib/stores/authStore';
@@ -34,7 +35,6 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { href: '/contractor/dashboard', labelKey: 'dashboard', icon: LayoutDashboard },
   { href: '/contractor/offers/active', labelKey: 'activeOffers', icon: ClipboardList },
-  { href: '/contractor/offers/create', labelKey: 'createOffer', icon: PlusCircle },
   { href: '/contractor/projects', labelKey: 'projects', icon: FolderKanban },
   { href: '/contractor/earnings', labelKey: 'earnings', icon: Wallet },
 ];
@@ -288,6 +288,7 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
             <div className="flex-1" />
 
             <div className="flex items-center gap-3">
+              <LanguageToggle />
               <NotificationPanel />
 
               <div className="relative" ref={userMenuRef}>

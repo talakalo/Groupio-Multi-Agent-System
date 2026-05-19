@@ -637,6 +637,7 @@
     "roleAdmin": "מנהל",
     "myAccount": "החשבון שלי",
     "myAccountHint": "שם, אימייל והתנתקות",
+    "accountMenu": "תפריט חשבון",
     "profile": "חשבון",
     "logout": "התנתקות"
   },
@@ -729,6 +730,7 @@
     "roleAdmin": "מנהל",
     "myAccount": "החשבון שלי",
     "myAccountHint": "שם, אימייל והתנתקות",
+    "accountMenu": "תפריט חשבון",
     "profile": "חשבון",
     "logout": "התנתקות"
   },

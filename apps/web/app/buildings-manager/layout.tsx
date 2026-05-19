@@ -15,6 +15,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 
+import { LanguageToggle } from '@/components/shared/LanguageToggle';
 import { NotificationPanel } from '@/components/shared/NotificationPanel';
 import { useAuthHasHydrated, useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
@@ -93,9 +94,9 @@ export default function BuildingsManagerLayout({ children }: { children: React.R
     <nav className="flex flex-col h-full">
       {/* Logo */}
       <div className="flex items-center gap-2 px-6 py-5 border-b border-gray-100">
-        <Building2 className="h-8 w-8 text-emerald-500" />
+        <Building2 className="h-8 w-8 text-primary-500" />
         <div>
-          <span className="text-xl font-bold text-emerald-600">Groupio</span>
+          <span className="text-xl font-bold text-primary-600">Groupio</span>
           <p className="text-xs text-gray-400 leading-none mt-0.5">{t('role')}</p>
         </div>
       </div>
@@ -113,11 +114,11 @@ export default function BuildingsManagerLayout({ children }: { children: React.R
               className={cn(
                 'flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors',
                 active
-                  ? 'bg-emerald-50 text-emerald-700'
+                  ? 'bg-primary-50 text-primary-700'
                   : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
               )}
             >
-              <Icon className={cn('h-5 w-5 flex-shrink-0', active ? 'text-emerald-500' : 'text-gray-400')} />
+              <Icon className={cn('h-5 w-5 flex-shrink-0', active ? 'text-primary-500' : 'text-gray-400')} />
               <span>{t(item.labelKey)}</span>
             </Link>
           );
@@ -132,7 +133,7 @@ export default function BuildingsManagerLayout({ children }: { children: React.R
           className={cn(
             'flex items-center gap-3 w-full text-start text-sm transition-colors rounded-xl px-2 py-2 -mx-2',
             accountActive
-              ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-50'
+              ? 'bg-primary-50 text-primary-700 hover:bg-primary-50'
               : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
           )}
           aria-label={t('myAccount')}
@@ -141,11 +142,11 @@ export default function BuildingsManagerLayout({ children }: { children: React.R
           <div
             className={cn(
               'w-8 h-8 rounded-full flex items-center justify-center shrink-0',
-              accountActive ? 'bg-emerald-200' : 'bg-emerald-100'
+              accountActive ? 'bg-primary-200' : 'bg-primary-100'
             )}
           >
             <UserCircle
-              className={cn('h-5 w-5', accountActive ? 'text-emerald-700' : 'text-emerald-600')}
+              className={cn('h-5 w-5', accountActive ? 'text-primary-700' : 'text-primary-600')}
               aria-hidden
             />
           </div>
@@ -208,6 +209,7 @@ export default function BuildingsManagerLayout({ children }: { children: React.R
             <div className="flex-1" />
 
             <div className="flex items-center gap-3">
+              <LanguageToggle />
               <NotificationPanel />
 
               <div className="relative" ref={userMenuRef}>
@@ -215,11 +217,12 @@ export default function BuildingsManagerLayout({ children }: { children: React.R
                   type="button"
                   onClick={() => setUserMenuOpen((o) => !o)}
                   className="flex items-center gap-2 ps-3 pe-2 py-1.5 rounded-xl hover:bg-gray-100 transition-colors"
+                  aria-label={t('accountMenu')}
                   aria-expanded={userMenuOpen}
                   aria-haspopup="true"
                 >
-                  <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
-                    <UserCircle className="h-5 w-5 text-emerald-600" />
+                  <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center">
+                    <UserCircle className="h-5 w-5 text-primary-600" />
                   </div>
                   <ChevronDown
                     className={cn('h-4 w-4 text-gray-400 transition-transform', userMenuOpen && 'rotate-180')}
