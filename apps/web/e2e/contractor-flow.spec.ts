@@ -264,10 +264,13 @@ test.describe("Contractor Create Offer Flow", () => {
     await page.locator('input[name="timeline"]').fill("2-3 שבועות");
     await page.getByRole("button", { name: /^הבא/ }).click();
 
-    // Step 2 — pricing (fill base price + default tier's pricePerUnit to pass zod).
+    // Step 2 — pricing: fill base price, then remove the default tier.
+    // The default tier has pricePerUnit=0 which fails z.number().min(1) at full
+    // submit validation. Removing it leaves pricingTiers=[], which passes
+    // z.array(...).optional() without requiring any tier to be valid.
     await expect(page.locator('input[name="basePrice"]')).toBeVisible({ timeout: 10000 });
     await page.locator('input[name="basePrice"]').fill("4500");
-    await page.locator('#create-tier-price-0').fill("4500");
+    await page.getByRole("button", { name: "הסר דרגה" }).click();
     await page.getByRole("button", { name: /^הבא/ }).click();
 
     // Step 3 — target / participants / validity.
@@ -334,8 +337,9 @@ test.describe("Contractor Manage Offers", () => {
     await expect(page.locator("main")).toBeVisible({ timeout: 15000 });
     // Wait for the page heading inside main. The contractor layout goes through a
     // token-refresh cycle in CI before rendering <main>, and then the page chunk
-    // may need to stream — use a long timeout to cover both phases.
-    await expect(page.locator("main h1").first()).toBeVisible({ timeout: 45000 });
+    // may stream briefly (loading.tsx). 30 s is enough headroom while keeping
+    // the total test time under the 60 s test timeout.
+    await expect(page.locator("main h1").first()).toBeVisible({ timeout: 30000 });
   });
 
   test("should have filter controls", async ({ page }) => {
