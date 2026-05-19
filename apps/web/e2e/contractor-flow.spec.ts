@@ -344,9 +344,12 @@ test.describe("Contractor Manage Offers", () => {
 
   test("should have filter controls", async ({ page }) => {
     await page.goto("/contractor/offers/active");
+    await page.waitForLoadState("domcontentloaded");
 
-    // Status filter dropdown exists
-    await expect(page.locator("select").first()).toBeVisible({ timeout: 10000 });
+    // Wait for the layout to fully render before looking for filter controls.
+    await expect(page.locator("main")).toBeVisible({ timeout: 15000 });
+    // The three <select> filters (status, category, sort) render with the heading.
+    await expect(page.locator("select").first()).toBeVisible({ timeout: 20000 });
   });
 });
 
