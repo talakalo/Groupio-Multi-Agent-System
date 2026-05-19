@@ -1,9 +1,11 @@
-import { Wind, ChefHat, Droplets, BadgeCheck, ArrowLeft } from "lucide-react";
+import { Wind, ChefHat, Droplets, BadgeCheck, ArrowLeft, Users, Clock } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
 
 interface Offer {
   icon: LucideIcon;
+  iconBg: string;
+  iconColor: string;
   title: string;
   subtitle: string;
   originalPrice: string;
@@ -12,11 +14,14 @@ interface Offer {
   participants: number;
   totalSlots: number;
   contractor: string;
+  daysLeft: number;
 }
 
 const OFFERS: Offer[] = [
   {
     icon: Wind,
+    iconBg: "bg-sky-50",
+    iconColor: "text-sky-600",
     title: "התקנת מזגנים",
     subtitle: "מזגן עילי / מיני מרכזי / הכנות והתקנה",
     originalPrice: "₪5,500",
@@ -25,9 +30,12 @@ const OFFERS: Offer[] = [
     participants: 15,
     totalSlots: 22,
     contractor: "חשמל ומיזוג פרו",
+    daysLeft: 12,
   },
   {
     icon: ChefHat,
+    iconBg: "bg-amber-50",
+    iconColor: "text-amber-600",
     title: "שדרוג מטבח קבלן",
     subtitle: "ארונות, שיש, אי, פירוקים ותוספות",
     originalPrice: "₪32,000",
@@ -36,9 +44,12 @@ const OFFERS: Offer[] = [
     participants: 12,
     totalSlots: 20,
     contractor: "נגריית בוטיק ישראל",
+    daysLeft: 8,
   },
   {
     icon: Droplets,
+    iconBg: "bg-violet-50",
+    iconColor: "text-violet-600",
     title: "מקלחונים וזכוכית",
     subtitle: "מקלחונים, מראות, זכוכיות וחיפויי אמבטיה",
     originalPrice: "₪4,800",
@@ -47,18 +58,34 @@ const OFFERS: Offer[] = [
     participants: 18,
     totalSlots: 24,
     contractor: "זכוכית לבית החדש",
+    daysLeft: 5,
   },
 ];
 
 export default function FeaturedOffers() {
   return (
-    <section className="py-16 sm:py-20 px-4 bg-surface-page">
+    <section className="py-20 sm:py-24 px-4 bg-white">
       <div className="max-w-5xl mx-auto">
-        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 text-center mb-12">
-          הצעות פופולריות עכשיו
-        </h2>
+        {/* Header */}
+        <div className="flex items-end justify-between mb-10">
+          <div>
+            <span className="inline-block px-4 py-1.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold tracking-wide mb-3">
+              עכשיו זמין
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight">
+              הצעות פופולריות עכשיו
+            </h2>
+          </div>
+          <Link
+            href="/offers"
+            className="hidden sm:inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-600 hover:text-emerald-700 transition-colors"
+          >
+            ראו את כל ההצעות
+            <ArrowLeft className="h-4 w-4 rtl-flip" />
+          </Link>
+        </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {OFFERS.map((offer) => {
             const Icon = offer.icon;
             const progress = Math.round(
@@ -68,50 +95,59 @@ export default function FeaturedOffers() {
               <Link
                 key={offer.title}
                 href="/offers"
-                className="card group hover:border-primary-200 flex flex-col"
+                className="group rounded-2xl bg-white ring-1 ring-slate-100 shadow-sm hover:shadow-md hover:ring-emerald-200 transition-all flex flex-col p-5"
               >
+                {/* Header row */}
                 <div className="flex items-start gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-lg bg-primary-50 flex items-center justify-center flex-shrink-0 group-hover:bg-primary-100 transition-colors">
-                    <Icon className="h-5 w-5 text-primary-600" />
+                  <div
+                    className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${offer.iconBg} ${offer.iconColor} group-hover:scale-105 transition-transform`}
+                  >
+                    <Icon className="h-5 w-5" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-gray-900 mb-0.5">
+                    <h3 className="font-bold text-slate-900 mb-0.5 group-hover:text-emerald-700 transition-colors">
                       {offer.title}
                     </h3>
-                    <p className="text-xs text-gray-500 mb-1 leading-snug">
+                    <p className="text-xs text-slate-400 leading-snug truncate">
                       {offer.subtitle}
                     </p>
-                    <div className="flex items-center gap-1.5 text-xs text-gray-400">
-                      <BadgeCheck className="h-3.5 w-3.5 text-primary-500" />
-                      <span>{offer.contractor}</span>
-                    </div>
                   </div>
+                  <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-700 flex-shrink-0">
+                    {offer.savingsPercent}%−
+                  </span>
+                </div>
+
+                {/* Contractor badge */}
+                <div className="flex items-center gap-1.5 text-xs text-slate-400 mb-4">
+                  <BadgeCheck className="h-3.5 w-3.5 text-emerald-500" />
+                  <span>{offer.contractor}</span>
                 </div>
 
                 {/* Pricing */}
                 <div className="flex items-baseline gap-2 mb-4">
-                  <span className="text-xl font-bold text-primary-600">
+                  <span className="text-xl font-bold text-emerald-700">
                     {offer.discountedPrice}
                   </span>
-                  <span className="text-sm text-gray-400 line-through">
+                  <span className="text-sm text-slate-400 line-through">
                     {offer.originalPrice}
-                  </span>
-                  <span className="badge-success text-xs mr-auto">
-                    {offer.savingsPercent}%−
                   </span>
                 </div>
 
                 {/* Progress */}
                 <div className="mt-auto">
-                  <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
-                    <span>
-                      {offer.participants} מתוך {offer.totalSlots} דיירים
+                  <div className="flex items-center justify-between text-xs text-slate-400 mb-1.5">
+                    <span className="flex items-center gap-1">
+                      <Users className="h-3 w-3" />
+                      {offer.participants}/{offer.totalSlots} דיירים
                     </span>
-                    <span>{progress}%</span>
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {offer.daysLeft} ימים
+                    </span>
                   </div>
-                  <div className="w-full bg-gray-100 rounded-full h-2">
+                  <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
                     <div
-                      className="bg-primary-400 h-2 rounded-full transition-all"
+                      className="h-full rounded-full bg-emerald-500 transition-all"
                       style={{ width: `${progress}%` }}
                     />
                   </div>
@@ -121,10 +157,11 @@ export default function FeaturedOffers() {
           })}
         </div>
 
-        <div className="text-center mt-10">
+        {/* Mobile CTA */}
+        <div className="text-center mt-10 sm:hidden">
           <Link
             href="/offers"
-            className="inline-flex items-center gap-2 text-primary-600 font-medium hover:text-primary-700 transition-colors"
+            className="inline-flex items-center gap-2 text-emerald-600 font-semibold hover:text-emerald-700 transition-colors text-sm"
           >
             <span>ראו את כל ההצעות</span>
             <ArrowLeft className="h-4 w-4 rtl-flip" />
