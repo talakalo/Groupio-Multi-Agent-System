@@ -193,13 +193,19 @@ test.describe("Language toggle switches locale for each role", () => {
       await page.goto(route);
       await expect(page.locator("aside").nth(1)).toBeVisible({ timeout: 15_000 });
 
+      // Wait for the LanguageToggle button to be visible before setting up the
+      // route mock — this ensures the component has finished its render cycle
+      // (important for contractor which has a token-refresh hydration delay).
+      const heBtn = page.getByRole("button", { name: /^עברית$/ }).first();
+      await expect(heBtn).toBeVisible({ timeout: 10_000 });
+
       await page.route("**/api/locale", (r) =>
         r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, locale: "he" }) }),
       );
 
       const [request] = await Promise.all([
         page.waitForRequest((req) => req.url().includes("/api/locale") && req.method() === "POST", { timeout: 25_000 }),
-        page.getByRole("button", { name: /^עברית$/ }).first().click(),
+        heBtn.click(),
       ]);
 
       const body = JSON.parse(request.postData() ?? "{}") as { locale?: string };

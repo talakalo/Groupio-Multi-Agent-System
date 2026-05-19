@@ -231,7 +231,17 @@ test.describe("Contractor Create Offer Flow", () => {
           body: JSON.stringify({ id: "offer_new", status: "active" }),
         });
       }
-      return route.continue();
+      // Fulfill OPTIONS (CORS preflight) and GET requests with Playwright's own
+      // response rather than route.continue(), so the browser never attempts to
+      // reach the dead backend (port 8000).  A route.continue() to a closed port
+      // causes a network error on the OPTIONS preflight, which makes the browser
+      // cancel the real POST before it is ever sent — the mock never fires and
+      // waitForResponse times out.
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ items: [], offers: [] }),
+      });
     });
     await page.route("**/api/v1/offers/offer_new", (route) =>
       route.fulfill({
