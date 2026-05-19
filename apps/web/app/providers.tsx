@@ -37,9 +37,6 @@ class AppErrorBoundary extends Component<
   { children: ReactNode },
   ErrorBoundaryState
 > {
-  // Satisfy React 19 Component type (refs is legacy but required by typings)
-  declare refs: Record<string, unknown>;
-
   constructor(props: { children: ReactNode }) {
     super(props);
     this.state = { hasError: false, error: null };
