@@ -13,6 +13,7 @@ vi.mock('next/navigation', () => ({
 // ---- next-intl mock (returns translation key as-is) ----
 vi.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
+  useLocale: () => 'he',
 }));
 
 // ---- NotificationPanel stub ----

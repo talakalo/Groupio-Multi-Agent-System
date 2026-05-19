@@ -94,7 +94,7 @@ def _patched_client(user: UserInDB) -> TestClient:
 
 class TestJoinNotification:
     def test_join_sends_offer_joined_email(self):
-        """Joining a non-threshold offer queues send_offer_joined."""
+        """Joining a non-threshold offer queues send_offer_joined (direct email path)."""
         user = _make_user()
         offer = _make_offer(current_participants=1, min_participants=5)
 
@@ -108,10 +108,15 @@ class TestJoinNotification:
         email_svc.send_offer_joined = AsyncMock(return_value=True)
         email_svc.send_offer_threshold_reached = AsyncMock(return_value=True)
 
+        fake_settings = MagicMock()
+        fake_settings.ENABLE_NOTIFICATION_QUEUE = False
+        fake_settings.ENABLE_OUTBOX = False
+
         with (
             patch("src.api.routes.offers.get_postgres_client", return_value=db),
             patch("src.api.routes.offers.get_email_service", return_value=email_svc),
             patch("src.api.routes.offers.get_whatsapp_bot", return_value=MagicMock()),
+            patch("src.api.routes.offers.get_settings", return_value=fake_settings),
         ):
             client = _patched_client(user)
             resp = client.post("/api/v1/offers/offer-1/join", json={"unit_count": 1})
