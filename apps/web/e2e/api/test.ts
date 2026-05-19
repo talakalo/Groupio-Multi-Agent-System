@@ -66,9 +66,10 @@ interface GroupioFixtures {
 
 function patchGoto(page: Page): void {
   const orig = page.goto.bind(page);
-  // @ts-expect-error — Page.goto is typed as a method, not a property
-  page.goto = (url: string | undefined, options?: Parameters<Page["goto"]>[1]) =>
-    orig(url as string, { waitUntil: "domcontentloaded", ...options });
+  (page as unknown as Record<string, unknown>).goto = (
+    url: string | undefined,
+    options?: Parameters<Page["goto"]>[1],
+  ) => orig(url as string, { waitUntil: "domcontentloaded", ...options });
 }
 
 // ─── Extended test ────────────────────────────────────────────────────────────
