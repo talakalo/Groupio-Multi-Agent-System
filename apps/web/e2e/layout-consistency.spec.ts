@@ -190,12 +190,26 @@ test.describe("Language toggle switches locale for each role", () => {
 
     test(`${role}: clicking "עברית" sends locale=he to /api/locale`, async ({ page }) => {
       await setupRole(page, role, "en");
+
+      // Override auth/me to return preferred_language:"en" so that
+      // LocaleSyncProvider (in providers.tsx) sees no mismatch and does NOT
+      // auto-POST /api/locale before the test is ready.  Without this, the
+      // admin layout's slower auth cycle lets LocaleSyncProvider complete its
+      // "he" sync before waitForRequest is set up, making the button click a
+      // no-op (locale already "he").
+      await page.route("**/api/v1/auth/me", (r) =>
+        r.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ id: "user-e2e", role, preferred_language: "en", full_name: "E2E User", email: "e2e@example.com" }),
+        }),
+      );
+
       await page.goto(route);
       await expect(page.locator("aside").nth(1)).toBeVisible({ timeout: 15_000 });
 
       // Wait for the LanguageToggle button to be visible before setting up the
-      // route mock — this ensures the component has finished its render cycle
-      // (important for contractor which has a token-refresh hydration delay).
+      // route mock — this ensures the component has finished its render cycle.
       const heBtn = page.getByRole("button", { name: /^עברית$/ }).first();
       await expect(heBtn).toBeVisible({ timeout: 10_000 });
 
