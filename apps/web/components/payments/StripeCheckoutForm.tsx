@@ -127,7 +127,7 @@ export default function StripeCheckoutForm({ clientSecret, onSuccess, onError }:
         appearance: {
           theme: "stripe",
           variables: {
-            colorPrimary: "#4f46e5", // indigo-600
+            colorPrimary: "#1a9a76",
             fontFamily: "inherit",
             borderRadius: "8px",
           },

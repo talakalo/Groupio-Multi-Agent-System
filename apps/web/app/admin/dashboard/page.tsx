@@ -22,13 +22,13 @@ export default function AdminDashboardPage(props: PageParamsProps) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Link
           href="/buildings-manager/dashboard"
-          className="card p-6 hover:shadow-lg transition-all group border border-gray-100 hover:border-indigo-200"
+          className="card p-6 hover:shadow-lg transition-all group border border-gray-100 hover:border-primary-200"
         >
           <div className="flex items-start justify-between">
-            <div className="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center">
-              <Building2 className="h-6 w-6 text-emerald-600" />
+            <div className="w-12 h-12 rounded-xl bg-primary-50 flex items-center justify-center">
+              <Building2 className="h-6 w-6 text-primary-600" />
             </div>
-            <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-indigo-500 group-hover:translate-x-1 transition-all" />
+            <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-primary-500 group-hover:translate-x-1 transition-all" />
           </div>
           <h2 className="mt-4 text-lg font-semibold text-gray-900">{t('buildingsManagerCard.title')}</h2>
           <p className="mt-1 text-sm text-gray-500">{t('buildingsManagerCard.description')}</p>
@@ -38,17 +38,17 @@ export default function AdminDashboardPage(props: PageParamsProps) {
           href={standaloneAdminUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="card p-6 hover:shadow-lg transition-all group border border-gray-100 hover:border-indigo-200 block"
+          className="card p-6 hover:shadow-lg transition-all group border border-gray-100 hover:border-primary-200 block"
         >
           <div className="flex items-start justify-between">
-            <div className="w-12 h-12 rounded-xl bg-indigo-100 flex items-center justify-center">
-              <Shield className="h-6 w-6 text-indigo-600" />
+            <div className="w-12 h-12 rounded-xl bg-primary-50 flex items-center justify-center">
+              <Shield className="h-6 w-6 text-primary-600" />
             </div>
-            <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-indigo-500 group-hover:translate-x-1 transition-all" />
+            <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-primary-500 group-hover:translate-x-1 transition-all" />
           </div>
           <h2 className="mt-4 text-lg font-semibold text-gray-900">{t('standaloneAdminCard.title')}</h2>
           <p className="mt-1 text-sm text-gray-500">{t('standaloneAdminCard.description')}</p>
-          <p className="mt-3 text-sm font-medium text-indigo-600">{t('standaloneAdminCard.cta')} →</p>
+          <p className="mt-3 text-sm font-medium text-primary-600">{t('standaloneAdminCard.cta')} →</p>
         </a>
       </div>
     </div>

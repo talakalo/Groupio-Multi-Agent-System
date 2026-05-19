@@ -26,33 +26,28 @@ export default async function AuthLayout({ children, params, searchParams }: Aut
         }}
       >
         <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2.5 group">
+          <Link href="/" className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #1a9a76, #105f49)' }}>
-              <Building2 className="h-4.5 w-4.5 text-white" />
+              <Building2 className="h-4 w-4 text-white" />
             </div>
             <span className="text-xl font-bold tracking-tight" style={{ color: '#0f1f1a', letterSpacing: '-0.02em' }}>Groupio</span>
           </Link>
           <nav className="flex items-center gap-5">
             <a
               href="/#how-it-works"
-              className="text-sm font-medium transition-colors hidden sm:block"
-              style={{ color: '#4a6154' }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = '#1a9a76'; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.color = '#4a6154'; }}
+              className="text-sm font-medium transition-colors hidden sm:block text-gray-500 hover:text-primary-600"
             >
               איך זה עובד
             </a>
             <Link
               href="/offers"
-              className="text-sm font-medium transition-colors hidden sm:block"
-              style={{ color: '#4a6154' }}
+              className="text-sm font-medium transition-colors hidden sm:block text-gray-500 hover:text-primary-600"
             >
               הצעות
             </Link>
             <Link
               href="/login"
-              className="text-sm font-semibold transition-colors"
-              style={{ color: '#1f2d27' }}
+              className="text-sm font-semibold transition-colors text-gray-700 hover:text-primary-600"
             >
               התחברות
             </Link>
@@ -70,11 +65,11 @@ export default async function AuthLayout({ children, params, searchParams }: Aut
         <div className="mt-10 text-center text-sm" style={{ color: '#9aadaa' }}>
           <p>
             בהתחברות או בהרשמה, אתם מסכימים ל
-            <Link href="/terms" className="font-medium hover:underline mx-1" style={{ color: '#1a9a76' }}>
+            <Link href="/terms" className="font-medium hover:underline mx-1 text-primary-600">
               תנאי השימוש
             </Link>
             ול
-            <Link href="/privacy" className="font-medium hover:underline mx-1" style={{ color: '#1a9a76' }}>
+            <Link href="/privacy" className="font-medium hover:underline mx-1 text-primary-600">
               מדיניות הפרטיות
             </Link>
           </p>

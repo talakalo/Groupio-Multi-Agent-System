@@ -46,7 +46,7 @@ const StripeCheckoutForm = dynamic(
   {
     loading: () => (
       <div className="flex items-center justify-center py-8">
-        <Loader2 className="h-6 w-6 animate-spin text-indigo-600" aria-hidden="true" />
+        <Loader2 className="h-6 w-6 animate-spin text-primary-600" aria-hidden="true" />
         <span className="mr-3 text-gray-500 text-sm">טוען טופס תשלום מאובטח...</span>
       </div>
     ),
@@ -59,7 +59,7 @@ const StripeCheckoutForm = dynamic(
 function EscrowBadge() {
   return (
     <div className="flex items-center gap-2 text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
-      <ShieldCheck className="h-4 w-4 text-indigo-500 flex-shrink-0" aria-hidden="true" />
+      <ShieldCheck className="h-4 w-4 text-primary-600 flex-shrink-0" aria-hidden="true" />
       <span>
         התשלום מוגן בנאמנות (Escrow) — הכסף ישוחרר לקבלן רק לאחר אישורך על השלמת העבודה.
       </span>
@@ -96,7 +96,7 @@ function OrderSummary({
   return (
     <div className="rounded-xl border border-gray-200 bg-gray-50 overflow-hidden">
       <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-200 bg-white">
-        <Receipt className="h-4 w-4 text-indigo-500" aria-hidden="true" />
+        <Receipt className="h-4 w-4 text-primary-600" aria-hidden="true" />
         <span className="text-sm font-semibold text-gray-900">סיכום הזמנה</span>
       </div>
       <dl className="px-4 py-3 space-y-2 text-sm">
@@ -120,11 +120,11 @@ function OrderSummary({
 /** Badge showing that payment is by credit card via Stripe. */
 function CreditCardBadge() {
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3">
-      <CreditCard className="h-5 w-5 text-indigo-600 flex-shrink-0" aria-hidden="true" />
+    <div className="flex items-center gap-3 rounded-xl border border-primary-100 bg-primary-50 px-4 py-3">
+      <CreditCard className="h-5 w-5 text-primary-600 flex-shrink-0" aria-hidden="true" />
       <div>
-        <p className="text-sm font-semibold text-indigo-800">תשלום בכרטיס אשראי</p>
-        <p className="text-xs text-indigo-600">Visa · Mastercard · American Express · Diners</p>
+        <p className="text-sm font-semibold text-primary-600">תשלום בכרטיס אשראי</p>
+        <p className="text-xs text-primary-600">Visa · Mastercard · American Express · Diners</p>
       </div>
       <div className="ms-auto flex gap-1.5 text-gray-400" aria-hidden="true">
         {/* Card network mini-icons (text placeholders) */}
@@ -346,7 +346,7 @@ function CheckoutContent() {
   if (phase === "loading") {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-4">
-        <Loader2 className="h-10 w-10 animate-spin text-indigo-600" aria-hidden="true" />
+        <Loader2 className="h-10 w-10 animate-spin text-primary-600" aria-hidden="true" />
         <p className="text-gray-600 text-sm">מכין תשלום מאובטח...</p>
       </div>
     );
@@ -423,7 +423,7 @@ export default function CheckoutPage() {
         <Suspense
           fallback={
             <div className="flex items-center justify-center py-16">
-              <Loader2 className="h-8 w-8 animate-spin text-indigo-600" aria-hidden="true" />
+              <Loader2 className="h-8 w-8 animate-spin text-primary-600" aria-hidden="true" />
             </div>
           }
         >

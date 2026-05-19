@@ -91,7 +91,7 @@ const STATUS_BADGE_CLASSES: Record<string, string> = {
   in_progress: "bg-info-50 text-info-700",
   completed: "bg-success-50 text-success-700",
   cancelled: "bg-danger-50 text-danger-700",
-  flagged: "bg-violet-50 text-violet-800",
+  flagged: "bg-warning-50 text-warning-800",
   active: "bg-primary-50 text-primary-700",
 };
 

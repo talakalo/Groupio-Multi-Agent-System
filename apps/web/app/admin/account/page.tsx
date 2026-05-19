@@ -27,8 +27,8 @@ export default function AdminAccountPage() {
     <div className="max-w-xl mx-auto" dir={locale === 'he' ? 'rtl' : 'ltr'}>
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
         <div className="flex items-center gap-4 mb-6">
-          <div className="w-14 h-14 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
-            <UserCircle className="h-8 w-8 text-indigo-600" aria-hidden />
+          <div className="w-14 h-14 rounded-full bg-primary-100 flex items-center justify-center shrink-0">
+            <UserCircle className="h-8 w-8 text-primary-600" aria-hidden />
           </div>
           <div className="min-w-0">
             <h1 className="text-xl font-bold text-gray-900">{t('title')}</h1>
@@ -52,7 +52,7 @@ export default function AdminAccountPage() {
         <div className="mt-8 flex flex-wrap items-center gap-3">
           <Link
             href="/admin/dashboard"
-            className="text-sm text-indigo-600 hover:underline font-medium"
+            className="text-sm text-primary-600 hover:underline font-medium"
           >
             {t('backToDashboard')}
           </Link>

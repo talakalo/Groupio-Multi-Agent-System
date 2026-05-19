@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import createMiddleware from "next-intl/middleware";
 
 // Paths served by the admin console that do NOT require authentication.
 // Everything else under the app is gated behind a valid session cookie and
@@ -12,13 +11,6 @@ const ALLOWED_ADMIN_ROLES = new Set<string>([
   "super_admin",
   "buildings_manager",
 ]);
-
-const intlMiddleware = createMiddleware({
-  locales: ["he", "en"],
-  defaultLocale: "he",
-  localePrefix: "never",
-  localeDetection: false,
-});
 
 function isPublicPath(pathname: string): boolean {
   if (PUBLIC_PATHS.has(pathname)) return true;
@@ -60,7 +52,11 @@ export default function middleware(request: NextRequest): NextResponse {
     }
   }
 
-  const response = intlMiddleware(request);
+  const locale =
+    request.cookies.get("NEXT_LOCALE")?.value === "en" ? "en" : "he";
+
+  const response = NextResponse.next();
+  response.headers.set("x-locale", locale);
   response.headers.set("X-Frame-Options", "DENY");
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");

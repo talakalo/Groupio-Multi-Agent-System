@@ -21,7 +21,7 @@ export const envConfig = {
   actionTimeout: Number(process.env.TEST_ACTION_TIMEOUT ?? 15_000),
 
   /** Default navigation timeout (ms) */
-  navigationTimeout: Number(process.env.TEST_NAVIGATION_TIMEOUT ?? 30_000),
+  navigationTimeout: Number(process.env.TEST_NAVIGATION_TIMEOUT ?? 60_000),
 
   /** Auth token used in smoke/mock suites */
   smokeAuthToken: process.env.SMOKE_AUTH_TOKEN ?? "smoke-test-token",

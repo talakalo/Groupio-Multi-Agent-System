@@ -98,7 +98,7 @@ function actionBadgeColor(action: string): string {
     case 'delete':
       return 'bg-red-100 text-red-800';
     case 'login':
-      return 'bg-violet-100 text-violet-800';
+      return 'bg-primary-100 text-primary-800';
     case 'logout':
       return 'bg-gray-100 text-gray-800';
     case 'approve':

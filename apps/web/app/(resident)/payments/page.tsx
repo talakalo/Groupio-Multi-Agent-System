@@ -156,10 +156,10 @@ function PaymentRow({ payment }: { payment: Payment }) {
 function EscrowExplainer() {
   const t = useTranslations('payments');
   return (
-    <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-xl border border-indigo-100 p-6">
+    <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-xl border border-primary-100 p-6">
       <div className="flex items-start gap-4">
-        <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-indigo-100 flex-shrink-0">
-          <Shield className="w-5 h-5 text-indigo-600" />
+        <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary-50 flex-shrink-0">
+          <Shield className="w-5 h-5 text-primary-600" />
         </div>
         <div>
           <h3 className="font-semibold text-gray-900 mb-2">{t('yourPaymentProtected')}</h3>
@@ -242,7 +242,7 @@ export default function PaymentsPage(props: PageParamsProps) {
         </div>
         <button
           onClick={fetchPayments}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors"
         >
           <RefreshCw className="w-4 h-4" />
           {t('refresh')}
@@ -304,7 +304,7 @@ export default function PaymentsPage(props: PageParamsProps) {
             onClick={() => setFilter(tab.key)}
             className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
               filter === tab.key
-                ? 'bg-indigo-600 text-white'
+                ? 'bg-primary-600 text-white'
                 : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
             }`}
           >

@@ -15,7 +15,7 @@
  *   - browserManager  → BrowserManager instance
  */
 
-import { test as base, expect } from "@playwright/test";
+import { test as base, expect, type Page } from "@playwright/test";
 import { LoginPage } from "../pages/LoginPage";
 import { DashboardPage } from "../pages/DashboardPage";
 import { OffersPage } from "../pages/OffersPage";
@@ -56,9 +56,29 @@ interface GroupioFixtures {
   browserManager: BrowserManager;
 }
 
+// ─── Patch page.goto to use domcontentloaded ─────────────────────────────────
+//
+// Next.js dev-mode pages emit the `load` event only after all client-side
+// hydration + async fetches settle, which can exceed 30 s when the backend
+// is unavailable or when JS bundles are large.  Using "domcontentloaded"
+// (fires once the HTML is parsed) avoids the hang without losing any assertion
+// safety — every assertion already has its own explicit timeout.
+
+function patchGoto(page: Page): void {
+  const orig = page.goto.bind(page);
+  // @ts-expect-error — Page.goto is typed as a method, not a property
+  page.goto = (url: string | undefined, options?: Parameters<Page["goto"]>[1]) =>
+    orig(url as string, { waitUntil: "domcontentloaded", ...options });
+}
+
 // ─── Extended test ────────────────────────────────────────────────────────────
 
 export const test = base.extend<GroupioFixtures>({
+  page: async ({ page }, use) => {
+    patchGoto(page);
+    await use(page);
+  },
+
   loginPage: async ({ page }, use) => {
     await use(new LoginPage(page));
   },

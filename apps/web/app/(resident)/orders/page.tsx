@@ -61,10 +61,10 @@ const STATUS_ICON: Record<StatusKey, React.ElementType> = {
 const STATUS_COLOR: Record<StatusKey, string> = {
   pending: "bg-amber-100 text-amber-800",
   processing: "bg-blue-100 text-blue-800",
-  succeeded: "bg-indigo-100 text-indigo-800",
+  succeeded: "bg-primary-50 text-primary-600",
   released: "bg-green-100 text-green-800",
   failed: "bg-red-100 text-red-800",
-  refunded: "bg-purple-100 text-purple-800",
+  refunded: "bg-surface-100 text-surface-600",
 };
 
 const STATUS_TAB: Record<StatusKey, OrderTab> = {
@@ -96,7 +96,7 @@ function TimelineStep({ label, done, active }: { label: string; done: boolean; a
       <div
         className={cn(
           "w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0",
-          done ? "bg-green-500" : active ? "bg-indigo-500" : "bg-gray-200"
+          done ? "bg-green-500" : active ? "bg-primary-500" : "bg-gray-200"
         )}
         aria-hidden="true"
       >
@@ -166,8 +166,8 @@ function OrderCard({ order }: { order: Order }) {
         aria-expanded={expanded}
       >
         <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center flex-shrink-0">
-            <Package className="w-5 h-5 text-indigo-600" aria-hidden="true" />
+          <div className="w-10 h-10 rounded-lg bg-primary-50 flex items-center justify-center flex-shrink-0">
+            <Package className="w-5 h-5 text-primary-600" aria-hidden="true" />
           </div>
           <div className="text-right">
             <p className="font-semibold text-gray-900 text-sm">
@@ -199,7 +199,7 @@ function OrderCard({ order }: { order: Order }) {
           <OrderTimeline status={order.status} />
 
           {order.status === "succeeded" && (
-            <div className="mt-4 bg-indigo-50 rounded-xl p-3 text-xs text-indigo-700 flex items-start gap-2">
+            <div className="mt-4 bg-primary-50 rounded-xl p-3 text-xs text-primary-600 flex items-start gap-2">
               <Shield className="w-4 h-4 flex-shrink-0 mt-0.5" aria-hidden="true" />
               <span>
                 {t("escrowActive")}{" "}
@@ -214,7 +214,7 @@ function OrderCard({ order }: { order: Order }) {
           {order.contractorPhone && (
             <a
               href={`tel:${order.contractorPhone}`}
-              className="mt-3 flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+              className="mt-3 flex items-center gap-2 text-sm text-primary-600 hover:text-primary-600 font-medium"
             >
               <Phone className="w-4 h-4" aria-hidden="true" />
               {order.contractorPhone}
@@ -404,9 +404,9 @@ export default function OrdersPage() {
       </div>
 
       {/* Escrow explainer */}
-      <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-xl border border-indigo-100 p-4 flex items-start gap-3">
-        <Shield className="w-5 h-5 text-indigo-600 flex-shrink-0 mt-0.5" aria-hidden="true" />
-        <p className="text-sm text-indigo-700">
+      <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-xl border border-primary-100 p-4 flex items-start gap-3">
+        <Shield className="w-5 h-5 text-primary-600 flex-shrink-0 mt-0.5" aria-hidden="true" />
+        <p className="text-sm text-primary-600">
           <span className="font-semibold">{t("escrowBadge")}</span>{" "}
           {t("escrowExplainer")}
         </p>
@@ -423,7 +423,7 @@ export default function OrdersPage() {
             className={cn(
               "px-4 py-2 text-sm font-medium rounded-lg transition-colors",
               tab === tab_item.key
-                ? "bg-indigo-600 text-white"
+                ? "bg-primary-600 text-white"
                 : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
             )}
           >
@@ -435,14 +435,14 @@ export default function OrdersPage() {
       {/* Order list */}
       {loading ? (
         <div className="flex items-center justify-center py-16">
-          <Loader2 className="w-6 h-6 animate-spin text-indigo-600" aria-hidden="true" />
+          <Loader2 className="w-6 h-6 animate-spin text-primary-600" aria-hidden="true" />
           <span className="mr-3 text-gray-500">{t("loading")}</span>
         </div>
       ) : error ? (
         <div className="flex flex-col items-center py-12 text-center">
           <AlertCircle className="w-10 h-10 text-red-400 mb-3" aria-hidden="true" />
           <p className="text-gray-600">{t("loadError")}</p>
-          <button onClick={fetchOrders} className="mt-3 text-indigo-600 text-sm font-medium hover:underline">
+          <button onClick={fetchOrders} className="mt-3 text-primary-600 text-sm font-medium hover:underline">
             {t("retry")}
           </button>
         </div>

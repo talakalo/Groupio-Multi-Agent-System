@@ -321,7 +321,7 @@ export default function AnalyticsPage() {
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div
-                      className="h-2 rounded-full bg-violet-500 transition-all duration-500"
+                      className="h-2 rounded-full bg-primary-500 transition-all duration-500"
                       style={{ width: `${percentage}%` }}
                     />
                   </div>
@@ -338,7 +338,7 @@ export default function AnalyticsPage() {
             {(data?.insights ?? []).map((insight, index) => (
               <div
                 key={index}
-                className="flex items-start gap-3 p-3 bg-gradient-to-r from-sky-50 to-violet-50 rounded-lg"
+                className="flex items-start gap-3 p-3 bg-gradient-to-r from-primary-50 to-blue-50 rounded-lg"
               >
                 <span className="text-sky-500 mt-0.5">💡</span>
                 <p className="text-sm text-gray-700">{insight}</p>

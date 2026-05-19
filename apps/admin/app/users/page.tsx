@@ -48,6 +48,41 @@ type StatusFilter = "all" | "active" | "suspended";
 type SortField = "name" | "email" | "role" | "status" | "created_at";
 type SortDir = "asc" | "desc";
 
+function SortTh({
+  field,
+  sortField,
+  sortDir,
+  onSort,
+  children,
+}: {
+  field: SortField;
+  sortField: SortField;
+  sortDir: SortDir;
+  onSort: (f: SortField) => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <th
+      className="table-header cursor-pointer select-none"
+      onClick={() => onSort(field)}
+      onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onSort(field)}
+      tabIndex={0}
+      role="columnheader"
+      aria-sort={sortField === field ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
+    >
+      <div className="flex items-center gap-1">
+        {children}
+        {sortField === field &&
+          (sortDir === "asc" ? (
+            <ChevronUp className="w-3.5 h-3.5" />
+          ) : (
+            <ChevronDown className="w-3.5 h-3.5" />
+          ))}
+      </div>
+    </th>
+  );
+}
+
 const ROLE_LABELS: Record<string, string> = {
   resident: "Resident",
   contractor: "Contractor",
@@ -266,32 +301,6 @@ export default function UsersPage() {
     [createForm, createMutation]
   );
 
-  // ---- Sort header helper ----
-  function SortTh({
-    field,
-    children,
-  }: {
-    field: SortField;
-    children: React.ReactNode;
-  }) {
-    return (
-      <th
-        className="table-header cursor-pointer select-none"
-        onClick={() => toggleSort(field)}
-      >
-        <div className="flex items-center gap-1">
-          {children}
-          {sortField === field &&
-            (sortDir === "asc" ? (
-              <ChevronUp className="w-3.5 h-3.5" />
-            ) : (
-              <ChevronDown className="w-3.5 h-3.5" />
-            ))}
-        </div>
-      </th>
-    );
-  }
-
   return (
     <div className="space-y-6">
       {/* ---- Page header ---- */}
@@ -422,12 +431,12 @@ export default function UsersPage() {
           <table className="w-full text-left">
             <thead>
               <tr>
-                <SortTh field="name">Name</SortTh>
-                <SortTh field="email">Email</SortTh>
+                <SortTh field="name" sortField={sortField} sortDir={sortDir} onSort={toggleSort}>Name</SortTh>
+                <SortTh field="email" sortField={sortField} sortDir={sortDir} onSort={toggleSort}>Email</SortTh>
                 <th className="table-header">Phone</th>
-                <SortTh field="role">Role</SortTh>
-                <SortTh field="status">Status</SortTh>
-                <SortTh field="created_at">Created</SortTh>
+                <SortTh field="role" sortField={sortField} sortDir={sortDir} onSort={toggleSort}>Role</SortTh>
+                <SortTh field="status" sortField={sortField} sortDir={sortDir} onSort={toggleSort}>Status</SortTh>
+                <SortTh field="created_at" sortField={sortField} sortDir={sortDir} onSort={toggleSort}>Created</SortTh>
                 <th className="table-header">Actions</th>
               </tr>
             </thead>
