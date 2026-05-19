@@ -1,10 +1,26 @@
 """Feature flags for RabbitMQ / outbox / CRM (defaults safe/off)."""
 
+import os
+from unittest.mock import patch
+
 from src.config.settings import Settings
+
+# Env vars that override the .env file to ensure we test Pydantic defaults.
+_ASYNC_FLAGS_OFF = {
+    "ENABLE_RABBITMQ": "false",
+    "ENABLE_OUTBOX": "false",
+    "ENABLE_NOTIFICATION_QUEUE": "false",
+    "ENABLE_CRM_SYNC": "false",
+    "ENABLE_PAYMENT_EVENTS": "false",
+    "RABBITMQ_URL": "",
+    "ESPOCRM_BASE_URL": "",
+    "ESPOCRM_API_KEY": "",
+}
 
 
 def test_async_flags_default_false() -> None:
-    s = Settings(ENVIRONMENT="development")
+    with patch.dict(os.environ, _ASYNC_FLAGS_OFF):
+        s = Settings(ENVIRONMENT="development")
     assert s.ENABLE_RABBITMQ is False
     assert s.ENABLE_OUTBOX is False
     assert s.ENABLE_NOTIFICATION_QUEUE is False
@@ -13,7 +29,8 @@ def test_async_flags_default_false() -> None:
 
 
 def test_async_config_placeholders() -> None:
-    s = Settings(ENVIRONMENT="development")
+    with patch.dict(os.environ, _ASYNC_FLAGS_OFF):
+        s = Settings(ENVIRONMENT="development")
     assert s.RABBITMQ_EXCHANGE_EVENTS == "groupio.events"
     assert s.OUTBOX_POLL_INTERVAL_MS == 500
     assert s.RABBITMQ_URL == ""

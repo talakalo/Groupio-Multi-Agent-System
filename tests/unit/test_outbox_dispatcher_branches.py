@@ -104,7 +104,7 @@ async def test_run_loop_exits_immediately_when_outbox_disabled() -> None:
     fake_settings.ENABLE_OUTBOX = False
 
     with (
-        patch("src.config.settings.get_settings", return_value=fake_settings),
+        patch("src.workers.outbox_dispatcher.get_settings", return_value=fake_settings),
         patch("src.workers.outbox_dispatcher.get_postgres_client") as db_getter,
     ):
         await run_loop()
