@@ -1,10 +1,11 @@
-import { Droplets, ArrowUpDown, Wrench, BadgeCheck, ArrowLeft } from "lucide-react";
+import { Wind, ChefHat, Droplets, BadgeCheck, ArrowLeft } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
 
 interface Offer {
   icon: LucideIcon;
   title: string;
+  subtitle: string;
   originalPrice: string;
   discountedPrice: string;
   savingsPercent: number;
@@ -15,34 +16,37 @@ interface Offer {
 
 const OFFERS: Offer[] = [
   {
-    icon: Droplets,
-    title: "איטום גג מקצועי",
-    originalPrice: "₪4,800",
-    discountedPrice: "₪2,880",
-    savingsPercent: 40,
-    participants: 18,
-    totalSlots: 24,
-    contractor: "איטום פלוס בע״מ",
-  },
-  {
-    icon: ArrowUpDown,
-    title: "תחזוקת מעלית שנתית",
-    originalPrice: "₪3,200",
-    discountedPrice: "₪2,240",
-    savingsPercent: 30,
-    participants: 12,
-    totalSlots: 20,
-    contractor: "מעליות ישראל",
-  },
-  {
-    icon: Wrench,
-    title: "החלפת צנרת ראשית",
+    icon: Wind,
+    title: "התקנת מזגנים",
+    subtitle: "מזגן עילי / מיני מרכזי / הכנות והתקנה",
     originalPrice: "₪5,500",
     discountedPrice: "₪3,575",
     savingsPercent: 35,
     participants: 15,
     totalSlots: 22,
-    contractor: "שרברב פרו",
+    contractor: "חשמל ומיזוג פרו",
+  },
+  {
+    icon: ChefHat,
+    title: "שדרוג מטבח קבלן",
+    subtitle: "ארונות, שיש, אי, פירוקים ותוספות",
+    originalPrice: "₪32,000",
+    discountedPrice: "₪22,400",
+    savingsPercent: 30,
+    participants: 12,
+    totalSlots: 20,
+    contractor: "נגריית בוטיק ישראל",
+  },
+  {
+    icon: Droplets,
+    title: "מקלחונים וזכוכית",
+    subtitle: "מקלחונים, מראות, זכוכיות וחיפויי אמבטיה",
+    originalPrice: "₪4,800",
+    discountedPrice: "₪2,880",
+    savingsPercent: 40,
+    participants: 18,
+    totalSlots: 24,
+    contractor: "זכוכית לבית החדש",
   },
 ];
 
@@ -74,6 +78,9 @@ export default function FeaturedOffers() {
                     <h3 className="font-bold text-gray-900 mb-0.5">
                       {offer.title}
                     </h3>
+                    <p className="text-xs text-gray-500 mb-1 leading-snug">
+                      {offer.subtitle}
+                    </p>
                     <div className="flex items-center gap-1.5 text-xs text-gray-400">
                       <BadgeCheck className="h-3.5 w-3.5 text-primary-500" />
                       <span>{offer.contractor}</span>
