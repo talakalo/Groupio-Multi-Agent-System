@@ -283,15 +283,19 @@ test.describe("Contractor Create Offer Flow", () => {
     await page.getByRole("button", { name: /^הבא/ }).click();
 
     // Step 4 — preview + publish.
+    // Wait for the preview heading to confirm step 4 has fully rendered before
+    // attempting the publish click.  The button can briefly detach during
+    // React Hook Form's re-render cycle that follows trigger(), so we anchor
+    // on stable text first, then click with an extended action timeout.
+    await expect(page.getByText("תצוגה מקדימה")).toBeVisible({ timeout: 15000 });
     const publishBtn = page.locator('[data-testid="publish-offer-btn"]');
-    await expect(publishBtn).toBeVisible({ timeout: 15000 });
-    await expect(publishBtn).toBeEnabled({ timeout: 5000 });
+    await expect(publishBtn).toBeVisible({ timeout: 10000 });
     await Promise.all([
       page.waitForResponse(
         (r) => r.url().includes("/api/v1/offers") && r.request().method() === "POST",
         { timeout: 20000 },
       ),
-      publishBtn.click(),
+      publishBtn.click({ timeout: 20000 }),
     ]);
     // router.push lands on /contractor/projects/{id}; dev server may need to
     // compile this route lazily, so give the URL change a generous window.

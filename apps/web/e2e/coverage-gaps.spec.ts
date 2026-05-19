@@ -301,7 +301,7 @@ test.describe("Buildings Manager Pages", () => {
       }),
     );
     await page.goto("/buildings-manager/dashboard");
-    await expect(page.locator("main, body")).toBeVisible({ timeout: 15000 });
+    await expect(page.locator("main").first()).toBeVisible({ timeout: 15000 });
   });
 
   test("buildings list page loads", async ({ page }) => {
@@ -382,7 +382,7 @@ test.describe("Order Detail Page", () => {
       }),
     );
     await page.goto("/orders/pay-1");
-    await expect(page.locator("main, [role='main']")).toBeVisible({
+    await expect(page.locator("main").first()).toBeVisible({
       timeout: 15000,
     });
     // Order detail should show key info (title or amount). The page renders
