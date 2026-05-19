@@ -166,6 +166,12 @@ export async function setupBaseMocks(
     r.fulfill(createMockResponse(authMeUser)),
   );
 
+  // Auth refresh — must succeed so layouts don't redirect to /login when the
+  // backend is not running (accessToken is in-memory only and starts null).
+  await page.route("**/api/v1/auth/refresh", (r) =>
+    r.fulfill(createMockResponse({ access_token: envConfig.smokeAuthToken })),
+  );
+
   // Offers list
   await page.route("**/api/v1/offers*", (r) =>
     r.fulfill(createMockResponse(createOfferList())),
