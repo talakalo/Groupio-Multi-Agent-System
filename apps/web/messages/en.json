@@ -334,7 +334,8 @@
       },
       "assistant": {
         "title": "AI Assistant",
-        "placeholder": "Ask me something..."
+        "placeholder": "Ask me something...",
+        "welcomeMessage": "Hello! I'm the Groupio assistant. I can help you manage offers, check pricing, and track projects."
       },
       "activeProjects": {
         "title": "Active Projects",

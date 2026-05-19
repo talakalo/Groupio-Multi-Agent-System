@@ -32,8 +32,10 @@ export interface AIChatProps {
   userId?: string;
   /** Custom API base URL override */
   apiUrl?: string;
-  /** Custom placeholder text for input */
+  /** Placeholder text for the message input field */
   placeholder?: string;
+  /** Initial welcome message shown in the chat bubble (separate from input placeholder) */
+  welcomeMessage?: string;
   /** Additional CSS class names */
   className?: string;
 }
@@ -68,15 +70,14 @@ export function AIChat({
   userId = 'anonymous',
   apiUrl,
   placeholder,
+  welcomeMessage,
   className,
 }: AIChatProps) {
   const baseUrl = apiUrl ?? API_BASE;
   const accessToken = useAccessToken();
 
   // ---- State ----
-  // Welcome message: passed as a prop so callers can provide a translated string.
-  // Defaults to an English string; Hebrew callers should pass the translated version.
-  const welcomeContent = placeholder ?? "Hello! I'm the Groupio assistant. How can I help?";
+  const welcomeContent = welcomeMessage ?? "Hello! I'm the Groupio assistant. How can I help?";
   const [thinkingMsgIdx, setThinkingMsgIdx] = useState(0);
   const [isSlowResponse, setIsSlowResponse] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([

@@ -179,6 +179,7 @@ export default function ContractorDashboardPage() {
           <h2 className="text-xl font-semibold mb-4">{t('assistant.title')}</h2>
           <AIChat
             context="contractor"
+            welcomeMessage={t('assistant.welcomeMessage')}
             placeholder={t('assistant.placeholder')}
           />
         </section>

@@ -21,6 +21,7 @@ export default function ChatPage(props: PageParamsProps) {
         context="resident"
         userId={user?.id}
         buildingId={user?.buildingId}
+        welcomeMessage={t('welcome')}
         placeholder={t('placeholder')}
         suggestions={[
           t('suggestions.findAC'),
