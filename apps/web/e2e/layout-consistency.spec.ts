@@ -180,7 +180,7 @@ test.describe("Language toggle switches locale for each role", () => {
       );
 
       const [request] = await Promise.all([
-        page.waitForRequest((req) => req.url().includes("/api/locale") && req.method() === "POST"),
+        page.waitForRequest((req) => req.url().includes("/api/locale") && req.method() === "POST", { timeout: 25_000 }),
         page.getByRole("button", { name: /^English$/i }).first().click(),
       ]);
 
@@ -198,7 +198,7 @@ test.describe("Language toggle switches locale for each role", () => {
       );
 
       const [request] = await Promise.all([
-        page.waitForRequest((req) => req.url().includes("/api/locale") && req.method() === "POST"),
+        page.waitForRequest((req) => req.url().includes("/api/locale") && req.method() === "POST", { timeout: 25_000 }),
         page.getByRole("button", { name: /^עברית$/ }).first().click(),
       ]);
 

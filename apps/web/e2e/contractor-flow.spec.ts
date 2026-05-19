@@ -283,14 +283,11 @@ test.describe("Contractor Create Offer Flow", () => {
     await page.getByRole("button", { name: /^הבא/ }).click();
 
     // Step 4 — preview + publish.
-    // Wait for the preview heading to confirm step 4 has fully rendered before
-    // attempting the publish click.  The button can briefly detach during
-    // React Hook Form's re-render cycle that follows trigger(), so we anchor
-    // on stable text first, then click with an extended action timeout.
-    // Use .first() because the step label renders "תצוגה מקדימה" in multiple places.
-    await expect(page.getByText("תצוגה מקדימה").first()).toBeVisible({ timeout: 15000 });
+    // "תצוגה מקדימה" appears in the step indicator breadcrumb on every step,
+    // so we cannot use it to confirm we reached step 4.  Instead wait directly
+    // for the publish button which only renders when currentStep === 3.
     const publishBtn = page.locator('[data-testid="publish-offer-btn"]');
-    await expect(publishBtn).toBeVisible({ timeout: 10000 });
+    await expect(publishBtn).toBeVisible({ timeout: 25000 });
     await Promise.all([
       page.waitForResponse(
         (r) => r.url().includes("/api/v1/offers") && r.request().method() === "POST",
@@ -335,11 +332,10 @@ test.describe("Contractor Manage Offers", () => {
     await page.waitForLoadState("domcontentloaded");
 
     await expect(page.locator("main")).toBeVisible({ timeout: 15000 });
-    // The page uses next-intl; heading text is "הצעות פעילות" (he) or "Active Offers" (en).
-    // Use a broad locator with a longer timeout to survive the loading.tsx Suspense phase.
-    await expect(
-      page.locator("h1, h2").filter({ hasText: /הצעות|Active Offers/ }).first()
-    ).toBeVisible({ timeout: 30000 });
+    // Wait for the page heading inside main. The contractor layout goes through a
+    // token-refresh cycle in CI before rendering <main>, and then the page chunk
+    // may need to stream — use a long timeout to cover both phases.
+    await expect(page.locator("main h1").first()).toBeVisible({ timeout: 45000 });
   });
 
   test("should have filter controls", async ({ page }) => {

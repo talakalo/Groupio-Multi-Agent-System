@@ -227,7 +227,7 @@ test.describe("Building Pages", () => {
       });
     });
     await page.goto("/building/join");
-    await expect(page.locator("main, body")).toBeVisible({ timeout: 15000 });
+    await expect(page.locator("main, body").first()).toBeVisible({ timeout: 15000 });
   });
 });
 
@@ -324,7 +324,7 @@ test.describe("Buildings Manager Pages", () => {
       }),
     );
     await page.goto("/buildings-manager/buildings");
-    await expect(page.locator("main, body")).toBeVisible({ timeout: 15000 });
+    await expect(page.locator("main, body").first()).toBeVisible({ timeout: 15000 });
   });
 
   test("escalations page loads", async ({ page }) => {
@@ -345,7 +345,7 @@ test.describe("Buildings Manager Pages", () => {
       }),
     );
     await page.goto("/buildings-manager/escalations");
-    await expect(page.locator("main, body")).toBeVisible({ timeout: 15000 });
+    await expect(page.locator("main, body").first()).toBeVisible({ timeout: 15000 });
   });
 });
 
