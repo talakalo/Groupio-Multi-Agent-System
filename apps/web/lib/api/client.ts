@@ -145,7 +145,9 @@ class ApiClient {
     if (err instanceof ApiError) return false;
     // AbortError from user-supplied signals bubbles up as DOMException — don't retry.
     if (err instanceof DOMException && err.name === "AbortError") return false;
-    // Network-level failure (fetch reject) — retry transparently.
+    // TypeError = server unreachable ("Failed to fetch") or invalid URL — retrying won't help.
+    if (err instanceof TypeError) return false;
+    // Network-level failure — retry transparently.
     return true;
   }
 

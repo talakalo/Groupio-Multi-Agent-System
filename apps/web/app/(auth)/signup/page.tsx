@@ -70,7 +70,16 @@ export default function SignupPage(props: PageParamsProps) {
       router.push(selectedRole === 'contractor' ? '/contractor/dashboard' : '/dashboard');
     } catch (err) {
       const status = err instanceof ApiError ? err.status : null;
-      setError(status === 503 ? 'השירות לא זמין כרגע.' : status === 500 ? 'אירעה שגיאה בשרת.' : status === 429 ? 'יותר מדי ניסיונות.' : err instanceof Error ? err.message : 'אירעה שגיאה בהרשמה.');
+      const rawMessage = err instanceof Error ? err.message : String(err);
+      const isConnectionError = err instanceof TypeError || rawMessage.includes('Failed to fetch') || rawMessage.includes('Connection refused');
+      setError(
+        isConnectionError ? 'לא ניתן להתחבר לשרת. בדקו את החיבור לאינטרנט ונסו שוב.' :
+        status === 503 ? 'השירות לא זמין כרגע.' :
+        status === 500 ? 'אירעה שגיאה בשרת.' :
+        status === 429 ? 'יותר מדי ניסיונות.' :
+        status === 409 ? 'כתובת האימייל כבר רשומה במערכת.' :
+        rawMessage || 'אירעה שגיאה בהרשמה.'
+      );
     } finally { submittingRef.current = false; setIsLoading(false); }
   };
 
