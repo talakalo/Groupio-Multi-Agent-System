@@ -1,7 +1,6 @@
 'use client';
 
 import { Globe } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import { useLocale } from 'next-intl';
 
 import { useAuthStore } from '@/lib/stores/authStore';
@@ -12,7 +11,6 @@ const LOCALES = [
 ] as const;
 
 export function LanguageToggle() {
-  const router = useRouter();
   const locale = useLocale();
   const accessToken = useAuthStore((s) => s.accessToken);
 
@@ -43,7 +41,11 @@ export function LanguageToggle() {
           // ignore profile sync failure
         }
       }
-      router.refresh();
+      // Hard reload so the server re-reads the NEXT_LOCALE cookie and
+      // NextIntlClientProvider receives the updated locale. router.refresh()
+      // is insufficient here because Next.js 15 can serve the root layout
+      // from its RSC cache, leaving useLocale() returning the stale value.
+      window.location.reload();
     }
   };
 

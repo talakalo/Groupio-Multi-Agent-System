@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
 import { useAuthStore } from "@/lib/stores/authStore";
@@ -19,7 +18,6 @@ const SS_KEY = "groupio-locale-synced";
  * next render/refresh cycle.
  */
 export function LocaleSyncProvider({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
   const accessToken = useAuthStore((s) => s.accessToken);
 
   useEffect(() => {
@@ -58,8 +56,10 @@ export function LocaleSyncProvider({ children }: { children: React.ReactNode }) 
           body: JSON.stringify({ locale: preferred }),
           credentials: "same-origin",
         });
+        // Hard reload so the server re-reads the NEXT_LOCALE cookie.
+        // sessionStorage flag is already set above, so this won't loop.
         if (localeRes.ok) {
-          router.refresh();
+          window.location.reload();
         }
       } catch {
         // Ignore sync failure
@@ -67,7 +67,7 @@ export function LocaleSyncProvider({ children }: { children: React.ReactNode }) 
     };
 
     sync();
-  }, [accessToken, router]);
+  }, [accessToken]);
 
   return <>{children}</>;
 }
