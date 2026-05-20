@@ -25,6 +25,9 @@ export function LanguageToggle() {
       credentials: 'same-origin',
     });
     if (res.ok) {
+      // Stamp the session flag so LocaleSyncProvider does not revert this
+      // explicit user choice back to preferred_language on the next render.
+      sessionStorage.setItem('groupio-locale-synced', '1');
       if (accessToken) {
         try {
           const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';

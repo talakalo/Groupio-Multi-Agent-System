@@ -73,6 +73,7 @@ export default function CreateOfferPage(props: PageParamsProps) {
     register,
     handleSubmit,
     watch,
+    getValues,
     trigger,
     setValue,
     formState: { errors },
@@ -94,7 +95,12 @@ export default function CreateOfferPage(props: PageParamsProps) {
     name: 'pricingTiers',
   });
 
-  const watchAll = watch();
+  // Watch only the field used in interactive steps (step 0 category chip).
+  // The preview step (step 3) reads values via getValues() — no subscription
+  // needed there since no fields are edited on that step, and avoiding the
+  // global watch() subscription prevents rapid re-renders that caused the
+  // publish button to detach from the DOM on every form-state commit.
+  const watchCategory = watch('category');
 
   const categories: { id: ServiceCategory; label: string }[] = [
     { id: 'ac_installation', label: t('categories.ac_installation') },
@@ -206,7 +212,7 @@ export default function CreateOfferPage(props: PageParamsProps) {
               <span className="block mb-2">קטגוריה *</span>
               <CategoryChips
                 categories={categories}
-                selected={watchAll.category}
+                selected={watchCategory}
                 onSelect={(id) => setValue('category', id, { shouldValidate: true })}
               />
               {errors.category && (
@@ -489,17 +495,17 @@ export default function CreateOfferPage(props: PageParamsProps) {
                   <Eye className="h-5 w-5" />
                   <span className="text-sm font-medium opacity-80">תצוגה מקדימה</span>
                 </div>
-                <h2 className="text-2xl font-bold">{watchAll.title || 'כותרת ההצעה'}</h2>
+                <h2 className="text-2xl font-bold">{getValues().title || 'כותרת ההצעה'}</h2>
                 <div className="flex items-center gap-3 mt-2 text-sm opacity-90">
-                  {watchAll.category && (
+                  {getValues().category && (
                     <span className="bg-white/20 rounded-full px-3 py-0.5">
-                      {CATEGORY_LABELS[watchAll.category] ?? watchAll.category}
+                      {CATEGORY_LABELS[getValues().category] ?? getValues().category}
                     </span>
                   )}
-                  {watchAll.timeline && (
+                  {getValues().timeline && (
                     <span className="flex items-center gap-1">
                       <Clock className="h-3.5 w-3.5" />
-                      {watchAll.timeline}
+                      {getValues().timeline}
                     </span>
                   )}
                 </div>
@@ -510,7 +516,7 @@ export default function CreateOfferPage(props: PageParamsProps) {
                 <div>
                   <h3 className="text-sm font-semibold text-gray-500 mb-1">תיאור</h3>
                   <p className="text-gray-700 text-sm leading-relaxed">
-                    {watchAll.description || 'לא הוזן תיאור'}
+                    {getValues().description || 'לא הוזן תיאור'}
                   </p>
                 </div>
 
@@ -519,37 +525,37 @@ export default function CreateOfferPage(props: PageParamsProps) {
                   <div className="bg-gray-50 rounded-lg p-3">
                     <p className="text-xs text-gray-500">מחיר בסיס</p>
                     <p className="text-lg font-bold text-gray-900">
-                      ₪{(watchAll.basePrice || 0).toLocaleString()}
+                      ₪{(getValues().basePrice || 0).toLocaleString()}
                     </p>
                   </div>
                   <div className="bg-gray-50 rounded-lg p-3">
                     <p className="text-xs text-gray-500">מינ׳ משתתפים</p>
                     <p className="text-lg font-bold text-gray-900">
-                      {watchAll.minParticipants || 0}
+                      {getValues().minParticipants || 0}
                     </p>
                   </div>
                   <div className="bg-gray-50 rounded-lg p-3">
                     <p className="text-xs text-gray-500">מקס׳ משתתפים</p>
                     <p className="text-lg font-bold text-gray-900">
-                      {watchAll.maxParticipants || 0}
+                      {getValues().maxParticipants || 0}
                     </p>
                   </div>
                   <div className="bg-gray-50 rounded-lg p-3">
                     <p className="text-xs text-gray-500">תוקף</p>
                     <p className="text-sm font-bold text-gray-900">
-                      {watchAll.validUntil
-                        ? new Date(watchAll.validUntil).toLocaleDateString('he-IL')
+                      {getValues().validUntil
+                        ? new Date(getValues().validUntil).toLocaleDateString('he-IL')
                         : '—'}
                     </p>
                   </div>
                 </div>
 
                 {/* Pricing Tiers */}
-                {watchAll.pricingTiers && watchAll.pricingTiers.length > 0 && (
+                {(getValues().pricingTiers?.length ?? 0) > 0 && (
                   <div>
                     <h3 className="text-sm font-semibold text-gray-500 mb-2">דרגות מחיר</h3>
                     <div className="flex flex-wrap gap-2">
-                      {watchAll.pricingTiers.map((tier, idx) => (
+                      {(getValues().pricingTiers ?? []).map((tier, idx) => (
                         <div
                           key={idx}
                           className="bg-sky-50 border border-sky-200 rounded-lg px-3 py-2 text-sm"
@@ -568,11 +574,11 @@ export default function CreateOfferPage(props: PageParamsProps) {
                 )}
 
                 {/* Included Services */}
-                {watchAll.includedServices && watchAll.includedServices.length > 0 && (
+                {getValues().includedServices && getValues().includedServices.length > 0 && (
                   <div>
                     <h3 className="text-sm font-semibold text-gray-500 mb-2">שירותים כלולים</h3>
                     <div className="flex flex-wrap gap-2">
-                      {watchAll.includedServices.map((service) => (
+                      {getValues().includedServices.map((service) => (
                         <span
                           key={service}
                           className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 rounded-full px-3 py-1 text-xs font-medium"
@@ -590,13 +596,13 @@ export default function CreateOfferPage(props: PageParamsProps) {
                   <div>
                     <h3 className="text-sm font-semibold text-gray-500 mb-1">בניין</h3>
                     <p className="text-sm text-gray-700">
-                      {watchAll.buildingId || '—'}
+                      {getValues().buildingId || '—'}
                     </p>
                   </div>
                   <div>
                     <h3 className="text-sm font-semibold text-gray-500 mb-1">אזור</h3>
                     <p className="text-sm text-gray-700">
-                      {regions.find((r) => r.value === watchAll.region)?.label ?? '—'}
+                      {regions.find((r) => r.value === getValues().region)?.label ?? '—'}
                     </p>
                   </div>
                 </div>
