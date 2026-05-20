@@ -1,6 +1,11 @@
 import { Building2, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
+import {
+  PLATFORM_STATS,
+  PLATFORM_STATS_LABELS,
+} from "@/lib/constants/platformStats";
+
 const FOOTER_LINKS = [
   { label: "אודות", href: "/about" },
   { label: "איך זה עובד", href: "#how-it-works" },
@@ -10,35 +15,20 @@ const FOOTER_LINKS = [
   { label: "מדיניות פרטיות", href: "/privacy" },
 ];
 
+// Single source of truth: pull from PLATFORM_STATS so hero & footer always match
 const STATS = [
-  { value: "5,000+", label: "דיירים פעילים" },
-  { value: "200+", label: "קבלנים מאומתים" },
-  { value: "₪2M+", label: "נחסכו בסך הכל" },
+  { value: PLATFORM_STATS.activeResidents, label: PLATFORM_STATS_LABELS.activeResidents },
+  { value: PLATFORM_STATS.verifiedContractors, label: PLATFORM_STATS_LABELS.verifiedContractors },
+  { value: PLATFORM_STATS.totalSaved, label: PLATFORM_STATS_LABELS.totalSaved },
   { value: "50+", label: "בניינים פעילים" },
-];
+] as const;
 
 export default function LandingFooter() {
   return (
     <footer className="bg-slate-900 text-slate-300">
-      {/* Stats row */}
-      <div className="border-b border-slate-800">
-        <div className="max-w-5xl mx-auto px-4 py-10">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-8 text-center">
-            {STATS.map((stat) => (
-              <div key={stat.label}>
-                <p className="text-2xl font-extrabold text-white mb-1">
-                  {stat.value}
-                </p>
-                <p className="text-xs text-slate-500">{stat.label}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Main footer */}
-      <div className="max-w-5xl mx-auto px-4 py-12">
-        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-10">
+      <div className="max-w-5xl mx-auto px-4 pt-14 pb-12">
+        {/* Brand + stats row */}
+        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-10 mb-12">
           {/* Brand */}
           <div className="flex flex-col gap-4 max-w-xs">
             <div className="flex items-center gap-2">
@@ -83,7 +73,22 @@ export default function LandingFooter() {
           </nav>
         </div>
 
-        <div className="border-t border-slate-800 mt-10 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
+        {/* Stats row — lives inside the footer, same bg-slate-900, no disconnection */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 py-8 border-y border-slate-800 mb-8 text-center">
+          {STATS.map((stat) => (
+            <div key={stat.label}>
+              <p
+                className="text-2xl font-extrabold text-white mb-1 tabular-nums"
+                dir="ltr"
+              >
+                {stat.value}
+              </p>
+              <p className="text-xs text-slate-500">{stat.label}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="text-xs text-slate-600">
             כל הזכויות שמורות &copy; 2026 גרופיו
           </p>

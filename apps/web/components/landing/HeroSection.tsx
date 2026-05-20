@@ -129,7 +129,8 @@ export default function HeroSection() {
                 className="flex items-center gap-2 text-sm text-emerald-100/70"
               >
                 <Icon className="h-4 w-4 text-emerald-300" />
-                <span>{badge.text}</span>
+                {/* dir="ltr" keeps "5,000+" reading left-to-right in RTL context */}
+                <span dir="ltr">{badge.text}</span>
               </div>
             );
           })}
