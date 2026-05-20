@@ -215,3 +215,44 @@ SEASONALITY_FACTORS: dict[str, dict[str, float]] = {
     "plumbing": {},
     "renovations": {"spring": 1.10, "summer": 1.05, "winter": 0.90},
 }
+
+
+class OrderStatus(StrEnum):
+    """Order lifecycle status."""
+
+    PENDING = "pending"
+    CONFIRMED = "confirmed"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+    REFUNDED = "refunded"
+
+
+class Order(BaseModel):
+    """An order created when a resident confirms participation in an offer."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    user_id: str
+    offer_id: str | None = None
+    building_id: str | None = None
+    status: str = OrderStatus.PENDING
+    total_amount: float | None = None
+    currency: str = "ILS"
+    notes: str | None = None
+    metadata: dict | None = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+class OrderCreate(BaseModel):
+    """Input for creating a new order."""
+
+    user_id: str
+    offer_id: str | None = None
+    building_id: str | None = None
+    total_amount: float | None = Field(default=None, ge=0)
+    currency: str = Field(default="ILS", min_length=3, max_length=3)
+    notes: str | None = None
+    metadata: dict | None = None
