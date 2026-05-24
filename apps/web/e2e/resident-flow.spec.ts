@@ -482,13 +482,21 @@ test.describe("Resident Join Offer Flow", () => {
   test("should join offer successfully", async ({ page, offersPage }) => {
     await offersPage.gotoOffer("offer_001");
 
-    // Click join button (Hebrew: "הצטרף להצעה")
-    const joinBtn = page.getByText("הצטרף להצעה");
-    if (await joinBtn.isVisible()) {
-      await joinBtn.click();
-      // Wait for success feedback
-      await expect(page.getByText(/הצטרפת|הצלחה/)).toBeVisible({ timeout: 10000 });
-    }
+    // Click join button (Hebrew: "הצטרף להצעה") — opens confirmation modal
+    const joinBtn = page.getByRole("button", { name: "הצטרף להצעה" });
+    if (!(await joinBtn.isVisible({ timeout: 5000 }).catch(() => false))) return;
+    await joinBtn.click();
+
+    // Modal: accept policy checkbox then confirm
+    const checkbox = page.getByRole("checkbox");
+    await expect(checkbox).toBeVisible({ timeout: 5000 });
+    await checkbox.check();
+
+    const confirmBtn = page.getByRole("button", { name: "אישור הצטרפות" });
+    await confirmBtn.click();
+
+    // Button should now display "הצטרפת" (joined state)
+    await expect(page.getByRole("button", { name: /הצטרפת/ })).toBeVisible({ timeout: 10000 });
   });
 });
 
