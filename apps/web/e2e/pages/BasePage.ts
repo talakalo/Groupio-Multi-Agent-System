@@ -5,10 +5,16 @@
  */
 
 import { type Page, type Locator } from "@playwright/test";
+
 import { envConfig } from "../config/env.config";
 
 export abstract class BasePage {
   constructor(protected readonly page: Page) {}
+
+  /** Expose the underlying Playwright page for assertions in specs. */
+  get rawPage(): Page {
+    return this.page;
+  }
 
   // ─── Navigation ───────────────────────────────────────────────────────────
 

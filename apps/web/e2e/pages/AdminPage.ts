@@ -18,7 +18,7 @@ export class AdminPage extends BasePage {
 
   // ─── Dashboard ────────────────────────────────────────────────────────────
 
-  readonly dashboardHeading = this.page.getByRole("heading", { name: /admin|ניהול/i });
+  readonly dashboardHeading = this.page.getByRole("heading", { level: 1, name: /ניהול מערכת|System/i });
   readonly systemHealthBadge = this.page.locator("[data-testid='system-health']");
   readonly totalUsersCard = this.page.locator("[data-testid='stat-users']");
   readonly totalOffersCard = this.page.locator("[data-testid='stat-offers']");
@@ -57,6 +57,24 @@ export class AdminPage extends BasePage {
   async goto(): Promise<void> {
     await super.goto("/admin");
     await this.waitForReady();
+  }
+
+  async gotoDashboard(): Promise<void> {
+    await super.goto("/admin/dashboard");
+    await this.waitForReady();
+  }
+
+  async gotoAccount(): Promise<void> {
+    await super.goto("/admin/account");
+    await this.waitForReady();
+  }
+
+  async gotoBuildings(): Promise<void> {
+    await super.goto("/admin/buildings");
+    await this.page.waitForURL(/buildings-manager\/buildings/, {
+      timeout: 30_000,
+      waitUntil: "commit",
+    });
   }
 
   async gotoContractors(): Promise<void> {

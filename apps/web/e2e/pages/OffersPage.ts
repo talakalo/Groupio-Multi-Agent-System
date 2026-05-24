@@ -81,6 +81,11 @@ export class OffersPage extends BasePage {
     await this.waitForReady();
   }
 
+  async gotoActiveOffers(): Promise<void> {
+    await super.goto("/contractor/offers/active");
+    await this.waitForReady();
+  }
+
   // ─── Assertions ───────────────────────────────────────────────────────────
 
   async expectOffersLoaded(minCount = 1): Promise<void> {

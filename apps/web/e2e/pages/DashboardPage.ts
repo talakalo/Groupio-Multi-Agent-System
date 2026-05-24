@@ -44,6 +44,11 @@ export class DashboardPage extends BasePage {
     await this.waitForReady();
   }
 
+  async gotoContractorProjects(): Promise<void> {
+    await super.goto("/contractor/projects");
+    await this.waitForReady();
+  }
+
   async clickOffers(): Promise<void> {
     await this.navOffers.click();
     await this.page.waitForURL(/\/offers/);

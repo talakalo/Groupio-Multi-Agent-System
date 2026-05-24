@@ -1,0 +1,16 @@
+export { BasePage } from "./BasePage";
+export { LoginPage } from "./LoginPage";
+export { SignupPage } from "./SignupPage";
+export { DashboardPage } from "./DashboardPage";
+export { OffersPage } from "./OffersPage";
+export { AdminPage } from "./AdminPage";
+export { ArchitecturePage } from "./ArchitecturePage";
+export { ProfilePage } from "./ProfilePage";
+export { BuildingPage } from "./BuildingPage";
+export { ContractorsPage } from "./ContractorsPage";
+export { BuildingsManagerPage } from "./BuildingsManagerPage";
+export { LandingPage } from "./LandingPage";
+export { OnboardingPage } from "./OnboardingPage";
+export { ChangePasswordPage } from "./ChangePasswordPage";
+export { VerifyEmailPage } from "./VerifyEmailPage";
+export { ContractorProfilePage } from "./ContractorProfilePage";
