@@ -202,7 +202,11 @@
     "contractorBadge": "Contractor",
     "newOffer": "New Offer",
     "myBusiness": "My Business",
-    "logout": "Log out"
+    "logout": "Log out",
+    "verifyEmailBanner": "Please verify your email address. Check your inbox and click the verification link.",
+    "resendVerification": "Resend Verification Link",
+    "resendSending": "Sending...",
+    "resendSent": "Sent! Check your email."
   },
   "dashboard": {
     "welcome": "Hello, {name}!",

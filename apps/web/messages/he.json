@@ -202,7 +202,11 @@
     "contractorBadge": "קבלן",
     "newOffer": "הצעה חדשה",
     "myBusiness": "העסק שלי",
-    "logout": "התנתקות"
+    "logout": "התנתקות",
+    "verifyEmailBanner": "נא לאמת את כתובת האימייל שלכם. בדקו את תיבת הדואר ולחצו על קישור האימות.",
+    "resendVerification": "שליחת קישור אימות מחדש",
+    "resendSending": "שולח...",
+    "resendSent": "נשלח! בדקו את האימייל."
   },
   "dashboard": {
     "welcome": "שלום, {name}!",
