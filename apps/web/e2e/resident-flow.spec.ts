@@ -47,6 +47,7 @@ const MOCK_OFFERS = [
       { min: 11, max: 20, discount: 0.15, price: 3825 },
     ],
     expiresAt: "2026-03-15T00:00:00Z",
+    createdAt: "2026-01-01T00:00:00Z",
     building: {
       id: "bld_001",
       address: "רוטשילד 15",
@@ -77,6 +78,7 @@ const MOCK_OFFERS = [
       { min: 6, max: 10, discount: 0.12, price: 22000 },
     ],
     expiresAt: "2026-04-01T00:00:00Z",
+    createdAt: "2026-01-15T00:00:00Z",
     building: {
       id: "bld_001",
       address: "רוטשילד 15",
