@@ -268,6 +268,23 @@ class RedisClient:
         """Remove a temporary lockout (called on successful login)."""
         await self._redis.delete(f"temp_lock:{user_id}")
 
+    # -- Pub/Sub --
+
+    async def publish(self, channel: str, message: str) -> int:
+        """Publish a message to a Redis channel.
+
+        Returns the number of subscribers that received the message.
+        """
+        return int(await self._redis.publish(channel, message))
+
+    def make_pubsub(self) -> Any:
+        """Create a new PubSub instance for subscribing to channels.
+
+        Each subscriber needs its own PubSub object because the subscribe
+        command puts the connection into a mode that cannot issue other commands.
+        """
+        return self._redis.pubsub()
+
     # -- Health --
 
     async def health_check(self) -> bool:

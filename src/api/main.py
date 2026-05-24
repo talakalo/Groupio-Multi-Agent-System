@@ -190,7 +190,11 @@ async def api_root() -> dict[str, str]:
 # WebSocket routes (mounted separately – no prefix collision with REST routes)
 from src.api.routes.websocket import router as ws_router
 
+# Mount at /api/v1 for API-versioned access (e.g. /api/v1/ws/admin).
 app.include_router(ws_router, prefix="/api/v1")
+# Also mount at root so the frontend default WS URL (ws://host/ws/offers) works
+# without requiring NEXT_PUBLIC_WS_URL to be configured.
+app.include_router(ws_router)
 
 
 # -- Request/Response Models --

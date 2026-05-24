@@ -1,5 +1,6 @@
 """Offer API routes."""
 
+import json
 import logging
 from datetime import datetime
 from uuid import uuid4
@@ -7,8 +8,10 @@ from uuid import uuid4
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 
 from src.api.middleware.auth import get_current_user
+from src.api.routes.websocket import OFFERS_CHANNEL
 from src.config.settings import get_settings
 from src.databases.postgres import get_postgres_client
+from src.databases.redis_client import get_redis_client
 from src.databases.vector_store import get_vector_store
 from src.domain.contractor_membership import contractor_membership_allows_offer_creation
 from src.messaging.envelope import EventEnvelope
@@ -375,10 +378,29 @@ async def join_offer(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    # Publish real-time update so WebSocket clients get the new participant count.
+    try:
+        updated_offer = await db.get_offer(offer_id)
+        if updated_offer:
+            redis = get_redis_client()
+            await redis.publish(
+                OFFERS_CHANNEL,
+                json.dumps(
+                    {
+                        "event_type": "UPDATE",
+                        "building_id": offer["building_id"],
+                        "record": updated_offer,
+                        "old_record": {"current_participants": offer.get("current_participants", 0)},
+                    },
+                    default=str,
+                ),
+            )
+    except Exception as _pub_exc:
+        logger.warning("Failed to publish offer update after join: %s", _pub_exc)
+
     # Record viral invite conversion in the graph (fire-and-forget)
     if request.invite_token:
         from src.databases.graph_store import get_graph_store
-        from src.databases.redis_client import get_redis_client
 
         async def _mark_converted() -> None:
             try:
