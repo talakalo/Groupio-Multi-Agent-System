@@ -4,6 +4,7 @@ import {
   BuildingPage,
   BuildingsManagerPage,
   ChangePasswordPage,
+  CheckoutPage,
   ContractorProfilePage,
   ContractorsPage,
   DashboardPage,
@@ -32,6 +33,7 @@ export type PageObjectFixtures = {
   landingPage: LandingPage;
   onboardingPage: OnboardingPage;
   changePasswordPage: ChangePasswordPage;
+  checkoutPage: CheckoutPage;
   verifyEmailPage: VerifyEmailPage;
   contractorProfilePage: ContractorProfilePage;
 };
@@ -87,6 +89,10 @@ export const test = baseTest.extend<PageObjectFixtures>({
 
   changePasswordPage: async ({ page }, use) => {
     await use(new ChangePasswordPage(page));
+  },
+
+  checkoutPage: async ({ page }, use) => {
+    await use(new CheckoutPage(page));
   },
 
   verifyEmailPage: async ({ page }, use) => {

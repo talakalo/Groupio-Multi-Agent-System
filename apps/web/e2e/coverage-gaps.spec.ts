@@ -156,7 +156,7 @@ test.describe("Verify Email Flow", () => {
   test("shows error when no token provided", async ({ page }) => {
     await page.goto("/verify-email");
     await expect(
-      page.getByText(/חסר|token|שגיאה|לא תקין/i),
+      page.getByText(/קישור לאימות לא תקין|Invalid verification link/i),
     ).toBeVisible({ timeout: 15000 });
   });
 });

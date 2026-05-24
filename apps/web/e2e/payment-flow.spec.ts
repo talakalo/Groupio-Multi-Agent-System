@@ -20,9 +20,8 @@
  *   pnpm --filter web exec playwright test e2e/payment-flow.spec.ts --project=chromium
  */
 
-import { test, expect } from "./fixtures/auth-fixtures";
-import { CheckoutPage } from "./pages/CheckoutPage";
-import type { Page } from "@playwright/test";
+import { test, expect, loginAs, setupBaseMocks } from "./fixtures/auth-fixtures";
+import { envConfig } from "./config/env.config";
 
 // ─── Shared test data ────────────────────────────────────────────────────────
 
@@ -83,7 +82,7 @@ const MOCK_PAYMENT_FAILURE = {
  * precedence (Playwright uses last-registered match).
  */
 async function setupOfferAndPaymentMocks(
-  page: Page,
+  page: import("@playwright/test").Page,
   paymentOverride?: {
     status?: number;
     body?: unknown;
@@ -133,44 +132,6 @@ async function setupOfferAndPaymentMocks(
   );
 }
 
-// ─── Auth helpers ────────────────────────────────────────────────────────────
-
-async function loginAs(page: Page, _role: "resident" | "contractor"): Promise<void> {
-  await page.evaluate(() => {
-    localStorage.setItem(
-      "auth-storage",
-      JSON.stringify({
-        state: {
-          user: { id: "user-e2e-1", role: "resident", email: "resident@example.com" },
-          isAuthenticated: true,
-        },
-        version: 0,
-      })
-    );
-  });
-  await page.context().addCookies([
-    { name: "sb-access-token", value: "mock-token-e2e", domain: "localhost", path: "/" },
-  ]);
-}
-
-async function setupBaseMocks(page: Page): Promise<void> {
-  await page.route("**/api/v1/users/me", (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({
-        id: "user-e2e-1",
-        email: "resident@example.com",
-        role: "resident",
-        building_id: "bld_001",
-      }),
-    })
-  );
-  await page.route("**/api/v1/notifications**", (route) =>
-    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([]) })
-  );
-}
-
 // ─── Connectivity guard ──────────────────────────────────────────────────────
 
 /**
@@ -178,9 +139,9 @@ async function setupBaseMocks(page: Page): Promise<void> {
  * If not, `test.skip()` is called so CI does not report a failure when the
  * backend is intentionally not running (e.g., in isolated lint/type-check jobs).
  */
-async function skipIfOffline(page: Page): Promise<void> {
+async function skipIfOffline(page: import("@playwright/test").Page): Promise<void> {
   try {
-    const response = await page.request.get("http://localhost:3000/", {
+    const response = await page.request.get(envConfig.baseURL, {
       timeout: 5_000,
     });
     if (!response.ok()) {
@@ -200,7 +161,7 @@ test.describe("Resident Payment Flow", () => {
     await skipIfOffline(page);
   });
 
-  test("should complete the full resident payment flow (mock mode)", async ({ page }) => {
+  test("should complete the full resident payment flow (mock mode)", async ({ page, checkoutPage }) => {
     // ── 1. Set up auth + API mocks ─────────────────────────────────────────
     await setupBaseMocks(page);
     await loginAs(page, "resident");
@@ -267,7 +228,6 @@ test.describe("Resident Payment Flow", () => {
     }
 
     // ── 5. Navigate to checkout ────────────────────────────────────────────
-    const checkoutPage = new CheckoutPage(page);
     await checkoutPage.goto(OFFER_ID);
 
     // ── 6. Verify mock payment success ────────────────────────────────────
@@ -286,7 +246,7 @@ test.describe("Resident Payment Flow", () => {
   // Error path — payment API returns 500
   // ==========================================================================
 
-  test("should show error state when payment fails", async ({ page }) => {
+  test("should show error state when payment fails", async ({ page, checkoutPage }) => {
     // ── Auth + mocks ──────────────────────────────────────────────────────
     await setupBaseMocks(page);
     await loginAs(page, "resident");
@@ -296,7 +256,6 @@ test.describe("Resident Payment Flow", () => {
     });
 
     // ── Navigate directly to checkout (simulating a deep-link / retry) ────
-    const checkoutPage = new CheckoutPage(page);
     await checkoutPage.goto(OFFER_ID);
 
     // ── Verify error state ────────────────────────────────────────────────
@@ -339,7 +298,7 @@ test.describe("Checkout Page — Mock Payment Mode", () => {
     await skipIfOffline(page);
   });
 
-  test("mock payment: shows success immediately without Stripe UI", async ({ page }) => {
+  test("mock payment: shows success immediately without Stripe UI", async ({ page, checkoutPage }) => {
     await setupBaseMocks(page);
     await loginAs(page, "resident");
 
@@ -352,7 +311,6 @@ test.describe("Checkout Page — Mock Payment Mode", () => {
       })
     );
 
-    const checkoutPage = new CheckoutPage(page);
     await checkoutPage.goto(OFFER_ID);
 
     // Success state must be visible without any Stripe card form
@@ -368,7 +326,7 @@ test.describe("Checkout Page — Mock Payment Mode", () => {
     await expect(checkoutPage.myOrdersLink).toBeVisible();
   });
 
-  test("mock payment: already-paid error shows friendly message", async ({ page }) => {
+  test("mock payment: already-paid error shows friendly message", async ({ page, checkoutPage }) => {
     await setupBaseMocks(page);
     await loginAs(page, "resident");
 
@@ -380,7 +338,6 @@ test.describe("Checkout Page — Mock Payment Mode", () => {
       })
     );
 
-    const checkoutPage = new CheckoutPage(page);
     await checkoutPage.goto(OFFER_ID);
 
     // The checkout page maps 400 "already" errors to a specific message
@@ -389,7 +346,7 @@ test.describe("Checkout Page — Mock Payment Mode", () => {
     ).toBeVisible({ timeout: 10_000 });
   });
 
-  test("mock payment: 404 error shows offer-not-found message", async ({ page }) => {
+  test("mock payment: 404 error shows offer-not-found message", async ({ page, checkoutPage }) => {
     await setupBaseMocks(page);
     await loginAs(page, "resident");
 
@@ -401,7 +358,6 @@ test.describe("Checkout Page — Mock Payment Mode", () => {
       })
     );
 
-    const checkoutPage = new CheckoutPage(page);
     await checkoutPage.goto(OFFER_ID);
 
     await expect(

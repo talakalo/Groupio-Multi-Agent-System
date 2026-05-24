@@ -3,6 +3,7 @@
 import json
 import logging
 import re
+import secrets
 from collections.abc import AsyncIterator as _AsyncIterator
 from contextlib import asynccontextmanager as _acm
 from datetime import UTC, datetime
@@ -16,6 +17,15 @@ from src.models.user import UserInDB
 
 # Regex for safe SQL column names (letters, digits, underscores)
 _SAFE_COLUMN_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
+
+# Building invite codes — uppercase alphanumerics, no ambiguous chars (0/O, 1/I/L).
+_INVITE_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+
+
+def generate_invite_code(length: int = 8) -> str:
+    """Generate a building invite code (uppercase, unambiguous characters)."""
+    return "".join(secrets.choice(_INVITE_CODE_ALPHABET) for _ in range(length))
+
 
 # ---------------------------------------------------------------------------
 # Named column lists — never use SELECT * in queries.
@@ -34,7 +44,7 @@ _BUILDING_COLS = (
     "id, name, address, city, region, total_units, floors, year_built, admin_user_id, "
     "resident_count, active_offers, completed_offers, total_savings, whatsapp_group_id, "
     "created_at, updated_at, municipality_code, municipality_name, address_normalized, "
-    "enrichment_confidence, enrichment_source, enriched_at"
+    "enrichment_confidence, enrichment_source, enriched_at, invite_code"
 )
 
 # offers (includes pricing_rationale added in migration 011)
@@ -275,6 +285,20 @@ class PostgresClient:
             await self._asyncpg_pool.close()
             self._asyncpg_pool = None
 
+    async def auth_tables_exist(self) -> bool:
+        """Check if auth-critical tables (e.g. users) exist. Used for startup readiness."""
+        if self._use_supabase_client():
+            return True
+        try:
+            pool = await self._get_client()
+            async with pool.acquire() as conn:
+                row = await conn.fetchrow(
+                    "SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'users'"
+                )
+                return row is not None
+        except Exception:
+            return False
+
     async def _pg_execute(self, query: str, *args: Any) -> None:
         """Execute query via asyncpg."""
         pool = await self._get_client()
@@ -301,6 +325,22 @@ class PostgresClient:
         pool = await self._get_client()
         async with pool.acquire() as conn:
             async with conn.transaction():
+                yield conn
+
+    @_acm
+    async def tenant_scope(self, user_id: str) -> "_AsyncIterator[Any]":
+        """Run a block with app.current_user_id set for RLS tenant policies."""
+        if self._use_supabase_client():
+            yield None
+            return
+
+        pool = await self._get_client()
+        async with pool.acquire() as conn:
+            async with conn.transaction():
+                await conn.execute(
+                    "SELECT set_config('app.current_user_id', $1, true)",
+                    str(user_id),
+                )
                 yield conn
 
     @retry(
@@ -519,6 +559,8 @@ class PostgresClient:
 
     async def create_building(self, building_data: dict[str, Any]) -> dict[str, Any]:
         """Create a new building."""
+        if not building_data.get("invite_code"):
+            building_data["invite_code"] = generate_invite_code()
         if self._use_supabase_client():
             client = await self._get_client()
             result = await client.table("buildings").insert(building_data).execute()
@@ -527,11 +569,14 @@ class PostgresClient:
             "id, name, address, city, region, total_units, floors, year_built, admin_user_id, "
             "resident_count, active_offers, completed_offers, total_savings, whatsapp_group_id, "
             "municipality_code, municipality_name, address_normalized, enrichment_confidence, "
-            "enrichment_source, enriched_at"
+            "enrichment_source, enriched_at, invite_code"
         )
         await self._pg_execute(
             f"""INSERT INTO buildings ({cols})
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)""",
+               VALUES (
+                   $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+                   $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21
+               )""",
             building_data["id"],
             building_data["name"],
             building_data["address"],
@@ -552,8 +597,23 @@ class PostgresClient:
             building_data.get("enrichment_confidence"),
             building_data.get("enrichment_source"),
             building_data.get("enriched_at"),
+            building_data["invite_code"],
         )
         return await self.get_building(building_data["id"]) or building_data
+
+    async def regenerate_building_invite_code(self, building_id: str, new_code: str | None = None) -> str:
+        """Rotate the invite code for a building. Returns the new code."""
+        code = new_code or generate_invite_code()
+        if self._use_supabase_client():
+            client = await self._get_client()
+            await client.table("buildings").update({"invite_code": code}).eq("id", building_id).execute()
+        else:
+            await self._pg_execute(
+                "UPDATE buildings SET invite_code = $1 WHERE id = $2",
+                code,
+                building_id,
+            )
+        return code
 
     async def list_buildings(
         self,
@@ -1424,6 +1484,37 @@ class PostgresClient:
             "completed_projects",
             "response_rate",
             "average_response_time_hours",
+        }
+        filtered = {k: v for k, v in update_data.items() if k in allowed}
+        if not filtered:
+            return await self.get_contractor(contractor_id) or {}
+        if self._use_supabase_client():
+            client = await self._get_client()
+            await client.table("contractors").update(filtered).eq("id", contractor_id).execute()
+        else:
+            query, args = self._build_safe_update("contractors", filtered, "id", contractor_id)
+            await self._pg_execute(query, *args)
+        return await self.get_contractor(contractor_id) or {}
+
+    async def admin_update_contractor_membership(
+        self, contractor_id: str, update_data: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Update marketplace membership columns (admin / system only)."""
+        allowed = {
+            "membership_status",
+            "membership_plan",
+            "membership_provider",
+            "provider_customer_id",
+            "provider_subscription_id",
+            "current_period_start",
+            "current_period_end",
+            "next_billing_at",
+            "cancel_at_period_end",
+            "canceled_at",
+            "billing_failure_count",
+            "membership_grace_until",
+            "trial_ends_at",
+            "last_payment_at",
         }
         filtered = {k: v for k, v in update_data.items() if k in allowed}
         if not filtered:

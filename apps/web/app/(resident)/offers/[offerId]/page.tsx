@@ -629,28 +629,6 @@ export default function OfferDetailPage(props: PageParamsProps) {
             </p>
           </details>
 
-          {/* Pricing rationale (Task 3.4) */}
-          <details className="mt-4 text-sm text-gray-500">
-            <summary className="cursor-pointer font-medium text-primary-600 hover:text-primary-700">
-              {t('pricingRationale.summary')}
-            </summary>
-            <p className="mt-2 leading-relaxed">
-              {(offer as { pricingRationale?: string }).pricingRationale ||
-                t('pricingRationale.defaultText')}
-            </p>
-          </details>
-
-          {/* Pricing rationale (Task 3.4) */}
-          <details className="mt-4 text-sm text-gray-500">
-            <summary className="cursor-pointer font-medium text-primary-600 hover:text-primary-700">
-              {t('pricingRationale.summary')}
-            </summary>
-            <p className="mt-2 leading-relaxed">
-              {(offer as { pricingRationale?: string }).pricingRationale ||
-                t('pricingRationale.defaultText')}
-            </p>
-          </details>
-
           {/* Timeline */}
           <h2 className="text-lg font-bold text-gray-900 mt-8 mb-4">{t('timeline')}</h2>
           <div className="card">

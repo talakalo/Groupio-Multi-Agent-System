@@ -222,12 +222,12 @@ class TestHigh02AdminEscalation:
         db.create_user = AsyncMock(return_value=new_user)
 
         from src.api.main import app
-        from src.api.middleware.auth import require_admin_only
+        from src.api.middleware.auth import get_admin_user
 
         async def _admin_dep():
             return admin
 
-        app.dependency_overrides[require_admin_only] = _admin_dep
+        app.dependency_overrides[get_admin_user] = _admin_dep
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 client = TestClient(app, raise_server_exceptions=False)
@@ -255,12 +255,12 @@ class TestHigh02AdminEscalation:
         db.create_audit_log = AsyncMock()
 
         from src.api.main import app
-        from src.api.middleware.auth import require_admin_only
+        from src.api.middleware.auth import get_admin_user
 
         async def _admin_dep():
             return admin
 
-        app.dependency_overrides[require_admin_only] = _admin_dep
+        app.dependency_overrides[get_admin_user] = _admin_dep
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 client = TestClient(app, raise_server_exceptions=False)
@@ -283,12 +283,12 @@ class TestHigh02AdminEscalation:
         db.create_audit_log = AsyncMock()
 
         from src.api.main import app
-        from src.api.middleware.auth import require_admin_only
+        from src.api.middleware.auth import get_admin_user
 
         async def _super_dep():
             return super_admin
 
-        app.dependency_overrides[require_admin_only] = _super_dep
+        app.dependency_overrides[get_admin_user] = _super_dep
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 client = TestClient(app, raise_server_exceptions=False)

@@ -184,10 +184,14 @@
     "offers": "הצעות",
     "contractors": "קבלנים",
     "architecture": "תוכנית הדירה",
-    "building": "בניין",
+    "building": "הבניין",
     "profile": "פרופיל",
     "aiAssistant": "עוזר AI",
-    "myAccount": "החשבון שלי"
+    "myAccount": "החשבון שלי",
+    "payments": "תשלומים",
+    "myAccountHint": "פרופיל, התראות והעדפות",
+    "accountMenu": "תפריט חשבון",
+    "logout": "התנתקות"
   },
   "contractorNav": {
     "dashboard": "לוח בקרה",
@@ -667,7 +671,27 @@
       "subtitle": "נהל את פרטי העסק והמסמכים",
       "trustScore": {
         "title": "ציון אמינות",
-        "description": "ציון האמינות שלך משפיע על הדירוג בהצעות"
+        "description": "ציון האמינות שלך משפיע על הדירוג בהצעות",
+        "scoreLabels": {
+          "excellent": "מצוין",
+          "good": "טוב",
+          "needsImprovement": "דורש שיפור"
+        },
+        "categories": {
+          "documents": "מסמכים",
+          "insurance": "ביטוח",
+          "rating": "דירוג",
+          "responseTime": "זמן תגובה"
+        },
+        "tips": {
+          "insurance": "שמרו על ביטוח בתוקף",
+          "profile": "השלימו את הפרופיל",
+          "response": "הגיבו במהירות ללקוחות",
+          "reviews": "אספו ביקורות חיוביות"
+        },
+        "yourTrustScore": "ציון האמינות שלך",
+        "scoreBreakdown": "פירוט הציון",
+        "improvementTips": "טיפים לשיפור"
       },
       "sections": {
         "business": "פרטי העסק",
@@ -709,12 +733,77 @@
         "availability": "זמינות",
         "acceptingOffers": "מקבל הצעות חדשות",
         "dangerZone": "אזור מסוכן",
-        "deactivate": "השבת חשבון"
+        "deactivate": "השבת חשבון",
+        "notificationsHint": "בחרו כיצד ליצור עמכם קשר לגבי לידים והצעות חדשות.",
+        "notificationsSave": "שמירת העדפות התראות",
+        "notificationsSaving": "שומר…",
+        "notificationsSaved": "ההעדפות נשמרו.",
+        "notificationsSaveError": "לא ניתן לשמור את ההעדפות. נסו שוב.",
+        "membershipTitle": "מנוי שוק Groupio",
+        "membershipDescription": "מנוי פעיל נדרש כדי לפרסם הצעות ב-Groupio. התשלום המאובטח מעובד באמצעות Stripe.",
+        "membershipStatusLabel": "סטטוס",
+        "membershipPeriodEnd": "תקופה נוכחית מסתיימת",
+        "membershipNextBilling": "חיוב הבא",
+        "membershipSubscribe": "הרשמה או חידוש דרך Stripe",
+        "membershipStatusLoading": "טוען סטטוס מנוי…",
+        "membershipCheckoutLoading": "פותח תשלום…",
+        "membershipCheckoutError": "לא ניתן להתחיל תשלום. ודאו שהגדרות החיוב מוגדרות או נסו שוב מאוחר יותר.",
+        "membershipLoadError": "לא ניתן לטעון את סטטוס המנוי.",
+        "membershipSuccessBanner": "התשלום התקבל. סטטוס המנוי יתעדכן בקרוב.",
+        "membershipCanceledBanner": "התשלום בוטל. ניתן לנסות שוב כשתהיו מוכנים.",
+        "membershipStates": {
+          "active": "פעיל",
+          "trialing": "ניסיון",
+          "renewal": "חידוש",
+          "past_due": "חוב",
+          "grace": "תקופת חסד",
+          "canceled": "בוטל",
+          "expired": "פג תוקף",
+          "inactive": "אין מנוי פעיל",
+          "unknown": "לא ידוע"
+        }
       },
       "save": "שמור",
       "saving": "שומר...",
       "saveSuccess": "הפרופיל נשמר בהצלחה",
-      "saveError": "שגיאה בשמירה"
+      "saveError": "שגיאה בשמירה",
+      "tabs": {
+        "info": "פרטי עסק",
+        "documents": "מסמכים",
+        "settings": "הגדרות"
+      },
+      "categories": {
+        "ac_installation": "התקנת מזגנים",
+        "kitchen": "מטבחים",
+        "electrical": "חשמל",
+        "plumbing": "אינסטלציה",
+        "painting": "צביעה",
+        "flooring": "ריצוף",
+        "windows": "חלונות",
+        "security": "אבטחה"
+      },
+      "regions": {
+        "center": "מרכז",
+        "tel_aviv": "תל אביב",
+        "jerusalem": "ירושלים",
+        "north": "צפון",
+        "south": "דרום",
+        "sharon": "שרון",
+        "shfela": "שפלה"
+      },
+      "vetting": {
+        "documentSubmission": "הגשת מסמכים",
+        "documentSubmissionDesc": "העלאת מסמכי עסק נדרשים.",
+        "licenseCheck": "אימות רישיון",
+        "licenseCheckDesc": "אנו מאמתים את רישיון העסק.",
+        "insuranceCheck": "בדיקת ביטוח",
+        "insuranceCheckDesc": "אנו מאמתים את ביטוח העסק.",
+        "finalVerification": "אימות סופי",
+        "finalVerificationDesc": "בדיקה ידנית לפני אישור מלא.",
+        "statusComplete": "הושלם",
+        "statusFailed": "נכשל",
+        "statusInProgress": "בתהליך"
+      }
     },
     "projects": {
       "title": "פרויקטים",
@@ -1013,5 +1102,133 @@
       "copyright": "כל הזכויות שמורות © 2026 גרופיו",
       "madeIn": "נבנה בישראל עם אהבה"
     }
+  },
+  "buildingsManager": {
+    "dashboard": {
+      "title": "סקירת בניינים",
+      "subtitle": "מעקב אחר בניינים, דיירים, הצעות ואסקלציות פתוחות",
+      "stats": {
+        "totalBuildings": "סה״כ בניינים",
+        "totalResidents": "סה״כ דיירים",
+        "activeOffers": "הצעות פעילות",
+        "openEscalations": "אסקלציות פתוחות"
+      },
+      "viewAll": "הצג הכל",
+      "recentBuildings": "בניינים אחרונים",
+      "openEscalations": "אסקלציות פתוחות",
+      "noBuildings": "אין בניינים עדיין",
+      "noEscalations": "אין אסקלציות פתוחות",
+      "units": "יח״ד",
+      "open": "פתוח"
+    },
+    "buildings": {
+      "title": "בניינים",
+      "total": "{count, plural, =0 {אין בניינים} one {בניין אחד} other {# בניינים}}",
+      "searchPlaceholder": "חיפוש לפי שם או עיר…",
+      "noResults": "לא נמצאו בניינים",
+      "empty": "אין בניינים להצגה",
+      "units": "{count, plural, one {יחידת דיור אחת} other {# יח״ד}}",
+      "activeOffers": "{count, plural, =0 {אין הצעות פעילות} one {הצעה פעילה אחת} other {# הצעות פעילות}}",
+      "createCta": "יצירת בניין",
+      "inviteCta": "שיתוף קוד הזמנה"
+    },
+    "escalations": {
+      "title": "אסקלציות",
+      "total": "{count, plural, =0 {אין אסקלציות} one {אסקלציה אחת} other {# אסקלציות}}",
+      "filters": {
+        "allStatuses": "כל הסטטוסים",
+        "open": "פתוח",
+        "inProgress": "בטיפול",
+        "resolved": "טופל",
+        "allPriorities": "כל העדיפויות",
+        "critical": "קריטי",
+        "high": "גבוה",
+        "medium": "בינוני",
+        "low": "נמוך"
+      },
+      "empty": "אין אסקלציות התואמות למסננים",
+      "resolve": "סגור פנייה",
+      "resolving": "סוגר…"
+    },
+    "account": {
+      "title": "חשבון",
+      "subtitle": "המשתמש המחובר למסוף זה.",
+      "name": "שם",
+      "email": "אימייל",
+      "role": "תפקיד",
+      "signOut": "התנתקות",
+      "backToDashboard": "חזרה ללוח הבקרה"
+    },
+    "invite": {
+      "label": "קוד הזמנה",
+      "copy": "העתק",
+      "copied": "הועתק!",
+      "share": "שיתוף",
+      "shareMessage": "הצטרפו ל-{buildingName} עם קוד: {code}",
+      "rotate": "חדש קוד",
+      "rotateHint": "חידוש הקוד ימחק מיידית את הקוד הקודם.",
+      "rotateError": "שגיאה בחידוש קוד ההזמנה"
+    },
+    "create": {
+      "title": "יצירת בניין",
+      "subtitle": "לאחר היצירה תוכלו לשתף את קוד ההזמנה עם הדיירים.",
+      "nameLabel": "שם הבניין",
+      "addressLabel": "כתובת",
+      "cityLabel": "עיר",
+      "regionLabel": "אזור",
+      "totalUnitsLabel": "סה\"כ דירות",
+      "floorsLabel": "קומות",
+      "submit": "יצירה",
+      "close": "סגירה",
+      "errorForbidden": "נדרשת הרשאת מנהל בניין",
+      "errorGeneric": "שגיאה ביצירת הבניין",
+      "errorMissingFields": "שם, כתובת ועיר הם שדות חובה"
+    }
+  },
+  "buildingsManagerNav": {
+    "dashboard": "לוח בקרה",
+    "buildings": "בניינים",
+    "escalations": "אסקלציות",
+    "role": "מנהל בניינים",
+    "roleSuperAdmin": "מנהל-על",
+    "roleAdmin": "מנהל",
+    "myAccount": "החשבון שלי",
+    "myAccountHint": "שם, אימייל והתנתקות",
+    "profile": "חשבון",
+    "logout": "התנתקות"
+  },
+  "admin": {
+    "dashboard": {
+      "title": "ניהול מערכת",
+      "subtitle": "קיצורי דרך לכלי תפעול",
+      "buildingsManagerCard": {
+        "title": "מנהל בניינים",
+        "description": "פתיחת מסוף מנהל הבניינים — בניינים, דיירים ואסקלציות."
+      },
+      "standaloneAdminCard": {
+        "title": "ניהול תפעולי (אפליקציה נפרדת)",
+        "description": "מסוף מנהל-העל רץ בכתובת נפרדת. פתחו בלשונית חדשה כשהאפליקציה פרוסה.",
+        "cta": "פתיחת מסוף הניהול"
+      }
+    },
+    "account": {
+      "title": "חשבון",
+      "subtitle": "משתמש הניהול המחובר.",
+      "name": "שם",
+      "email": "אימייל",
+      "role": "תפקיד",
+      "signOut": "התנתקות",
+      "backToDashboard": "חזרה ללוח הבקרה"
+    }
+  },
+  "adminNav": {
+    "dashboard": "לוח בקרה",
+    "buildingsManager": "מנהל בניינים",
+    "roleSuperAdmin": "מנהל-על",
+    "roleAdmin": "מנהל",
+    "myAccount": "החשבון שלי",
+    "myAccountHint": "שם, אימייל והתנתקות",
+    "profile": "חשבון",
+    "logout": "התנתקות"
   }
 }

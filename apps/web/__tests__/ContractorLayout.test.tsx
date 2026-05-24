@@ -77,8 +77,7 @@ describe('ContractorLayout — logout navigation', () => {
   it('calls router.push("/login") after clicking the logout button', async () => {
     render(<ContractorLayout><div>page</div></ContractorLayout>);
 
-    fireEvent.click(screen.getByRole('button', { name: /accountMenu/i }));
-    fireEvent.click(screen.getByRole('button', { name: /logout/i }));
+    fireEvent.click(screen.getAllByRole('button', { name: /logout/i })[0]!);
 
     await waitFor(() => {
       expect(mockLogout).toHaveBeenCalled();

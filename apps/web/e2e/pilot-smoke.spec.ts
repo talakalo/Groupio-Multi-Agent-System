@@ -458,14 +458,14 @@ test("11. Forgot-password page — sends reset request and shows confirmation", 
   await waitForPageInteractive(page);
 
   // Heading is rendered
-  await expect(page.getByRole("heading", { name: /שכחתי סיסמה/i })).toBeVisible({ timeout: 5_000 });
+  await expect(page.getByRole("heading", { name: /שכחתי סיסמה|Forgot Password/i })).toBeVisible({ timeout: 5_000 });
 
   // Fill email and submit
   await page.fill("#forgot-email", "pilot@example.com");
-  await page.getByRole("button", { name: /שלח קישור לאיפוס/i }).click();
+  await page.getByRole("button", { name: /שלח קישור לאיפוס|Send Reset Link/i }).click();
 
   // Success state: message about email sent
-  await expect(page.getByText(/אם כתובת האימייל קיימת במערכת/i)).toBeVisible({ timeout: 8_000 });
+  await expect(page.getByText(/אם כתובת האימייל קיימת במערכת|If this email address exists/i)).toBeVisible({ timeout: 8_000 });
 });
 
 // ===========================================================================
@@ -476,9 +476,9 @@ test("12. Reset-password page — shows invalid-token error when no token provid
   await page.goto("/reset-password");
 
   // Should show "invalid link" card (no token in query string)
-  await expect(page.getByText(/קישור לא תקין/i)).toBeVisible({ timeout: 8_000 });
+  await expect(page.getByText(/קישור לא תקין|Invalid Link/i)).toBeVisible({ timeout: 8_000 });
   // Should have a link back to forgot-password
-  await expect(page.getByRole("link", { name: /בקשת קישור חדש/i })).toBeVisible();
+  await expect(page.getByRole("link", { name: /בקשת קישור חדש|Request New Link/i })).toBeVisible();
 });
 
 // ===========================================================================
@@ -489,12 +489,12 @@ test("13. Reset-password page — renders form with valid token in URL", async (
   await page.goto("/reset-password?token=fake-valid-reset-token");
 
   // Form heading is rendered
-  await expect(page.getByRole("heading", { name: /איפוס סיסמה/i })).toBeVisible({ timeout: 8_000 });
+  await expect(page.getByRole("heading", { name: /איפוס סיסמה|Reset Password/i })).toBeVisible({ timeout: 8_000 });
   // Password fields are rendered
   await expect(page.locator("#reset-password")).toBeVisible();
   await expect(page.locator("#reset-confirm-password")).toBeVisible();
   // Submit button
-  await expect(page.getByRole("button", { name: /אפס סיסמה/i })).toBeVisible();
+  await expect(page.getByRole("button", { name: /אפס סיסמה|Reset Password/i })).toBeVisible();
 });
 
 // ===========================================================================

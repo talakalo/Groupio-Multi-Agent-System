@@ -12,5 +12,6 @@ export { BuildingsManagerPage } from "./BuildingsManagerPage";
 export { LandingPage } from "./LandingPage";
 export { OnboardingPage } from "./OnboardingPage";
 export { ChangePasswordPage } from "./ChangePasswordPage";
+export { CheckoutPage } from "./CheckoutPage";
 export { VerifyEmailPage } from "./VerifyEmailPage";
 export { ContractorProfilePage } from "./ContractorProfilePage";

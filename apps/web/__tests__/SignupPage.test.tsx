@@ -2,6 +2,29 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+// ---- next-intl mock (Hebrew strings from locale files) ----
+vi.mock('next-intl', async () => {
+  const he = await import('../messages/he.json');
+  const messages = he.default ?? he;
+  const resolve =
+    (namespace: string) =>
+    (key: string): string => {
+      let node: unknown = messages;
+      for (const part of namespace.split('.')) {
+        node = (node as Record<string, unknown>)?.[part];
+      }
+      return (node as Record<string, string>)?.[key] ?? key;
+    };
+  return {
+    useTranslations: (namespace: string) => resolve(namespace),
+    useLocale: () => 'he',
+  };
+});
+
+vi.mock('@/lib/utils/unwrapPageParams', () => ({
+  useUnwrapPageParams: vi.fn(),
+}));
+
 // ---- next/navigation mock ----
 const mockPush = vi.fn();
 vi.mock('next/navigation', () => ({

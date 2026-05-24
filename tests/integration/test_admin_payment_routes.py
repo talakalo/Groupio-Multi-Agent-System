@@ -6,7 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src.api.main import app
-from src.api.middleware.auth import get_current_user, require_admin_only
+from src.api.middleware.auth import get_admin_user, get_current_user
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -27,7 +27,7 @@ def mock_admin():
 @pytest.fixture
 def admin_client(mock_admin):
     """Create test client with admin auth dependency overridden."""
-    app.dependency_overrides[require_admin_only] = lambda: mock_admin
+    app.dependency_overrides[get_admin_user] = lambda: mock_admin
     app.dependency_overrides[get_current_user] = lambda: mock_admin
     yield TestClient(app)
     app.dependency_overrides.clear()
@@ -298,6 +298,7 @@ class TestApproveContractorPayout:
     def test_approve_payout_success(self, admin_client, mock_db, mock_invoice):
         """Admin can approve a payout for a paid invoice."""
         mock_db.get_invoice = AsyncMock(return_value=mock_invoice)
+        mock_db.get_offer = AsyncMock(return_value={"id": "offer-100", "status": "completed"})
         mock_db.update_invoice = AsyncMock()
 
         response = admin_client.post("/api/v1/admin/payments/payouts/inv-100/approve")
@@ -338,6 +339,7 @@ class TestReleaseEscrow:
     def test_release_escrow_success(self, admin_client, mock_db, mock_invoice):
         """Admin can release escrow for an offer with a paid invoice."""
         mock_db.get_invoice_by_offer = AsyncMock(return_value=mock_invoice)
+        mock_db.get_offer = AsyncMock(return_value={"id": "offer-100", "status": "in_progress"})
         mock_db.update_invoice = AsyncMock()
         mock_db.update_offer = AsyncMock()
 

@@ -11,6 +11,8 @@ from src.config.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
+_REDIS_TRANSIENT_ERRORS = (redis.ConnectionError, redis.TimeoutError, OSError)
+
 
 def _normalize_redis_url(url: str) -> str:
     """Replace localhost with 127.0.0.1 to avoid IPv6 errno 99 on macOS/Linux."""
@@ -126,6 +128,14 @@ class RedisClient:
 
     # -- Rate Limiting --
 
+    async def _eval_rate_limit(self, key: str, limit: int, window: int) -> int | None:
+        """Run the rate-limit Lua script; return None when Redis is unreachable."""
+        try:
+            return int(await self._redis.eval(_RATE_LIMIT_SCRIPT, 1, key, limit, window))
+        except _REDIS_TRANSIENT_ERRORS as exc:
+            logger.warning("Redis unavailable for rate limit on %s; allowing request: %s", key, exc)
+            return None
+
     async def check_rate_limit(self, user_id: str, limit: int = 60, window: int = 60) -> bool:
         """Check if a user has exceeded their rate limit (atomic via Lua).
 
@@ -134,8 +144,10 @@ class RedisClient:
         GET and INCR in high-concurrency scenarios.
         """
         key = f"rate:{user_id}"
-        count = await self._redis.eval(_RATE_LIMIT_SCRIPT, 1, key, limit, window)
-        return int(count) <= limit
+        count = await self._eval_rate_limit(key, limit, window)
+        if count is None:
+            return True
+        return count <= limit
 
     async def check_ip_rate_limit(self, ip: str, limit: int = 20, window: int = 60) -> bool:
         """Check if an IP has exceeded the rate limit (atomic via Lua).
@@ -144,14 +156,18 @@ class RedisClient:
         Uses the same atomic Lua script as check_rate_limit.
         """
         key = f"auth_ip:{ip}"
-        count = await self._redis.eval(_RATE_LIMIT_SCRIPT, 1, key, limit, window)
-        return int(count) <= limit
+        count = await self._eval_rate_limit(key, limit, window)
+        if count is None:
+            return True
+        return count <= limit
 
     async def increment_login_failures(self, user_id: str, window: int = 900) -> int:
         """Increment failed login counter for a user. Returns new count."""
         key = f"login_fail:{user_id}"
-        count = await self._redis.eval(_RATE_LIMIT_SCRIPT, 1, key, 9999, window)
-        return int(count)
+        count = await self._eval_rate_limit(key, 9999, window)
+        if count is None:
+            return 0
+        return count
 
     async def clear_login_failures(self, user_id: str) -> None:
         """Clear the failed login counter after a successful login."""
@@ -205,7 +221,11 @@ class RedisClient:
             kwargs["ex"] = ex
         if nx:
             kwargs["nx"] = nx
-        result = await self._redis.set(key, value, **kwargs)
+        try:
+            result = await self._redis.set(key, value, **kwargs)
+        except _REDIS_TRANSIENT_ERRORS as exc:
+            logger.warning("Redis unavailable; could not set %s: %s", key, exc)
+            return False
         return result is not None
 
     async def get(self, key: str) -> str | None:

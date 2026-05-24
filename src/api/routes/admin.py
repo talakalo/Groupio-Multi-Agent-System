@@ -16,6 +16,7 @@ from src.api.middleware.auth import get_admin_user, hash_password
 from src.databases.postgres import get_postgres_client
 from src.databases.redis_client import get_redis_client
 from src.databases.vector_store import get_vector_store
+from src.models.contractor import ContractorMembershipAdminUpdate
 from src.models.user import UserInDB
 from src.orchestration.graph import get_orchestrator
 from src.rag.pipeline import get_rag_pipeline
@@ -1289,6 +1290,36 @@ async def request_contractor_docs(
     logger.info("Admin %s requested docs from contractor %s", admin.email, contractor_id)
 
     return {"status": "doc_request_sent", "contractor_id": contractor_id}
+
+
+@router.patch("/contractors/{contractor_id}/membership")
+async def admin_patch_contractor_membership(
+    contractor_id: str,
+    body: ContractorMembershipAdminUpdate,
+    request: Request,
+    admin: UserInDB = Depends(get_admin_user),
+) -> dict[str, Any]:
+    """Override contractor marketplace membership fields (manual comp, suspension, provider IDs)."""
+    db = get_postgres_client()
+    existing = await db.get_contractor(contractor_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Contractor not found")
+    patch = body.model_dump(exclude_unset=True, mode="python")
+    if not patch:
+        return existing
+    updated = await db.admin_update_contractor_membership(contractor_id, patch)
+    await db.create_audit_log(
+        {
+            "user_id": admin.id,
+            "action": "contractor_membership_update",
+            "resource_type": "contractor",
+            "resource_id": contractor_id,
+            "details": {"patch": patch, "previous_status": existing.get("membership_status")},
+            "ip_address": request.client.host if request.client else None,
+        }
+    )
+    logger.info("Admin %s updated membership for contractor %s", admin.id, contractor_id)
+    return updated
 
 
 # ---------------------------------------------------------------------------

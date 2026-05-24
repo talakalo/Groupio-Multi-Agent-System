@@ -165,7 +165,9 @@ def test_record_invite_happy_path():
     user = _make_user()
     graph = _make_graph()
     mock_db = MagicMock()
-    mock_db.get_user_by_phone = AsyncMock(return_value={"id": "invitee-99", "phone": "0501111111"})
+    invitee = MagicMock()
+    invitee.id = "invitee-99"
+    mock_db.get_user_by_phone = AsyncMock(return_value=invitee)
     mock_redis = MagicMock()
     mock_redis.set = AsyncMock(return_value=True)
 
@@ -237,7 +239,9 @@ def test_record_invite_graph_exception_returns_500():
     graph = _make_graph()
     graph.record_invite_event = AsyncMock(side_effect=RuntimeError("graph write failed"))
     mock_db = MagicMock()
-    mock_db.get_user_by_phone = AsyncMock(return_value={"id": "invitee-1"})
+    invitee = MagicMock()
+    invitee.id = "invitee-1"
+    mock_db.get_user_by_phone = AsyncMock(return_value=invitee)
     mock_redis = MagicMock()
     mock_redis.set = AsyncMock(return_value=True)
 

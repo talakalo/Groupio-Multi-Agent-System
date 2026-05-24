@@ -12,12 +12,11 @@
  * interactions and to keep tests deterministic.
  */
 
-import { type Page, type Locator, expect } from "@playwright/test";
+import { type Locator, expect } from "@playwright/test";
 
-export class CheckoutPage {
-  readonly page: Page;
+import { BasePage } from "./BasePage";
 
-  // ─── Selectors ────────────────────────────────────────────────────────────
+export class CheckoutPage extends BasePage {
 
   /** Loading spinner while payment is being initiated */
   readonly loadingSpinner: Locator;
@@ -52,34 +51,36 @@ export class CheckoutPage {
   /** "Pay" / "Submit payment" button inside the Stripe form */
   readonly stripeSubmitButton: Locator;
 
-  constructor(page: Page) {
-    this.page = page;
+  constructor(page: import("@playwright/test").Page) {
+    super(page);
 
     this.loadingSpinner = page.locator('[aria-label="loading"], .animate-spin').first();
 
-    this.successHeading = page.getByText(/התשלום בוצע בהצלחה/i);
+    this.successHeading = page.getByText(/התשלום בוצע בהצלחה|payment successful/i);
 
     this.successReceipt = page.locator(
-      ".rounded-xl.border-emerald-100, [data-testid='payment-receipt']"
+      ".rounded-xl.border-emerald-100, [data-testid='payment-receipt']",
     );
 
-    this.escrowBadge = page.getByText(/נאמנות|Escrow/i).first();
+    this.escrowBadge = page.getByText(/נאמנות|escrow/i).first();
 
-    this.errorHeading = page.getByText(/שגיאה בעיבוד התשלום/i);
+    this.errorHeading = page.getByText(/שגיאה בעיבוד התשלום|payment processing error/i);
 
     this.errorMessage = page.locator(
-      "p.text-sm.text-gray-600, [data-testid='payment-error-message']"
+      "p.text-sm.text-gray-600, [data-testid='payment-error-message']",
     );
 
-    this.retryButton = page.getByRole("button", { name: /נסה שוב/i });
+    this.retryButton = page.getByRole("button", { name: /נסה שוב|try again/i });
 
-    this.myOrdersLink = page.getByRole("link", { name: /להזמנות שלי/i });
+    this.myOrdersLink = page.getByRole("link", { name: /להזמנות שלי|my orders/i });
 
-    this.backToOfferLink = page.getByRole("link", { name: /חזרה להצעה/i });
+    this.backToOfferLink = page.getByRole("link", { name: /חזרה להצעה|back to offer/i });
 
-    this.stripePaymentForm = page.locator(
-      "[data-testid='stripe-checkout-form'], #payment-element, iframe[title*='Secure card']"
-    ).first();
+    this.stripePaymentForm = page
+      .locator(
+        "[data-testid='stripe-checkout-form'], #payment-element, iframe[title*='Secure card']",
+      )
+      .first();
 
     this.stripeSubmitButton = page.getByRole("button", { name: /שלם|אשר תשלום|pay/i });
   }
@@ -92,7 +93,8 @@ export class CheckoutPage {
    * checkout page reads via `useSearchParams`.
    */
   async goto(offerId: string): Promise<void> {
-    await this.page.goto(`/checkout?offerId=${offerId}`);
+    await super.goto(`/checkout?offerId=${offerId}`);
+    await this.waitForLoadingComplete();
   }
 
   // ─── Actions ──────────────────────────────────────────────────────────────
