@@ -1,24 +1,18 @@
 import { Users, ShieldCheck, BadgeCheck, ArrowLeft, TrendingDown } from "lucide-react";
+import { getTranslations } from "next-intl/server";
 import Link from "next/link";
 
-import {
-  PLATFORM_STATS,
-  PLATFORM_STATS_LABELS,
-} from "@/lib/constants/platformStats";
+import { PLATFORM_STATS } from "@/lib/constants/platformStats";
 
-const TRUST_BADGES = [
-  {
-    icon: Users,
-    text: `${PLATFORM_STATS.activeResidents} ${PLATFORM_STATS_LABELS.activeResidents}`,
-  },
-  { icon: ShieldCheck, text: "תשלום מוגן בנאמנות" },
-  {
-    icon: BadgeCheck,
-    text: `${PLATFORM_STATS.verifiedContractors} קבלנים מאומתים`,
-  },
-];
+export default async function HeroSection() {
+  const t = await getTranslations("landing");
 
-export default function HeroSection() {
+  const TRUST_BADGES = [
+    { icon: Users, text: `${PLATFORM_STATS.activeResidents} ${t("stats.activeResidents")}` },
+    { icon: ShieldCheck, text: t("hero.trustEscrow") },
+    { icon: BadgeCheck, text: `${PLATFORM_STATS.verifiedContractors} ${t("stats.verifiedContractors")}` },
+  ];
+
   return (
     <section className="relative pt-28 pb-20 sm:pt-36 sm:pb-28 px-4 overflow-hidden">
       <div
@@ -41,14 +35,14 @@ export default function HeroSection() {
         <div className="flex justify-center mb-6">
           <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold tracking-wide bg-white/10 text-emerald-100 border border-white/20">
             <TrendingDown className="h-3.5 w-3.5 text-emerald-300" />
-            חיסכון קבוצתי חכם לבניינים
+            {t("hero.badge")}
           </span>
         </div>
 
         <div className="text-center mb-12">
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white leading-tight mb-6 tracking-tight">
             <span className="text-balance">
-              הדיירים בבניין שלך כבר חוסכים{" "}
+              {t("hero.headline")}{" "}
               <span
                 style={{
                   background: "linear-gradient(90deg, #6ee7c0, #34d399)",
@@ -56,14 +50,13 @@ export default function HeroSection() {
                   WebkitTextFillColor: "transparent",
                 }}
               >
-                אלפי שקלים
+                {t("hero.headlineHighlight")}
               </span>
             </span>
           </h1>
 
           <p className="text-lg sm:text-xl text-emerald-100/80 max-w-2xl mx-auto leading-relaxed mb-10">
-            גרופיו מאגדת דיירים מאותו בניין לקנייה קבוצתית של שירותי תחזוקה
-            ושיפוצים — וככל שיותר שכנים מצטרפים, המחיר יורד לכולם.
+            {t("hero.subtext")}
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
@@ -71,14 +64,14 @@ export default function HeroSection() {
               href="/signup"
               className="inline-flex items-center gap-2 bg-emerald-400 hover:bg-emerald-300 text-emerald-950 font-bold text-base px-8 py-3.5 rounded-xl transition-all shadow-lg shadow-emerald-900/40 active:scale-[0.98]"
             >
-              <span>הצטרפו לבניין שלכם</span>
+              <span>{t("hero.ctaResident")}</span>
               <ArrowLeft className="h-5 w-5 rtl-flip" />
             </Link>
             <Link
               href="/signup?role=contractor"
               className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white font-semibold text-base px-8 py-3.5 rounded-xl border border-white/20 transition-all active:scale-[0.98]"
             >
-              אני קבלן
+              {t("hero.ctaContractor")}
             </Link>
           </div>
         </div>
@@ -86,26 +79,26 @@ export default function HeroSection() {
         <div className="max-w-md mx-auto rounded-2xl bg-white p-6 shadow-2xl shadow-black/30">
           <div className="flex items-center justify-between mb-4">
             <span className="text-sm font-semibold text-slate-500">
-              דוגמת חיסכון — בניין ברמת גן
+              {t("hero.sampleLabel")}
             </span>
             <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-700">
-              40% הנחה
+              {t("hero.sampleDiscount")}
             </span>
           </div>
 
-          <h3 className="text-xl font-bold text-slate-900 mb-1">איטום גג</h3>
+          <h3 className="text-xl font-bold text-slate-900 mb-1">{t("hero.sampleTitle")}</h3>
           <p className="text-sm text-slate-500 mb-5">
-            מ-₪4,800 ל-
+            {t("hero.sampleFrom")}
             <span className="font-extrabold text-emerald-600 text-base">
-              ₪2,880
+              {t("hero.samplePrice")}
             </span>{" "}
-            לדירה
+            {t("hero.samplePerUnit")}
           </p>
 
           <div className="mb-2">
             <div className="flex items-center justify-between text-xs text-slate-500 mb-2">
-              <span>18 מתוך 24 דיירים הצטרפו</span>
-              <span className="font-semibold text-emerald-600">75%</span>
+              <span>{t("hero.sampleProgress")}</span>
+              <span className="font-semibold text-emerald-600">{t("hero.samplePct")}</span>
             </div>
             <div className="w-full bg-slate-100 rounded-full h-2.5">
               <div
@@ -117,7 +110,7 @@ export default function HeroSection() {
               />
             </div>
           </div>
-          <p className="text-xs text-slate-400">עוד 6 דיירים לשלב ההנחה הבא</p>
+          <p className="text-xs text-slate-400">{t("hero.sampleMore")}</p>
         </div>
 
         <div className="flex flex-wrap items-center justify-center gap-6 mt-10">
@@ -129,7 +122,6 @@ export default function HeroSection() {
                 className="flex items-center gap-2 text-sm text-emerald-100/70"
               >
                 <Icon className="h-4 w-4 text-emerald-300" />
-                {/* dir="ltr" keeps "5,000+" reading left-to-right in RTL context */}
                 <span dir="ltr">{badge.text}</span>
               </div>
             );

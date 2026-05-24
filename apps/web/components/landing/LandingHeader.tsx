@@ -1,18 +1,20 @@
 'use client';
 
 import { Building2, Menu, X } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useState } from 'react';
 
 import { LanguageToggle } from '@/components/shared/LanguageToggle';
 
-const NAV_LINKS = [
-  { label: 'איך זה עובד', href: '#how-it-works', scroll: true },
-  { label: 'הצעות', href: '/offers', scroll: false },
-];
-
 export default function LandingHeader() {
   const [open, setOpen] = useState(false);
+  const t = useTranslations('landing.nav');
+
+  const NAV_LINKS = [
+    { label: t('howItWorks'), href: '#how-it-works', scroll: true },
+    { label: t('offers'), href: '/offers', scroll: false },
+  ];
 
   return (
     <header className="fixed top-0 right-0 left-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100">
@@ -50,10 +52,10 @@ export default function LandingHeader() {
               href="/login"
               className="text-gray-700 font-medium hover:text-primary-600 transition-colors text-sm"
             >
-              התחברות
+              {t('login')}
             </Link>
             <Link href="/signup" className="btn-primary text-sm">
-              הרשמה חינם
+              {t('signupFree')}
             </Link>
           </nav>
 
@@ -62,7 +64,7 @@ export default function LandingHeader() {
             <LanguageToggle />
             <button
               type="button"
-              aria-label={open ? 'סגור תפריט' : 'פתח תפריט'}
+              aria-label={open ? t('closeMenu') : t('openMenu')}
               aria-expanded={open}
               onClick={() => setOpen((v) => !v)}
               className="p-2 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
@@ -104,14 +106,14 @@ export default function LandingHeader() {
               onClick={() => setOpen(false)}
               className="px-3 py-2.5 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors text-sm font-medium"
             >
-              התחברות
+              {t('login')}
             </Link>
             <Link
               href="/signup"
               onClick={() => setOpen(false)}
               className="mx-3 mt-1 btn-primary text-center text-sm"
             >
-              הרשמה חינם
+              {t('signupFree')}
             </Link>
           </nav>
         </div>

@@ -12,7 +12,8 @@
     "search": "חיפוש",
     "filter": "סינון",
     "share": "שתף",
-    "close": "סגור"
+    "close": "סגור",
+    "stepOf": "שלב {current} מתוך {total}"
   },
   "auth": {
     "login": "התחברות",
@@ -24,7 +25,106 @@
     "forgotPassword": "שכחתי סיסמה",
     "iAmResident": "אני דייר",
     "iAmContractor": "אני קבלן",
-    "welcome": "ברוכים הבאים לגרופיו"
+    "welcome": "ברוכים הבאים לגרופיו",
+    "nav": {
+      "howItWorks": "איך זה עובד",
+      "offers": "הצעות",
+      "login": "התחברות",
+      "signupFree": "הרשמה חינם"
+    },
+    "layout": {
+      "tosAgreement": "בהתחברות או בהרשמה, אתם מסכימים ל",
+      "terms": "תנאי השימוש",
+      "and": " ול",
+      "privacy": "מדיניות הפרטיות"
+    },
+    "trustBadges": {
+      "escrow": "תשלום מוגן בנאמנות"
+    },
+    "loginPage": {
+      "securedBadge": "מאובטח ומוצפן",
+      "welcomeBack": "ברוכים הבאים חזרה",
+      "welcomeSubtext": "התחברו כדי להמשיך לחסוך יחד עם השכנים",
+      "byEmail": "אימייל",
+      "byPhone": "טלפון",
+      "identifierRequired": "נא להזין כתובת אימייל או מספר טלפון",
+      "identifierInvalid": "נא להזין כתובת אימייל תקינה או מספר טלפון ישראלי",
+      "passwordMinLength": "סיסמה חייבת להכיל לפחות 6 תווים",
+      "emailLabel": "כתובת אימייל",
+      "phoneLabel": "מספר טלפון",
+      "emailPlaceholder": "your@email.com",
+      "phonePlaceholder": "050-1234567",
+      "passwordLabel": "סיסמה",
+      "passwordPlaceholder": "הזינו סיסמה",
+      "forgotPassword": "שכחתי סיסמה",
+      "rememberMe": "זכור אותי",
+      "submitBtn": "התחברות",
+      "submitting": "מתחבר...",
+      "noAccount": "אין לכם חשבון?",
+      "signupFree": "הרשמו חינם לגרופיו",
+      "errorEmailNotVerified": "האימייל לא אומת. נא לבדוק את תיבת הדואר ולחצו על קישור האימות, או לשלוח קישור מחדש.",
+      "errorWrongCredentials": "אימייל או סיסמה שגויים. נסו שוב.",
+      "errorDbUnavailable": "מסד הנתונים לא זמין. נסו שוב מאוחר יותר.",
+      "errorServer": "לא ניתן להתחבר לשרת. וודא שהשירות (פורט 8000) ומסד הנתונים פועלים.",
+      "errorGeneric": "אירעה שגיאה בהתחברות. נסו שוב.",
+      "verificationSent": "נשלח אליכם קישור אימות. בדקו את תיבת הדואר.",
+      "resendFailed": "שליחת קישור נכשלה. נסו שוב מאוחר יותר.",
+      "resending": "שולח...",
+      "resendVerification": "לשלוח קישור אימות מחדש"
+    },
+    "signupPage": {
+      "joinBadge": "הצטרפו לאלפי שכנים שחוסכים",
+      "title": "הצטרפו ל-Groupio",
+      "subtext": "התחילו לחסוך עם השכנים שלכם",
+      "stepRole": "בחירת תפקיד",
+      "stepDetails": "פרטים אישיים",
+      "continueBtn": "המשך",
+      "nameRequired": "נא להזין שם מלא (לפחות 2 תווים)",
+      "emailInvalid": "נא להזין כתובת אימייל תקינה",
+      "phoneInvalid": "נא להזין מספר טלפון ישראלי תקין (למשל 0501234567)",
+      "passwordLength": "סיסמה חייבת להכיל לפחות 8 תווים",
+      "passwordUppercase": "סיסמה חייבת להכיל לפחות אות גדולה אחת",
+      "passwordNumber": "סיסמה חייבת להכיל לפחות ספרה אחת",
+      "roleResidentTitle": "דייר",
+      "roleResidentDesc": "אני דייר בבניין ומחפש להצטרף להצעות קבוצתיות",
+      "roleResidentFeature1": "גישה להצעות קבוצתיות",
+      "roleResidentFeature2": "AI חכם למציאת קבלנים",
+      "roleResidentFeature3": "מעקב חסכונות",
+      "roleContractorTitle": "קבלן",
+      "roleContractorDesc": "אני קבלן ומעוניין להציע שירותים לבניינים",
+      "roleContractorFeature1": "גישה לביקוש מוכח",
+      "roleContractorFeature2": "ניהול הצעות מחיר",
+      "roleContractorFeature3": "חשיפה לדיירים חדשים",
+      "roleManagerTitle": "מנהל בניין",
+      "roleManagerDesc": "אני מנהל בניין ורוצה לנהל את הבניין שלי",
+      "roleManagerFeature1": "ניהול דיירים וועד בית",
+      "roleManagerFeature2": "מעקב פניות ותחזוקה",
+      "roleManagerFeature3": "גישה לדוחות ומידע",
+      "fullNameLabel": "שם מלא",
+      "fullNamePlaceholder": "ישראל ישראלי",
+      "emailLabel": "כתובת אימייל",
+      "phoneLabel": "מספר טלפון",
+      "phonePlaceholder": "0501234567",
+      "passwordLabel": "סיסמה",
+      "passwordPlaceholder": "לפחות 8 תווים, אות גדולה ומספר",
+      "buildingCodeLabel": "קוד בניין (אופציונלי)",
+      "buildingCodePlaceholder": "הזינו קוד בניין אם קיבלתם מהוועד",
+      "tosText": "קראתי ומסכים/ה ל",
+      "tosLink": "תנאי השימוש",
+      "and": " ול",
+      "privacyLink": "מדיניות הפרטיות",
+      "backBtn": "חזרה",
+      "signingUp": "נרשם...",
+      "signupBtn": "הרשמה",
+      "alreadyHaveAccount": "כבר יש לכם חשבון?",
+      "loginExisting": "התחברו לחשבון קיים",
+      "errorConnection": "לא ניתן להתחבר לשרת. בדקו את החיבור לאינטרנט ונסו שוב.",
+      "errorUnavailable": "השירות לא זמין כרגע.",
+      "errorServer": "אירעה שגיאה בשרת.",
+      "errorTooManyRequests": "יותר מדי ניסיונות.",
+      "errorEmailExists": "כתובת האימייל כבר רשומה במערכת.",
+      "errorGeneric": "אירעה שגיאה בהרשמה."
+    }
   },
   "forgotPassword": {
     "title": "שכחתי סיסמה",
@@ -83,9 +183,9 @@
     "dashboard": "לוח בקרה",
     "offers": "הצעות",
     "contractors": "קבלנים",
-    "building": "הבניין",
+    "architecture": "תוכנית הדירה",
+    "building": "בניין",
     "profile": "פרופיל",
-    "payments": "תשלומים",
     "aiAssistant": "עוזר AI",
     "myAccount": "החשבון שלי"
   },
@@ -98,11 +198,7 @@
     "contractorBadge": "קבלן",
     "newOffer": "הצעה חדשה",
     "myBusiness": "העסק שלי",
-    "logout": "התנתקות",
-    "verifyEmailBanner": "נא לאמת את כתובת האימייל שלכם. בדקו את תיבת הדואר ולחצו על קישור האימות.",
-    "resendVerification": "שליחת קישור אימות מחדש",
-    "resendSending": "שולח...",
-    "resendSent": "נשלח! בדקו את האימייל."
+    "logout": "התנתקות"
   },
   "dashboard": {
     "welcome": "שלום, {name}!",
@@ -289,7 +385,21 @@
     "deleteAccountWarning": "מחיקת החשבון היא פעולה בלתי הפיכה",
     "deleteAccount": "מחק חשבון",
     "logout": "התנתקות",
-    "saved": "נשמר בהצלחה"
+    "saved": "נשמר בהצלחה",
+    "currentPasswordRequired": "נא להזין את הסיסמה הנוכחית",
+    "passwordMinLength": "הסיסמה חייבת להכיל לפחות 8 תווים",
+    "passwordUppercaseRequired": "הסיסמה חייבת להכיל אות גדולה",
+    "passwordNumberRequired": "הסיסמה חייבת להכיל ספרה",
+    "passwordMismatch": "הסיסמאות אינן תואמות",
+    "currentPasswordWrong": "הסיסמה הנוכחית שגויה",
+    "passwordUpdateFailed": "שגיאה בשינוי הסיסמה. נסו שוב.",
+    "unexpectedError": "שגיאה בלתי צפויה. נסו שוב.",
+    "passwordUpdated": "הסיסמה שונתה בהצלחה",
+    "passwordSaved": "הסיסמה החדשה שלך נשמרה.",
+    "backToProfile": "חזרה לפרופיל",
+    "passwordSubtitle": "הזינו את הסיסמה הנוכחית ואת הסיסמה החדשה",
+    "changing": "משנה...",
+    "changePasswordBtn": "שנה סיסמה"
   },
   "building": {
     "title": "הבניין",
@@ -388,7 +498,9 @@
         "sections": {
           "basicInfo": "פרטים בסיסיים",
           "pricing": "תמחור",
-          "services": "שירותים ודרישות"
+          "services": "שירותים ודרישות",
+          "details": "פרטים",
+          "target": "יעד ופרטים נוספים"
         },
         "fields": {
           "title": "כותרת",
@@ -401,7 +513,8 @@
           "maxParticipants": "מקסימום משתתפים",
           "includedServices": "שירותים כלולים",
           "requirements": "דרישות",
-          "validUntil": "תוקף עד"
+          "validUntil": "תוקף עד",
+          "timeline": "לוח זמנים"
         },
         "placeholders": {
           "title": "הכנס כותרת להצעה",
@@ -409,7 +522,8 @@
           "category": "בחר קטגוריה",
           "region": "בחר אזור",
           "buildingId": "הזן מזהה בניין",
-          "requirements": "דרישות נוספות (אופציונלי)"
+          "requirements": "דרישות נוספות (אופציונלי)",
+          "timeline": "למשל: 2-3 שבועות מרגע אישור הקבלן"
         },
         "hints": {
           "basePrice": "מחיר ליחידה. ככל שיותר משתתפים, המחיר יורד."
@@ -445,12 +559,71 @@
         "buttons": {
           "cancel": "ביטול",
           "create": "צור הצעה",
-          "creating": "יוצר..."
+          "creating": "יוצר...",
+          "back": "חזרה",
+          "next": "הבא",
+          "publish": "פרסם הצעה"
         },
         "hidePricingPreview": "הסתר תצוגת מחירים",
         "showPricingPreview": "הצג תצוגת מחירים",
         "errors": {
           "createFailed": "יצירת ההצעה נכשלה. נסה שוב."
+        },
+        "validation": {
+          "minResidents": "מינימום 1 דייר",
+          "pricePositive": "מחיר חייב להיות חיובי",
+          "titleMin": "כותרת חייבת להכיל לפחות 10 תווים",
+          "descriptionMin": "תיאור חייבת להכיל לפחות 50 תווים",
+          "categoryRequired": "יש לבחור קטגוריה",
+          "timelineRequired": "לוח זמנים נדרש",
+          "basePriceMin": "מחיר מינימלי ₪100",
+          "buildingRequired": "יש לבחור בניין",
+          "regionRequired": "אזור נדרש",
+          "minParticipantsMin": "מינימום 3 משתתפים",
+          "maxParticipantsMax": "מקסימום 100 משתתפים",
+          "validUntilRequired": "תאריך תפוגה נדרש",
+          "serviceRequired": "יש לבחור לפחות שירות אחד"
+        },
+        "steps": {
+          "0": {
+            "label": "פרטים",
+            "description": "קטגוריה, כותרת ותיאור"
+          },
+          "1": {
+            "label": "תמחור",
+            "description": "מחיר בסיס ודרגות מחיר"
+          },
+          "2": {
+            "label": "יעד",
+            "description": "בניין וקהל יעד"
+          },
+          "3": {
+            "label": "תצוגה מקדימה",
+            "description": "בדיקה לפני פרסום"
+          }
+        },
+        "pricingTiers": {
+          "label": "דרגות מחיר",
+          "add": "הוסף דרגה",
+          "fromResidentsLabel": "החל ממספר דיירים",
+          "pricePerUnitLabel": "מחיר ליחידה (₪)",
+          "removeAria": "הסר דרגת מחיר",
+          "emptyHint": "הוסיפו דרגות מחיר כדי להציע הנחה לפי גודל הקבוצה"
+        },
+        "preview": {
+          "badge": "תצוגה מקדימה",
+          "offerTitlePlaceholder": "כותרת ההצעה",
+          "description": "תיאור",
+          "noDescription": "לא הוזן תיאור",
+          "basePrice": "מחיר בסיס",
+          "minParticipants": "מינימום משתתפים",
+          "maxParticipants": "מקסימום משתתפים",
+          "validUntil": "תוקף עד",
+          "pricingTiers": "דרגות מחיר",
+          "fromResidents": "מ-{count} דיירים",
+          "includedServices": "שירותים כלולים",
+          "building": "בניין",
+          "region": "אזור"
         }
       },
       "active": {
@@ -696,27 +869,6 @@
       "refunded": "הוחזר"
     }
   },
-  "contractorNav": {
-    "dashboard": "לוח בקרה",
-    "activeOffers": "הצעות פעילות",
-    "createOffer": "צור הצעה",
-    "projects": "פרויקטים",
-    "profile": "פרופיל",
-    "contractorBadge": "קבלן",
-    "newOffer": "הצעה חדשה",
-    "myBusiness": "העסק שלי",
-    "logout": "התנתקות"
-  },
-  "residentNav": {
-    "dashboard": "לוח בקרה",
-    "offers": "הצעות",
-    "contractors": "קבלנים",
-    "architecture": "תוכנית הדירה",
-    "building": "בניין",
-    "profile": "פרופיל",
-    "aiAssistant": "עוזר AI",
-    "myAccount": "החשבון שלי"
-  },
   "architecture": {
     "title": "תוכנית הדירה שלי",
     "subtitle": "העלה תוכנית קומה וקבל המלצות שיפוץ חכמות מבוססות AI",
@@ -758,5 +910,108 @@
     },
     "tryAgain": "נסה שוב",
     "uploadAnother": "העלה תוכנית נוספת"
+  },
+  "landing": {
+    "stats": {
+      "activeResidents": "דיירים פעילים",
+      "verifiedContractors": "קבלנים מאומתים",
+      "totalSaved": "נחסכו בסך הכל",
+      "activeBuildings": "בניינים פעילים"
+    },
+    "hero": {
+      "badge": "חיסכון קבוצתי חכם לבניינים",
+      "headline": "הדיירים בבניין שלך כבר חוסכים",
+      "headlineHighlight": "אלפי שקלים",
+      "subtext": "גרופיו מאגדת דיירים מאותו בניין לקנייה קבוצתית של שירותי תחזוקה ושיפוצים — וככל שיותר שכנים מצטרפים, המחיר יורד לכולם.",
+      "ctaResident": "הצטרפו לבניין שלכם",
+      "ctaContractor": "אני קבלן",
+      "trustEscrow": "תשלום מוגן בנאמנות",
+      "sampleLabel": "דוגמת חיסכון — בניין ברמת גן",
+      "sampleDiscount": "40% הנחה",
+      "sampleTitle": "איטום גג",
+      "sampleFrom": "מ-₪4,800 ל-",
+      "samplePrice": "₪2,880",
+      "samplePerUnit": "לדירה",
+      "sampleProgress": "18 מתוך 24 דיירים הצטרפו",
+      "samplePct": "75%",
+      "sampleMore": "עוד 6 דיירים לשלב ההנחה הבא"
+    },
+    "nav": {
+      "howItWorks": "איך זה עובד",
+      "offers": "הצעות",
+      "login": "התחברות",
+      "signupFree": "הרשמה חינם",
+      "openMenu": "פתח תפריט",
+      "closeMenu": "סגור תפריט"
+    },
+    "featuredOffers": {
+      "badge": "עכשיו זמין",
+      "title": "הצעות פופולריות עכשיו",
+      "viewAll": "ראו את כל ההצעות",
+      "offer1Title": "התקנת מזגנים",
+      "offer1Subtitle": "מזגן עילי / מיני מרכזי / הכנות והתקנה",
+      "offer1Contractor": "חשמל ומיזוג פרו",
+      "offer2Title": "שדרוג מטבח קבלן",
+      "offer2Subtitle": "ארונות, שיש, אי, פירוקים ותוספות",
+      "offer2Contractor": "נגריית בוטיק ישראל",
+      "offer3Title": "מקלחונים וזכוכית",
+      "offer3Subtitle": "מקלחונים, מראות, זכוכיות וחיפויי אמבטיה",
+      "offer3Contractor": "זכוכית לבית החדש",
+      "residents": "{participants}/{total} דיירים",
+      "days": "{days} ימים"
+    },
+    "howItWorks": {
+      "badgeLabel": "שלושה שלבים פשוטים",
+      "title": "איך זה עובד?",
+      "subtitle": "מההרשמה ועד לחיסכון האמיתי — תהליך פשוט ושקוף לחלוטין",
+      "step1Title": "הצטרפו לבניין",
+      "step1Description": "הירשמו וצרפו את הבניין שלכם תוך דקה. הזמינו את השכנים להצטרף.",
+      "step2Title": "בחרו הצעה קבוצתית",
+      "step2Description": "עיינו בהצעות מקבלנים מאומתים והצטרפו לעסקה הקבוצתית שמתאימה לכם.",
+      "step3Title": "שלמו וחסכו",
+      "step3Description": "שלמו בצורה מאובטחת דרך חשבון נאמנות — הכסף משוחרר רק לאחר ביצוע העבודה.",
+      "cta": "התחילו לחסוך עכשיו"
+    },
+    "trust": {
+      "badgeLabel": "הבטחת Groupio",
+      "title": "למה לסמוך על גרופיו?",
+      "subtitle": "בנינו את הפלטפורמה עם שקיפות ואמון בלב — כך שתוכלו לחסוך בלי לדאוג",
+      "card1Title": "קבלנים מאומתים",
+      "card1Description": "כל קבלן עובר בדיקת רישיון, ביטוח ורקע לפני שהוא מתקבל לפלטפורמה.",
+      "card2Title": "תשלום מוגן בנאמנות",
+      "card2Description": "הכסף שלכם מוחזק בחשבון נאמנות ומשוחרר לקבלן רק לאחר סיום העבודה.",
+      "card3Title": "מחירים שקופים",
+      "card3Description": "ללא עמלות נסתרות. תמחור מדורג לפי מספר המשתתפים — מה שאתם רואים זה מה שאתם משלמים.",
+      "card4Title": "תמיכה מלאה",
+      "card4Description": "עוזר AI חכם זמין בכל שלב, עם אפשרות להעברה לנציג אנושי בכל רגע."
+    },
+    "contractorCTA": {
+      "badge": "לקבלנים ונותני שירות",
+      "title": "הגיעו ללקוחות חדשים",
+      "titleHighlight": "כל יום",
+      "subtext": "הצטרפו לפלטפורמה ופגשו דיירים שמחפשים בדיוק את השירות שלכם — ללא חיפוש עצמאי, ללא פרסום יקר.",
+      "step1": "הירשמו כקבלן ועברו אימות מהיר",
+      "step2": "קבלו גישה לבניינים המחפשים שירותים",
+      "step3": "הגישו הצעות מחיר ונהלו עסקאות",
+      "cta": "הצטרפו כקבלן מאומת",
+      "value1Title": "גישה לאלפי לקוחות",
+      "value1Text": "גישה למאות בניינים ואלפי דיירים פוטנציאליים",
+      "value2Title": "הכנסה יציבה",
+      "value2Text": "עסקאות בנפח גבוה עם פרויקטים חוזרים ומאובטחים",
+      "value3Title": "תג מאומת",
+      "value3Text": "תג קבלן מאומת שמגביר אמון לקוחות ומשפר המרות"
+    },
+    "footer": {
+      "about": "אודות",
+      "howItWorks": "איך זה עובד",
+      "faq": "שאלות נפוצות",
+      "contact": "צור קשר",
+      "terms": "תנאי שימוש",
+      "privacy": "מדיניות פרטיות",
+      "tagline": "הפלטפורמה לקנייה קבוצתית חכמה לבניינים בישראל — חוסכים יחד, מרוויחים יחד.",
+      "joinFree": "הצטרפו חינם",
+      "copyright": "כל הזכויות שמורות © 2026 גרופיו",
+      "madeIn": "נבנה בישראל עם אהבה"
+    }
   }
 }

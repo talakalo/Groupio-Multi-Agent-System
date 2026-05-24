@@ -1,46 +1,26 @@
 import { Users, TrendingUp, BadgeCheck, ArrowLeft, CheckCircle2 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { getTranslations } from "next-intl/server";
 import Link from "next/link";
 
-interface ValueProp {
-  icon: LucideIcon;
-  title: string;
-  text: string;
-}
+const VALUE_ICONS: LucideIcon[] = [Users, TrendingUp, BadgeCheck];
 
-const VALUE_PROPS: ValueProp[] = [
-  {
-    icon: Users,
-    title: "גישה לאלפי לקוחות",
-    text: "גישה למאות בניינים ואלפי דיירים פוטנציאליים",
-  },
-  {
-    icon: TrendingUp,
-    title: "הכנסה יציבה",
-    text: "עסקאות בנפח גבוה עם פרויקטים חוזרים ומאובטחים",
-  },
-  {
-    icon: BadgeCheck,
-    title: "תג מאומת",
-    text: "תג קבלן מאומת שמגביר אמון לקוחות ומשפר המרות",
-  },
-];
+export default async function ContractorCTA() {
+  const t = await getTranslations("landing.contractorCTA");
 
-const PROCESS_STEPS = [
-  "הירשמו כקבלן ועברו אימות מהיר",
-  "קבלו גישה לבניינים המחפשים שירותים",
-  "הגישו הצעות מחיר ונהלו עסקאות",
-];
+  const VALUE_PROPS = [
+    { icon: VALUE_ICONS[0], title: t("value1Title"), text: t("value1Text") },
+    { icon: VALUE_ICONS[1], title: t("value2Title"), text: t("value2Text") },
+    { icon: VALUE_ICONS[2], title: t("value3Title"), text: t("value3Text") },
+  ];
 
-export default function ContractorCTA() {
+  const PROCESS_STEPS = [t("step1"), t("step2"), t("step3")];
+
   return (
     <section className="py-20 sm:py-24 px-4 relative overflow-hidden">
-      {/* Background */}
       <div
         className="absolute inset-0 -z-10"
-        style={{
-          background: "linear-gradient(135deg, #093826 0%, #0e5c3a 50%, #147a5e 100%)",
-        }}
+        style={{ background: "linear-gradient(135deg, #093826 0%, #0e5c3a 50%, #147a5e 100%)" }}
       />
       <div
         className="absolute inset-0 -z-10 opacity-5"
@@ -52,20 +32,18 @@ export default function ContractorCTA() {
 
       <div className="max-w-5xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-          {/* Left: text */}
           <div>
             <span className="inline-block px-4 py-1.5 rounded-full bg-white/10 text-emerald-200 text-xs font-semibold tracking-wide mb-5 border border-white/20">
-              לקבלנים ונותני שירות
+              {t("badge")}
             </span>
             <h2 className="text-3xl sm:text-4xl font-extrabold text-white mb-5 leading-tight tracking-tight">
-              הגיעו ללקוחות חדשים<br />
-              <span className="text-emerald-300">כל יום</span>
+              {t("title")}<br />
+              <span className="text-emerald-300">{t("titleHighlight")}</span>
             </h2>
             <p className="text-emerald-100/80 text-base mb-8 leading-relaxed">
-              הצטרפו לפלטפורמה ופגשו דיירים שמחפשים בדיוק את השירות שלכם — ללא חיפוש עצמאי, ללא פרסום יקר.
+              {t("subtext")}
             </p>
 
-            {/* Process steps */}
             <div className="space-y-3 mb-8">
               {PROCESS_STEPS.map((step, idx) => (
                 <div key={idx} className="flex items-center gap-3">
@@ -79,12 +57,11 @@ export default function ContractorCTA() {
               href="/signup?role=contractor"
               className="inline-flex items-center gap-2 bg-emerald-400 hover:bg-emerald-300 text-emerald-950 font-bold text-base px-8 py-3.5 rounded-xl transition-all shadow-lg shadow-black/20 active:scale-[0.98]"
             >
-              <span>הצטרפו כקבלן מאומת</span>
+              <span>{t("cta")}</span>
               <ArrowLeft className="h-5 w-5 rtl-flip" />
             </Link>
           </div>
 
-          {/* Right: value props cards */}
           <div className="space-y-4">
             {VALUE_PROPS.map((prop) => {
               const Icon = prop.icon;

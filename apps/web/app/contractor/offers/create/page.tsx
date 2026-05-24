@@ -9,12 +9,11 @@ import {
   ArrowLeft,
   Loader2,
   Eye,
-  Users,
   Clock,
   Tag,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import { useState } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { z } from 'zod';
@@ -25,35 +24,21 @@ import { apiClient, ApiError } from '@/lib/api/client';
 import { cn } from '@/lib/utils/cn';
 import { useUnwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
 
-const pricingTierSchema = z.object({
-  minResidents: z.number().min(1, 'מינימום 1 דייר'),
-  pricePerUnit: z.number().min(1, 'מחיר חייב להיות חיובי'),
-});
-
-const createOfferSchema = z.object({
-  title: z.string().min(10, 'כותרת חייבת להכיל לפחות 10 תווים'),
-  description: z.string().min(50, 'תיאור חייב להכיל לפחות 50 תווים'),
-  category: z.string().min(1, 'יש לבחור קטגוריה'),
-  timeline: z.string().min(1, 'לוח זמנים נדרש'),
-  basePrice: z.number().min(100, 'מחיר מינימלי ₪100'),
-  pricingTiers: z.array(pricingTierSchema).optional(),
-  buildingId: z.string().min(1, 'יש לבחור בניין'),
-  region: z.string().min(1, 'אזור נדרש'),
-  minParticipants: z.number().min(3, 'מינימום 3 משתתפים'),
-  maxParticipants: z.number().max(100, 'מקסימום 100 משתתפים'),
-  validUntil: z.string().min(1, 'תאריך תפוגה נדרש'),
-  requirements: z.string().optional(),
-  includedServices: z.array(z.string()).min(1, 'יש לבחור לפחות שירות אחד'),
-});
-
-type CreateOfferForm = z.infer<typeof createOfferSchema>;
-
-const WIZARD_STEPS = [
-  { label: 'פרטים', description: 'קטגוריה, כותרת ותיאור' },
-  { label: 'תמחור', description: 'מחיר בסיס ודרגות מחיר' },
-  { label: 'יעד', description: 'בניין וקהל יעד' },
-  { label: 'תצוגה מקדימה', description: 'בדיקה לפני פרסום' },
-];
+type CreateOfferForm = {
+  title: string;
+  description: string;
+  category: string;
+  timeline: string;
+  basePrice: number;
+  pricingTiers?: { minResidents: number; pricePerUnit: number }[];
+  buildingId: string;
+  region: string;
+  minParticipants: number;
+  maxParticipants: number;
+  validUntil: string;
+  requirements?: string;
+  includedServices: string[];
+};
 
 const STEP_FIELDS: Record<number, (keyof CreateOfferForm)[]> = {
   0: ['category', 'title', 'description', 'timeline'],
@@ -65,9 +50,39 @@ const STEP_FIELDS: Record<number, (keyof CreateOfferForm)[]> = {
 export default function CreateOfferPage(props: PageParamsProps) {
   useUnwrapPageParams(props);
   const t = useTranslations('contractor.offers.create');
+  const locale = useLocale();
+  const dir = locale === 'he' ? 'rtl' : 'ltr';
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const pricingTierSchema = z.object({
+    minResidents: z.number().min(1, t('validation.minResidents')),
+    pricePerUnit: z.number().min(1, t('validation.pricePositive')),
+  });
+
+  const createOfferSchema = z.object({
+    title: z.string().min(10, t('validation.titleMin')),
+    description: z.string().min(50, t('validation.descriptionMin')),
+    category: z.string().min(1, t('validation.categoryRequired')),
+    timeline: z.string().min(1, t('validation.timelineRequired')),
+    basePrice: z.number().min(100, t('validation.basePriceMin')),
+    pricingTiers: z.array(pricingTierSchema).optional(),
+    buildingId: z.string().min(1, t('validation.buildingRequired')),
+    region: z.string().min(1, t('validation.regionRequired')),
+    minParticipants: z.number().min(3, t('validation.minParticipantsMin')),
+    maxParticipants: z.number().max(100, t('validation.maxParticipantsMax')),
+    validUntil: z.string().min(1, t('validation.validUntilRequired')),
+    requirements: z.string().optional(),
+    includedServices: z.array(z.string()).min(1, t('validation.serviceRequired')),
+  });
+
+  const WIZARD_STEPS = [
+    { label: t('steps.0.label'), description: t('steps.0.description') },
+    { label: t('steps.1.label'), description: t('steps.1.description') },
+    { label: t('steps.2.label'), description: t('steps.2.description') },
+    { label: t('steps.3.label'), description: t('steps.3.description') },
+  ];
 
   const {
     register,
@@ -95,11 +110,6 @@ export default function CreateOfferPage(props: PageParamsProps) {
     name: 'pricingTiers',
   });
 
-  // Watch only the field used in interactive steps (step 0 category chip).
-  // The preview step (step 3) reads values via getValues() — no subscription
-  // needed there since no fields are edited on that step, and avoiding the
-  // global watch() subscription prevents rapid re-renders that caused the
-  // publish button to detach from the DOM on every form-state commit.
   const watchCategory = watch('category');
 
   const categories: { id: ServiceCategory; label: string }[] = [
@@ -159,15 +169,15 @@ export default function CreateOfferPage(props: PageParamsProps) {
         max_participants: data.maxParticipants,
         deadline,
         building_id: data.buildingId,
-        pricing_tiers: (data.pricingTiers ?? []).map((t, i, arr) => {
+        pricing_tiers: (data.pricingTiers ?? []).map((tier, i, arr) => {
           const nextMin = arr[i + 1]?.minResidents;
           const discountPercent = data.basePrice > 0
-            ? Math.max(0, ((data.basePrice - t.pricePerUnit) / data.basePrice) * 100)
+            ? Math.max(0, ((data.basePrice - tier.pricePerUnit) / data.basePrice) * 100)
             : 0;
           return {
-            min_participants: t.minResidents,
+            min_participants: tier.minResidents,
             max_participants: nextMin ? nextMin - 1 : data.maxParticipants,
-            price_per_unit: t.pricePerUnit,
+            price_per_unit: tier.pricePerUnit,
             discount_percent: Math.round(discountPercent * 100) / 100,
           };
         }),
@@ -182,19 +192,8 @@ export default function CreateOfferPage(props: PageParamsProps) {
     }
   }
 
-  const CATEGORY_LABELS: Record<string, string> = {
-    ac_installation: 'התקנת מזגנים',
-    kitchen: 'מטבחים',
-    electrical: 'חשמל',
-    plumbing: 'אינסטלציה',
-    painting: 'צביעה',
-    flooring: 'ריצוף',
-    windows: 'חלונות',
-    security: 'אבטחה',
-  };
-
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl" dir="rtl">
+    <div className="container mx-auto px-4 py-8 max-w-4xl" dir={dir}>
       <header className="mb-6">
         <h1 className="text-3xl font-bold text-gray-900">{t('title')}</h1>
         <p className="text-gray-600 mt-1">{t('subtitle')}</p>
@@ -206,10 +205,10 @@ export default function CreateOfferPage(props: PageParamsProps) {
         {/* Step 1: Details */}
         {currentStep === 0 && (
           <section className="bg-white rounded-xl shadow-sm border p-6 space-y-6">
-            <h2 className="text-xl font-semibold">פרטי ההצעה</h2>
+            <h2 className="text-xl font-semibold">{t('sections.details')}</h2>
 
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              <span className="block mb-2">קטגוריה *</span>
+              <span className="block mb-2">{t('fields.category')} *</span>
               <CategoryChips
                 categories={categories}
                 selected={watchCategory}
@@ -254,14 +253,14 @@ export default function CreateOfferPage(props: PageParamsProps) {
 
             <div>
               <label htmlFor="create-timeline" className="block text-sm font-medium text-gray-700 mb-1">
-                לוח זמנים *
+                {t('fields.timeline')} *
               </label>
               <input
                 id="create-timeline"
                 type="text"
                 {...register('timeline')}
                 className="w-full rounded-lg border-gray-300 shadow-sm focus:border-sky-500 focus:ring-sky-500"
-                placeholder="למשל: 2-3 שבועות עבודה"
+                placeholder={t('placeholders.timeline')}
               />
               {errors.timeline && (
                 <p className="text-red-500 text-sm mt-1">{errors.timeline.message}</p>
@@ -273,7 +272,7 @@ export default function CreateOfferPage(props: PageParamsProps) {
         {/* Step 2: Pricing */}
         {currentStep === 1 && (
           <section className="bg-white rounded-xl shadow-sm border p-6 space-y-6">
-            <h2 className="text-xl font-semibold">תמחור</h2>
+            <h2 className="text-xl font-semibold">{t('sections.pricing')}</h2>
 
             <div>
               <label htmlFor="create-basePrice" className="block text-sm font-medium text-gray-700 mb-1">
@@ -299,7 +298,7 @@ export default function CreateOfferPage(props: PageParamsProps) {
             <div>
               <div className="flex items-center justify-between mb-3">
                 <span className="block text-sm font-medium text-gray-700">
-                  דרגות מחיר (אופציונלי)
+                  {t('pricingTiers.label')}
                 </span>
                 <button
                   type="button"
@@ -307,7 +306,7 @@ export default function CreateOfferPage(props: PageParamsProps) {
                   className="flex items-center gap-1.5 text-sm text-sky-600 hover:text-sky-700 font-medium"
                 >
                   <Plus className="h-4 w-4" />
-                  הוסף דרגה
+                  {t('pricingTiers.add')}
                 </button>
               </div>
 
@@ -319,7 +318,7 @@ export default function CreateOfferPage(props: PageParamsProps) {
                   >
                     <div className="flex-1">
                       <label htmlFor={`create-tier-min-${index}`} className="block text-xs text-gray-500 mb-1">
-                        החל מ-X דיירים
+                        {t('pricingTiers.fromResidentsLabel')}
                       </label>
                       <input
                         id={`create-tier-min-${index}`}
@@ -331,7 +330,7 @@ export default function CreateOfferPage(props: PageParamsProps) {
                     </div>
                     <div className="flex-1">
                       <label htmlFor={`create-tier-price-${index}`} className="block text-xs text-gray-500 mb-1">
-                        מחיר ליחידה (₪)
+                        {t('pricingTiers.pricePerUnitLabel')}
                       </label>
                       <input
                         id={`create-tier-price-${index}`}
@@ -345,7 +344,7 @@ export default function CreateOfferPage(props: PageParamsProps) {
                       type="button"
                       onClick={() => removeTier(index)}
                       className="p-2 text-red-400 hover:text-red-600 mt-4"
-                      aria-label="הסר דרגה"
+                      aria-label={t('pricingTiers.removeAria')}
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -353,9 +352,7 @@ export default function CreateOfferPage(props: PageParamsProps) {
                 ))}
               </div>
               {tierFields.length === 0 && (
-                <p className="text-gray-400 text-sm">
-                  ניתן להוסיף דרגות מחיר כדי לתמרץ יותר דיירים להצטרף.
-                </p>
+                <p className="text-gray-400 text-sm">{t('pricingTiers.emptyHint')}</p>
               )}
             </div>
           </section>
@@ -364,7 +361,7 @@ export default function CreateOfferPage(props: PageParamsProps) {
         {/* Step 3: Target */}
         {currentStep === 2 && (
           <section className="bg-white rounded-xl shadow-sm border p-6 space-y-6">
-            <h2 className="text-xl font-semibold">יעד ופרטים נוספים</h2>
+            <h2 className="text-xl font-semibold">{t('sections.target')}</h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -493,13 +490,13 @@ export default function CreateOfferPage(props: PageParamsProps) {
               <div className="bg-gradient-to-l from-sky-500 to-sky-600 p-6 text-white">
                 <div className="flex items-center gap-2 mb-2">
                   <Eye className="h-5 w-5" />
-                  <span className="text-sm font-medium opacity-80">תצוגה מקדימה</span>
+                  <span className="text-sm font-medium opacity-80">{t('preview.badge')}</span>
                 </div>
-                <h2 className="text-2xl font-bold">{getValues().title || 'כותרת ההצעה'}</h2>
+                <h2 className="text-2xl font-bold">{getValues().title || t('preview.offerTitlePlaceholder')}</h2>
                 <div className="flex items-center gap-3 mt-2 text-sm opacity-90">
                   {getValues().category && (
                     <span className="bg-white/20 rounded-full px-3 py-0.5">
-                      {CATEGORY_LABELS[getValues().category] ?? getValues().category}
+                      {categories.find((c) => c.id === getValues().category)?.label ?? getValues().category}
                     </span>
                   )}
                   {getValues().timeline && (
@@ -512,48 +509,45 @@ export default function CreateOfferPage(props: PageParamsProps) {
               </div>
 
               <div className="p-6 space-y-5">
-                {/* Description */}
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-500 mb-1">תיאור</h3>
+                  <h3 className="text-sm font-semibold text-gray-500 mb-1">{t('preview.description')}</h3>
                   <p className="text-gray-700 text-sm leading-relaxed">
-                    {getValues().description || 'לא הוזן תיאור'}
+                    {getValues().description || t('preview.noDescription')}
                   </p>
                 </div>
 
-                {/* Price + Participants */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="bg-gray-50 rounded-lg p-3">
-                    <p className="text-xs text-gray-500">מחיר בסיס</p>
+                    <p className="text-xs text-gray-500">{t('preview.basePrice')}</p>
                     <p className="text-lg font-bold text-gray-900">
                       ₪{(getValues().basePrice || 0).toLocaleString()}
                     </p>
                   </div>
                   <div className="bg-gray-50 rounded-lg p-3">
-                    <p className="text-xs text-gray-500">מינ׳ משתתפים</p>
+                    <p className="text-xs text-gray-500">{t('preview.minParticipants')}</p>
                     <p className="text-lg font-bold text-gray-900">
                       {getValues().minParticipants || 0}
                     </p>
                   </div>
                   <div className="bg-gray-50 rounded-lg p-3">
-                    <p className="text-xs text-gray-500">מקס׳ משתתפים</p>
+                    <p className="text-xs text-gray-500">{t('preview.maxParticipants')}</p>
                     <p className="text-lg font-bold text-gray-900">
                       {getValues().maxParticipants || 0}
                     </p>
                   </div>
                   <div className="bg-gray-50 rounded-lg p-3">
-                    <p className="text-xs text-gray-500">תוקף</p>
+                    <p className="text-xs text-gray-500">{t('preview.validUntil')}</p>
                     <p className="text-sm font-bold text-gray-900">
                       {getValues().validUntil
-                        ? new Date(getValues().validUntil).toLocaleDateString('he-IL')
+                        ? new Date(getValues().validUntil).toLocaleDateString(locale === 'he' ? 'he-IL' : 'en-US')
                         : '—'}
                     </p>
                   </div>
                 </div>
 
-                {/* Pricing Tiers */}
                 {(getValues().pricingTiers?.length ?? 0) > 0 && (
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-500 mb-2">דרגות מחיר</h3>
+                    <h3 className="text-sm font-semibold text-gray-500 mb-2">{t('preview.pricingTiers')}</h3>
                     <div className="flex flex-wrap gap-2">
                       {(getValues().pricingTiers ?? []).map((tier, idx) => (
                         <div
@@ -561,7 +555,7 @@ export default function CreateOfferPage(props: PageParamsProps) {
                           className="bg-sky-50 border border-sky-200 rounded-lg px-3 py-2 text-sm"
                         >
                           <span className="font-medium text-sky-700">
-                            מ-{tier.minResidents} דיירים
+                            {t('preview.fromResidents', { count: tier.minResidents })}
                           </span>
                           <span className="text-gray-500 mx-1">→</span>
                           <span className="font-bold text-gray-900">
@@ -573,10 +567,9 @@ export default function CreateOfferPage(props: PageParamsProps) {
                   </div>
                 )}
 
-                {/* Included Services */}
                 {getValues().includedServices && getValues().includedServices.length > 0 && (
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-500 mb-2">שירותים כלולים</h3>
+                    <h3 className="text-sm font-semibold text-gray-500 mb-2">{t('preview.includedServices')}</h3>
                     <div className="flex flex-wrap gap-2">
                       {getValues().includedServices.map((service) => (
                         <span
@@ -591,16 +584,15 @@ export default function CreateOfferPage(props: PageParamsProps) {
                   </div>
                 )}
 
-                {/* Target */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-500 mb-1">בניין</h3>
+                    <h3 className="text-sm font-semibold text-gray-500 mb-1">{t('preview.building')}</h3>
                     <p className="text-sm text-gray-700">
                       {getValues().buildingId || '—'}
                     </p>
                   </div>
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-500 mb-1">אזור</h3>
+                    <h3 className="text-sm font-semibold text-gray-500 mb-1">{t('preview.region')}</h3>
                     <p className="text-sm text-gray-700">
                       {regions.find((r) => r.value === getValues().region)?.label ?? '—'}
                     </p>
@@ -620,7 +612,7 @@ export default function CreateOfferPage(props: PageParamsProps) {
               className="flex-1 flex items-center justify-center gap-2 py-3 px-6 border border-gray-300 rounded-xl font-medium text-gray-700 hover:bg-gray-50 transition-colors"
             >
               <ArrowRight className="h-4 w-4" />
-              חזרה
+              {t('buttons.back')}
             </button>
           )}
 
@@ -640,7 +632,7 @@ export default function CreateOfferPage(props: PageParamsProps) {
               onClick={goToNextStep}
               className="flex-1 flex items-center justify-center gap-2 py-3 px-6 bg-sky-500 hover:bg-sky-600 text-white rounded-xl font-medium transition-colors"
             >
-              הבא
+              {t('buttons.next')}
               <ArrowLeft className="h-4 w-4" />
             </button>
           ) : (
@@ -656,7 +648,7 @@ export default function CreateOfferPage(props: PageParamsProps) {
                   {t('buttons.creating')}
                 </>
               ) : (
-                'פרסום הצעה'
+                t('buttons.publish')
               )}
             </button>
           )}
