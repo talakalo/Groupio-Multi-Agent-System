@@ -924,9 +924,21 @@ async def request_refund(
     if current_status in ("refunded", "failed"):
         raise HTTPException(status_code=409, detail=f"Cannot refund payment with status: {current_status}")
 
+    payment_amount = float(payment.get("amount") or 0)
+    if body.amount is not None:
+        refund_amount = float(body.amount)
+        if refund_amount <= 0:
+            raise HTTPException(status_code=400, detail="Refund amount must be greater than zero")
+        if refund_amount > payment_amount:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Refund amount ({refund_amount}) cannot exceed payment amount ({payment_amount})",
+            )
+    else:
+        refund_amount = payment_amount
+
     provider = get_payment_provider()
     transaction_id = str(payment.get("transaction_id") or payment.get("id") or "")
-    refund_amount = body.amount or payment.get("amount")
 
     try:
         if current_status == "succeeded":

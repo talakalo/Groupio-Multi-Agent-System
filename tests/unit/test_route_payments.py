@@ -347,6 +347,78 @@ class TestContractorEarnings:
             app.dependency_overrides.clear()
 
 
+class TestRequestRefund:
+    def test_refund_rejects_amount_exceeding_payment(self):
+        user = _make_user()
+        db = AsyncMock()
+        db.get_payment = AsyncMock(return_value=_make_payment(amount=1000.0, status="succeeded"))
+        db.update_payment_and_invoice_for_webhook = AsyncMock()
+
+        from src.api.main import app
+        from src.api.middleware.auth import get_current_user
+
+        app.dependency_overrides[get_current_user] = lambda: user
+        try:
+            with patch("src.api.routes.payments.get_postgres_client", return_value=db):
+                client = TestClient(app, raise_server_exceptions=False)
+                resp = client.post(
+                    "/api/v1/payments/pay-1/refund",
+                    json={"amount": 1500.0, "reason": "test"},
+                )
+            assert resp.status_code == 400
+            assert "cannot exceed" in resp.json()["detail"].lower()
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_refund_rejects_non_positive_amount(self):
+        user = _make_user()
+        db = AsyncMock()
+        db.get_payment = AsyncMock(return_value=_make_payment(amount=1000.0, status="succeeded"))
+
+        from src.api.main import app
+        from src.api.middleware.auth import get_current_user
+
+        app.dependency_overrides[get_current_user] = lambda: user
+        try:
+            with patch("src.api.routes.payments.get_postgres_client", return_value=db):
+                client = TestClient(app, raise_server_exceptions=False)
+                resp = client.post(
+                    "/api/v1/payments/pay-1/refund",
+                    json={"amount": 0, "reason": "test"},
+                )
+            assert resp.status_code == 400
+            assert "greater than zero" in resp.json()["detail"].lower()
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_refund_allows_partial_amount(self):
+        user = _make_user()
+        db = AsyncMock()
+        db.get_payment = AsyncMock(return_value=_make_payment(amount=1000.0, status="succeeded"))
+        db.update_payment_and_invoice_for_webhook = AsyncMock()
+        provider = AsyncMock()
+        provider.refund = AsyncMock(return_value={"status": "refunded", "refund_id": "re_123"})
+
+        from src.api.main import app
+        from src.api.middleware.auth import get_current_user
+
+        app.dependency_overrides[get_current_user] = lambda: user
+        try:
+            with (
+                patch("src.api.routes.payments.get_postgres_client", return_value=db),
+                patch("src.api.routes.payments.get_payment_provider", return_value=provider),
+            ):
+                client = TestClient(app, raise_server_exceptions=False)
+                resp = client.post(
+                    "/api/v1/payments/pay-1/refund",
+                    json={"amount": 250.0, "reason": "partial"},
+                )
+            assert resp.status_code == 200
+            provider.refund.assert_awaited_once_with(transaction_id="pay-1", amount=250.0)
+        finally:
+            app.dependency_overrides.clear()
+
+
 class TestStripeWebhookPaymentIntent:
     """Stripe webhook applies payment + invoice updates via a single DB helper."""
 

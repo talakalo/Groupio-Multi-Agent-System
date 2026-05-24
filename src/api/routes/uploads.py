@@ -10,7 +10,7 @@ from src.api.middleware.auth import get_current_user
 from src.databases.postgres import get_postgres_client
 from src.databases.redis_client import get_redis_client
 from src.models.user import UserInDB
-from src.services.storage import StorageError, get_storage_service
+from src.services.storage import MAX_FILE_SIZE, StorageError, get_storage_service
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +21,18 @@ router = APIRouter(tags=["uploads"])
 # throttled more aggressively to prevent abuse/DoS.
 _UPLOAD_RATE_LIMIT = 10  # requests
 _UPLOAD_RATE_WINDOW = 60  # per 60 seconds
+MAX_UPLOAD_BYTES = MAX_FILE_SIZE
+
+
+async def _read_upload_file(file: UploadFile) -> bytes:
+    """Read upload body and reject oversize files before storage processing."""
+    data = await file.read()
+    if len(data) > MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large ({len(data)} bytes). Max {MAX_UPLOAD_BYTES} bytes.",
+        )
+    return data
 
 
 async def _check_upload_rate_limit(current_user: UserInDB) -> None:
@@ -83,7 +95,7 @@ async def upload_architecture_plan(
     """Upload a floor plan / architecture document for AI analysis."""
     await _check_upload_rate_limit(current_user)
     storage = get_storage_service()
-    data = await file.read()
+    data = await _read_upload_file(file)
 
     try:
         storage.validate_file(
@@ -148,7 +160,7 @@ async def upload_contractor_doc(
     """Upload a contractor document (license, insurance, certificate)."""
     await _check_upload_rate_limit(current_user)
     storage = get_storage_service()
-    data = await file.read()
+    data = await _read_upload_file(file)
 
     try:
         storage.validate_file("contractor-docs", file.filename or "", len(data), file.content_type, file_data=data)
@@ -194,7 +206,7 @@ async def upload_avatar(
     """Upload user avatar."""
     await _check_upload_rate_limit(current_user)
     storage = get_storage_service()
-    data = await file.read()
+    data = await _read_upload_file(file)
 
     try:
         storage.validate_file("avatars", file.filename or "", len(data), file.content_type, file_data=data)
