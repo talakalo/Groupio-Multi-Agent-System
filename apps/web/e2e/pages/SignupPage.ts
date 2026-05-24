@@ -1,7 +1,5 @@
 import { type Page, expect } from "@playwright/test";
 
-import { waitForPageInteractive } from "../api/actions";
-
 import { BasePage } from "./BasePage";
 
 export class SignupPage extends BasePage {
@@ -21,14 +19,14 @@ export class SignupPage extends BasePage {
 
   async goto(): Promise<void> {
     await super.goto("/signup");
-    await waitForPageInteractive(this.page);
+    await this.waitForReady();
   }
 
   async selectResidentAndContinue(): Promise<void> {
     await expect(this.residentRoleButton).toBeVisible({ timeout: 10_000 });
     await this.residentRoleButton.click();
     await expect(this.continueButton).toBeVisible();
-    await waitForPageInteractive(this.page);
+    await this.waitForReady();
 
     for (let attempt = 0; attempt < 5; attempt++) {
       await this.continueButton.click();
@@ -55,7 +53,7 @@ export class SignupPage extends BasePage {
   }
 
   async submit(): Promise<void> {
-    await waitForPageInteractive(this.page);
+    await this.waitForReady();
     await this.submitButton.click();
   }
 
