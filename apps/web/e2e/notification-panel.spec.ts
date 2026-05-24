@@ -197,7 +197,7 @@ test.describe("NotificationPanel (mock API)", () => {
 
     await expect(
       page.getByTestId("notification-panel-dialog").getByRole("alert"),
-    ).toContainText(/לא ניתן לעדכן/);
+    ).toContainText(/לא ניתן לסמן/);
   });
 
   test("loading skeleton visible when list is slow", async ({ dashboardPage, setupAuthAndMocks }) => {

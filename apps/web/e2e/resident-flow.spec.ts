@@ -127,6 +127,23 @@ async function setupCommonMocks(page: Page) {
       body: JSON.stringify({ id: 'bld_001', address: 'רוטשילד 15', city: 'תל אביב', region: 'center', units: 24 }),
     })
   );
+
+  // Prevent notification polling from blocking networkidle
+  await page.route('**/api/v1/notifications**', (route) => {
+    const url = route.request().url();
+    if (url.includes('unread-count')) {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ count: 0 }) });
+    }
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ items: [], total: 0, limit: 50, offset: 0 }) });
+  });
+
+  await page.route('**/api/v1/auth/me', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ id: 'user_123', role: 'resident', email: 'yael.cohen@example.com', is_verified: true }),
+    })
+  );
 }
 
 // ============================================================================

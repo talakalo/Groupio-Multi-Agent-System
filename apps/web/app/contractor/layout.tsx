@@ -20,7 +20,7 @@ import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 
 import { apiClient } from '@/lib/api/client';
-import { useAuthStore } from '@/lib/stores/authStore';
+import { useAuthHasHydrated, useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
 import { NotificationPanel } from '@/components/shared/NotificationPanel';
 import { LanguageToggle } from '@/components/shared/LanguageToggle';
@@ -53,16 +53,16 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
   const [resending, setResending] = useState(false);
   const refreshAccessToken = useAuthStore((s) => s.refreshAccessToken);
   const logout = useAuthStore((s) => s.logout);
+  const hasHydrated = useAuthHasHydrated();
 
   useEffect(() => {
-    if (!token && isAuthenticated) {
+    if (!hasHydrated) return;
+    if (!token) {
       refreshAccessToken().then((success) => {
         if (!success) router.replace('/login');
       });
-    } else if (!token && !isAuthenticated) {
-      router.replace('/login');
     }
-  }, [token, isAuthenticated, router, refreshAccessToken]);
+  }, [hasHydrated, token, router, refreshAccessToken]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -76,8 +76,16 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
     }
   }, [userMenuOpen]);
 
-  if (!token && !isAuthenticated) {
+  if (!hasHydrated) {
     return null;
+  }
+
+  if (!token) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
+      </div>
+    );
   }
 
 

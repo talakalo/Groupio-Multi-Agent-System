@@ -360,7 +360,7 @@ test("9. Payments page loads and shows test-mode indicator", async ({ page }) =>
   );
 
   await page.goto("/payments");
-  await expect(page.locator("main, [data-testid='payments-page'], h1, h2, body")).toBeVisible({
+  await expect(page.locator("main, [data-testid='payments-page'], h1, h2, body").first()).toBeVisible({
     timeout: 8_000,
   });
   // Should not see a 500 error page
