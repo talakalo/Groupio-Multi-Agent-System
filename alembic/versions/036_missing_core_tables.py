@@ -85,39 +85,39 @@ def upgrade() -> None:
     op.execute("""
         CREATE POLICY orders_select_own ON orders
         FOR SELECT USING (
-            user_id = auth.uid()
+            user_id = auth.uid()::text
             OR EXISTS (
-                SELECT 1 FROM users u WHERE u.id = auth.uid() AND u.role IN ('admin','super_admin')
+                SELECT 1 FROM users u WHERE u.id = auth.uid()::text AND u.role IN ('admin','super_admin')
             )
         )
     """)
     op.execute("""
         CREATE POLICY orders_insert_own ON orders
-        FOR INSERT WITH CHECK (user_id = auth.uid())
+        FOR INSERT WITH CHECK (user_id = auth.uid()::text)
     """)
 
     op.execute("""
         CREATE POLICY support_tickets_select ON support_tickets
         FOR SELECT USING (
-            user_id = auth.uid()
+            user_id = auth.uid()::text
             OR EXISTS (
-                SELECT 1 FROM users u WHERE u.id = auth.uid() AND u.role IN ('admin','super_admin')
+                SELECT 1 FROM users u WHERE u.id = auth.uid()::text AND u.role IN ('admin','super_admin')
             )
         )
     """)
     op.execute("""
         CREATE POLICY support_tickets_insert ON support_tickets
-        FOR INSERT WITH CHECK (user_id = auth.uid())
+        FOR INSERT WITH CHECK (user_id = auth.uid()::text)
     """)
 
     op.execute("""
         CREATE POLICY contractor_documents_select ON contractor_documents
         FOR SELECT USING (
             EXISTS (
-                SELECT 1 FROM contractors c WHERE c.id = contractor_id AND c.user_id = auth.uid()
+                SELECT 1 FROM contractors c WHERE c.id = contractor_id AND c.user_id = auth.uid()::text
             )
             OR EXISTS (
-                SELECT 1 FROM users u WHERE u.id = auth.uid() AND u.role IN ('admin','super_admin')
+                SELECT 1 FROM users u WHERE u.id = auth.uid()::text AND u.role IN ('admin','super_admin')
             )
         )
     """)
@@ -125,7 +125,7 @@ def upgrade() -> None:
         CREATE POLICY contractor_documents_insert ON contractor_documents
         FOR INSERT WITH CHECK (
             EXISTS (
-                SELECT 1 FROM contractors c WHERE c.id = contractor_id AND c.user_id = auth.uid()
+                SELECT 1 FROM contractors c WHERE c.id = contractor_id AND c.user_id = auth.uid()::text
             )
         )
     """)
