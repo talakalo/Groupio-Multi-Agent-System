@@ -1496,14 +1496,42 @@ async def approve_contractor_payout(
             detail=f"Invoice status is '{invoice.get('status')}', must be 'paid' to approve payout",
         )
 
+    offer_id = invoice.get("offer_id")
+    if offer_id:
+        offer = await db.get_offer(offer_id)
+        if not offer or offer.get("status") != "completed":
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot approve payout: offer is not completed",
+            )
+
     await db.update_invoice(invoice_id, {"status": "released"})
 
     logger.info(
         "Admin %s approved payout for invoice %s (offer %s)",
         admin_user.email,
         invoice_id,
-        invoice.get("offer_id"),
+        offer_id,
     )
+
+    try:
+        await db.create_audit_log(
+            {
+                "user_id": admin_user.id if hasattr(admin_user, "id") else None,
+                "action": "payout_approved",
+                "resource_type": "invoice",
+                "resource_id": invoice_id,
+                "details": {
+                    "old_status": "paid",
+                    "new_status": "released",
+                    "offer_id": offer_id,
+                    "amount": invoice.get("total", 0),
+                    "approved_by": admin_user.email,
+                },
+            }
+        )
+    except Exception:
+        logger.exception("Failed to write payout approval audit log (non-fatal)")
 
     return {
         "status": "approved",
@@ -1539,6 +1567,17 @@ async def release_escrow(
             detail=(
                 f"Cannot release escrow: invoice status is '{current_status}'. "
                 "Escrow can only be released when status is 'paid' (all funds collected)."
+            ),
+        )
+
+    # Verify offer is in a valid work-completion state before releasing funds.
+    offer = await db.get_offer(offer_id)
+    if not offer or offer.get("status") not in ("in_progress", "completed"):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Cannot release escrow: offer status is '{offer.get('status') if offer else 'not found'}'. "
+                "Offer must be in_progress or completed before escrow can be released."
             ),
         )
 
