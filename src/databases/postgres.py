@@ -92,8 +92,7 @@ _AGENT_METRIC_COLS = "id, agent_name, metric_type, value, metadata, recorded_at"
 
 # outreach_queue
 _OUTREACH_QUEUE_COLS = (
-    "id, user_id, campaign_type, message, variant, status, "
-    "approved_by, approved_at, sent_at, created_at"
+    "id, user_id, campaign_type, message, variant, status, approved_by, approved_at, sent_at, created_at"
 )
 
 # invoices (includes columns added in migration 022 and 029)
@@ -2033,9 +2032,7 @@ class PostgresClient:
             res = await client.table("system_settings").insert(insert_payload).execute()
             return res.data[0] if res.data else insert_payload
 
-        existing = await self._pg_fetch_one(
-            f"SELECT {_SYSTEM_SETTING_COLS} FROM system_settings WHERE key = $1", key
-        )
+        existing = await self._pg_fetch_one(f"SELECT {_SYSTEM_SETTING_COLS} FROM system_settings WHERE key = $1", key)
         if existing:
             set_parts = ['"value" = $1']
             args: list[Any] = [json.dumps(value)]
@@ -2895,13 +2892,10 @@ class PostgresClient:
             "UPDATE pending_agent_decisions SET " + ", ".join(set_parts) + f" WHERE id = ${len(args)}",
             *args,
         )
-        return (
-            await self._pg_fetch_one(
-                f"SELECT {_PENDING_DECISION_COLS} FROM pending_agent_decisions WHERE id = $1",
-                decision_id,
-            )
-            or {"id": decision_id, **update_data}
-        )
+        return await self._pg_fetch_one(
+            f"SELECT {_PENDING_DECISION_COLS} FROM pending_agent_decisions WHERE id = $1",
+            decision_id,
+        ) or {"id": decision_id, **update_data}
 
     async def get_pending_decision(self, decision_id: str) -> dict[str, Any] | None:
         """Fetch a single pending decision by ID."""

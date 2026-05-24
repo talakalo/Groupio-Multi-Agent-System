@@ -1192,9 +1192,7 @@ async def get_agent_audit_entry(
         "model_used, tokens_used, latency_ms, confidence_score, requires_human_review, "
         "reasoning_chain, cited_sources, alternatives_considered, created_at"
     )
-    entry = await db._pg_fetch_one(
-        f"SELECT {agent_audit_log_cols} FROM agent_audit_log WHERE id = $1", audit_id
-    )
+    entry = await db._pg_fetch_one(f"SELECT {agent_audit_log_cols} FROM agent_audit_log WHERE id = $1", audit_id)
     if not entry:
         raise HTTPException(status_code=404, detail="Audit entry not found")
     return dict(entry)
