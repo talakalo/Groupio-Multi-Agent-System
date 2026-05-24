@@ -206,7 +206,8 @@
     "verifyEmailBanner": "Please verify your email address. Check your inbox and click the verification link.",
     "resendVerification": "Resend Verification Link",
     "resendSending": "Sending...",
-    "resendSent": "Sent! Check your email."
+    "resendSent": "Sent! Check your email.",
+    "accountMenu": "Account menu"
   },
   "dashboard": {
     "welcome": "Hello, {name}!",
@@ -466,6 +467,30 @@
     "cannotProcess": "Payment could not be processed. Please try again.",
     "unexpectedError": "An unexpected error occurred."
   },
+  "notificationPanel": {
+    "title": "Notifications",
+    "panel": "Notifications panel",
+    "markAsRead": "Mark as read",
+    "deleteNotification": "Delete notification",
+    "timeNow": "Just now",
+    "timeMinutesAgo": "{minutes} min ago",
+    "timeHoursAgo": "{hours} hr ago",
+    "networkError": "Could not load notifications",
+    "markAllError": "Could not mark all as read",
+    "markOneError": "Could not mark as read",
+    "deleteError": "Could not delete notification",
+    "clearError": "Could not clear notifications",
+    "markAllRead": "Mark all as read",
+    "markAllReadButton": "Mark all read",
+    "clearAll": "Clear all",
+    "clearAllButton": "Clear all",
+    "loginToSee": "Sign in to see notifications",
+    "loading": "Loading notifications...",
+    "retry": "Retry",
+    "empty": "No notifications yet",
+    "emptyHint": "Updates about offers and payments will appear here",
+    "count": "{count} notifications"
+  },
   "contractor": {
     "dashboard": {
       "title": "Dashboard",
@@ -491,7 +516,8 @@
       },
       "assistant": {
         "title": "AI Assistant",
-        "placeholder": "Ask me something..."
+        "placeholder": "Ask me something...",
+        "welcomeMessage": "Hi! I'm your Groupio assistant. Ask me about offers, pricing, or how to grow your business."
       },
       "activeProjects": {
         "title": "Active Projects",

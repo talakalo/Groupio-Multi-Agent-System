@@ -451,7 +451,7 @@ test.describe("Change Password Page", () => {
     await page.fill("#newPassword", "NewPassword1!");
     await page.fill("#confirmPassword", "NewPassword1!");
     await page.getByRole("button", { name: /שנה סיסמה|Change Password/i }).click();
-    await expect(page.getByText(/הסיסמה עודכנה בהצלחה|Password updated/i).first()).toBeVisible({
+    await expect(page.getByText(/הסיסמה שונתה בהצלחה|Password changed successfully/i).first()).toBeVisible({
       timeout: 15000,
     });
   });

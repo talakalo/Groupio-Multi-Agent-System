@@ -23,6 +23,7 @@ import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
 import { NotificationPanel } from '@/components/shared/NotificationPanel';
+import { LanguageToggle } from '@/components/shared/LanguageToggle';
 
 interface NavItem {
   href: string;
@@ -33,7 +34,6 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { href: '/contractor/dashboard', labelKey: 'dashboard', icon: LayoutDashboard },
   { href: '/contractor/offers/active', labelKey: 'activeOffers', icon: ClipboardList },
-  { href: '/contractor/offers/create', labelKey: 'createOffer', icon: PlusCircle },
   { href: '/contractor/projects', labelKey: 'projects', icon: FolderKanban },
   { href: '/contractor/profile', labelKey: 'profile', icon: UserCircle },
 ];
@@ -247,6 +247,7 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
             <div className="flex-1" />
 
             <div className="flex items-center gap-3">
+              <LanguageToggle />
               <NotificationPanel />
 
               <div className="relative" ref={userMenuRef}>
@@ -254,6 +255,7 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
                   type="button"
                   onClick={() => setUserMenuOpen((o) => !o)}
                   className="flex items-center gap-2 ps-3 pe-2 py-1.5 rounded-xl hover:bg-gray-100 transition-colors"
+                  aria-label={t('accountMenu')}
                   aria-expanded={userMenuOpen}
                   aria-haspopup="true"
                 >

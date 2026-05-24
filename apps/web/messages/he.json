@@ -206,7 +206,8 @@
     "verifyEmailBanner": "נא לאמת את כתובת האימייל שלכם. בדקו את תיבת הדואר ולחצו על קישור האימות.",
     "resendVerification": "שליחת קישור אימות מחדש",
     "resendSending": "שולח...",
-    "resendSent": "נשלח! בדקו את האימייל."
+    "resendSent": "נשלח! בדקו את האימייל.",
+    "accountMenu": "תפריט חשבון"
   },
   "dashboard": {
     "welcome": "שלום, {name}!",
@@ -466,6 +467,30 @@
     "cannotProcess": "לא ניתן לעבד את התשלום. נסו שוב.",
     "unexpectedError": "אירעה שגיאה בלתי צפויה."
   },
+  "notificationPanel": {
+    "title": "התראות",
+    "panel": "לוח התראות",
+    "markAsRead": "סמן כנקרא",
+    "deleteNotification": "מחק התראה",
+    "timeNow": "עכשיו",
+    "timeMinutesAgo": "לפני {minutes} דק'",
+    "timeHoursAgo": "לפני {hours} ש'",
+    "networkError": "לא ניתן לטעון התראות",
+    "markAllError": "לא ניתן לסמן הכל כנקרא",
+    "markOneError": "לא ניתן לסמן כנקרא",
+    "deleteError": "לא ניתן למחוק התראה",
+    "clearError": "לא ניתן לנקות התראות",
+    "markAllRead": "סמן הכל כנקרא",
+    "markAllReadButton": "סמן הכל",
+    "clearAll": "נקה הכל",
+    "clearAllButton": "נקה הכל",
+    "loginToSee": "התחברו כדי לראות התראות",
+    "loading": "טוען התראות...",
+    "retry": "נסה שוב",
+    "empty": "אין התראות עדיין",
+    "emptyHint": "עדכונים על הצעות ותשלומים יופיעו כאן",
+    "count": "{count} התראות"
+  },
   "contractor": {
     "dashboard": {
       "title": "לוח בקרה",
@@ -491,7 +516,8 @@
       },
       "assistant": {
         "title": "עוזר AI",
-        "placeholder": "שאל אותי משהו..."
+        "placeholder": "שאל אותי משהו...",
+        "welcomeMessage": "שלום! אני העוזר של גרופיו. שאלו אותי על הצעות, תמחור או איך לגדל את העסק."
       },
       "activeProjects": {
         "title": "פרויקטים פעילים",

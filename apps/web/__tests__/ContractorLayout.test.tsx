@@ -21,6 +21,10 @@ vi.mock('@/components/shared/NotificationPanel', () => ({
   NotificationPanel: () => React.createElement('div', { 'data-testid': 'notifications' }),
 }));
 
+vi.mock('@/components/shared/LanguageToggle', () => ({
+  LanguageToggle: () => React.createElement('div', { 'data-testid': 'language-toggle' }),
+}));
+
 // ---- Auth store — token controlled per-test ----
 let mockAccessToken: string | null = 'contractor-token';
 const mockLogout = vi.fn(() => Promise.resolve());
@@ -45,7 +49,6 @@ describe('ContractorLayout — sidebar navigation links', () => {
   const EXPECTED_HREFS = [
     '/contractor/dashboard',
     '/contractor/offers/active',
-    '/contractor/offers/create',
     '/contractor/projects',
     '/contractor/profile',
   ];
@@ -59,12 +62,12 @@ describe('ContractorLayout — sidebar navigation links', () => {
     });
   }
 
-  it('renders the quick-create offer link (/contractor/offers/create)', () => {
+  it('renders the quick-create offer link (/contractor/offers/create) in each sidebar', () => {
     render(<ContractorLayout><div>child</div></ContractorLayout>);
     const links = screen.getAllByRole('link');
     const createLinks = links.filter((l) => l.getAttribute('href') === '/contractor/offers/create');
-    // Appears in both sidebar nav and quick-create CTA
-    expect(createLinks.length).toBeGreaterThanOrEqual(1);
+    // Mobile + desktop asides both render the same sidebar content
+    expect(createLinks).toHaveLength(2);
   });
 });
 
