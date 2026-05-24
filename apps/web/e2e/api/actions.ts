@@ -106,6 +106,21 @@ export async function loginAs(
 }
 
 /**
+ * Set the HTTP-only refresh_token cookie on the web app origin.
+ * Mocked API Set-Cookie headers target localhost:8000 and do not satisfy
+ * Next.js middleware on localhost:3000 — call this after login/signup mocks.
+ */
+export async function ensureRefreshTokenCookie(page: Page): Promise<void> {
+  await page.context().addCookies([
+    {
+      name: "refresh_token",
+      value: testData.auth.refreshToken,
+      url: envConfig.baseURL,
+    },
+  ]);
+}
+
+/**
  * Remove all auth state from the browser context (simulate logout).
  */
 export async function clearAuth(page: Page): Promise<void> {

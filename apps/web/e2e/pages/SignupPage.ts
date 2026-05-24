@@ -3,8 +3,10 @@ import { type Page, expect } from "@playwright/test";
 import { BasePage } from "./BasePage";
 
 export class SignupPage extends BasePage {
-  readonly residentRoleButton = this.page.getByRole("button", { name: /^דייר / });
-  readonly continueButton = this.page.getByRole("button", { name: /^המשך$/ });
+  readonly residentRoleButton = this.page
+    .getByRole("button", { name: /^(דייר|Resident)\b/i })
+    .first();
+  readonly continueButton = this.page.getByRole("button", { name: /^(המשך|Continue)$/i });
   readonly nameInput = this.page.locator("#name");
   readonly emailInput = this.page.locator("#email");
   readonly phoneInput = this.page.locator("#phone");
@@ -23,8 +25,13 @@ export class SignupPage extends BasePage {
   }
 
   async selectResidentAndContinue(): Promise<void> {
-    await expect(this.residentRoleButton).toBeVisible({ timeout: 10_000 });
-    await this.residentRoleButton.click();
+    const residentOption = this.page.locator('button[aria-pressed="true"]').first();
+    if (await residentOption.isVisible().catch(() => false)) {
+      await expect(residentOption).toBeVisible({ timeout: 10_000 });
+    } else {
+      await expect(this.residentRoleButton).toBeVisible({ timeout: 10_000 });
+      await this.residentRoleButton.click();
+    }
     await expect(this.continueButton).toBeVisible();
     await this.waitForReady();
 

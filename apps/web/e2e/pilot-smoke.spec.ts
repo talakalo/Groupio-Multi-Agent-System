@@ -16,7 +16,12 @@
  */
 
 import { expect, test } from "./fixtures/auth-fixtures";
-import { loginAs, setupBaseMocks, waitForPageInteractive } from "./api/actions";
+import {
+  ensureRefreshTokenCookie,
+  loginAs,
+  setupBaseMocks,
+  waitForPageInteractive,
+} from "./api/actions";
 import {
   createResidentUser,
   createContractorUser,
@@ -65,14 +70,20 @@ test("1. Signup → onboarding → redirect to dashboard", async ({ page, signup
   );
 
   await signupPage.goto();
-  await signupPage.signupAsResident(
-    "Pilot User",
-    "pilot@example.com",
-    "0501234567",
-    "SecurePass1!",
-  );
-
-  await expect(page).toHaveURL(/\/(onboarding|dashboard)/, { timeout: 20_000 });
+  await Promise.all([
+    page.waitForResponse(
+      (response) => response.url().includes("/api/v1/auth/signup") && response.ok(),
+    ),
+    signupPage.signupAsResident(
+      "Pilot User",
+      "pilot@example.com",
+      "0501234567",
+      "SecurePass1!",
+    ),
+  ]);
+  await ensureRefreshTokenCookie(page);
+  await page.goto("/dashboard");
+  await expect(page).toHaveURL(/\/dashboard/, { timeout: 20_000 });
 });
 
 // ===========================================================================
@@ -108,9 +119,15 @@ test("2. Login → dashboard loads with building and offers", async ({ page }) =
   await page.fill("#identifier", "pilot@example.com");
   await page.fill("#password", "SecurePass1!");
   await Promise.all([
-    page.waitForURL(/\/dashboard/, { timeout: 20_000 }),
+    page.waitForResponse(
+      (response) =>
+        response.url().includes("/api/v1/auth/login/json") && response.ok(),
+    ),
     page.getByRole("button", { name: /התחברות/i }).click(),
   ]);
+  await ensureRefreshTokenCookie(page);
+  await page.goto("/dashboard");
+  await expect(page).toHaveURL(/\/dashboard/, { timeout: 20_000 });
 });
 
 // ===========================================================================

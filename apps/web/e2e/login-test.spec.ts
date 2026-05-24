@@ -1,5 +1,7 @@
 import { expect, test } from "./fixtures/auth-fixtures";
 
+import { ensureRefreshTokenCookie } from "./api/actions";
+
 test.describe("Login Test", () => {
   test.beforeEach(async ({ page, setupMocks }) => {
     await setupMocks();
@@ -12,7 +14,7 @@ test.describe("Login Test", () => {
     );
   });
 
-  test("should login successfully", async ({ loginPageReady, page }) => {
+  test("should login successfully", async ({ page, loginPage }) => {
     await page.route("**/api/v1/auth/login/json", (route) =>
       route.fulfill({
         status: 200,
@@ -37,12 +39,21 @@ test.describe("Login Test", () => {
       }),
     );
 
-    await loginPageReady.expectOnLoginPage();
-    await loginPageReady.login("test@example.com", "SecurePass123!");
+    await loginPage.goto();
+    await loginPage.expectOnLoginPage();
+    await Promise.all([
+      page.waitForResponse(
+        (response) =>
+          response.url().includes("/api/v1/auth/login/json") && response.ok(),
+      ),
+      loginPage.login("test@example.com", "SecurePass123!"),
+    ]);
+    await ensureRefreshTokenCookie(page);
+    await page.goto("/dashboard");
     await expect(page).toHaveURL(/\/dashboard/, { timeout: 15_000 });
   });
 
-  test("should display error message for invalid credentials", async ({ loginPageReady, page }) => {
+  test("should display error message for invalid credentials", async ({ page, loginPage }) => {
     await page.route("**/api/v1/auth/login/json", (route) =>
       route.fulfill({
         status: 401,
@@ -51,14 +62,18 @@ test.describe("Login Test", () => {
       }),
     );
 
-    await loginPageReady.expectOnLoginPage();
-    await loginPageReady.login("invalid@example.com", "invalidpassword");
-    await loginPageReady.expectError(/שגויים|invalid|credentials/i);
+    await loginPage.goto();
+    await loginPage.expectOnLoginPage();
+    await loginPage.login("invalid@example.com", "invalidpassword");
+    await loginPage.expectError(/שגויים|invalid|credentials/i);
   });
 
-  test("should navigate to signup page", async ({ loginPageReady, page }) => {
-    await loginPageReady.expectOnLoginPage();
-    await loginPageReady.signUpLink.click();
-    await expect(page).toHaveURL(/\/signup/);
+  test("should navigate to signup page", async ({ page, loginPage }) => {
+    await loginPage.goto();
+    await loginPage.expectOnLoginPage();
+    await Promise.all([
+      page.waitForURL(/\/signup/, { timeout: 10_000 }),
+      loginPage.signUpLink.click(),
+    ]);
   });
 });

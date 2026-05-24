@@ -13,9 +13,7 @@ export class LoginPage extends BasePage {
   readonly submitButton = this.page.getByRole("button", { name: /login|התחברות/i });
   readonly errorMessage = this.page.locator("form ~ div[role='alert'], form + div [role='alert']").first();
   readonly forgotPasswordLink = this.page.getByRole("link", { name: /forgot-password|שכחתי סיסמה/i });
-  readonly signUpLink = this.page
-    .getByRole("main")
-    .getByRole("link", { name: /הרשמו חינם לגרופיו|sign up free/i });
+  readonly signUpLink = this.page.locator('main a[href="/signup"]');
 
   constructor(page: Page) {
     super(page);
