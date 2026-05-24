@@ -12,10 +12,7 @@
     "search": "Search",
     "filter": "Filter",
     "share": "Share",
-    "close": "Close",
-    "closeMenu": "Close menu",
-    "openMenu": "Open menu",
-    "notifications": "Notifications"
+    "close": "Close"
   },
   "auth": {
     "login": "Log In",
@@ -29,53 +26,82 @@
     "iAmContractor": "I'm a Contractor",
     "welcome": "Welcome to Groupio"
   },
+  "forgotPassword": {
+    "title": "Forgot Password",
+    "subtitle": "Enter your email address and we will send you a password reset link.",
+    "emailLabel": "Email Address",
+    "sendButton": "Send Reset Link",
+    "sending": "Sending...",
+    "backToLogin": "Back to Login",
+    "tooManyRequests": "Too many requests. Please wait a few minutes and try again.",
+    "successTitle": "Check your inbox",
+    "successMessage": "If this email address exists in our system, a reset link will be sent within a few minutes.",
+    "successSpamNote": "Check your spam folder too. The link is valid for one hour.",
+    "backToLoginButton": "Back to Login",
+    "emailValidation": "Please enter a valid email address"
+  },
+  "resetPassword": {
+    "title": "Reset Password",
+    "subtitle": "Enter a new password for your account. The password must contain at least 8 characters, an uppercase letter, and a digit.",
+    "newPasswordLabel": "New Password",
+    "newPasswordPlaceholder": "At least 8 characters",
+    "confirmPasswordLabel": "Confirm Password",
+    "confirmPasswordPlaceholder": "Enter password again",
+    "submitButton": "Reset Password",
+    "resetting": "Resetting...",
+    "backToLogin": "Back to Login",
+    "requestNewLink": "Request New Link",
+    "invalidLinkTitle": "Invalid Link",
+    "invalidLinkMessage": "The reset link is missing or incorrect. Make sure you copied the full link from the email.",
+    "successTitle": "Password Reset Successfully!",
+    "successMessage": "Your password has been changed. Redirecting to login...",
+    "loginButton": "Log In",
+    "loading": "Loading...",
+    "errorExpired": "The link has expired or is invalid. Request a new reset link.",
+    "errorTooManyAttempts": "Too many attempts. Please wait a few minutes and try again.",
+    "errorGeneral": "An error occurred. Please try again later.",
+    "validationMinLength": "Password must be at least 8 characters",
+    "validationUppercase": "Password must include at least one uppercase letter",
+    "validationDigit": "Password must include at least one digit",
+    "validationMismatch": "Passwords do not match",
+    "invalidLinkRef": "Request New Link"
+  },
+  "verifyEmail": {
+    "pendingTitle": "Verifying your email...",
+    "pendingSubtitle": "Please wait",
+    "successTitle": "Email verified successfully",
+    "successMessage": "You can now log in to your account",
+    "proceedToLogin": "Proceed to Login",
+    "errorTitle": "Verification failed",
+    "invalidToken": "Invalid verification link.",
+    "defaultError": "Verification error. Please try again or request a new link.",
+    "backToLogin": "Back to Login",
+    "resendLink": "Resend Verification Link",
+    "loading": "Loading..."
+  },
   "residentNav": {
     "dashboard": "Dashboard",
     "offers": "Offers",
     "contractors": "Contractors",
-    "architecture": "My Home Plan",
     "building": "Building",
     "profile": "Profile",
     "payments": "Payments",
     "aiAssistant": "AI Assistant",
-    "myAccount": "My Account",
-    "myAccountHint": "Profile, notifications & preferences",
-    "accountMenu": "Account menu",
-    "logout": "Log out",
-    "orders": "My Orders",
-    "resident": "Resident"
+    "myAccount": "My Account"
   },
   "contractorNav": {
     "dashboard": "Dashboard",
     "activeOffers": "Active Offers",
     "createOffer": "Create Offer",
     "projects": "Projects",
-    "earnings": "Earnings",
     "profile": "Profile",
     "contractorBadge": "Contractor",
     "newOffer": "New Offer",
     "myBusiness": "My Business",
-    "myBusinessHint": "Details, documents & settings",
-    "accountMenu": "Account menu",
-    "logout": "Log out",
-    "contractorAccount": "Contractor Account",
-    "contractors": "Contractors"
-  },
-  "contractorEarnings": {
-    "title": "Earnings & payouts",
-    "subtitle": "Invoice totals from offers matched to you",
-    "pending": "Pending",
-    "completed": "Completed",
-    "heldEscrow": "Held in escrow",
-    "recent": "Recent invoices",
-    "empty": "No invoice data yet. When residents pay on matched offers, it will appear here.",
-    "loadError": "Could not load earnings. Try again.",
-    "retry": "Retry",
-    "offer": "Offer",
-    "status": "Status",
-    "type": "Type",
-    "amount": "Amount",
-    "paidAt": "Paid"
+    "verifyEmailBanner": "Please verify your email address. Check your inbox and click the verification link.",
+    "resendVerification": "Resend Verification Link",
+    "resendSending": "Sending...",
+    "resendSent": "Sent! Check your email."
   },
   "dashboard": {
     "welcome": "Hello, {name}!",
@@ -96,18 +122,7 @@
     "noActiveOffers": "No active offers",
     "browseOffers": "Browse Offers",
     "recentActivity": "Recent Activity",
-    "noRecentActivity": "No recent activity",
-    "errorLoadingActivity": "Error loading activity. Please try again.",
-    "messages": "Messages",
-    "contractorInquiries": "Contractor Inquiries",
-    "upcomingInstallations": "Upcoming Installations",
-    "documentsOffers": "Documents / Quotes",
-    "recentCommunications": "Recent Communications",
-    "upcoming": "Upcoming",
-    "popularOffers": "Popular Offers Now",
-    "startChat": "Start a conversation",
-    "noUpcoming": "No upcoming events",
-    "view": "View"
+    "noRecentActivity": "No recent activity"
   },
   "offers": {
     "title": "Offers",
@@ -116,11 +131,7 @@
     "expired": "Expired",
     "completed": "Completed",
     "joinOffer": "Join Offer",
-    "joining": "Joining...",
     "joined": "Joined",
-    "joinError": "Failed to join. Please try again.",
-    "alreadyJoined": "You've already joined this offer",
-    "alreadyJoinedHint": "Complete your payment to secure your spot.",
     "participants": "{count} neighbors joined",
     "discount": "{percent}% discount",
     "expiresIn": "Expires in {days} days",
@@ -144,45 +155,64 @@
     "priceMax": "Max Price",
     "noLimit": "No Limit",
     "noOffersDescription": "No offers match your search",
-    "clearFilterHint": "No offers match your search. Try clearing the filters.",
-    "discoverOffers": "Discover Offers",
     "errorLoadingOffers": "Error loading offers. Please try again.",
     "retry": "Retry",
-    "backToOffers": "Back to Offers",
-    "offerNotFound": "Offer not found",
-    "currentTier": "Current tier",
+    "home": "Home",
+    "tierLevel": "Tier {level}",
+    "currentTier": "Current Tier",
     "residents": "residents",
-    "participantsLabel": "Participants",
-    "daysRemaining": "Days remaining",
-    "currentDiscount": "Current discount",
+    "participantsLabel": "Joined",
+    "daysRemaining": "Days Left",
+    "currentDiscount": "Current Discount",
+    "shareText": "Join the group offer for {category} and save more!",
+    "linkCopied": "Link copied!",
+    "linkCopiedDescription": "Link copied to clipboard — share with your neighbors",
+    "offerNotFound": "Offer not found",
+    "backToOffers": "Back to Offers",
     "timeline": "Timeline",
-    "offerCreated": "Offer created",
-    "collectingParticipants": "Collecting participants",
-    "contractorConfirmation": "Contractor confirmation",
-    "workBegins": "Work begins",
-    "currentStage": "Current Tier",
-    "perUnit": "per unit",
-    "savingsPerUnit": "Save {amount} per unit",
-    "neighborsToNextTier": "{count} more neighbors to next tier!",
-    "maxTierReached": "You've reached the highest discount tier!",
-    "totalGroupSavings": "Total group savings",
-    "units": "units",
-    "draft": "Draft",
-    "cancelled": "Cancelled",
-    "details": "Details",
-    "categories": {
-      "ac_installation": "AC Installation",
-      "ac_maintenance": "AC Maintenance",
-      "kitchen": "Kitchen",
-      "electrical": "Electrical",
-      "plumbing": "Plumbing",
-      "heating": "Heating",
-      "renovations": "Renovations",
-      "painting": "Painting",
-      "flooring": "Flooring",
-      "windows": "Windows",
-      "security": "Security"
-    }
+    "offerCreated": "Offer Created",
+    "collectingParticipants": "Collecting Participants",
+    "contractorConfirmation": "Contractor Confirmation",
+    "workBegins": "Work Begins",
+    "joining": "Joining...",
+    "joinError": "Failed to join offer. Please try again.",
+    "joinConfirmation": {
+      "title": "Confirm Joining Offer",
+      "offerLabel": "Offer:",
+      "policyTitle": "Cancellation Policy",
+      "policyFree": "You can leave the offer freely until contractor matching — no charge.",
+      "policyAfterContractor": "After a contractor is matched — cancellation via customer support only.",
+      "policyAfterPayment": "After payment — subject to refund policy.",
+      "fullTerms": "Full Terms of Use",
+      "checkboxLabel": "I have read the cancellation policy and agree to the terms",
+      "confirmButton": "Confirm Join",
+      "cancelButton": "Cancel"
+    },
+    "savings": {
+      "title": "Your Savings",
+      "currentPerUnit": "Current savings per unit",
+      "moreNeighbors": "{count} more neighbors = savings of {amount}",
+      "maxDiscount": "You've reached the highest discount level!"
+    },
+    "joinSuccess": {
+      "title": "Joined successfully!",
+      "subtitle": "To secure your spot, please complete the payment.",
+      "proceedToPayment": "Proceed to Payment"
+    },
+    "cancellationPolicy": {
+      "title": "Cancellation Policy",
+      "item1": "You can leave the offer for free until contractor matching",
+      "item2": "After contractor approval — cancellation via customer support only",
+      "item3": "After payment — subject to refund policy",
+      "fullTerms": "Full Terms of Use"
+    },
+    "shareWithNeighborsCTA": "Share with your neighbors — the more who join, the lower the price!",
+    "pricingRationale": {
+      "summary": "How was the price calculated?",
+      "defaultText": "The price was calculated by AI based on participant count, category, and market prices."
+    },
+    "joinNow": "Join Now",
+    "trustScore": "Trust Score"
   },
   "contractors": {
     "title": "Contractors",
@@ -210,20 +240,7 @@
     "sortByTrust": "By Trust",
     "sortByExperience": "By Experience",
     "verifiedOnly": "Verified Only",
-    "noContractorsDescription": "No contractors match your search",
-    "govRegistered": "Gov Registered",
-    "reviewsHeading": "Reviews",
-    "reviewsEmpty": "No reviews yet for this contractor",
-    "reviewsError": "Could not load reviews",
-    "reviewNoComment": "Rating without comment",
-    "trustHigh": "High Trust",
-    "trustMedium": "Medium Trust",
-    "trustLow": "Low Trust",
-    "priceEstimate": "Price estimate",
-    "available": "Available",
-    "unavailable": "Unavailable",
-    "requestQuote": "Request Quote",
-    "profile": "Profile"
+    "noContractorsDescription": "No contractors match your search"
   },
   "profile": {
     "title": "Profile",
@@ -271,13 +288,7 @@
     "deleteAccountWarning": "Deleting your account is irreversible",
     "deleteAccount": "Delete Account",
     "logout": "Log Out",
-    "saved": "Saved successfully",
-    "notificationsUnsaved": "You have unsaved notification changes. Tap Save to apply.",
-    "saveFailed": "Could not save. Please try again.",
-    "passwordUpdated": "Password updated successfully",
-    "passwordUpdateFailed": "Failed to update password. Please try again.",
-    "passwordMismatch": "Passwords do not match",
-    "updating": "Updating..."
+    "saved": "Saved successfully"
   },
   "building": {
     "title": "Building",
@@ -301,23 +312,40 @@
     "city": "City",
     "buildingAge": "Building Age",
     "yearsOld": "years old",
-    "contactCommittee": "Contact Committee",
-    "municipalityVerified": "Verified Municipality",
-    "joinCodeRequired": "Please enter an invite code",
-    "noBuilding": "You are not assigned to a building yet",
-    "share": "Share",
-    "joinTitle": "Join a building",
-    "joinSubtitle": "Enter the invite code you received from the building committee.",
-    "joinCodeLabel": "Invite code",
-    "joinCodePlaceholder": "e.g. ABC12345",
-    "joinSubmit": "Join",
-    "joining": "Joining...",
-    "joinSuccess": "Joined successfully!",
-    "joinSuccessSubtitle": "You can now browse your building's group offers.",
-    "joinGoToBuilding": "Go to building",
-    "joinNoCode": "Don't have a code?",
-    "joinBack": "Back to building",
-    "joinErrorGeneric": "Failed to join building"
+    "contactCommittee": "Contact Committee"
+  },
+  "checkout": {
+    "breadcrumbOffers": "Offers",
+    "breadcrumbPayment": "Payment",
+    "breadcrumbNav": "Navigation",
+    "loadingPayment": "Preparing secure payment...",
+    "loadingStripeForm": "Loading secure payment form...",
+    "completePayment": "Complete Payment",
+    "securityFooter": "Secured with Stripe — card details are not stored on Groupio's servers",
+    "escrowProtection": "Payment is protected in escrow (Escrow) — funds are released to the contractor only after you confirm completion of the work.",
+    "orderSummary": "Order Summary",
+    "subtotal": "Price before VAT",
+    "vat": "VAT {percent}%",
+    "total": "Total to pay",
+    "creditCardTitle": "Credit Card Payment",
+    "successTitle": "Payment successful!",
+    "successEmailNote": "You will receive a confirmation email shortly.",
+    "paid": "Paid",
+    "myOrders": "My Orders",
+    "backToOffer": "Back to Offer",
+    "shareOfferTitle": "Groupio — Join the group offer!",
+    "shareCopied": "Link copied!",
+    "shareWithNeighbors": "Share with Neighbors",
+    "moreNeighborsTip": "More neighbors = bigger discount for everyone!",
+    "errorTitle": "Payment Processing Error",
+    "errorRetry": "Try Again",
+    "errorMyPayments": "My Payments",
+    "missingOfferId": "No offer ID specified. Go back to the offers page and select an offer.",
+    "alreadyPaid": "You have already paid for this offer. You can view it in your payment history.",
+    "offerNotFound": "Offer not found. It may have ended.",
+    "unknownError": "An unknown error occurred",
+    "cannotProcess": "Payment could not be processed. Please try again.",
+    "unexpectedError": "An unexpected error occurred."
   },
   "contractor": {
     "dashboard": {
@@ -344,8 +372,7 @@
       },
       "assistant": {
         "title": "AI Assistant",
-        "placeholder": "Ask me something...",
-        "welcomeMessage": "Hello! I'm the Groupio assistant. I can help you manage offers, check pricing, and track projects."
+        "placeholder": "Ask me something..."
       },
       "activeProjects": {
         "title": "Active Projects",
@@ -464,34 +491,9 @@
     "profile": {
       "title": "Business Profile",
       "subtitle": "Manage your business details and documents",
-      "tabs": {
-        "info": "Business information",
-        "documents": "Documents",
-        "settings": "Settings"
-      },
       "trustScore": {
         "title": "Trust Score",
-        "description": "Your trust score affects your ranking in offers",
-        "scoreLabels": {
-          "excellent": "Excellent",
-          "good": "Good",
-          "needsImprovement": "Needs improvement"
-        },
-        "categories": {
-          "documents": "Documents",
-          "insurance": "Insurance",
-          "rating": "Rating",
-          "responseTime": "Response time"
-        },
-        "tips": {
-          "insurance": "Keep insurance up to date",
-          "profile": "Complete your profile",
-          "response": "Reply quickly to customers",
-          "reviews": "Collect positive reviews"
-        },
-        "yourTrustScore": "Your Trust Score",
-        "scoreBreakdown": "Score Breakdown",
-        "improvementTips": "Improvement Tips"
+        "description": "Your trust score affects your ranking in offers"
       },
       "sections": {
         "business": "Business Details",
@@ -511,25 +513,6 @@
         "categories": "Categories",
         "regions": "Regions"
       },
-      "categories": {
-        "ac_installation": "AC Installation",
-        "kitchen": "Kitchen",
-        "electrical": "Electrical",
-        "plumbing": "Plumbing",
-        "painting": "Painting",
-        "flooring": "Flooring",
-        "windows": "Windows",
-        "security": "Security"
-      },
-      "regions": {
-        "center": "Center",
-        "tel_aviv": "Tel Aviv",
-        "jerusalem": "Jerusalem",
-        "north": "North",
-        "south": "South",
-        "sharon": "Sharon",
-        "shfela": "Shfela"
-      },
       "documents": {
         "requestBannerTitle": "Additional documents requested",
         "license": "License",
@@ -546,54 +529,13 @@
       },
       "settings": {
         "notifications": "Notifications",
-        "notificationsHint": "Choose how we may contact you about new leads and offers.",
-        "notificationsSave": "Save notification preferences",
-        "notificationsSaving": "Saving…",
-        "notificationsSaved": "Preferences saved.",
-        "notificationsSaveError": "Could not save preferences. Try again.",
         "emailOffers": "Email offers",
         "smsOffers": "SMS offers",
         "whatsappOffers": "WhatsApp offers",
         "availability": "Availability",
         "acceptingOffers": "Accepting new offers",
-        "membershipTitle": "Marketplace membership",
-        "membershipDescription": "An active subscription is required to publish offers on Groupio. Secure payment is processed by Stripe.",
-        "membershipStatusLabel": "Status",
-        "membershipPeriodEnd": "Current period ends",
-        "membershipNextBilling": "Next billing",
-        "membershipSubscribe": "Subscribe or renew with Stripe",
-        "membershipStatusLoading": "Loading membership status…",
-        "membershipCheckoutLoading": "Opening checkout…",
-        "membershipCheckoutError": "Could not start checkout. Check that billing is configured or try again later.",
-        "membershipLoadError": "Could not load membership status.",
-        "membershipSuccessBanner": "Payment received. Your membership will update shortly.",
-        "membershipCanceledBanner": "Checkout was canceled. You can try again when ready.",
-        "membershipStates": {
-          "active": "Active",
-          "trialing": "Trial",
-          "renewal": "Renewal",
-          "past_due": "Past due",
-          "grace": "Grace period",
-          "canceled": "Canceled",
-          "expired": "Expired",
-          "inactive": "No active subscription",
-          "unknown": "Unknown"
-        },
         "dangerZone": "Danger Zone",
         "deactivate": "Deactivate account"
-      },
-      "vetting": {
-        "documentSubmission": "Document submission",
-        "documentSubmissionDesc": "Upload required business documents.",
-        "licenseCheck": "License verification",
-        "licenseCheckDesc": "We verify your business license.",
-        "insuranceCheck": "Insurance check",
-        "insuranceCheckDesc": "We verify your liability insurance.",
-        "finalVerification": "Final verification",
-        "finalVerificationDesc": "Manual review before full approval.",
-        "statusComplete": "Complete",
-        "statusFailed": "Failed",
-        "statusInProgress": "In progress"
       },
       "save": "Save",
       "saving": "Saving...",
@@ -624,9 +566,6 @@
       "completedAt": "Completed",
       "viewDetails": "View Details",
       "requestReview": "Request Review",
-      "requestReviewLoading": "Sending…",
-      "requestReviewSuccess": "Review request sent. Our team will follow up.",
-      "requestReviewError": "Could not send request. Try again.",
       "statuses": {
         "draft": "Draft",
         "pending": "Pending",
@@ -637,136 +576,6 @@
         "cancelled": "Cancelled",
         "active": "Active"
       }
-    }
-  },
-  "buildingsManagerNav": {
-    "dashboard": "Dashboard",
-    "buildings": "Buildings",
-    "escalations": "Escalations",
-    "role": "Buildings manager",
-    "roleSuperAdmin": "Super admin",
-    "roleAdmin": "Admin",
-    "myAccount": "My account",
-    "myAccountHint": "Name, email & sign out",
-    "accountMenu": "Account menu",
-    "profile": "Account",
-    "logout": "Log out"
-  },
-  "buildingsManager": {
-    "dashboard": {
-      "title": "Buildings overview",
-      "subtitle": "Monitor buildings, residents, offers, and open escalations",
-      "stats": {
-        "totalBuildings": "Total buildings",
-        "totalResidents": "Total residents",
-        "activeOffers": "Active offers",
-        "openEscalations": "Open escalations"
-      },
-      "viewAll": "View all",
-      "recentBuildings": "Recent buildings",
-      "openEscalations": "Open escalations",
-      "noBuildings": "No buildings yet",
-      "noEscalations": "No open escalations",
-      "units": "units",
-      "open": "open"
-    },
-    "buildings": {
-      "title": "Buildings",
-      "total": "{count, plural, =0 {No buildings} one {# building} other {# buildings}}",
-      "searchPlaceholder": "Search by name or city…",
-      "noResults": "No buildings match your search",
-      "empty": "No buildings to show",
-      "units": "{count, plural, one {# unit} other {# units}}",
-      "activeOffers": "{count, plural, =0 {No active offers} one {# active offer} other {# active offers}}",
-      "createCta": "Create building",
-      "inviteCta": "Share invite code"
-    },
-    "escalations": {
-      "title": "Escalations",
-      "total": "{count, plural, =0 {No escalations} one {# escalation} other {# escalations}}",
-      "filters": {
-        "allStatuses": "All statuses",
-        "open": "Open",
-        "inProgress": "In progress",
-        "resolved": "Resolved",
-        "allPriorities": "All priorities",
-        "critical": "Critical",
-        "high": "High",
-        "medium": "Medium",
-        "low": "Low"
-      },
-      "empty": "No escalations match your filters",
-      "resolve": "Resolve",
-      "resolving": "Resolving…"
-    },
-    "account": {
-      "title": "Account",
-      "subtitle": "Your signed-in user for this console.",
-      "name": "Name",
-      "email": "Email",
-      "role": "Role",
-      "signOut": "Sign out",
-      "backToDashboard": "Back to dashboard"
-    },
-    "invite": {
-      "label": "Invite code",
-      "copy": "Copy",
-      "copied": "Copied!",
-      "share": "Share",
-      "shareMessage": "Join {buildingName} with code: {code}",
-      "rotate": "Rotate code",
-      "rotateHint": "Rotating the code will immediately invalidate the previous one.",
-      "rotateError": "Failed to rotate invite code"
-    },
-    "create": {
-      "title": "Create a building",
-      "subtitle": "Once created, you can share the invite code with residents.",
-      "nameLabel": "Building name",
-      "addressLabel": "Address",
-      "cityLabel": "City",
-      "regionLabel": "Region",
-      "totalUnitsLabel": "Total units",
-      "floorsLabel": "Floors",
-      "submit": "Create",
-      "close": "Close",
-      "errorForbidden": "Buildings manager / admin role required",
-      "errorGeneric": "Failed to create building",
-      "errorMissingFields": "Name, address and city are required"
-    }
-  },
-  "adminNav": {
-    "dashboard": "Dashboard",
-    "buildingsManager": "Buildings manager",
-    "roleSuperAdmin": "Super admin",
-    "roleAdmin": "Admin",
-    "myAccount": "My account",
-    "myAccountHint": "Name, email & sign out",
-    "accountMenu": "Account menu",
-    "profile": "Account",
-    "logout": "Log out"
-  },
-  "admin": {
-    "dashboard": {
-      "title": "Admin home",
-      "subtitle": "Shortcuts to operational tools",
-      "buildingsManagerCard": {
-        "title": "Buildings manager",
-        "description": "Open the buildings manager console for buildings, residents, and escalations."
-      },
-      "standaloneAdminCard": {
-        "title": "Operations admin (separate app)",
-        "description": "Super-admin console runs on its own URL. Open it in a new tab when your team has deployed the admin app.",
-        "cta": "Open admin app"
-      }
-    },
-    "account": {
-      "title": "Account",
-      "subtitle": "Your signed-in admin user.",
-      "name": "Name",
-      "email": "Email",
-      "role": "Role",
-      "signOut": "Sign out",
-      "backToDashboard": "Back to dashboard"
     }
   },
   "onboarding": {
@@ -849,87 +658,6 @@
     "payNow": "Pay Now",
     "total": "Total"
   },
-  "orders": {
-    "title": "My Orders",
-    "subtitle": "Track your orders, payments and work",
-    "refresh": "Refresh",
-    "refreshAriaLabel": "Refresh orders",
-    "tabActive": "Active",
-    "tabCompleted": "Completed",
-    "tabAll": "All",
-    "loading": "Loading orders...",
-    "loadError": "Could not load orders. Please try again.",
-    "retry": "Try again",
-    "emptyActive": "No active orders",
-    "emptyCompleted": "No completed orders",
-    "emptyAll": "No orders yet",
-    "emptyHint": "Orders will appear after joining an offer and paying",
-    "discoverOffers": "Discover offers",
-    "offerFallback": "Offer #{id}",
-    "escrowBadge": "Your payments are escrow-protected.",
-    "escrowExplainer": "Groupio holds the funds until the work is done. Money is released to the contractor only after admin approval.",
-    "escrowActive": "Your payment is held in escrow. Funds will be released to the contractor after work completion and admin approval.",
-    "escrowSupport": "If there's an issue, contact support",
-    "reportProblem": "Report a problem",
-    "invoices": "Invoices",
-    "writeReview": "Write a review",
-    "reviewSent": "Review submitted!",
-    "reviewTitle": "Rate {name}",
-    "reviewPlaceholder": "Share your experience (optional)...",
-    "reviewSubmit": "Submit review",
-    "reviewCancel": "Cancel",
-    "reviewSelectRating": "Please select a rating",
-    "reviewError": "Failed to submit review",
-    "starAriaLabel": "{n} stars",
-    "ratingAriaLabel": "Rating",
-    "timeline": {
-      "joined": "Joined offer",
-      "paid": "Payment held in escrow",
-      "scheduled": "Work scheduled",
-      "done": "Work completed",
-      "released": "Payment released to contractor",
-      "orderCreated": "Order created",
-      "paymentReceived": "Payment received",
-      "contractorApproved": "Contractor approved",
-      "workInProgress": "Work in progress",
-      "workCompleted": "Work completed"
-    },
-    "status": {
-      "pending": "Awaiting payment",
-      "processing": "Processing",
-      "succeeded": "Paid — in escrow",
-      "released": "Completed",
-      "failed": "Failed",
-      "refunded": "Refunded"
-    },
-    "detail": {
-      "breadcrumbHome": "Home",
-      "breadcrumbOrders": "Orders",
-      "defaultTitle": "Order",
-      "orderStatus": "Order Status",
-      "category": "Category: {value}",
-      "transactionId": "Transaction ID: {id}",
-      "contractorDetails": "Contractor Details",
-      "approveTitle": "Approve Work Completion",
-      "approveDescription": "Once you confirm work completion, funds will be released from escrow to the contractor. This action is irreversible.",
-      "approveButton": "Approve Work & Release Payment",
-      "approving": "Approving...",
-      "approveError": "Error approving work. Please try again.",
-      "approvedBanner": "Work approved! Funds will be released to the contractor.",
-      "invoiceDownload": "Download invoice (HTML for PDF print)",
-      "invoiceDownloading": "Downloading…",
-      "invoiceError": "Could not download the invoice",
-      "loadError": "Could not load order details",
-      "backToOrders": "← Back to Orders",
-      "backToPayments": "Back to Payments",
-      "escrow": {
-        "held": "Funds held in escrow",
-        "released": "Funds released to contractor",
-        "refunded": "Funds refunded to you",
-        "pending": "Pending"
-      }
-    }
-  },
   "payments": {
     "title": "My Payments",
     "subtitle": "Track your payments, invoices, and active projects",
@@ -966,6 +694,27 @@
       "failed": "Failed",
       "refunded": "Refunded"
     }
+  },
+  "contractorNav": {
+    "dashboard": "Dashboard",
+    "activeOffers": "Active Offers",
+    "createOffer": "Create Offer",
+    "projects": "Projects",
+    "profile": "Profile",
+    "contractorBadge": "Contractor",
+    "newOffer": "New Offer",
+    "myBusiness": "My Business",
+    "logout": "Log out"
+  },
+  "residentNav": {
+    "dashboard": "Dashboard",
+    "offers": "Offers",
+    "contractors": "Contractors",
+    "architecture": "My Home Plan",
+    "building": "Building",
+    "profile": "Profile",
+    "aiAssistant": "AI Assistant",
+    "myAccount": "My Account"
   },
   "architecture": {
     "title": "My Home Plan",
@@ -1008,29 +757,5 @@
     },
     "tryAgain": "Try again",
     "uploadAnother": "Upload another plan"
-  },
-  "notificationPanel": {
-    "title": "Notifications",
-    "panel": "Notification panel",
-    "markAllRead": "Mark all as read",
-    "markAllReadButton": "Mark",
-    "clearAll": "Clear all notifications",
-    "clearAllButton": "Clear",
-    "markAsRead": "Mark as read",
-    "deleteNotification": "Delete notification",
-    "loginToSee": "Log in to see server notifications",
-    "loading": "Loading…",
-    "retry": "Retry",
-    "empty": "No notifications",
-    "emptyHint": "Updates on offers and activity will appear here",
-    "count": "{count} notifications",
-    "networkError": "Network error",
-    "markAllError": "Could not mark all as read. Try again.",
-    "markOneError": "Could not update notification. Try again.",
-    "deleteError": "Could not delete notification. Try again.",
-    "clearError": "Could not clear notifications. Try again.",
-    "timeNow": "Just now",
-    "timeMinutesAgo": "{minutes} minutes ago",
-    "timeHoursAgo": "{hours} hours ago"
   }
 }

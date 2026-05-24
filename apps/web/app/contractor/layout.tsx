@@ -3,7 +3,6 @@
 import {
   LayoutDashboard,
   FolderKanban,
-  Wallet,
   UserCircle,
   Menu,
   X,
@@ -20,11 +19,10 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 
-import { LanguageToggle } from '@/components/shared/LanguageToggle';
-import { NotificationPanel } from '@/components/shared/NotificationPanel';
 import { apiClient } from '@/lib/api/client';
-import { useAuthHasHydrated, useAuthStore } from '@/lib/stores/authStore';
+import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
+import { NotificationPanel } from '@/components/shared/NotificationPanel';
 
 interface NavItem {
   href: string;
@@ -35,15 +33,10 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { href: '/contractor/dashboard', labelKey: 'dashboard', icon: LayoutDashboard },
   { href: '/contractor/offers/active', labelKey: 'activeOffers', icon: ClipboardList },
+  { href: '/contractor/offers/create', labelKey: 'createOffer', icon: PlusCircle },
   { href: '/contractor/projects', labelKey: 'projects', icon: FolderKanban },
-  { href: '/contractor/earnings', labelKey: 'earnings', icon: Wallet },
+  { href: '/contractor/profile', labelKey: 'profile', icon: UserCircle },
 ];
-
-const ALLOWED_CONTRACTOR_ROLES = new Set(['contractor', 'admin', 'super_admin']);
-const ROLE_DEFAULT_ROUTES: Record<string, string> = {
-  resident: '/dashboard',
-  buildings_manager: '/buildings-manager/dashboard',
-};
 
 export default function ContractorLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -60,24 +53,16 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
   const [resending, setResending] = useState(false);
   const refreshAccessToken = useAuthStore((s) => s.refreshAccessToken);
   const logout = useAuthStore((s) => s.logout);
-  const hasHydrated = useAuthHasHydrated();
 
   useEffect(() => {
-    if (!hasHydrated) return;
-    if (!token) {
+    if (!token && isAuthenticated) {
       refreshAccessToken().then((success) => {
         if (!success) router.replace('/login');
       });
+    } else if (!token && !isAuthenticated) {
+      router.replace('/login');
     }
-  }, [hasHydrated, token, router, refreshAccessToken]);
-
-  useEffect(() => {
-    if (!hasHydrated) return;
-    if (!isAuthenticated || !user?.role) return;
-    if (!ALLOWED_CONTRACTOR_ROLES.has(user.role)) {
-      router.replace(ROLE_DEFAULT_ROUTES[user.role] || '/login');
-    }
-  }, [hasHydrated, isAuthenticated, user?.role, router]);
+  }, [token, isAuthenticated, router, refreshAccessToken]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -91,21 +76,10 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
     }
   }, [userMenuOpen]);
 
-  if (!hasHydrated) {
+  if (!token && !isAuthenticated) {
     return null;
   }
 
-  if (!token) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
-      </div>
-    );
-  }
-
-  if (isAuthenticated && user?.role && !ALLOWED_CONTRACTOR_ROLES.has(user.role)) {
-    return null;
-  }
 
   const handleLogout = async () => {
     try {
@@ -117,7 +91,6 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
   };
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
-  const profileActive = isActive('/contractor/profile');
 
   const sidebar = (
     <nav className="flex flex-col h-full">
@@ -163,36 +136,22 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
         </Link>
       </div>
 
-      {/* Business profile shortcut (not logout — use header menu for sign out) */}
+      {/* User section */}
       <div className="border-t border-gray-100 px-4 py-4">
-        <Link
-          href="/contractor/profile"
-          onClick={() => setSidebarOpen(false)}
-          className={cn(
-            'flex items-center gap-3 w-full text-start text-sm transition-colors rounded-xl px-2 py-2 -mx-2',
-            profileActive
-              ? 'bg-primary-50 text-primary-700 hover:bg-primary-50'
-              : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-          )}
-          aria-label={t('myBusiness')}
-          aria-current={profileActive ? 'page' : undefined}
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="flex items-center gap-3 w-full text-start text-sm text-gray-600 hover:text-gray-900 transition-colors"
+          aria-label={t('logout')}
         >
-          <div
-            className={cn(
-              'w-8 h-8 rounded-full flex items-center justify-center',
-              profileActive ? 'bg-primary-100' : 'bg-accent-100'
-            )}
-          >
-            <Building2
-              className={cn('h-5 w-5', profileActive ? 'text-primary-600' : 'text-accent-600')}
-              aria-hidden
-            />
+          <div className="w-8 h-8 rounded-full bg-accent-100 flex items-center justify-center">
+            <UserCircle className="h-5 w-5 text-accent-600" />
           </div>
           <div className="flex-1 min-w-0">
             <p className="font-medium text-gray-900 truncate">{t('myBusiness')}</p>
-            <p className="text-xs text-gray-500 truncate">{t('myBusinessHint')}</p>
           </div>
-        </Link>
+          <LogOut className="h-4 w-4 text-gray-400" />
+        </button>
       </div>
     </nav>
   );
@@ -241,10 +200,10 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
           >
             <div className="flex items-center gap-2 text-amber-800 text-sm">
               <Mail className="h-4 w-4 flex-shrink-0" aria-hidden />
-              <span>נא לאמת את כתובת האימייל שלכם. בדקו את תיבת הדואר ולחצו על קישור האימות.</span>
+              <span>{t('verifyEmailBanner')}</span>
             </div>
             {resendSent ? (
-              <span className="text-emerald-700 text-sm font-medium">נשלח! בדקו את האימייל.</span>
+              <span className="text-emerald-700 text-sm font-medium">{t('resendSent')}</span>
             ) : (
               <button
                 type="button"
@@ -263,10 +222,10 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
                 {resending ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    שולח...
+                    {t('resendSending')}
                   </>
                 ) : (
-                  'שליחת קישור אימות מחדש'
+                  t('resendVerification')
                 )}
               </button>
             )}
@@ -288,7 +247,6 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
             <div className="flex-1" />
 
             <div className="flex items-center gap-3">
-              <LanguageToggle />
               <NotificationPanel />
 
               <div className="relative" ref={userMenuRef}>
@@ -296,7 +254,6 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
                   type="button"
                   onClick={() => setUserMenuOpen((o) => !o)}
                   className="flex items-center gap-2 ps-3 pe-2 py-1.5 rounded-xl hover:bg-gray-100 transition-colors"
-                  aria-label={t('accountMenu')}
                   aria-expanded={userMenuOpen}
                   aria-haspopup="true"
                 >
