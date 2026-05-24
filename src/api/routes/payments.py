@@ -423,7 +423,7 @@ async def initiate_payment(
     charge_tax: float = existing_invoice.get("tax_amount", round(charge_subtotal * VAT_RATE, 2))
     charge_total: float = existing_invoice.get("amount", round(charge_subtotal + charge_tax, 2))
 
-    payment_data = {
+    payment_data: dict[str, Any] = {
         "id": payment_id,
         "user_id": current_user.id,
         "offer_id": request.offer_id,

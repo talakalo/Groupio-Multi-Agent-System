@@ -491,7 +491,7 @@ class GovDataClient:
                 name_rehov = _normalize_hebrew(rec.get(FLD_NAME_REHOV))
                 score = fuzz.partial_ratio(_normalize_hebrew(street_norm), name_rehov)
                 if score > best_score:
-                    best_score = score
+                    best_score = int(score)
                     best_rec = rec
 
             if best_rec and best_score >= STREET_FUZZY_THRESHOLD:

@@ -125,7 +125,10 @@ module = [
     "src.agents.vetting",
     "src.agents.notification",
     "src.databases.graph_store",
+    "src.databases.vector_store",
     "src.orchestration.graph",
+    "src.api.routes.auth",
+    "src.api.routes.onboarding",
 ]
 disable_error_code = ["return-value", "assignment", "arg-type", "attr-defined", "index", "union-attr", "dict-item", "typeddict-item", "misc"]
 

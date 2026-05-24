@@ -223,7 +223,7 @@ class ToolRegistry:
                 source=source,
                 verified=verified,
                 confidence=confidence,
-                raw_response=raw_response,
+                raw_response=raw_response or {},
             )
         except Exception as exc:
             logger.warning("Failed to persist verification for contractor %s: %s", contractor_id, exc)

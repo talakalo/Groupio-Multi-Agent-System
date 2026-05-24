@@ -123,6 +123,15 @@ _PENDING_DECISION_COLS = (
     "status, decided_by, decision_note, decided_at, created_at"
 )
 
+# outbox_events
+_OUTBOX_EVENT_COLS = "id, routing_key, event_name, payload, idempotency_key, status, created_at, processed_at"
+
+# notifications
+_NOTIFICATION_COLS = "id, user_id, type, title, body, data, read, read_at, created_at"
+
+# crm_external_refs
+_CRM_EXTERNAL_REF_COLS = "id, entity_type, entity_id, crm_entity_type, crm_id, updated_at"
+
 logger = logging.getLogger(__name__)
 
 
@@ -2927,6 +2936,218 @@ class PostgresClient:
             if isinstance(val, dict) and "v" in val:
                 return str(val["v"])
         return None
+
+    # ------------------------------------------------------------------
+    # Outbox / messaging
+    # ------------------------------------------------------------------
+
+    async def insert_outbox_event(
+        self,
+        routing_key: str,
+        event_name: str,
+        payload: dict[str, Any],
+        idempotency_key: str | None = None,
+        conn: Any | None = None,
+    ) -> str | None:
+        row = await self._pg_fetch_one(
+            "INSERT INTO outbox_events (routing_key, event_name, payload, idempotency_key, status)"
+            " VALUES ($1, $2, $3::jsonb, $4, 'pending') RETURNING id",
+            routing_key,
+            event_name,
+            json.dumps(payload),
+            idempotency_key,
+        )
+        return str(row["id"]) if row else None
+
+    async def fetch_pending_outbox_events(self, limit: int = 50) -> list[dict[str, Any]]:
+        rows = await self._pg_fetch_all(
+            f"SELECT {_OUTBOX_EVENT_COLS} FROM outbox_events WHERE status = 'pending' ORDER BY created_at LIMIT $1",
+            limit,
+        )
+        return [dict(r) for r in rows]
+
+    # ------------------------------------------------------------------
+    # Notifications
+    # ------------------------------------------------------------------
+
+    async def list_notifications(
+        self,
+        user_id: str,
+        limit: int = 50,
+        offset: int = 0,
+        unread_only: bool = False,
+    ) -> tuple[list[dict[str, Any]], int]:
+        where = "user_id = $1" + (" AND read = FALSE" if unread_only else "")
+        rows = await self._pg_fetch_all(
+            f"SELECT {_NOTIFICATION_COLS} FROM notifications WHERE {where} ORDER BY created_at DESC LIMIT $2 OFFSET $3",
+            user_id,
+            limit,
+            offset,
+        )
+        count_row = await self._pg_fetch_one(f"SELECT COUNT(*) AS n FROM notifications WHERE {where}", user_id)
+        total = int(count_row["n"]) if count_row else 0
+        return [dict(r) for r in rows], total
+
+    async def get_unread_notification_count(self, user_id: str) -> int:
+        row = await self._pg_fetch_one(
+            "SELECT COUNT(*) AS n FROM notifications WHERE user_id = $1 AND read = FALSE", user_id
+        )
+        return int(row["n"]) if row else 0
+
+    async def mark_all_notifications_read(self, user_id: str) -> None:
+        await self._pg_execute(
+            "UPDATE notifications SET read = TRUE, read_at = NOW() WHERE user_id = $1 AND read = FALSE",
+            user_id,
+        )
+
+    async def mark_notification_read(self, notification_id: str, user_id: str) -> bool:
+        row = await self._pg_fetch_one(
+            "UPDATE notifications SET read = TRUE, read_at = NOW() WHERE id = $1 AND user_id = $2 RETURNING id",
+            notification_id,
+            user_id,
+        )
+        return row is not None
+
+    # ------------------------------------------------------------------
+    # Payments — additional helpers
+    # ------------------------------------------------------------------
+
+    async def list_payments_for_user_paginated(
+        self,
+        user_id: str,
+        page: int = 1,
+        page_size: int = 20,
+        status: str | None = None,
+    ) -> tuple[list[dict[str, Any]], int]:
+        offset = (page - 1) * page_size
+        args: list[Any] = [user_id]
+        where = "user_id = $1"
+        if status:
+            args.append(status)
+            where += f" AND status = ${len(args)}"
+        rows = await self._pg_fetch_all(
+            f"SELECT {_PAYMENT_COLS} FROM payments WHERE {where}"
+            f" ORDER BY created_at DESC LIMIT ${len(args) + 1} OFFSET ${len(args) + 2}",
+            *args,
+            page_size,
+            offset,
+        )
+        count_row = await self._pg_fetch_one(f"SELECT COUNT(*) AS n FROM payments WHERE {where}", *args)
+        total = int(count_row["n"]) if count_row else 0
+        return [dict(r) for r in rows], total
+
+    async def list_invoices_for_contractor(self, contractor_id: str) -> list[dict[str, Any]]:
+        rows = await self._pg_fetch_all(
+            f"SELECT {_INVOICE_COLS} FROM invoices WHERE contractor_id = $1 ORDER BY created_at DESC",
+            contractor_id,
+        )
+        return [dict(r) for r in rows]
+
+    async def get_payment_by_idempotency_key(self, user_id: str, key: str) -> dict[str, Any] | None:
+        row = await self._pg_fetch_one(
+            f"SELECT {_PAYMENT_COLS} FROM payments WHERE user_id = $1 AND idempotency_key = $2 LIMIT 1",
+            user_id,
+            key,
+        )
+        return dict(row) if row else None
+
+    async def count_succeeded_payments_for_invoice(self, invoice_id: str) -> int:
+        row = await self._pg_fetch_one(
+            "SELECT COUNT(*) AS n FROM payments WHERE invoice_id = $1 AND status = 'succeeded'",
+            invoice_id,
+        )
+        return int(row["n"]) if row else 0
+
+    async def try_claim_stripe_webhook_event(self, event_id: str) -> bool:
+        """Insert idempotency record; returns False if the event was already processed."""
+        try:
+            await self._pg_execute(
+                "INSERT INTO stripe_webhook_events (event_id, processed_at) VALUES ($1, NOW())",
+                event_id,
+            )
+            return True
+        except Exception:
+            return False
+
+    async def update_payment_and_invoice_for_webhook(
+        self,
+        payment_id: str,
+        invoice_id: str | None,
+        payment_status: str,
+        invoice_status: str | None,
+    ) -> None:
+        await self._pg_execute(
+            "UPDATE payments SET status = $1, updated_at = NOW() WHERE id = $2",
+            payment_status,
+            payment_id,
+        )
+        if invoice_id and invoice_status:
+            await self._pg_execute(
+                "UPDATE invoices SET status = $1, updated_at = NOW() WHERE id = $2",
+                invoice_status,
+                invoice_id,
+            )
+
+    # ------------------------------------------------------------------
+    # Contractor verification
+    # ------------------------------------------------------------------
+
+    async def upsert_contractor_verification(
+        self,
+        contractor_id: str,
+        source: str,
+        verified: bool,
+        confidence: float,
+        raw_response: dict[str, Any],
+    ) -> None:
+        await self._pg_execute(
+            "INSERT INTO contractor_verification_metadata"
+            " (contractor_id, source, verified, confidence, raw_response, verified_at)"
+            " VALUES ($1, $2, $3, $4, $5::jsonb, NOW())"
+            " ON CONFLICT (contractor_id, source)"
+            " DO UPDATE SET verified = EXCLUDED.verified,"
+            "               confidence = EXCLUDED.confidence,"
+            "               raw_response = EXCLUDED.raw_response,"
+            "               verified_at = NOW()",
+            contractor_id,
+            source,
+            verified,
+            confidence,
+            json.dumps(raw_response),
+        )
+
+    # ------------------------------------------------------------------
+    # CRM external refs
+    # ------------------------------------------------------------------
+
+    async def get_crm_external_ref(self, entity_type: str, entity_id: str) -> dict[str, Any] | None:
+        row = await self._pg_fetch_one(
+            f"SELECT {_CRM_EXTERNAL_REF_COLS} FROM crm_external_refs WHERE entity_type = $1 AND entity_id = $2 LIMIT 1",
+            entity_type,
+            entity_id,
+        )
+        return dict(row) if row else None
+
+    async def upsert_crm_external_ref(
+        self,
+        entity_type: str,
+        entity_id: str,
+        crm_entity_type: str,
+        crm_id: str,
+    ) -> None:
+        await self._pg_execute(
+            "INSERT INTO crm_external_refs"
+            " (entity_type, entity_id, crm_entity_type, crm_id, updated_at)"
+            " VALUES ($1, $2, $3, $4, NOW())"
+            " ON CONFLICT (entity_type, entity_id)"
+            " DO UPDATE SET crm_entity_type = EXCLUDED.crm_entity_type,"
+            "               crm_id = EXCLUDED.crm_id,"
+            "               updated_at = NOW()",
+            entity_type,
+            entity_id,
+            crm_entity_type,
+            crm_id,
+        )
 
     async def health_check(self) -> bool:
         """Check if PostgreSQL is accessible."""

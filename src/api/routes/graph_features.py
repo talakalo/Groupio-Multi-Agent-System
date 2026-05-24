@@ -70,7 +70,7 @@ async def record_invite(
     if not invitee:
         raise HTTPException(status_code=404, detail="Invitee not found — must be a registered resident")
 
-    invitee_id = invitee["id"]
+    invitee_id = invitee.id
     graph = get_graph_store()
 
     try:
