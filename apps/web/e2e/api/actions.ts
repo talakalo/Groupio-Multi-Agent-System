@@ -25,11 +25,23 @@ import testData from "../config/test-data.json";
 // ─── App Navigation ──────────────────────────────────────────────────────────
 
 /**
+ * Wait until Next.js client components have hydrated so form handlers fire
+ * instead of native HTML GET submissions.
+ */
+export async function waitForPageInteractive(page: Page): Promise<void> {
+  await page.waitForLoadState("domcontentloaded");
+  await page.locator("main").first().waitFor({ state: "visible", timeout: 15_000 });
+  await page
+    .waitForLoadState("networkidle", { timeout: 20_000 })
+    .catch(() => undefined);
+}
+
+/**
  * Navigate to the app root (or a specific path) and wait for it to be ready.
  */
 export async function openApp(page: Page, path = "/"): Promise<void> {
   await page.goto(`${envConfig.baseURL}${path}`);
-  await page.waitForLoadState("networkidle");
+  await waitForPageInteractive(page);
 }
 
 // ─── Authentication ──────────────────────────────────────────────────────────

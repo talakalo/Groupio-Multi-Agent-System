@@ -162,6 +162,13 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // Admin shortcut — redirect after auth/role checks (more reliable than client-only redirect).
+  if (pathname === '/admin/buildings' && ['admin', 'super_admin'].includes(userRole)) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/buildings-manager/buildings';
+    return NextResponse.redirect(url);
+  }
+
   // Add locale header for i18n
   const response = NextResponse.next();
   response.headers.set('x-locale', locale);

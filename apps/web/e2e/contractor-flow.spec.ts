@@ -1,4 +1,4 @@
-import { test, expect } from "./api/test";
+import { expect, test } from "./fixtures/auth-fixtures";
 import type { Page } from "@playwright/test";
 
 /**
@@ -123,7 +123,7 @@ async function setupContractorAuth(page: Page) {
 // ============================================================================
 
 test.describe("Contractor Dashboard", () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, dashboardPage }) => {
     await setupCommonMocks(page);
     await setupContractorAuth(page);
 
@@ -162,10 +162,11 @@ test.describe("Contractor Dashboard", () => {
         body: JSON.stringify({ items: MOCK_CONTRACTOR_OFFERS, offers: MOCK_CONTRACTOR_OFFERS }),
       })
     );
+
+    await dashboardPage.gotoContractor();
   });
 
   test("should display contractor dashboard with stats", async ({ page }) => {
-    await page.goto("/contractor/dashboard");
 
     // Wait for dashboard to load — heading then stat value in main content
     await expect(page.getByRole("heading", { name: "לוח בקרה" })).toBeVisible({ timeout: 5000 });
@@ -173,7 +174,6 @@ test.describe("Contractor Dashboard", () => {
   });
 
   test("should navigate to create offer", async ({ page }) => {
-    await page.goto("/contractor/dashboard");
 
     // Sidebar or quick action link to create offer
     const createLink = page.locator('a[href="/contractor/offers/create"]');
@@ -184,7 +184,6 @@ test.describe("Contractor Dashboard", () => {
   });
 
   test("should navigate to active offers", async ({ page }) => {
-    await page.goto("/contractor/dashboard");
 
     const offersLink = page.locator('a[href="/contractor/offers/active"]');
     if (await offersLink.first().isVisible()) {
@@ -212,8 +211,8 @@ test.describe("Contractor Create Offer Flow", () => {
     );
   });
 
-  test("should display offer creation form", async ({ page }) => {
-    await page.goto("/contractor/offers/create");
+  test("should display offer creation form", async ({ page, offersPage }) => {
+    await offersPage.gotoCreateOffer();
 
     // Step 1 of the wizard shows category chips + title/description; basePrice
     // lives on Step 2 ("תמחור") and is not in the DOM until we advance. Keep
@@ -224,7 +223,7 @@ test.describe("Contractor Create Offer Flow", () => {
     await expect(page.getByRole("button", { name: "מטבחים", exact: true })).toBeVisible();
   });
 
-  test("should fill in and submit offer form", async ({ page }) => {
+  test("should fill in and submit offer form", async ({ page, offersPage }) => {
     test.setTimeout(60000);
     await page.route("**/api/v1/offers", (route) => {
       if (route.request().method() === "POST") {
@@ -261,7 +260,7 @@ test.describe("Contractor Create Offer Flow", () => {
       })
     );
 
-    await page.goto("/contractor/offers/create");
+    await offersPage.gotoCreateOffer();
     await expect(page).toHaveURL(/contractor\/offers\/create/, { timeout: 20000 });
     await page.waitForLoadState("domcontentloaded");
 
@@ -341,8 +340,8 @@ test.describe("Contractor Manage Offers", () => {
     );
   });
 
-  test("should display active offers list", async ({ page }) => {
-    await page.goto("/contractor/offers/active");
+  test("should display active offers list", async ({ page, offersPage }) => {
+    await offersPage.gotoActiveOffers();
     await page.waitForLoadState("domcontentloaded");
 
     await expect(page.locator("main")).toBeVisible({ timeout: 15000 });
@@ -353,8 +352,8 @@ test.describe("Contractor Manage Offers", () => {
     await expect(page.locator("main h1").first()).toBeVisible({ timeout: 30000 });
   });
 
-  test("should have filter controls", async ({ page }) => {
-    await page.goto("/contractor/offers/active");
+  test("should have filter controls", async ({ page, offersPage }) => {
+    await offersPage.gotoActiveOffers();
     await page.waitForLoadState("domcontentloaded");
 
     // Wait for the layout to fully render before looking for filter controls.
@@ -390,8 +389,8 @@ test.describe("Contractor Projects", () => {
     );
   });
 
-  test("should display projects page", async ({ page }) => {
-    await page.goto("/contractor/projects");
+  test("should display projects page", async ({ page, dashboardPage }) => {
+    await dashboardPage.gotoContractorProjects();
 
     await expect(page.locator("h1, h2").first()).toBeVisible({ timeout: 10000 });
   });
@@ -441,8 +440,8 @@ test.describe("Contractor Profile Settings", () => {
     );
   });
 
-  test("should display profile settings page", async ({ page }) => {
-    await page.goto("/contractor/profile");
+  test("should display profile settings page", async ({ page, contractorProfilePage }) => {
+    await contractorProfilePage.goto();
 
     // Profile page renders with tabs
     await expect(page.locator("h1, h2").first()).toBeVisible({ timeout: 10000 });

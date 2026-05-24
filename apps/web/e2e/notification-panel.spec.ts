@@ -1,20 +1,21 @@
-import { setupAuthAndMocks, setupDefaultNotificationMocks } from "./api/actions";
-import { test, expect } from "./api/test";
+import { setupDefaultNotificationMocks } from "./api/actions";
+import { expect, test } from "./fixtures/auth-fixtures";
 import { createMockResponse } from "./helpers/factory.util";
 
 test.describe("NotificationPanel (mock API)", () => {
-  test("empty state when there are no notifications", async ({ page }) => {
-    await setupAuthAndMocks(page, "resident", { skipDefaultNotifications: true });
-    await setupDefaultNotificationMocks(page);
+  test("empty state when there are no notifications", async ({ dashboardPage, setupAuthAndMocks }) => {
+    await setupAuthAndMocks("resident", { skipDefaultNotifications: true });
+    await setupDefaultNotificationMocks(dashboardPage.rawPage);
 
-    await page.goto("/dashboard");
-    await page.getByTestId("notification-panel-trigger").click();
-    await expect(page.getByTestId("notification-panel-dialog")).toBeVisible();
-    await expect(page.getByTestId("notification-panel-empty")).toBeVisible();
+    await dashboardPage.goto();
+    await dashboardPage.rawPage.getByTestId("notification-panel-trigger").click();
+    await expect(dashboardPage.rawPage.getByTestId("notification-panel-dialog")).toBeVisible();
+    await expect(dashboardPage.rawPage.getByTestId("notification-panel-empty")).toBeVisible();
   });
 
-  test("shows unread badge, list, mark one read, and mark all read", async ({ page }) => {
-    await setupAuthAndMocks(page, "resident", { skipDefaultNotifications: true });
+  test("shows unread badge, list, mark one read, and mark all read", async ({ dashboardPage, setupAuthAndMocks }) => {
+    await setupAuthAndMocks("resident", { skipDefaultNotifications: true });
+    const page = dashboardPage.rawPage;
 
     const item = {
       id: "n1",
@@ -59,7 +60,7 @@ test.describe("NotificationPanel (mock API)", () => {
       );
     });
 
-    await page.goto("/dashboard");
+    await dashboardPage.goto();
     await page.getByTestId("notification-panel-trigger").click();
     await expect(page.getByText("הצעה חדשה")).toBeVisible();
 
@@ -76,8 +77,9 @@ test.describe("NotificationPanel (mock API)", () => {
     await expect.poll(() => readAllCalls).toBe(1);
   });
 
-  test("error state and retry refetches", async ({ page }) => {
-    await setupAuthAndMocks(page, "resident", { skipDefaultNotifications: true });
+  test("error state and retry refetches", async ({ dashboardPage, setupAuthAndMocks }) => {
+    await setupAuthAndMocks("resident", { skipDefaultNotifications: true });
+    const page = dashboardPage.rawPage;
 
     const ctrl = { failNextNotificationList: false };
     let listGets = 0;
@@ -121,7 +123,7 @@ test.describe("NotificationPanel (mock API)", () => {
         !r.url().includes("unread-count"),
       { timeout: 30_000 },
     );
-    await page.goto("/dashboard");
+    await dashboardPage.goto();
     await expect(page.getByTestId("notification-panel-trigger")).toBeVisible({
       timeout: 30_000,
     });
@@ -145,8 +147,9 @@ test.describe("NotificationPanel (mock API)", () => {
     await expect(page.getByTestId("notification-panel-empty")).toBeVisible();
   });
 
-  test("optimistic rollback when mark-single read fails", async ({ page }) => {
-    await setupAuthAndMocks(page, "resident", { skipDefaultNotifications: true });
+  test("optimistic rollback when mark-single read fails", async ({ dashboardPage, setupAuthAndMocks }) => {
+    await setupAuthAndMocks("resident", { skipDefaultNotifications: true });
+    const page = dashboardPage.rawPage;
 
     const item = {
       id: "n-rollback",
@@ -179,7 +182,7 @@ test.describe("NotificationPanel (mock API)", () => {
       );
     });
 
-    await page.goto("/dashboard");
+    await dashboardPage.goto();
     await page.getByTestId("notification-panel-trigger").click();
     await expect(page.getByText("צריך סימון")).toBeVisible();
 
@@ -197,8 +200,9 @@ test.describe("NotificationPanel (mock API)", () => {
     ).toContainText(/לא ניתן לעדכן/);
   });
 
-  test("loading skeleton visible when list is slow", async ({ page }) => {
-    await setupAuthAndMocks(page, "resident", { skipDefaultNotifications: true });
+  test("loading skeleton visible when list is slow", async ({ dashboardPage, setupAuthAndMocks }) => {
+    await setupAuthAndMocks("resident", { skipDefaultNotifications: true });
+    const page = dashboardPage.rawPage;
 
     let listPass = 0;
     await page.route("**/api/v1/notifications**", async (route) => {
@@ -246,7 +250,7 @@ test.describe("NotificationPanel (mock API)", () => {
         !r.url().includes("unread-count"),
       { timeout: 30_000 },
     );
-    await page.goto("/dashboard");
+    await dashboardPage.goto();
     await expect(page.getByTestId("notification-panel-trigger")).toBeVisible({
       timeout: 30_000,
     });

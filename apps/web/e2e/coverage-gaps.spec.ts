@@ -7,7 +7,8 @@
  * All backend calls are intercepted with page.route() mocks.
  */
 
-import { test, expect } from "./api/test";
+import { expect, test } from "./fixtures/auth-fixtures";
+import { waitForPageInteractive } from "./api/actions";
 import type { Page } from "@playwright/test";
 
 // ---------------------------------------------------------------------------
@@ -167,17 +168,22 @@ test.describe("Verify Email Flow", () => {
 test.describe("Resend Verification Flow", () => {
   test("renders form and submits successfully", async ({ page }) => {
     await page.route("**/api/v1/auth/resend-verification-by-email", (r) =>
-      r.fulfill({ status: 200, body: JSON.stringify({ status: "sent" }) }),
+      r.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ status: "sent" }),
+      }),
     );
     await page.goto("/resend-verification");
-    const emailInput = page.locator("#email, input[type='email']").first();
+    await waitForPageInteractive(page);
+    const emailInput = page.locator("#resend-email");
     await expect(emailInput).toBeVisible({ timeout: 10000 });
     await emailInput.fill("test@example.com");
-    const submitBtn = page.getByRole("button", { name: /שלח|send|אימות/i });
+    const submitBtn = page.getByRole("button", { name: /שלח קישור אימות/i });
     await expect(submitBtn).toBeVisible();
     await submitBtn.click();
     await expect(
-      page.getByText(/נשלח|sent|בדוק|תיבת/i),
+      page.getByText(/נשלח אליכם מייל עם קישור לאימות/i),
     ).toBeVisible({ timeout: 10000 });
   });
 });
@@ -242,16 +248,23 @@ test.describe("Contractors Directory", () => {
     await page.route("**/api/v1/contractors*", (r) =>
       r.fulfill({
         status: 200,
-        body: JSON.stringify([
-          {
-            id: "ctr-1",
-            business_name: "קבלן הכיסוי",
-            rating: 4.5,
-            category: "ac_installation",
-            verified: true,
-            city: "תל אביב",
-          },
-        ]),
+        body: JSON.stringify({
+          items: [
+            {
+              id: "ctr-1",
+              business_name: "קבלן הכיסוי",
+              businessName: "קבלן הכיסוי",
+              rating: 4.5,
+              category: "ac_installation",
+              verified: true,
+              city: "תל אביב",
+            },
+          ],
+          total: 1,
+          page: 1,
+          page_size: 50,
+          has_more: false,
+        }),
       }),
     );
     await page.route("**/api/v1/offers*", (r) =>
@@ -434,27 +447,12 @@ test.describe("Change Password Page", () => {
     await expect(page.locator("#currentPassword").first()).toBeVisible({
       timeout: 15000,
     });
-    // Fill form fields and submit programmatically to avoid DOM detachment
-    await page.evaluate(() => {
-      const set = (id: string, val: string) => {
-        const el = document.getElementById(id) as HTMLInputElement;
-        if (!el) return;
-        const nativeSetter = Object.getOwnPropertyDescriptor(
-          HTMLInputElement.prototype,
-          "value",
-        )?.set;
-        nativeSetter?.call(el, val);
-        el.dispatchEvent(new Event("input", { bubbles: true }));
-        el.dispatchEvent(new Event("change", { bubbles: true }));
-      };
-      set("currentPassword", "OldPassword1!");
-      set("newPassword", "NewPassword1!");
-      set("confirmPassword", "NewPassword1!");
-      const btn = document.querySelector('button[type="submit"]') as HTMLButtonElement;
-      btn?.click();
+    await page.fill("#currentPassword", "OldPassword1!");
+    await page.fill("#newPassword", "NewPassword1!");
+    await page.fill("#confirmPassword", "NewPassword1!");
+    await page.getByRole("button", { name: /שנה סיסמה|Change Password/i }).click();
+    await expect(page.getByText(/הסיסמה עודכנה בהצלחה|Password updated/i).first()).toBeVisible({
+      timeout: 15000,
     });
-    await expect(
-      page.getByText(/הסיסמה שונתה/i).first(),
-    ).toBeVisible({ timeout: 15000 });
   });
 });

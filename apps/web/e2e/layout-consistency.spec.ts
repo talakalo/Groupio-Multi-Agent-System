@@ -14,7 +14,7 @@
  */
 
 import type { Page, Route } from "@playwright/test";
-import { test, expect } from "./api/test";
+import { expect, test } from "./fixtures/auth-fixtures";
 import { setupAuthAndMocks } from "./api/actions";
 import type { UserRole } from "./helpers/user.factory";
 
@@ -48,6 +48,18 @@ async function setupRole(
   await setupAuthAndMocks(page, role);
 }
 
+/** Wait until authenticated shell (header LanguageToggle) is rendered. */
+async function waitForLayoutShell(page: Page) {
+  await expect(
+    page.getByRole("button", { name: /^English$/i }).first(),
+  ).toBeVisible({ timeout: 15_000 });
+}
+
+/** Desktop sidebar (lg breakpoint); avoids mobile drawer at aside index 0. */
+function desktopSidebar(page: Page) {
+  return page.locator("aside.hidden.lg\\:block").first();
+}
+
 // ─── 1. LanguageToggle presence in all authenticated layouts ─────────────────
 
 test.describe("LanguageToggle present in every authenticated layout", () => {
@@ -63,7 +75,7 @@ test.describe("LanguageToggle present in every authenticated layout", () => {
       await setupRole(page, role);
       await page.goto(route);
       // Wait for desktop sidebar to confirm layout has rendered
-      await expect(page.locator("aside").nth(1)).toBeVisible({ timeout: 15_000 });
+      await waitForLayoutShell(page);
 
       // LanguageToggle renders buttons with "עברית" and "English" labels
       const toggle = page.getByRole("button", { name: /עברית|English/i }).first();
@@ -86,7 +98,7 @@ test.describe("NotificationPanel present in every authenticated layout", () => {
     test(`${role} layout has NotificationPanel bell`, async ({ page }) => {
       await setupRole(page, role);
       await page.goto(route);
-      await expect(page.locator("aside").nth(1)).toBeVisible({ timeout: 15_000 });
+      await waitForLayoutShell(page);
 
       // Both NotificationPanel and user-menu have aria-haspopup; use first() to avoid strict-mode error
       const userMenuBtn = page.locator('header button[aria-haspopup="true"]').first();
@@ -102,9 +114,9 @@ test.describe("No duplicate nav links in contractor sidebar", () => {
     await setupRole(page, "contractor");
     await page.goto("/contractor/dashboard");
     // Use desktop sidebar (nth(1)) to avoid double-counting from mobile aside
-    await expect(page.locator("aside").nth(1)).toBeVisible({ timeout: 15_000 });
+    await waitForLayoutShell(page);
 
-    const createOfferLinks = page.locator("aside").nth(1).locator('a[href="/contractor/offers/create"]');
+    const createOfferLinks = desktopSidebar(page).locator('a[href="/contractor/offers/create"]');
     // Should be exactly 1 (the quick-create button), not 2
     await expect(createOfferLinks).toHaveCount(1, { timeout: 10_000 });
   });
@@ -112,10 +124,10 @@ test.describe("No duplicate nav links in contractor sidebar", () => {
   test("resident sidebar nav links are all unique URLs", async ({ page }) => {
     await setupRole(page, "resident");
     await page.goto("/dashboard");
-    await expect(page.locator("aside").nth(1)).toBeVisible({ timeout: 15_000 });
+    await waitForLayoutShell(page);
 
     // Collect all nav link hrefs in the desktop sidebar only
-    const sidebarLinks = page.locator("aside").nth(1).locator("a[href]");
+    const sidebarLinks = desktopSidebar(page).locator("a[href]");
     const hrefs = await sidebarLinks.evaluateAll((els) =>
       els.map((el) => (el as HTMLAnchorElement).getAttribute("href")),
     );
@@ -134,9 +146,9 @@ test.describe("No duplicate nav links in contractor sidebar", () => {
   test("buildings-manager sidebar nav links are all unique", async ({ page }) => {
     await setupRole(page, "buildings_manager");
     await page.goto("/buildings-manager/dashboard");
-    await expect(page.locator("aside").nth(1)).toBeVisible({ timeout: 15_000 });
+    await waitForLayoutShell(page);
 
-    const sidebarLinks = page.locator("aside").nth(1).locator("a[href]");
+    const sidebarLinks = desktopSidebar(page).locator("a[href]");
     const hrefs = await sidebarLinks.evaluateAll((els) =>
       els.map((el) => (el as HTMLAnchorElement).getAttribute("href")),
     );
@@ -172,11 +184,16 @@ test.describe("Language toggle switches locale for each role", () => {
     test(`${role}: clicking "English" sends locale=en to /api/locale`, async ({ page }) => {
       await setupRole(page, role, "he");
       await page.goto(route);
-      await expect(page.locator("aside").nth(1)).toBeVisible({ timeout: 15_000 });
+      await waitForLayoutShell(page);
 
       // Mock the locale endpoint so the POST doesn't fail and cause an error toast
       await page.route("**/api/locale", (r) =>
-        r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, locale: "en" }) }),
+        r.fulfill({
+          status: 200,
+          contentType: "application/json",
+          headers: { "Set-Cookie": "NEXT_LOCALE=en; Path=/; SameSite=Lax" },
+          body: JSON.stringify({ ok: true, locale: "en" }),
+        }),
       );
 
       const [request] = await Promise.all([
@@ -206,7 +223,7 @@ test.describe("Language toggle switches locale for each role", () => {
       );
 
       await page.goto(route);
-      await expect(page.locator("aside").nth(1)).toBeVisible({ timeout: 15_000 });
+      await waitForLayoutShell(page);
 
       // Wait for the LanguageToggle button to be visible before setting up the
       // route mock — this ensures the component has finished its render cycle.
@@ -239,35 +256,35 @@ test.describe("Brand color consistency", () => {
     await setupRole(page, "resident");
     await page.goto("/dashboard");
     // Desktop sidebar (index 1): hidden lg:block — visible at 1280px
-    await expect(page.locator("aside").nth(1)).toBeVisible({ timeout: 15_000 });
-    await expect(page.locator("aside").nth(1).locator('a[href="/dashboard"]')).toBeVisible({ timeout: 10_000 });
+    await waitForLayoutShell(page);
+    await expect(desktopSidebar(page).locator('a[href="/dashboard"]')).toBeVisible({ timeout: 10_000 });
   });
 
   test("contractor sidebar renders with contractor dashboard link", async ({ page }) => {
     await setupRole(page, "contractor");
     await page.goto("/contractor/dashboard");
-    await expect(page.locator("aside").nth(1)).toBeVisible({ timeout: 15_000 });
-    await expect(page.locator("aside").nth(1).locator('a[href="/contractor/dashboard"]')).toBeVisible({ timeout: 10_000 });
+    await waitForLayoutShell(page);
+    await expect(desktopSidebar(page).locator('a[href="/contractor/dashboard"]')).toBeVisible({ timeout: 10_000 });
   });
 
   test("buildings-manager sidebar renders with buildings link", async ({ page }) => {
     await setupRole(page, "buildings_manager");
     await page.goto("/buildings-manager/dashboard");
-    await expect(page.locator("aside").nth(1)).toBeVisible({ timeout: 15_000 });
-    await expect(page.locator("aside").nth(1).locator('a[href="/buildings-manager/dashboard"]')).toBeVisible({ timeout: 10_000 });
+    await waitForLayoutShell(page);
+    await expect(desktopSidebar(page).locator('a[href="/buildings-manager/dashboard"]')).toBeVisible({ timeout: 10_000 });
   });
 
   test("admin (web) sidebar renders with admin dashboard link", async ({ page }) => {
     await setupRole(page, "admin");
     await page.goto("/admin/dashboard");
-    await expect(page.locator("aside").nth(1)).toBeVisible({ timeout: 15_000 });
-    await expect(page.locator("aside").nth(1).locator('a[href="/admin/dashboard"]')).toBeVisible({ timeout: 10_000 });
+    await waitForLayoutShell(page);
+    await expect(desktopSidebar(page).locator('a[href="/admin/dashboard"]')).toBeVisible({ timeout: 10_000 });
   });
 
   test("no layout uses hardcoded indigo class on nav links", async ({ page }) => {
     await setupRole(page, "resident");
     await page.goto("/dashboard");
-    await expect(page.locator("aside").nth(1)).toBeVisible({ timeout: 15_000 });
+    await waitForLayoutShell(page);
 
     // No nav link should have Tailwind indigo classes (indicates off-brand color)
     const indigoLinks = page.locator('nav a[class*="indigo"]');
@@ -411,7 +428,7 @@ test.describe("Header has exactly one user-menu dropdown button", () => {
     test(`${role} header has one account user-menu button`, async ({ page }) => {
       await setupRole(page, role);
       await page.goto(route);
-      await expect(page.locator("aside").nth(1)).toBeVisible({ timeout: 15_000 });
+      await waitForLayoutShell(page);
 
       // Every layout's account menu button has aria-label containing "חשבון" (he) or "Account" (en)
       const accountBtn = page.locator('header button[aria-label*="חשבון"], header button[aria-label*="ccount"]');
@@ -469,7 +486,7 @@ test.describe("Authenticated pages load in both locales", () => {
       await expect(page.locator("html")).toHaveAttribute("dir", "rtl", { timeout: 10_000 });
       await expect(page.locator("html")).toHaveAttribute("lang", "he");
       // Desktop sidebar (index 1) is visible at 1280px viewport
-      await expect(page.locator("aside").nth(1)).toBeVisible({ timeout: 15_000 });
+      await waitForLayoutShell(page);
     });
 
     test(`${role} dashboard loads in English (LTR)`, async ({ page }) => {
@@ -477,7 +494,7 @@ test.describe("Authenticated pages load in both locales", () => {
       await page.goto(route);
       await expect(page.locator("html")).toHaveAttribute("dir", "ltr", { timeout: 10_000 });
       await expect(page.locator("html")).toHaveAttribute("lang", "en");
-      await expect(page.locator("aside").nth(1)).toBeVisible({ timeout: 15_000 });
+      await waitForLayoutShell(page);
     });
   }
 });

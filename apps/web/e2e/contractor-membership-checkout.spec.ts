@@ -1,4 +1,4 @@
-import { test, expect } from "./api/test";
+import { expect, test } from "./fixtures/auth-fixtures";
 import type { Page } from "@playwright/test";
 import { createMockResponse } from "./helpers/factory.util";
 

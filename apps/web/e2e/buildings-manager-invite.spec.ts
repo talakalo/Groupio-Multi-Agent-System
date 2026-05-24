@@ -9,7 +9,7 @@
  *  5. Non-BM (resident) cannot reach the buildings-manager route
  */
 
-import { test, expect } from "./api/test";
+import { expect, test } from "./fixtures/auth-fixtures";
 import { createMockResponse } from "./helpers/factory.util";
 
 const MOCK_BUILDING = {
@@ -52,40 +52,38 @@ test.describe("Building Manager — Invite Code", () => {
     );
   });
 
-  test("shows 'Share invite' button on each building card", async ({ page }) => {
-    await page.goto(PAGE);
-    await page.waitForLoadState("networkidle");
+  test("shows 'Share invite' button on each building card", async ({ buildingsManagerPage }) => {
+    await buildingsManagerPage.gotoBuildings();
+    await buildingsManagerPage.rawPage.waitForLoadState("networkidle");
 
-    const inviteBtn = page.getByTestId(`invite-btn-${MOCK_BUILDING.id}`);
+    const inviteBtn = buildingsManagerPage.rawPage.getByTestId(`invite-btn-${MOCK_BUILDING.id}`);
     await expect(inviteBtn).toBeVisible();
   });
 
   test("clicking the invite button opens the invite panel with the code", async ({
-    page,
+    buildingsManagerPage,
   }) => {
-    await page.goto(PAGE);
-    await page.waitForLoadState("networkidle");
+    await buildingsManagerPage.gotoBuildings();
+    await buildingsManagerPage.rawPage.waitForLoadState("networkidle");
 
-    await page.getByTestId(`invite-btn-${MOCK_BUILDING.id}`).click();
-
-    // The BuildingInvitePanel renders the invite code
-    await expect(page.getByText(MOCK_BUILDING.invite_code)).toBeVisible();
+    await buildingsManagerPage.rawPage.getByTestId(`invite-btn-${MOCK_BUILDING.id}`).click();
+    await expect(buildingsManagerPage.rawPage.getByText(MOCK_BUILDING.invite_code)).toBeVisible();
   });
 
-  test("invite panel contains a copy button", async ({ page }) => {
-    await page.goto(PAGE);
-    await page.waitForLoadState("networkidle");
+  test("invite panel contains a copy button", async ({ buildingsManagerPage }) => {
+    await buildingsManagerPage.gotoBuildings();
+    await buildingsManagerPage.rawPage.waitForLoadState("networkidle");
 
-    await page.getByTestId(`invite-btn-${MOCK_BUILDING.id}`).click();
+    await buildingsManagerPage.rawPage.getByTestId(`invite-btn-${MOCK_BUILDING.id}`).click();
 
-    // Panel should have a copy button (data-testid or role)
-    const copyBtn = page
+    const copyBtn = buildingsManagerPage.rawPage
       .getByRole("button", { name: /copy|העתק/i })
       .first();
     await expect(copyBtn).toBeVisible();
   });
 
   test("regenerate invite code calls API and updates displayed code", async ({
+    buildingsManagerPage,
     page,
   }) => {
     const NEW_CODE = "INV-NEW-9999";
@@ -99,21 +97,20 @@ test.describe("Building Manager — Invite Code", () => {
         ),
     );
 
-    await page.goto(PAGE);
-    await page.waitForLoadState("networkidle");
+    await buildingsManagerPage.gotoBuildings();
+    await buildingsManagerPage.rawPage.waitForLoadState("networkidle");
 
-    await page.getByTestId(`invite-btn-${MOCK_BUILDING.id}`).click();
-    await expect(page.getByText(MOCK_BUILDING.invite_code)).toBeVisible();
+    await buildingsManagerPage.rawPage.getByTestId(`invite-btn-${MOCK_BUILDING.id}`).click();
+    await expect(buildingsManagerPage.rawPage.getByText(MOCK_BUILDING.invite_code)).toBeVisible();
 
-    // Click the rotate/regenerate button
-    const rotateBtn = page
+    const rotateBtn = buildingsManagerPage.rawPage
       .getByRole("button", { name: /regenerate|חדש|rotate|חדש קוד/i })
       .first();
 
     if (await rotateBtn.isVisible()) {
       await rotateBtn.click();
       // New code should appear after API responds
-      await expect(page.getByText(NEW_CODE)).toBeVisible({ timeout: 5000 });
+      await expect(buildingsManagerPage.rawPage.getByText(NEW_CODE)).toBeVisible({ timeout: 5000 });
     } else {
       // If the rotate button is hidden (non-owner BM), skip gracefully
       test.skip(true, "Rotate button not visible for this user — expected for non-owner BM");
@@ -138,6 +135,7 @@ test.describe("Building Manager — Invite Code (Hebrew locale)", () => {
   test.use({ locale: "he-IL" });
 
   test("invite panel is visible in RTL Hebrew layout", async ({
+    buildingsManagerPage,
     page,
     setupAuthAndMocks,
   }) => {
@@ -147,11 +145,11 @@ test.describe("Building Manager — Invite Code (Hebrew locale)", () => {
       r.fulfill(createMockResponse(MOCK_BUILDINGS_LIST)),
     );
 
-    await page.goto(PAGE);
-    await page.waitForLoadState("networkidle");
+    await buildingsManagerPage.gotoBuildings();
+    await buildingsManagerPage.rawPage.waitForLoadState("networkidle");
 
-    await page.getByTestId(`invite-btn-${MOCK_BUILDING.id}`).click();
-    await expect(page.getByText(MOCK_BUILDING.invite_code)).toBeVisible();
+    await buildingsManagerPage.rawPage.getByTestId(`invite-btn-${MOCK_BUILDING.id}`).click();
+    await expect(buildingsManagerPage.rawPage.getByText(MOCK_BUILDING.invite_code)).toBeVisible();
 
     // The page root should have dir="rtl" set by the layout
     const dir = await page.evaluate(() =>

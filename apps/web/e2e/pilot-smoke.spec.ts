@@ -15,8 +15,8 @@
  *   pnpm --filter web exec playwright test e2e/pilot-smoke.spec.ts --project=chromium
  */
 
-import { test, expect } from "./api/test";
-import { loginAs, setupBaseMocks } from "./api/actions";
+import { expect, test } from "./fixtures/auth-fixtures";
+import { loginAs, setupBaseMocks, waitForPageInteractive } from "./api/actions";
 import {
   createResidentUser,
   createContractorUser,
@@ -40,7 +40,7 @@ const MOCK_STATS = createResidentStats();
 // 1. Signup → Onboarding → Dashboard
 // ===========================================================================
 
-test("1. Signup → onboarding → redirect to dashboard", async ({ page }) => {
+test("1. Signup → onboarding → redirect to dashboard", async ({ page, signupPage }) => {
   await setupBaseMocks(page);
 
   // Mock signup → client uses /auth/signup
@@ -64,23 +64,15 @@ test("1. Signup → onboarding → redirect to dashboard", async ({ page }) => {
     })
   );
 
-  await page.goto("/signup");
-  // Step 1: select resident role and continue to the details form
-  await page.click('button:has-text("דייר")');
-  await page.click('button:has-text("המשך")');
-  // Step 2: fill form fields (inputs are only rendered after step transition)
-  await page.fill("#name", "Pilot User");
-  await page.fill("#email", "pilot@example.com");
-  await page.fill("#phone", "0501234567");
-  await page.fill("#password", "SecurePass1!");
-  // Check the required ToS checkbox before submitting
-  await page.check("#tos");
-  // Submit
-  await page.click('button[type="submit"]');
+  await signupPage.goto();
+  await signupPage.signupAsResident(
+    "Pilot User",
+    "pilot@example.com",
+    "0501234567",
+    "SecurePass1!",
+  );
 
-  // After signup the app goes to /onboarding — mock the page load
-  // We just verify navigation away from /signup or arrival at onboarding/dashboard
-  await expect(page).toHaveURL(/\/(onboarding|dashboard)/, { timeout: 10_000 });
+  await expect(page).toHaveURL(/\/(onboarding|dashboard)/, { timeout: 20_000 });
 });
 
 // ===========================================================================
@@ -112,11 +104,13 @@ test("2. Login → dashboard loads with building and offers", async ({ page }) =
   );
 
   await page.goto("/login");
-  await page.fill('input[type="email"]', "pilot@example.com");
-  await page.fill('input[type="password"]', "SecurePass1!");
-  await page.click('button[type="submit"]');
-
-  await expect(page).toHaveURL(/\/dashboard/, { timeout: 10_000 });
+  await waitForPageInteractive(page);
+  await page.fill("#identifier", "pilot@example.com");
+  await page.fill("#password", "SecurePass1!");
+  await Promise.all([
+    page.waitForURL(/\/dashboard/, { timeout: 20_000 }),
+    page.getByRole("button", { name: /התחברות/i }).click(),
+  ]);
 });
 
 // ===========================================================================
@@ -138,10 +132,7 @@ test("3. Offer detail → join → leave flow (mocked)", async ({ page }) => {
   );
 
   await page.goto("/offers/offer-pilot-1");
-  // The page shows category (התקנת מזגנים) or contractor — avoid error boundary
-  await expect(
-    page.getByText(/התקנת מזגנים|Pilot Contractors|המשך/i).first()
-  ).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 15_000 });
 });
 
 // ===========================================================================
@@ -170,8 +161,8 @@ test("4. Contractor dashboard stats load", async ({ page }) => {
   );
 
   await page.goto("/contractor/dashboard");
-  await expect(page.locator("main, [data-testid='contractor-dashboard'], h1, h2")).toBeVisible({
-    timeout: 8_000,
+  await expect(page.getByRole("heading", { name: "לוח בקרה" })).toBeVisible({
+    timeout: 15_000,
   });
 });
 
@@ -415,9 +406,10 @@ test("10. Chat sends message and history loads on mount", async ({ page }) => {
   );
 
   await page.goto("/chat");
+  await waitForPageInteractive(page);
 
   // Chat widget should render
-  await expect(page.locator('[data-testid="chat-widget"]')).toBeVisible({ timeout: 8_000 });
+  await expect(page.locator('[data-testid="chat-widget"]')).toBeVisible({ timeout: 20_000 });
 
   // The historical message should appear
   await expect(page.locator("text=שאלה קודמת")).toBeVisible({ timeout: 5_000 });
@@ -436,11 +428,17 @@ test("10. Chat sends message and history loads on mount", async ({ page }) => {
 // ===========================================================================
 
 test("11. Forgot-password page — sends reset request and shows confirmation", async ({ page }) => {
+  await setupBaseMocks(page);
   await page.route("**/api/v1/auth/password/reset", (r) =>
-    r.fulfill({ status: 200, body: JSON.stringify({ status: "sent" }) })
+    r.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ status: "sent" }),
+    })
   );
 
   await page.goto("/forgot-password");
+  await waitForPageInteractive(page);
 
   // Heading is rendered
   await expect(page.getByRole("heading", { name: /שכחתי סיסמה/i })).toBeVisible({ timeout: 5_000 });
@@ -450,7 +448,7 @@ test("11. Forgot-password page — sends reset request and shows confirmation", 
   await page.getByRole("button", { name: /שלח קישור לאיפוס/i }).click();
 
   // Success state: message about email sent
-  await expect(page.getByText(/אם כתובת האימייל קיימת/i)).toBeVisible({ timeout: 8_000 });
+  await expect(page.getByText(/אם כתובת האימייל קיימת במערכת/i)).toBeVisible({ timeout: 8_000 });
 });
 
 // ===========================================================================

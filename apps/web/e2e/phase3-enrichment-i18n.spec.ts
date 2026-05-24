@@ -3,7 +3,7 @@
  * Reuses existing Playwright config, mocks, and auth patterns.
  */
 
-import { test, expect } from "./api/test";
+import { expect, test } from "./fixtures/auth-fixtures";
 
 test.describe("Phase 3: Address suggestion flow", () => {
   test.beforeEach(async ({ page }) => {
@@ -14,14 +14,15 @@ test.describe("Phase 3: Address suggestion flow", () => {
           status: "healthy",
           services: { vector_db: true, graph_db: true, redis: true, postgres: true },
         }),
-      })
+      }),
     );
     await page.route("**/api/v1/auth/refresh", (route) =>
-      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ access_token: "e2e-token" }) })
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ access_token: "e2e-token" }) }),
     );
   });
 
   test("onboarding shows suggest address button and accepts mocked suggestion", async ({
+    onboardingPage,
     page,
   }) => {
     await page.route("**/api/v1/enrichment/normalize-address", (route) => {
@@ -43,28 +44,21 @@ test.describe("Phase 3: Address suggestion flow", () => {
       return route.continue();
     });
 
-    await page.goto("/onboarding");
-    // Onboarding role buttons use t('resident') + description; match by leading "דייר"
-    await expect(page.getByRole("button", { name: /^דייר\s/ }).first()).toBeVisible({ timeout: 5000 });
-    await page.getByRole("button", { name: /^דייר\s/ }).first().click();
-    // Use exact "הבא" to avoid matching Next.js Dev Tools button (contains "Next")
-    await page.getByRole("button", { name: "הבא" }).click();
-
-    await expect(page.locator("#buildingAddress")).toBeVisible({ timeout: 5000 });
-    await page.fill("#buildingAddress", "רוטשילד 15");
-    await page.fill("#city", "תל אביב");
-    await page.getByRole("button", { name: /הצע כתובת|Suggest address/ }).click();
+    await onboardingPage.goto();
+    await onboardingPage.selectResidentAndContinue();
+    await onboardingPage.fillAddress("רוטשילד 15", "תל אביב");
+    await onboardingPage.suggestAddressButton.click();
 
     await expect(
-      page.getByText(/רוטשילד 15|תל אביב - יפו|suggested address/i).first()
-    ).toBeVisible({ timeout: 5000 });
+      page.getByText(/רוטשילד 15|תל אביב - יפו|suggested address/i).first(),
+    ).toBeVisible({ timeout: 5_000 });
     await page.getByRole("button", { name: /השתמש בהצעה|Use suggested/ }).click();
 
-    await expect(page.locator("#buildingAddress")).toHaveValue("רוטשילד 15");
-    await expect(page.locator("#city")).toHaveValue("תל אביב - יפו");
+    await expect(onboardingPage.buildingAddressInput).toHaveValue("רוטשילד 15");
+    await expect(onboardingPage.cityInput).toHaveValue("תל אביב - יפו");
   });
 
-  test("no suggestion when API returns low confidence", async ({ page }) => {
+  test("no suggestion when API returns low confidence", async ({ onboardingPage, page }) => {
     await page.route("**/api/v1/enrichment/normalize-address", (route) =>
       route.fulfill({
         status: 200,
@@ -78,139 +72,81 @@ test.describe("Phase 3: Address suggestion flow", () => {
           confidence: 0.2,
           source: "stub",
         }),
-      })
+      }),
     );
 
-    await page.goto("/onboarding");
-    await page.getByRole("button", { name: /^דייר\s/ }).first().click();
-    await page.getByRole("button", { name: "הבא" }).click();
-    await expect(page.locator("#buildingAddress")).toBeVisible({ timeout: 5000 });
-
-    await page.fill("#buildingAddress", "רחוב לא ידוע 1");
-    await page.fill("#city", "עיר לא קיימת");
-    const lowConfidenceRes = page.waitForResponse("**/api/v1/enrichment/normalize-address**", { timeout: 10_000 });
-    await page.getByRole("button", { name: /הצע כתובת|Suggest address/ }).click();
+    await onboardingPage.goto();
+    await onboardingPage.selectResidentAndContinue();
+    await onboardingPage.fillAddress("רחוב לא ידוע 1", "עיר לא קיימת");
+    const lowConfidenceRes = page.waitForResponse("**/api/v1/enrichment/normalize-address**", {
+      timeout: 10_000,
+    });
+    await onboardingPage.suggestAddressButton.click();
     await lowConfidenceRes;
     await expect(page.getByText(/השתמש בהצעה|Use suggested/)).not.toBeVisible();
   });
 
-  test("no suggestion when provider returns 5xx", async ({ page }) => {
+  test("no suggestion when provider returns 5xx", async ({ onboardingPage, page }) => {
     await page.route("**/api/v1/enrichment/normalize-address", (route) =>
-      route.fulfill({ status: 503, body: "Service Unavailable" })
+      route.fulfill({ status: 503, body: "Service Unavailable" }),
     );
 
-    await page.goto("/onboarding");
-    await page.getByRole("button", { name: /^דייר\s/ }).first().click();
-    await page.getByRole("button", { name: "הבא" }).click();
-    await expect(page.locator("#buildingAddress")).toBeVisible({ timeout: 5000 });
-
-    await page.fill("#buildingAddress", "רוטשילד 15");
-    await page.fill("#city", "תל אביב");
-    const errorRes = page.waitForResponse("**/api/v1/enrichment/normalize-address**", { timeout: 10_000 });
-    await page.getByRole("button", { name: /הצע כתובת|Suggest address/ }).click();
+    await onboardingPage.goto();
+    await onboardingPage.selectResidentAndContinue();
+    await onboardingPage.fillAddress("רוטשילד 15", "תל אביב");
+    const errorRes = page.waitForResponse("**/api/v1/enrichment/normalize-address**", {
+      timeout: 10_000,
+    });
+    await onboardingPage.suggestAddressButton.click();
     await errorRes;
     await expect(page.getByText(/השתמש בהצעה|Use suggested/)).not.toBeVisible();
   });
 });
 
 test.describe("Phase 3: Language toggle persistence", () => {
-  test("switch Hebrew to English updates dir on onboarding", async ({ page }) => {
-    await page.goto("/onboarding");
-    await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
-
-    const englishBtn = page.getByRole("button", { name: "English" });
-    if (await englishBtn.isVisible()) {
-      await englishBtn.click();
-      await expect(page.locator("html")).toHaveAttribute("dir", "ltr", { timeout: 5_000 });
-    }
+  test("switch Hebrew to English updates dir on onboarding", async ({ onboardingPage }) => {
+    await onboardingPage.goto();
+    await expect(onboardingPage.rawPage.locator("html")).toHaveAttribute("dir", "rtl");
+    await onboardingPage.englishToggle.click();
+    await expect(onboardingPage.rawPage.locator("html")).toHaveAttribute("dir", "ltr", {
+      timeout: 5_000,
+    });
   });
 
-  test("locale cookie persists after navigation", async ({ page }) => {
-    await page.goto("/onboarding");
-    const englishBtn = page.getByRole("button", { name: "English" });
-    if (await englishBtn.isVisible()) {
-      await englishBtn.click();
-      await expect(page.locator("html")).toHaveAttribute("dir", "ltr", { timeout: 5_000 });
-    }
+  test("locale cookie persists after navigation", async ({ onboardingPage, page }) => {
+    await onboardingPage.goto();
+    await onboardingPage.englishToggle.click();
+    await expect(onboardingPage.rawPage.locator("html")).toHaveAttribute("dir", "ltr", {
+      timeout: 5_000,
+    });
     await page.goto("/signup");
     const dir = await page.locator("html").getAttribute("dir");
     expect(["ltr", "rtl"]).toContain(dir);
   });
 
-  test("authenticated language toggle persists to profile", async ({ page }) => {
-    let putMePayload: Record<string, unknown> | null = null;
-    await page.route("**/api/v1/auth/me", (route) => {
-      if (route.request().method() === "PUT") {
-        putMePayload = route.request().postDataJSON();
-        return route.fulfill({
-          status: 200,
-          contentType: "application/json",
-          body: JSON.stringify({
-            id: "user-e2e",
-            email: "resident@test.com",
-            preferred_language: putMePayload?.preferred_language ?? "he",
-          }),
-        });
-      }
-      return route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          id: "u1",
-          email: "resident@test.com",
-          preferred_language: "he",
-          role: "resident",
-        }),
-      });
-    });
-    await page.route("**/api/v1/auth/refresh", (route) =>
+  test("authenticated language toggle persists to profile", async ({ page, setupAuthAndMocks }) => {
+    await setupAuthAndMocks("resident");
+    await page.route("**/api/locale", (route) =>
       route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({ access_token: "e2e-jwt-token" }),
-      })
+        body: JSON.stringify({ ok: true, locale: "en" }),
+      }),
     );
-    await page.context().addCookies([
-      { name: "refresh_token", value: "e2e-session", url: "http://localhost:3000" },
-      {
-        name: "groupio-auth",
-        value: encodeURIComponent(
-          JSON.stringify({
-            state: {
-              user: { id: "u1", role: "resident", preferredLanguage: "he" },
-              isAuthenticated: true,
-            },
-          })
-        ),
-        url: "http://localhost:3000",
-      },
-    ]);
-    await page.addInitScript(() => {
-      localStorage.setItem(
-        "groupio-auth",
-        JSON.stringify({
-          state: {
-            user: { id: "u1", role: "resident", preferredLanguage: "he" },
-            accessToken: "e2e-jwt-token",
-            isAuthenticated: true,
-          },
-          version: 0,
-        })
-      );
+
+    await page.goto("/dashboard");
+    await expect(page.getByRole("button", { name: /^English$/i }).first()).toBeVisible({
+      timeout: 15_000,
     });
 
-    await page.goto("/onboarding");
-    const englishBtn = page.getByRole("button", { name: "English" });
-    await expect(englishBtn).toBeVisible({ timeout: 10_000 });
-    await englishBtn.click();
-    // UI must switch to ltr when clicking English
-    await expect(page.locator("html")).toHaveAttribute("dir", "ltr", { timeout: 5_000 });
-    // When accessToken is in store (e.g. after real login), profile PUT is sent
-    if (putMePayload != null) {
-      expect(putMePayload["preferred_language"] === "en").toBe(true);
-    }
+    const englishBtn = page.getByRole("button", { name: /^English$/i }).first();
+    const putMeRequest = page.waitForRequest(
+      (req) => req.method() === "PUT" && req.url().includes("/auth/me"),
+      { timeout: 15_000 },
+    );
+    await Promise.all([putMeRequest, englishBtn.click()]);
+
+    const payload = (await putMeRequest).postDataJSON() as Record<string, unknown>;
+    expect(payload.preferred_language).toBe("en");
   });
 });
-
-// Admin verification metadata is covered in apps/admin/e2e/admin-flow.spec.ts
-// (admin app runs on port 3001 with separate Playwright config)

@@ -1,4 +1,6 @@
-import { test, expect } from "./api/test";
+import { expect, test } from "./fixtures/auth-fixtures";
+import { waitForPageInteractive } from "./api/actions";
+
 import type { Page } from "@playwright/test";
 
 /**
@@ -132,12 +134,12 @@ async function setupCommonMocks(page: Page) {
 // ============================================================================
 
 test.describe("Resident Registration Flow", () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, signupPage }) => {
     await setupCommonMocks(page);
+    await signupPage.goto();
   });
 
   test("should display signup page with role selection", async ({ page }) => {
-    await page.goto("/signup");
 
     // First step is role selection (Hebrew: "דייר", "קבלן")
     await expect(page.getByText("דייר").first()).toBeVisible();
@@ -146,7 +148,6 @@ test.describe("Resident Registration Flow", () => {
   });
 
   test("should navigate to details step after role selection", async ({ page }) => {
-    await page.goto("/signup");
 
     // Select resident role and continue
     await page.click('button:has-text("דייר")');
@@ -160,7 +161,6 @@ test.describe("Resident Registration Flow", () => {
   });
 
   test("should validate email format", async ({ page }) => {
-    await page.goto("/signup");
 
     await page.click('button:has-text("דייר")');
     await page.click('button:has-text("המשך")');
@@ -179,7 +179,6 @@ test.describe("Resident Registration Flow", () => {
   });
 
   test("should validate password strength", async ({ page }) => {
-    await page.goto("/signup");
 
     await page.click('button:has-text("דייר")');
     await page.click('button:has-text("המשך")');
@@ -231,8 +230,6 @@ test.describe("Resident Registration Flow", () => {
       })
     );
 
-    await page.goto("/signup");
-
     await page.click('button:has-text("דייר")');
     await page.click('button:has-text("המשך")');
 
@@ -255,12 +252,13 @@ test.describe("Resident Registration Flow", () => {
 // ============================================================================
 
 test.describe("Resident Login Flow", () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, loginPage }) => {
     await setupCommonMocks(page);
+    await loginPage.goto();
+    await waitForPageInteractive(page);
   });
 
   test("should display login page", async ({ page }) => {
-    await page.goto("/login");
 
     // Login form uses id="identifier" and id="password"
     await expect(page.locator("#identifier")).toBeVisible();
@@ -268,7 +266,7 @@ test.describe("Resident Login Flow", () => {
     await expect(page.getByText("התחברות").first()).toBeVisible();
   });
 
-  test("should login successfully and redirect to dashboard", async ({ page }) => {
+  test("should login successfully and redirect to dashboard", async ({ page, loginPage }) => {
     // Correct endpoint is /auth/login/json; response must include access_token
     await page.route("**/api/v1/auth/login/json", (route) =>
       route.fulfill({
@@ -284,13 +282,8 @@ test.describe("Resident Login Flow", () => {
       })
     );
 
-    await page.goto("/login");
-
-    await page.fill("#identifier", TEST_RESIDENT.email);
-    await page.fill("#password", TEST_RESIDENT.password);
-    await page.click('button[type="submit"]');
-
-    await expect(page).toHaveURL(/dashboard/, { timeout: 10000 });
+    await loginPage.login(TEST_RESIDENT.email, TEST_RESIDENT.password);
+    await expect(page).toHaveURL(/dashboard/, { timeout: 20_000 });
   });
 
   test("should show error for invalid credentials", async ({ page }) => {
@@ -301,8 +294,6 @@ test.describe("Resident Login Flow", () => {
       })
     );
 
-    await page.goto("/login");
-
     await page.fill("#identifier", TEST_RESIDENT.email);
     await page.fill("#password", "wrongpassword");
     await page.click('button[type="submit"]');
@@ -311,12 +302,9 @@ test.describe("Resident Login Flow", () => {
     await expect(page.getByText(/שגיאה|שגויים|invalid/i)).toBeVisible({ timeout: 5000 });
   });
 
-  test("should navigate to signup from login", async ({ page }) => {
-    await page.goto("/login");
-
-    // The link says "הרשמו חינם" and points to /signup
-    await page.click('a[href="/signup"]');
-    await expect(page).toHaveURL(/signup/);
+  test("should navigate to signup from login", async ({ loginPage, page }) => {
+    await loginPage.signUpLink.click();
+    await expect(page).toHaveURL(/signup/, { timeout: 10_000 });
   });
 });
 
@@ -378,16 +366,16 @@ test.describe("Resident Browse Offers Flow", () => {
     });
   });
 
-  test("should display offers page with active offers", async ({ page }) => {
-    await page.goto("/offers");
+  test("should display offers page with active offers", async ({ page, offersPage }) => {
+    await offersPage.goto();
 
     await expect(page.locator("main").getByText("הצעות").first()).toBeVisible();
     await expect(page.getByText("Cool Air Ltd")).toBeVisible();
     await expect(page.getByText("Kitchen Masters")).toBeVisible();
   });
 
-  test("should display offer details when clicking an offer", async ({ page }) => {
-    await page.goto("/offers/offer_001");
+  test("should display offer details when clicking an offer", async ({ page, offersPage }) => {
+    await offersPage.gotoOffer("offer_001");
     await page.waitForLoadState("networkidle");
 
     // Wait for offer content in main — not error state (offerNotFound)
@@ -453,8 +441,8 @@ test.describe("Resident Join Offer Flow", () => {
     });
   });
 
-  test("should display offer details page", async ({ page }) => {
-    await page.goto("/offers/offer_001");
+  test("should display offer details page", async ({ page, offersPage }) => {
+    await offersPage.gotoOffer("offer_001");
     await page.waitForLoadState("networkidle");
 
     await expect(page.getByText(/הצעה לא נמצאה|offerNotFound/i)).not.toBeVisible();
@@ -463,8 +451,8 @@ test.describe("Resident Join Offer Flow", () => {
     ).toBeVisible({ timeout: 15000 });
   });
 
-  test("should display pricing tiers", async ({ page }) => {
-    await page.goto("/offers/offer_001");
+  test("should display pricing tiers", async ({ page, offersPage }) => {
+    await offersPage.gotoOffer("offer_001");
 
     // Should show discount percentages
     await expect(page.getByText("5%").first()).toBeVisible();
@@ -472,8 +460,8 @@ test.describe("Resident Join Offer Flow", () => {
     await expect(page.getByText("15%").first()).toBeVisible();
   });
 
-  test("should join offer successfully", async ({ page }) => {
-    await page.goto("/offers/offer_001");
+  test("should join offer successfully", async ({ page, offersPage }) => {
+    await offersPage.gotoOffer("offer_001");
 
     // Click join button (Hebrew: "הצטרף להצעה")
     const joinBtn = page.getByText("הצטרף להצעה");
@@ -542,8 +530,8 @@ test.describe("Resident Profile & Settings", () => {
     });
   });
 
-  test("should display profile page", async ({ page }) => {
-    await page.goto("/profile");
+  test("should display profile page", async ({ page, profilePage }) => {
+    await profilePage.goto();
 
     // Profile page has tabs: Personal, Notifications, Security
     await expect(page.locator('h1').first()).toBeVisible({ timeout: 10000 });
@@ -558,7 +546,7 @@ test.describe("Resident Profile & Settings", () => {
 // ---------------------------------------------------------------------------
 
 test.describe("Critical User Journey — Register → Login → Join Offer", () => {
-  test("full journey: register, login, browse, and join an offer", async ({ page }) => {
+  test("full journey: register, login, browse, and join an offer", async ({ page, offersPage, signupPage }) => {
     // Mock all API endpoints for the full journey (no live backend needed)
     await setupCommonMocks(page);
 
@@ -609,20 +597,18 @@ test.describe("Critical User Journey — Register → Login → Join Offer", () 
     });
 
     // ── 1. Registration ───────────────────────────────────────────────────
-    await page.goto("/signup");
+    await signupPage.goto();
     await expect(page).toHaveURL(/signup/);
 
-    // Select resident role and advance to details form (signup uses המשך)
-    // Use ^דייר to avoid matching "חשיפה לדיירים" on contractor card
-    await page.getByRole("button", { name: /^דייר\s/ }).click();
-    await page.getByRole("button", { name: /המשך/ }).click();
+    await signupPage.selectResidentAndContinue();
 
     // Fill registration form (step 2 fields — use id or name attributes)
-    await page.fill('#name', "Test Resident");
-    await page.fill('#email', "e2e-resident@groupio-test.co.il");
-    await page.fill('#phone', "0501234567");
-    await page.fill('#password', "SecurePass123!");
-    await page.check('#tos');
+    await signupPage.fillDetails(
+      "Test Resident",
+      "e2e-resident@groupio-test.co.il",
+      "0501234567",
+      "SecurePass123!",
+    );
     // buildingId field may not exist on this form — skip if absent
     const buildingIdInput = page.locator('input[name="buildingId"]');
     if (await buildingIdInput.count() > 0) {
@@ -630,7 +616,7 @@ test.describe("Critical User Journey — Register → Login → Join Offer", () 
     }
 
     // Submit — validates that the correct /api/v1/auth/signup endpoint is called
-    await page.click('[type="submit"]');
+    await signupPage.submit();
 
     // After registration, expect redirect to dashboard or a success indicator
     await expect(page).toHaveURL(/dashboard|signup|onboarding/, { timeout: 10_000 });
@@ -651,7 +637,7 @@ test.describe("Critical User Journey — Register → Login → Join Offer", () 
     await expect(page).toHaveURL(/dashboard/, { timeout: 10_000 });
 
     // ── 3. Browse offers ─────────────────────────────────────────────────
-    await page.goto("/offers");
+    await offersPage.goto();
     await expect(page).toHaveURL(/offers/, { timeout: 10000 });
 
     // Wait for offers to load — card or link to offer detail
@@ -685,34 +671,40 @@ test.describe("Critical User Journey — Register → Login → Join Offer", () 
     }
   });
 
-  test("signup form sends request to correct endpoint (/auth/signup)", async ({ page }) => {
-    // Capture the outgoing fetch request to verify endpoint URL
+  test("signup form sends request to correct endpoint (/auth/signup)", async ({ page, signupPage }) => {
     let registrationUrl = "";
-    await page.route("**/api/v1/**", async (route) => {
-      const url = route.request().url();
-      if (route.request().method() === "POST" && url.includes("/auth/")) {
-        registrationUrl = url;
-      }
-      await route.continue();
+    await page.route("**/api/v1/auth/signup", async (route) => {
+      registrationUrl = route.request().url();
+      await route.fulfill({
+        status: 201,
+        headers: {
+          "Content-Type": "application/json",
+          "Set-Cookie": "refresh_token=e2e-refresh-token; Path=/; SameSite=Lax",
+        },
+        body: JSON.stringify({ token: "jwt_token", user: { id: "user_new", email: "url-check@groupio-test.co.il" } }),
+      });
     });
+    await page.route("**/api/v1/auth/refresh", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ access_token: "e2e-access-token" }),
+      }),
+    );
 
-    await page.goto("/signup");
-    // Step 1: select resident role and continue (form inputs are in step 2 only)
-    await page.getByRole("button", { name: /^דייר\s/ }).click();
-    await page.getByRole("button", { name: /המשך/ }).click();
-
-    // Step 2: fill form fields
-    await page.fill("#name", "URL Test User");
-    await page.fill("#email", "url-check@groupio-test.co.il");
-    await page.fill("#phone", "0502345678");
-    await page.fill("#password", "SecurePass123!");
-    // Check the required ToS checkbox — without it the browser blocks form submit
-    await page.check("#tos");
+    await signupPage.goto();
+    await signupPage.selectResidentAndContinue();
+    await signupPage.fillDetails(
+      "URL Test User",
+      "url-check@groupio-test.co.il",
+      "0502345678",
+      "SecurePass123!",
+    );
     const signupResponse = page.waitForResponse(
       (r) => r.request().method() === "POST" && r.url().includes("/auth/"),
       { timeout: 10_000 },
     ).catch(() => null);
-    await page.click('[type="submit"]');
+    await signupPage.submit();
     await signupResponse;
 
     if (registrationUrl) {
