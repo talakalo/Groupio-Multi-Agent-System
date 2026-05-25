@@ -349,14 +349,22 @@ jobs:
           # Uses stub env vars — no real DB or LLM connections are made.
           python -m uvicorn src.api.main:app --host 127.0.0.1 --port 8099 &
           BACKEND_PID=$!
+          READY=0
           # Poll /openapi.json for readiness (max 30s). Fail fast if backend never comes up.
           for i in $(seq 1 30); do
             if curl -sSf http://127.0.0.1:8099/openapi.json -o /dev/null; then
               echo "Backend ready after ${i}s"
+              READY=1
               break
             fi
             sleep 1
           done
+          if [ "$READY" -ne 1 ]; then
+            echo "::error::Backend did not expose /openapi.json within 30s"
+            kill $BACKEND_PID 2>/dev/null || true
+            wait $BACKEND_PID 2>/dev/null || true
+            exit 1
+          fi
           npx --yes openapi-typescript http://127.0.0.1:8099/openapi.json \
             -o packages/types/src/generated.ts
           kill $BACKEND_PID || true
@@ -365,6 +373,8 @@ jobs:
           TESTING: 'true'
           ENVIRONMENT: testing
           JWT_SECRET_KEY: ci-test-secret-key-for-openapi-schema-export-only
+          ANTHROPIC_API_KEY: test-key
+          OPENAI_API_KEY: test-key
 
       - name: Build all packages
         run: pnpm build

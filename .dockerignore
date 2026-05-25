@@ -41,24 +41,19 @@ htmlcov
 .tox
 nox
 
-# Docs and tasks
+# Docs and frontend apps (API/worker only need src + requirements)
+apps
+packages
 docs
 tasks
 *.md
 !README.md
 
-# Next.js build artifacts (excluded to keep context small; rebuilt in Docker)
-apps/**/.next
-apps/**/out
-apps/**/storybook-static
-apps/**/.turbo
-
-# Package build artifacts
-packages/**/dist
-packages/**/.turbo
-
-# Lockfiles and config not needed at runtime
+# Lockfiles and config not needed for pip install
+package.json
 package-lock.json
+pnpm-lock.yaml
+turbo.json
 uv.lock
 .eslintrc.js
 .prettierrc
