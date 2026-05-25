@@ -63,6 +63,7 @@ export default function ContractorProjectDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<'publish' | 'cancel' | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [showCancelModal, setShowCancelModal] = useState(false);
 
   const fetchProject = useCallback(async () => {
     if (!id) {
@@ -120,8 +121,9 @@ export default function ContractorProjectDetailPage() {
     }
   }
 
-  async function handleCancel() {
-    if (!id || !window.confirm(t('cancelConfirm'))) return;
+  async function handleCancelConfirmed() {
+    if (!id) return;
+    setShowCancelModal(false);
     setActionLoading('cancel');
     setActionError(null);
     try {
@@ -250,7 +252,7 @@ export default function ContractorProjectDetailPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => void handleCancel()}
+                    onClick={() => setShowCancelModal(true)}
                     disabled={actionLoading !== null}
                     className="px-3 py-1.5 bg-white border border-red-300 text-red-600 text-sm font-medium rounded-lg hover:bg-red-50 disabled:opacity-50"
                   >
@@ -263,7 +265,7 @@ export default function ContractorProjectDetailPage() {
                 <div className="mt-3 flex gap-2 justify-end">
                   <button
                     type="button"
-                    onClick={() => void handleCancel()}
+                    onClick={() => setShowCancelModal(true)}
                     disabled={actionLoading !== null}
                     className="px-3 py-1.5 bg-white border border-red-300 text-red-600 text-sm font-medium rounded-lg hover:bg-red-50 disabled:opacity-50"
                   >
@@ -373,6 +375,39 @@ export default function ContractorProjectDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Cancel confirmation modal */}
+      {showCancelModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="cancel-modal-title"
+        >
+          <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full" dir="rtl">
+            <h2 id="cancel-modal-title" className="text-lg font-bold text-gray-900 mb-2">
+              {t('cancelConfirmTitle')}
+            </h2>
+            <p className="text-gray-600 text-sm mb-6">{t('cancelConfirm')}</p>
+            <div className="flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => setShowCancelModal(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+              >
+                {t('cancelModalBack')}
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleCancelConfirmed()}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700"
+              >
+                {t('cancelModalConfirm')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

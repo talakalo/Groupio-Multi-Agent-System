@@ -629,15 +629,17 @@ export default function ResidentProfilePage() {
                   t('updatePassword')
                 )}
               </button>
-              {passwordStatus === 'success' && (
-                <span className="text-sm text-green-600 flex items-center gap-1">
-                  <Check className="h-4 w-4" />
-                  {t('passwordUpdated')}
-                </span>
-              )}
-              {passwordStatus === 'error' && (
-                <span className="text-sm text-red-600">{t('passwordUpdateFailed')}</span>
-              )}
+              <span aria-live="polite" aria-atomic="true" className="text-sm">
+                {passwordStatus === 'success' && (
+                  <span className="text-green-600 flex items-center gap-1">
+                    <Check className="h-4 w-4" aria-hidden="true" />
+                    {t('passwordUpdated')}
+                  </span>
+                )}
+                {passwordStatus === 'error' && (
+                  <span className="text-red-600">{t('passwordUpdateFailed')}</span>
+                )}
+              </span>
             </div>
           </div>
 

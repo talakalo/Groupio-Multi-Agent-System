@@ -903,7 +903,10 @@
         "cancelled": "בוטל",
         "active": "פעיל"
       },
-      "cancelConfirm": "לביטול ההצעה? פעולה זו אינה הפיכה.",
+      "cancelConfirm": "פעולה זו אינה הפיכה. ההצעה וכל המשתתפים יקבלו הודעה.",
+      "cancelConfirmTitle": "לבטל את ההצעה?",
+      "cancelModalBack": "חזרה",
+      "cancelModalConfirm": "כן, בטל הצעה",
       "publishFailed": "פרסום נכשל",
       "cancelFailed": "הביטול נכשל"
     }

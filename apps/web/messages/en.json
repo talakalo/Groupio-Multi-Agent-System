@@ -903,7 +903,10 @@
         "cancelled": "Cancelled",
         "active": "Active"
       },
-      "cancelConfirm": "Cancel this offer? This action cannot be undone.",
+      "cancelConfirm": "This action cannot be undone. The offer and all participants will be notified.",
+      "cancelConfirmTitle": "Cancel this offer?",
+      "cancelModalBack": "Go back",
+      "cancelModalConfirm": "Yes, cancel offer",
       "publishFailed": "Publish failed",
       "cancelFailed": "Cancel failed"
     }
