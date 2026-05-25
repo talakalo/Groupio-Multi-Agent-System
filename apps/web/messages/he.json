@@ -191,7 +191,11 @@
     "payments": "תשלומים",
     "myAccountHint": "פרופיל, התראות והעדפות",
     "accountMenu": "תפריט חשבון",
-    "logout": "התנתקות"
+    "logout": "התנתקות",
+    "verifyEmailBanner": "נא לאמת את כתובת האימייל שלכם. בדקו את תיבת הדואר ולחצו על קישור האימות.",
+    "resendVerification": "שליחת קישור אימות מחדש",
+    "resendSending": "שולח...",
+    "resendSent": "נשלח! בדקו את האימייל."
   },
   "contractorNav": {
     "dashboard": "לוח בקרה",
@@ -207,7 +211,8 @@
     "resendVerification": "שליחת קישור אימות מחדש",
     "resendSending": "שולח...",
     "resendSent": "נשלח! בדקו את האימייל.",
-    "accountMenu": "תפריט חשבון"
+    "accountMenu": "תפריט חשבון",
+    "earnings": "הכנסות"
   },
   "dashboard": {
     "welcome": "שלום, {name}!",
@@ -228,7 +233,12 @@
     "noActiveOffers": "אין הצעות פעילות",
     "browseOffers": "עיין בהצעות",
     "recentActivity": "פעילות אחרונה",
-    "noRecentActivity": "אין פעילות אחרונה"
+    "noRecentActivity": "אין פעילות אחרונה",
+    "noBuilding": {
+      "title": "ברוכים הבאים ל-Groupio!",
+      "description": "עדיין לא הצטרפתם לבניין. הצטרפו לבניין שלכם כדי לגשת להצעות קבוצתיות.",
+      "action": "הצטרפו לבניין"
+    }
   },
   "offers": {
     "title": "הצעות",
@@ -318,7 +328,15 @@
       "defaultText": "המחיר חושב על ידי AI על בסיס מספר משתתפים, קטגוריה, ומחירי שוק."
     },
     "joinNow": "הצטרפו עכשיו",
-    "trustScore": "ציון אמינות"
+    "trustScore": "ציון אמינות",
+    "sortBy": "מיון לפי",
+    "sort": {
+      "popularity": "פופולריות",
+      "new": "חדש",
+      "savings": "חיסכון",
+      "price": "מחיר"
+    },
+    "quickAll": "הכל"
   },
   "contractors": {
     "title": "קבלנים",
@@ -408,7 +426,14 @@
     "backToProfile": "חזרה לפרופיל",
     "passwordSubtitle": "הזינו את הסיסמה הנוכחית ואת הסיסמה החדשה",
     "changing": "משנה...",
-    "changePasswordBtn": "שנה סיסמה"
+    "changePasswordBtn": "שנה סיסמה",
+    "deleteIrreversible": "⚠️ פעולה זו אינה הפיכה",
+    "deleteConfirmInstruction": "הקלידו DELETE כדי לאשר מחיקת החשבון:",
+    "deleteButton": "מחק את החשבון שלי",
+    "cancel": "ביטול",
+    "deleteConfirmAriaLabel": "אישור מחיקת חשבון",
+    "deleteValidationError": "יש להקליד DELETE לאישור",
+    "deleteErrorMessage": "שגיאה במחיקת החשבון. נסו שוב."
   },
   "building": {
     "title": "הבניין",
@@ -432,7 +457,16 @@
     "city": "עיר",
     "buildingAge": "גיל הבניין",
     "yearsOld": "שנים",
-    "contactCommittee": "צור קשר עם ועד הבית"
+    "contactCommittee": "צור קשר עם ועד הבית",
+    "noBuilding": "אין בניין משויך",
+    "noBuildingDescription": "הצטרפו לבניין שלכם כדי לראות שכנים והצעות קבוצתיות.",
+    "joinBuilding": "הצטרפו לבניין",
+    "shareTitle": "הזמנה ל-Groupio",
+    "shareText": "הצטרפו לבניין שלנו ב-Groupio! קוד הזמנה: {code}",
+    "residents": "דיירים",
+    "share": "שתף",
+    "inviteCodeBadge": "קוד הזמנה",
+    "inviteCodeHint": "שתפו את הקוד עם שכנים כדי שיוכלו להצטרף לבניין ולקבל הצעות קבוצתיות"
   },
   "checkout": {
     "breadcrumbOffers": "הצעות",
@@ -868,7 +902,10 @@
         "completed": "הושלם",
         "cancelled": "בוטל",
         "active": "פעיל"
-      }
+      },
+      "cancelConfirm": "לביטול ההצעה? פעולה זו אינה הפיכה.",
+      "publishFailed": "פרסום נכשל",
+      "cancelFailed": "הביטול נכשל"
     }
   },
   "onboarding": {
@@ -1260,5 +1297,65 @@
     "myAccountHint": "שם, אימייל והתנתקות",
     "profile": "חשבון",
     "logout": "התנתקות"
+  },
+  "resendVerification": {
+    "title": "שליחת קישור אימות מחדש",
+    "subtitle": "הזינו את כתובת האימייל שלכם ונשלח אליכם קישור לאימות החשבון.",
+    "emailLabel": "כתובת אימייל",
+    "sendButton": "שלח קישור אימות",
+    "sending": "שולח...",
+    "successMessage": "נשלח אליכם מייל עם קישור לאימות. בדקו את תיקיית הספאם אם אינכם מוצאים.",
+    "backToLogin": "חזרה להתחברות",
+    "errorMessage": "אירעה שגיאה. נסו שוב מאוחר יותר.",
+    "validEmailRequired": "נא להזין כתובת אימייל תקינה"
+  },
+  "contact": {
+    "pageTitle": "צור קשר",
+    "pageDescription": "צרו קשר עם צוות Groupio — נשמח לעזור",
+    "hero": {
+      "badge": "יצירת קשר",
+      "title": "אנחנו כאן בשבילכם",
+      "description": "נחזור אליכם תוך יום עסקים. לשאלות נפוצות ראו את",
+      "faqLink": "דף שאלות ותשובות"
+    },
+    "channels": {
+      "sectionTitle": "ערוצי יצירת קשר",
+      "general": {
+        "label": "תמיכה כללית",
+        "desc": "לכל שאלה או בעיה בפלטפורמה"
+      },
+      "billing": {
+        "label": "שאלות תשלומים וחיובים",
+        "desc": "חיובים, החזרים, עמלות"
+      },
+      "privacy": {
+        "label": "הגנת פרטיות ומחיקת נתונים",
+        "desc": "בקשות GDPR ומחיקת חשבון"
+      },
+      "contractors": {
+        "label": "קבלנים — הצטרפות לפלטפורמה",
+        "desc": "הרשמה ואימות קבלנים"
+      }
+    },
+    "responseTimes": {
+      "sectionTitle": "זמני תגובה מובטחים",
+      "support": {
+        "label": "פניות תמיכה",
+        "time": "עד יום עסקים אחד"
+      },
+      "payment": {
+        "label": "בעיות תשלום דחופות",
+        "time": "עד 4 שעות בימי חול"
+      },
+      "gdpr": {
+        "label": "בקשות GDPR / מחיקת נתונים",
+        "time": "עד 30 ימים (כנדרש בחוק)"
+      }
+    },
+    "faqNudge": {
+      "title": "רוב השאלות כבר נענו",
+      "description": "בדקו את דף שאלות ותשובות לפני שמגיעים אלינו — תחסכו זמן.",
+      "button": "לדף FAQ"
+    }
   }
 }

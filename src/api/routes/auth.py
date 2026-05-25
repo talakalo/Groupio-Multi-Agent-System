@@ -124,6 +124,63 @@ async def signup(request: SignupRequest, _: None = Depends(check_auth_rate_limit
 
     user = await db.create_user(user_data)
 
+    # Auto-create a minimal contractors row so contractor-only endpoints work
+    # immediately after signup (before the full onboarding wizard completes).
+    if request.role == UserRole.CONTRACTOR:
+        from uuid import uuid4 as _uuid4
+
+        contractor_id = str(_uuid4())
+        contractor_row = {
+            "id": contractor_id,
+            "user_id": user_id,
+            "business_name": request.name,
+            "contact_name": request.name,
+            "email": request.email,
+            "phone": request.phone,
+            "description": "",
+            "categories": [],
+            "regions": [],
+            "years_experience": 0,
+            "employee_count": 1,
+            "website": None,
+            "verification_status": "pending",
+            "trust_score": 0.0,
+            "license_number": None,
+        }
+        try:
+            if db._use_supabase_client():
+                client = await db._get_client()
+                await client.table("contractors").insert(contractor_row).execute()
+            else:
+                await db._pg_execute(
+                    """INSERT INTO contractors
+                       (id, user_id, business_name, contact_name, email,
+                        phone, description, categories, regions,
+                        years_experience, employee_count, website,
+                        verification_status, trust_score, license_number)
+                       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9,
+                               $10, $11, $12, $13, $14, $15)""",
+                    contractor_row["id"],
+                    contractor_row["user_id"],
+                    contractor_row["business_name"],
+                    contractor_row["contact_name"],
+                    contractor_row["email"],
+                    contractor_row["phone"],
+                    contractor_row["description"],
+                    contractor_row["categories"],
+                    contractor_row["regions"],
+                    contractor_row["years_experience"],
+                    contractor_row["employee_count"],
+                    contractor_row["website"],
+                    contractor_row["verification_status"],
+                    contractor_row["trust_score"],
+                    contractor_row["license_number"],
+                )
+            await db.update_user(user_id, {"contractor_id": contractor_id})
+            user = await db.get_user(user_id) or user
+        except Exception as exc:
+            logger.error("Failed to auto-create contractor profile for %s: %s", user_id, exc)
+
     logger.info("User registered via signup: %s", user.email)
 
     # Send verification email (if SMTP configured)

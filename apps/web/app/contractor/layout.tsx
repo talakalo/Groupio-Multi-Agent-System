@@ -13,6 +13,7 @@ import {
   ClipboardList,
   Mail,
   Loader2,
+  DollarSign,
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -35,6 +36,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/contractor/dashboard', labelKey: 'dashboard', icon: LayoutDashboard },
   { href: '/contractor/offers/active', labelKey: 'activeOffers', icon: ClipboardList },
   { href: '/contractor/projects', labelKey: 'projects', icon: FolderKanban },
+  { href: '/contractor/earnings', labelKey: 'earnings', icon: DollarSign },
   { href: '/contractor/profile', labelKey: 'profile', icon: UserCircle },
 ];
 

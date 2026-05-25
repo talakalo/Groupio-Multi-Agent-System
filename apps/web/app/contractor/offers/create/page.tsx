@@ -611,7 +611,7 @@ export default function CreateOfferPage(props: PageParamsProps) {
               onClick={goToPrevStep}
               className="flex-1 flex items-center justify-center gap-2 py-3 px-6 border border-gray-300 rounded-xl font-medium text-gray-700 hover:bg-gray-50 transition-colors"
             >
-              <ArrowRight className="h-4 w-4" />
+              {dir === 'rtl' ? <ArrowRight className="h-4 w-4" /> : <ArrowLeft className="h-4 w-4" />}
               {t('buttons.back')}
             </button>
           )}
@@ -633,7 +633,7 @@ export default function CreateOfferPage(props: PageParamsProps) {
               className="flex-1 flex items-center justify-center gap-2 py-3 px-6 bg-sky-500 hover:bg-sky-600 text-white rounded-xl font-medium transition-colors"
             >
               {t('buttons.next')}
-              <ArrowLeft className="h-4 w-4" />
+              {dir === 'rtl' ? <ArrowLeft className="h-4 w-4" /> : <ArrowRight className="h-4 w-4" />}
             </button>
           ) : (
             <button

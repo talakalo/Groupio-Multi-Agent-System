@@ -239,14 +239,7 @@ export default function ResidentDashboardPage() {
     queryFn: async () => {
       try {
         const base = await apiClient.getMyBuilding();
-        const data = base as unknown as Building & {
-          activeOffers?: unknown[];
-          residents?: unknown[];
-          totalSavings?: number;
-          total_savings?: number;
-          name?: string;
-          address?: string;
-        };
+        const data = base as Building & { total_savings?: number };
         return {
           activeOffers: Array.isArray(data.activeOffers) ? data.activeOffers.length : 0,
           neighborsJoined: Array.isArray(data.residents) ? data.residents.length : 0,
@@ -329,9 +322,9 @@ export default function ResidentDashboardPage() {
       {stats?.buildingName === '-' && (
         <EmptyState
           icon={Building2}
-          title="ברוכים הבאים ל-Groupio!"
-          description="עדיין לא הצטרפתם לבניין. הצטרפו לבניין שלכם כדי לגשת להצעות קבוצתיות."
-          action={{ label: 'הצטרפו לבניין', href: '/building/join' }}
+          title={t('noBuilding.title')}
+          description={t('noBuilding.description')}
+          action={{ label: t('noBuilding.action'), href: '/building/join' }}
         />
       )}
 

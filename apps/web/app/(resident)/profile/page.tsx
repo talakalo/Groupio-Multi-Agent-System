@@ -195,7 +195,7 @@ export default function ResidentProfilePage() {
 
   const handleDeleteAccount = async () => {
     if (deleteInput !== 'DELETE') {
-      setDeleteError('יש להקליד DELETE לאישור');
+      setDeleteError(t('deleteValidationError'));
       return;
     }
     setDeleteError('');
@@ -205,7 +205,7 @@ export default function ResidentProfilePage() {
       router.push('/login');
     } catch (error) {
       console.error('Failed to delete account:', error);
-      setDeleteError('שגיאה במחיקת החשבון. נסו שוב.');
+      setDeleteError(t('deleteErrorMessage'));
     }
   };
 
@@ -657,15 +657,15 @@ export default function ResidentProfilePage() {
               </div>
             ) : (
               <div className="space-y-3 p-4 rounded-xl border border-red-200 bg-red-50">
-                <p className="text-sm font-semibold text-red-700">⚠️ פעולה זו אינה הפיכה</p>
-                <p className="text-xs text-red-600">הקלידו <strong>DELETE</strong> כדי לאשר מחיקת החשבון:</p>
+                <p className="text-sm font-semibold text-red-700">{t('deleteIrreversible')}</p>
+                <p className="text-xs text-red-600">{t('deleteConfirmInstruction')}</p>
                 <input
                   type="text"
                   value={deleteInput}
                   onChange={e => { setDeleteInput(e.target.value); setDeleteError(''); }}
                   placeholder="DELETE"
                   className="input-field text-sm"
-                  aria-label="אישור מחיקת חשבון"
+                  aria-label={t('deleteConfirmAriaLabel')}
                   autoComplete="off"
                 />
                 {deleteError && <p className="text-xs text-red-600" role="alert">{deleteError}</p>}
@@ -677,14 +677,14 @@ export default function ResidentProfilePage() {
                     className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
                   >
                     <Trash2 className="h-4 w-4" />
-                    מחק את החשבון שלי
+                    {t('deleteButton')}
                   </button>
                   <button
                     type="button"
                     onClick={() => { setDeletePhase('idle'); setDeleteInput(''); setDeleteError(''); }}
                     className="px-4 py-2 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors text-sm font-medium"
                   >
-                    ביטול
+                    {t('cancel')}
                   </button>
                 </div>
               </div>

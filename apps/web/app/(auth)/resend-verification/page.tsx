@@ -3,20 +3,21 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Building2, Loader2, Mail } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { apiClient } from "@/lib/api/client";
-import { cn } from "@/lib/utils/cn";
-
-const schema = z.object({
-  email: z.string().email("נא להזין כתובת אימייל תקינה"),
-});
-
-type FormData = z.infer<typeof schema>;
 
 export default function ResendVerificationPage() {
+  const t = useTranslations("resendVerification");
+
+  const schema = z.object({
+    email: z.string().email(t("validEmailRequired")),
+  });
+  type FormData = z.infer<typeof schema>;
+
   const [isLoading, setIsLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,9 +26,7 @@ export default function ResendVerificationPage() {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<FormData>({
-    resolver: zodResolver(schema),
-  });
+  } = useForm<FormData>({ resolver: zodResolver(schema) });
 
   const onSubmit = async (data: FormData) => {
     setIsLoading(true);
@@ -36,7 +35,7 @@ export default function ResendVerificationPage() {
       await apiClient.resendVerificationByEmail(data.email);
       setSent(true);
     } catch {
-      setError("אירעה שגיאה. נסו שוב מאוחר יותר.");
+      setError(t("errorMessage"));
     } finally {
       setIsLoading(false);
     }
@@ -52,20 +51,14 @@ export default function ResendVerificationPage() {
       </div>
 
       <div className="card">
-        <h1 className="text-xl font-bold text-gray-900 mb-2">
-          שליחת קישור אימות מחדש
-        </h1>
-        <p className="text-sm text-gray-600 mb-6">
-          הזינו את כתובת האימייל שלכם ונסלח אליכם קישור לאימות החשבון.
-        </p>
+        <h1 className="text-xl font-bold text-gray-900 mb-2">{t("title")}</h1>
+        <p className="text-sm text-gray-600 mb-6">{t("subtitle")}</p>
 
         {sent ? (
           <div className="py-4 text-center">
-            <p className="text-emerald-600 font-medium">
-              נשלח אליכם מייל עם קישור לאימות. בדקו את תיקיית הספאם אם אינכם מוצאים.
-            </p>
+            <p className="text-emerald-600 font-medium">{t("successMessage")}</p>
             <Link href="/login" className="btn-primary mt-4 inline-block">
-              חזרה להתחברות
+              {t("backToLogin")}
             </Link>
           </div>
         ) : (
@@ -80,7 +73,7 @@ export default function ResendVerificationPage() {
                 htmlFor="resend-email"
                 className="block text-sm font-medium text-gray-700 mb-1.5"
               >
-                כתובת אימייל
+                {t("emailLabel")}
               </label>
               <div className="relative">
                 <Mail className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -108,10 +101,10 @@ export default function ResendVerificationPage() {
               {isLoading ? (
                 <>
                   <Loader2 className="h-5 w-5 animate-spin" />
-                  שולח...
+                  {t("sending")}
                 </>
               ) : (
-                "שלח קישור אימות"
+                t("sendButton")
               )}
             </button>
           </form>
@@ -120,7 +113,7 @@ export default function ResendVerificationPage() {
 
       <p className="text-center text-sm text-gray-600">
         <Link href="/login" className="text-primary-600 hover:text-primary-700 font-medium">
-          חזרה להתחברות
+          {t("backToLogin")}
         </Link>
       </p>
     </div>

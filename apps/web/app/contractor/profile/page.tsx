@@ -75,6 +75,24 @@ function mergeContractorNotifPrefs(raw: unknown): ContractorNotifPrefs {
   };
 }
 
+function contractorToForm(c: Contractor): ProfileForm {
+  const raw = c as Contractor & Record<string, unknown>;
+  return {
+    businessName: c.businessName ?? (raw.business_name as string) ?? '',
+    contactName: (raw.contactName ?? raw.contact_name ?? c.businessName ?? '') as string,
+    email: (c.email ?? '') as string,
+    phone: (c.phone ?? '') as string,
+    description: (c.description ?? '') as string,
+    categories: (c.categories as string[]) ?? [],
+    regions: (c.regions as string[]) ?? [],
+    yearsExperience: ((raw.yearsExperience ?? raw.years_experience ?? c.yearsInBusiness ?? 0) as number),
+    employeeCount: ((raw.employeeCount ?? raw.employee_count ?? 1) as number),
+    licenseNumber: (c.licenseNumber ?? (raw.license_number as string) ?? undefined),
+    insuranceExpiry: (c.insuranceExpiry ?? (raw.insurance_expiry as string) ?? undefined),
+    website: ((raw.website ?? '') as string),
+  };
+}
+
 export default function ContractorProfilePage() {
   const t = useTranslations('contractor.profile');
   const accessToken = useAuthStore((s) => s.accessToken);
@@ -222,7 +240,7 @@ export default function ContractorProfilePage() {
           if (contractorResult.status === 'fulfilled') {
             const contractor = contractorResult.value;
             setContractor(contractor);
-            reset(contractor as unknown as ProfileForm);
+            reset(contractorToForm(contractor));
           }
           if (docReqResult.status === 'fulfilled') {
             const dr = docReqResult.value;
@@ -251,10 +269,10 @@ export default function ContractorProfilePage() {
     try {
       const updated = await apiClient.updateContractor(
         contractorId,
-        data as unknown as Record<string, unknown>,
+        data as Record<string, unknown>,
       );
       setContractor(updated);
-      reset(updated as unknown as ProfileForm);
+      reset(contractorToForm(updated as Contractor));
       alert(t('saveSuccess'));
     } catch (error) {
       console.error('Failed to save profile:', error);

@@ -273,12 +273,10 @@ export default function ResidentLayout({ children }: { children: React.ReactNode
           >
             <div className="flex items-center gap-2 text-sm" style={{ color: '#92400e' }}>
               <Mail className="h-4 w-4 flex-shrink-0" aria-hidden />
-              <span>
-                נא לאמת את כתובת האימייל שלכם. בדקו את תיבת הדואר ולחצו על קישור האימות.
-              </span>
+              <span>{t('verifyEmailBanner')}</span>
             </div>
             {resendSent ? (
-              <span className="text-sm font-medium" style={{ color: '#14532d' }}>נשלח! בדקו את האימייל.</span>
+              <span className="text-sm font-medium" style={{ color: '#14532d' }}>{t('resendSent')}</span>
             ) : (
               <button
                 type="button"
@@ -298,10 +296,10 @@ export default function ResidentLayout({ children }: { children: React.ReactNode
                 {resending ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    שולח...
+                    {t('resendSending')}
                   </>
                 ) : (
-                  'שליחת קישור אימות מחדש'
+                  t('resendVerification')
                 )}
               </button>
             )}

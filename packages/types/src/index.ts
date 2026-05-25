@@ -29,6 +29,15 @@ export interface Building {
   municipality_code?: string;
   enrichment_confidence?: number;
   enrichment_source?: string;
+  /** Runtime-populated by API join — shape varies by endpoint */
+  residents?: unknown[];
+  inviteCode?: string;
+  /** Aggregate stats returned by the API */
+  activeOffers?: Offer[];
+  totalSavings?: number;
+  committee?: string;
+  buildingAge?: number;
+  name?: string;
 }
 
 export interface Contractor {

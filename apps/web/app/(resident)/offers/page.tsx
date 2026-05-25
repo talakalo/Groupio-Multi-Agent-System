@@ -58,24 +58,8 @@ const STATUS_COLORS: Record<OfferStatus, string> = {
   expired: 'bg-gray-100 text-gray-500',
 };
 
-const QUICK_CATEGORIES = [
-  { id: 'all', label: 'הכל' },
-  { id: 'renovations', label: 'שיפוצים' },
-  { id: 'plumbing', label: 'אינסטלציה' },
-  { id: 'electrical', label: 'חשמל' },
-  { id: 'ac_installation', label: 'מיזוג אוויר' },
-  { id: 'painting', label: 'צביעה' },
-  { id: 'flooring', label: 'ריצוף' },
-  { id: 'windows', label: 'חלונות' },
-  { id: 'heating', label: 'חימום' },
-];
-
-const SORT_OPTIONS: { value: SortOption; label: string }[] = [
-  { value: 'popularity', label: 'פופולריות' },
-  { value: 'new', label: 'חדש' },
-  { value: 'savings', label: 'חיסכון' },
-  { value: 'price', label: 'מחיר' },
-];
+const QUICK_CATEGORY_IDS = ['all', 'renovations', 'plumbing', 'electrical', 'ac_installation', 'painting', 'flooring', 'windows', 'heating'] as const;
+const SORT_OPTION_VALUES: SortOption[] = ['popularity', 'new', 'savings', 'price'];
 
 // ---------------------------------------------------------------------------
 // Offer Card — new design language
@@ -162,6 +146,15 @@ export default function OffersListPage(props: PageParamsProps) {
   const t = useTranslations("offers");
   const tCat = useTranslations("categories");
   const tCommon = useTranslations("common");
+
+  const QUICK_CATEGORIES = QUICK_CATEGORY_IDS.map((id) => ({
+    id,
+    label: id === 'all' ? t('quickAll') : tCat(id),
+  }));
+  const SORT_OPTIONS = SORT_OPTION_VALUES.map((value) => ({
+    value,
+    label: t(`sort.${value}`),
+  }));
   const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState<SortOption>("popularity");
   const [filters, setFilters] = useState<OffersFilters>({ search: "", category: "all", status: "all", priceMin: null, priceMax: null });

@@ -114,21 +114,21 @@ export default function ContractorProjectDetailPage() {
       const updated = await apiClient.publishOffer(id);
       setProject(updated as unknown as ProjectDetail);
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : 'פרסום נכשל');
+      setActionError(err instanceof ApiError ? err.message : t('publishFailed'));
     } finally {
       setActionLoading(null);
     }
   }
 
   async function handleCancel() {
-    if (!id || !window.confirm('לביטול ההצעה? פעולה זו אינה הפיכה.')) return;
+    if (!id || !window.confirm(t('cancelConfirm'))) return;
     setActionLoading('cancel');
     setActionError(null);
     try {
       await apiClient.cancelOffer(id);
       router.push('/contractor/projects');
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : 'הביטול נכשל');
+      setActionError(err instanceof ApiError ? err.message : t('cancelFailed'));
       setActionLoading(null);
     }
   }

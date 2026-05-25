@@ -100,8 +100,20 @@ export default function OrderDetailPage(props: PageParamsProps) {
   } = useApiData<OrderDetail | null>(
     ["orders", id],
     async () => {
-      const data = await apiClient.getPayment(id);
-      return data as unknown as OrderDetail;
+      const raw = await apiClient.getPayment(id) as unknown as Record<string, unknown>;
+      return {
+        id: raw.id as string,
+        offerId: (raw.offerId ?? raw.offer_id ?? '') as string,
+        amount: (raw.amount ?? 0) as number,
+        currency: (raw.currency ?? 'ILS') as string,
+        status: (raw.status ?? 'pending') as string,
+        createdAt: (raw.createdAt ?? raw.created_at ?? '') as string,
+        transactionId: raw.transactionId as string | undefined,
+        paymentMethod: raw.paymentMethod as string | undefined,
+        offer: raw.offer as OrderDetail['offer'],
+        escrowStatus: raw.escrowStatus as string | undefined,
+        invoiceId: raw.invoiceId as string | undefined,
+      };
     },
     { enabled: !!id },
   );

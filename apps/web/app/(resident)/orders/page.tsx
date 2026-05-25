@@ -367,8 +367,20 @@ export default function OrdersPage() {
     ["orders", "my", { page: 1, limit: 50 }],
     async () => {
       const raw = await apiClient.getMyPayments({ page: 1, limit: 50 });
-      const list = Array.isArray(raw) ? raw : (raw?.payments ?? []);
-      return list as unknown as Order[];
+      const list = (Array.isArray(raw) ? raw : (raw?.payments ?? [])) as unknown as Record<string, unknown>[];
+      return list.map((p) => ({
+        id: p.id as string,
+        offerId: (p.offerId ?? p.offer_id ?? '') as string,
+        offerTitle: p.offerTitle as string | undefined,
+        contractorId: p.contractorId as string | undefined,
+        contractorName: p.contractorName as string | undefined,
+        contractorPhone: p.contractorPhone as string | undefined,
+        amount: (p.amount ?? 0) as number,
+        currency: (p.currency ?? 'ILS') as string,
+        status: (p.status ?? 'pending') as string,
+        createdAt: (p.createdAt ?? p.created_at ?? '') as string,
+        transactionId: p.transactionId as string | undefined,
+      }));
     },
   );
   const fetchOrders = () => { void refetch(); };

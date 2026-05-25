@@ -113,12 +113,7 @@ export default function BuildingsManagerDashboardPage() {
     queryFn: async () => {
       const data = await apiClient.listEscalations({ status: 'open', page_size: 5 });
       return {
-        items: (data.items ?? []) as unknown as {
-          id: string;
-          reason: string;
-          priority: string;
-          created_at: string;
-        }[],
+        items: (data.items ?? []) as unknown as { id: string; reason: string; priority: string; created_at: string }[],
       };
     },
     enabled: !!accessToken,

@@ -163,7 +163,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
       })
   );
 
-  const ErrorBoundary = AppErrorBoundary as unknown as React.JSX.ElementType;
+  // React 19 changed Component<> to not extend JSX.ElementType directly.
+  const ErrorBoundary = AppErrorBoundary as React.ComponentType<{ children: React.ReactNode }>;
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>

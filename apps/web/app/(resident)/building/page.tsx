@@ -135,21 +135,14 @@ export default function BuildingPage(props: PageParamsProps) {
     queryFn: async () => {
       try {
         const base = await apiClient.getMyBuilding();
-        const data = base as unknown as Building & {
-          residents?: unknown[];
-          activeOffers?: unknown[];
-          totalSavings?: number;
-          total_savings?: number;
-          inviteCode?: string;
-          invite_code?: string;
-        };
+        const data = base as Building & { total_savings?: number; invite_code?: string };
         return {
           ...base,
           residents: Array.isArray(data.residents) ? data.residents : [],
           activeOffers: Array.isArray(data.activeOffers) ? data.activeOffers : [],
           totalSavings: data.totalSavings ?? data.total_savings ?? 0,
           inviteCode: data.inviteCode ?? data.invite_code ?? '',
-        } as BuildingProfile;
+        } as unknown as BuildingProfile;
       } catch (err) {
         if (err instanceof ApiError && err.status === 404) return null;
         throw err;
@@ -173,10 +166,10 @@ export default function BuildingPage(props: PageParamsProps) {
 
   const handleShare = async () => {
     if (!building?.inviteCode) return;
-    const shareText = `הצטרפו לבניין שלנו ב-Groupio! קוד הזמנה: ${building.inviteCode}`;
+    const shareText = t('shareText', { code: building.inviteCode });
     if (navigator.share) {
       try {
-        await navigator.share({ title: 'הזמנה ל-Groupio', text: shareText });
+        await navigator.share({ title: t('shareTitle'), text: shareText });
       } catch {
         // User cancelled
       }
@@ -192,9 +185,9 @@ export default function BuildingPage(props: PageParamsProps) {
       <div className="max-w-4xl mx-auto">
         <EmptyState
           icon={Building2}
-          title={t('noBuilding') ?? 'אין בניין משויך'}
-          description="הצטרפו לבניין שלכם כדי לראות שכנים והצעות קבוצתיות."
-          action={{ label: 'הצטרפו לבניין', href: '/building/join' }}
+          title={t('noBuilding')}
+          description={t('noBuildingDescription')}
+          action={{ label: t('joinBuilding'), href: '/building/join' }}
         />
       </div>
     );
@@ -244,7 +237,7 @@ export default function BuildingPage(props: PageParamsProps) {
                 )}
               </div>
               <Badge variant="primary" size="sm">
-                {building.residents?.length ?? 0} דיירים
+                {building.residents?.length ?? 0} {t('residents')}
               </Badge>
             </div>
 
@@ -290,10 +283,10 @@ export default function BuildingPage(props: PageParamsProps) {
                 <p className="text-2xl font-bold text-primary-600 font-mono tracking-widest select-all">
                   {building.inviteCode}
                 </p>
-                <Badge variant="primary" size="sm">קוד הזמנה</Badge>
+                <Badge variant="primary" size="sm">{t('inviteCodeBadge')}</Badge>
               </div>
               <p className="text-sm text-primary-700 mb-4">
-                שתפו את הקוד עם שכנים כדי שיוכלו להצטרף לבניין ולקבל הצעות קבוצתיות
+                {t('inviteCodeHint')}
               </p>
               <div className="flex gap-2">
                 <button
@@ -324,7 +317,7 @@ export default function BuildingPage(props: PageParamsProps) {
                   className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium border border-primary-300 text-primary-700 hover:bg-primary-50 transition-colors"
                 >
                   <Share2 className="h-4 w-4" />
-                  {t('share') ?? 'שתף'}
+                  {t('share')}
                 </button>
               </div>
             </div>

@@ -191,7 +191,11 @@
     "payments": "Payments",
     "myAccountHint": "Profile, notifications & preferences",
     "accountMenu": "Account menu",
-    "logout": "Log out"
+    "logout": "Log out",
+    "verifyEmailBanner": "Please verify your email address. Check your inbox and click the verification link.",
+    "resendVerification": "Resend Verification Link",
+    "resendSending": "Sending...",
+    "resendSent": "Sent! Check your email."
   },
   "contractorNav": {
     "dashboard": "Dashboard",
@@ -207,7 +211,8 @@
     "resendVerification": "Resend Verification Link",
     "resendSending": "Sending...",
     "resendSent": "Sent! Check your email.",
-    "accountMenu": "Account menu"
+    "accountMenu": "Account menu",
+    "earnings": "Earnings"
   },
   "dashboard": {
     "welcome": "Hello, {name}!",
@@ -228,7 +233,12 @@
     "noActiveOffers": "No active offers",
     "browseOffers": "Browse Offers",
     "recentActivity": "Recent Activity",
-    "noRecentActivity": "No recent activity"
+    "noRecentActivity": "No recent activity",
+    "noBuilding": {
+      "title": "Welcome to Groupio!",
+      "description": "You haven't joined a building yet. Join your building to access group offers.",
+      "action": "Join a Building"
+    }
   },
   "offers": {
     "title": "Offers",
@@ -318,7 +328,15 @@
       "defaultText": "The price was calculated by AI based on participant count, category, and market prices."
     },
     "joinNow": "Join Now",
-    "trustScore": "Trust Score"
+    "trustScore": "Trust Score",
+    "sortBy": "Sort by",
+    "sort": {
+      "popularity": "Popularity",
+      "new": "Newest",
+      "savings": "Savings",
+      "price": "Price"
+    },
+    "quickAll": "All"
   },
   "contractors": {
     "title": "Contractors",
@@ -408,7 +426,14 @@
     "backToProfile": "Back to profile",
     "passwordSubtitle": "Enter your current password and new password",
     "changing": "Changing...",
-    "changePasswordBtn": "Change password"
+    "changePasswordBtn": "Change password",
+    "deleteIrreversible": "⚠️ This action cannot be undone",
+    "deleteConfirmInstruction": "Type DELETE to confirm account deletion:",
+    "deleteButton": "Delete My Account",
+    "cancel": "Cancel",
+    "deleteConfirmAriaLabel": "Confirm account deletion",
+    "deleteValidationError": "Please type DELETE to confirm",
+    "deleteErrorMessage": "Error deleting account. Please try again."
   },
   "building": {
     "title": "Building",
@@ -432,7 +457,16 @@
     "city": "City",
     "buildingAge": "Building Age",
     "yearsOld": "years old",
-    "contactCommittee": "Contact Committee"
+    "contactCommittee": "Contact Committee",
+    "noBuilding": "No Building Assigned",
+    "noBuildingDescription": "Join your building to see neighbors and group offers.",
+    "joinBuilding": "Join a Building",
+    "shareTitle": "Invitation to Groupio",
+    "shareText": "Join our building on Groupio! Invite code: {code}",
+    "residents": "Residents",
+    "share": "Share",
+    "inviteCodeBadge": "Invite Code",
+    "inviteCodeHint": "Share this code with neighbors so they can join the building and receive group offers"
   },
   "checkout": {
     "breadcrumbOffers": "Offers",
@@ -868,7 +902,10 @@
         "completed": "Completed",
         "cancelled": "Cancelled",
         "active": "Active"
-      }
+      },
+      "cancelConfirm": "Cancel this offer? This action cannot be undone.",
+      "publishFailed": "Publish failed",
+      "cancelFailed": "Cancel failed"
     }
   },
   "onboarding": {
@@ -1260,5 +1297,65 @@
     "myAccountHint": "Name, email & sign out",
     "profile": "Account",
     "logout": "Log out"
+  },
+  "resendVerification": {
+    "title": "Resend Verification Email",
+    "subtitle": "Enter your email address and we'll send you a new verification link.",
+    "emailLabel": "Email Address",
+    "sendButton": "Send Verification Link",
+    "sending": "Sending...",
+    "successMessage": "We've sent you a verification email. Check your spam folder if you don't see it.",
+    "backToLogin": "Back to Login",
+    "errorMessage": "An error occurred. Please try again later.",
+    "validEmailRequired": "Please enter a valid email address"
+  },
+  "contact": {
+    "pageTitle": "Contact Us",
+    "pageDescription": "Contact the Groupio team — we're happy to help",
+    "hero": {
+      "badge": "Contact",
+      "title": "We're Here for You",
+      "description": "We'll get back to you within one business day. For common questions see our",
+      "faqLink": "FAQ page"
+    },
+    "channels": {
+      "sectionTitle": "Contact Channels",
+      "general": {
+        "label": "General Support",
+        "desc": "Any question or platform issue"
+      },
+      "billing": {
+        "label": "Payments & Billing",
+        "desc": "Charges, refunds, commissions"
+      },
+      "privacy": {
+        "label": "Privacy & Data Deletion",
+        "desc": "GDPR requests and account deletion"
+      },
+      "contractors": {
+        "label": "Contractors — Join Platform",
+        "desc": "Registration and contractor verification"
+      }
+    },
+    "responseTimes": {
+      "sectionTitle": "Guaranteed Response Times",
+      "support": {
+        "label": "Support enquiries",
+        "time": "Within 1 business day"
+      },
+      "payment": {
+        "label": "Urgent payment issues",
+        "time": "Within 4 hours on weekdays"
+      },
+      "gdpr": {
+        "label": "GDPR / Data deletion requests",
+        "time": "Within 30 days (as required by law)"
+      }
+    },
+    "faqNudge": {
+      "title": "Most Questions Already Answered",
+      "description": "Check the FAQ page before reaching out — save yourself time.",
+      "button": "Go to FAQ"
+    }
   }
 }
