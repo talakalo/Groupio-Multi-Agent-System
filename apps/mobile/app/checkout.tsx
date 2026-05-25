@@ -1,4 +1,3 @@
-import { usePaymentSheet } from "@stripe/stripe-react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import React, { useState, useCallback } from "react";
 import { View, ScrollView, StyleSheet } from "react-native";
@@ -12,7 +11,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 
-import { createCheckout, initiatePayment } from "../lib/api";
+import { createCheckout } from "../lib/api";
 import { useOffer } from "../lib/hooks";
 import i18n from "../lib/i18n";
 
@@ -32,7 +31,6 @@ export default function CheckoutScreen() {
 
   const [state, setState] = useState<CheckoutState>("review");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const { initPaymentSheet, presentPaymentSheet } = usePaymentSheet();
 
   const tierIndex = parseInt(tierId ?? "0", 10);
   const tier = offer?.tiers[tierIndex] ?? offer?.tiers[offer.currentTier];
@@ -45,27 +43,6 @@ export default function CheckoutScreen() {
     setState("processing");
     setErrorMessage(null);
     try {
-      // Try native Stripe payment sheet first (requires client_secret from backend)
-      const payment = await initiatePayment(offerId);
-
-      if (payment.provider === "stripe" && payment.client_secret) {
-        const { error: initError } = await initPaymentSheet({
-          paymentIntentClientSecret: payment.client_secret,
-          merchantDisplayName: "Groupio",
-          returnURL: "groupio://checkout-return",
-        });
-        if (initError) {
-          throw new Error(initError.message);
-        }
-        const { error: presentError } = await presentPaymentSheet();
-        if (presentError) {
-          throw new Error(presentError.message);
-        }
-        setState("success");
-        return;
-      }
-
-      // Fallback: use generic checkout endpoint (mock / other providers)
       await createCheckout({ offerId, tierId: tierIndex });
       setState("success");
     } catch (err: unknown) {
@@ -74,7 +51,7 @@ export default function CheckoutScreen() {
       setErrorMessage(message);
       setState("error");
     }
-  }, [offerId, tierIndex, initPaymentSheet, presentPaymentSheet]);
+  }, [offerId, tierIndex]);
 
   if (isLoading) {
     return (

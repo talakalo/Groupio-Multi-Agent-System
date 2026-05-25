@@ -4,10 +4,10 @@ import { useTranslations } from 'next-intl';
 
 import { AIChat } from '@/components/features/chat/AIChat';
 import { useAuthStore } from '@/lib/stores/authStore';
-import { useUnwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
+import { unwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
 
 export default function ChatPage(props: PageParamsProps) {
-  useUnwrapPageParams(props);
+  unwrapPageParams(props);
   const t = useTranslations('chat');
   const user = useAuthStore((s) => s.user);
 
@@ -21,7 +21,6 @@ export default function ChatPage(props: PageParamsProps) {
         context="resident"
         userId={user?.id}
         buildingId={user?.buildingId}
-        welcomeMessage={t('welcome')}
         placeholder={t('placeholder')}
         suggestions={[
           t('suggestions.findAC'),

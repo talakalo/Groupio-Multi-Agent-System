@@ -31,7 +31,7 @@ import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { useNotificationStore } from '@/lib/stores/notificationStore';
 import { cn } from '@/lib/utils/cn';
-import { useUnwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
+import { unwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
 
 // ---------------------------------------------------------------------------
 // Join Confirmation Modal with cancellation policy disclosure
@@ -50,31 +50,30 @@ function JoinConfirmationModal({
   offerTitle: string;
   isLoading: boolean;
 }) {
-  const t = useTranslations('offers');
   const [policyAccepted, setPolicyAccepted] = useState(false);
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
-        <h2 className="text-xl font-bold text-gray-900 mb-2">{t('joinConfirmation.title')}</h2>
+      <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6" dir="rtl">
+        <h2 className="text-xl font-bold text-gray-900 mb-2">אישור הצטרפות להצעה</h2>
         <p className="text-gray-600 text-sm mb-4">
-          {t('joinConfirmation.offerLabel')} <strong>{offerTitle}</strong>
+          הצעה: <strong>{offerTitle}</strong>
         </p>
 
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-5">
           <h3 className="font-semibold text-amber-900 mb-2 text-sm flex items-center gap-1.5">
             <Shield className="h-4 w-4" />
-            {t('joinConfirmation.policyTitle')}
+            מדיניות ביטול
           </h3>
           <ul className="text-sm text-amber-800 space-y-1.5 list-disc list-inside">
-            <li>{t('joinConfirmation.policyFree')}</li>
-            <li>{t('joinConfirmation.policyAfterContractor')}</li>
-            <li>{t('joinConfirmation.policyAfterPayment')}</li>
+            <li>ניתן לעזוב את ההצעה חופשית <strong>עד לשלב התאמת הקבלן</strong> — ללא חיוב.</li>
+            <li>לאחר שנמצא קבלן — ביטול דרך תמיכת לקוחות בלבד.</li>
+            <li>לאחר ביצוע תשלום — כפוף למדיניות ההחזרים.</li>
           </ul>
           <Link href="/terms" className="text-xs text-amber-700 underline mt-2 inline-block" target="_blank">
-            {t('joinConfirmation.fullTerms')}
+            תנאי שימוש מלאים ←
           </Link>
         </div>
 
@@ -85,7 +84,7 @@ function JoinConfirmationModal({
             onChange={(e) => setPolicyAccepted(e.target.checked)}
             className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600"
           />
-          <span>{t('joinConfirmation.checkboxLabel')}</span>
+          <span>קראתי את מדיניות הביטול ואני מסכים/ה לתנאים</span>
         </label>
 
         <div className="flex gap-3">
@@ -96,7 +95,7 @@ function JoinConfirmationModal({
             className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-            {t('joinConfirmation.confirmButton')}
+            אישור הצטרפות
           </button>
           <button
             type="button"
@@ -104,7 +103,7 @@ function JoinConfirmationModal({
             disabled={isLoading}
             className="btn-secondary flex-1"
           >
-            {t('joinConfirmation.cancelButton')}
+            ביטול
           </button>
         </div>
       </div>
@@ -234,7 +233,6 @@ function StickyJoinCTA({
   disabled: boolean;
   targetRef: React.RefObject<HTMLButtonElement | null>;
 }) {
-  const t = useTranslations('offers');
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -263,7 +261,7 @@ function StickyJoinCTA({
           disabled={disabled}
           className="btn-primary px-8 py-2.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {t('joinNow')}
+          הצטרפו עכשיו
         </button>
       </div>
     </div>
@@ -275,7 +273,7 @@ function StickyJoinCTA({
 // ---------------------------------------------------------------------------
 
 export default function OfferDetailPage(props: PageParamsProps) {
-  useUnwrapPageParams(props);
+  unwrapPageParams(props);
   const params = useParams<{ offerId: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -323,12 +321,12 @@ export default function OfferDetailPage(props: PageParamsProps) {
         await navigator.share(shareData);
       } else {
         await navigator.clipboard.writeText(window.location.href);
-        addSuccess(t('linkCopied'), t('linkCopiedDescription'));
+        addSuccess('הקישור הועתק!', 'הקישור הועתק ללוח — שתפו עם שכנים');
       }
     } catch {
       // User cancelled share dialog — ignore
     }
-  }, [offer, t, tCat, addSuccess]);
+  }, [offer, t, tCat]);
 
   if (offerQuery.isLoading) {
     return (
@@ -381,7 +379,7 @@ export default function OfferDetailPage(props: PageParamsProps) {
       {/* Breadcrumb */}
       <Breadcrumb
         items={[
-          { label: t('home'), href: '/' },
+          { label: 'ראשי', href: '/' },
           { label: t('title'), href: '/offers' },
           { label: `${tCat(offer.category)} - ${t('groupOffer')}` },
         ]}
@@ -450,10 +448,10 @@ export default function OfferDetailPage(props: PageParamsProps) {
         {currentTier && (
           <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 mb-6">
             <h3 className="text-sm font-semibold text-emerald-800 mb-3">
-              {t('savings.title')}
+              החיסכון שלך
             </h3>
             <div className="flex items-center justify-between mb-3">
-              <span className="text-sm text-emerald-700">{t('savings.currentPerUnit')}</span>
+              <span className="text-sm text-emerald-700">חיסכון נוכחי לדירה</span>
               <span className="text-lg font-bold text-emerald-700">
                 {formatPrice(currentSavings)}
               </span>
@@ -462,7 +460,7 @@ export default function OfferDetailPage(props: PageParamsProps) {
               <>
                 <div className="flex items-center justify-between text-xs text-emerald-600 mb-1">
                   <span>
-                    {t('savings.moreNeighbors', { count: toNextTier, amount: formatPrice(nextTierSavings) })}
+                    עוד {toNextTier} שכנים = חיסכון של {formatPrice(nextTierSavings)}
                   </span>
                   <span>{progressToNextPct}%</span>
                 </div>
@@ -476,7 +474,7 @@ export default function OfferDetailPage(props: PageParamsProps) {
             )}
             {(!nextTier || toNextTier === 0) && (
               <p className="text-xs text-emerald-600">
-                {t('savings.maxDiscount')}
+                הגעתם לרמת ההנחה הגבוהה ביותר!
               </p>
             )}
           </div>
@@ -564,9 +562,9 @@ export default function OfferDetailPage(props: PageParamsProps) {
         {joinMutation.isSuccess && (
           <div className="mt-3 bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-semibold text-emerald-800">{t('joinSuccess.title')}</p>
+              <p className="text-sm font-semibold text-emerald-800">הצטרפתם בהצלחה!</p>
               <p className="text-xs text-emerald-700 mt-0.5">
-                {t('joinSuccess.subtitle')}
+                כדי להבטיח את מקומכם, יש להשלים את התשלום.
               </p>
             </div>
             <Link
@@ -574,21 +572,21 @@ export default function OfferDetailPage(props: PageParamsProps) {
               className="btn-primary text-sm whitespace-nowrap flex-shrink-0"
               data-testid="proceed-to-payment-button"
             >
-              {t('joinSuccess.proceedToPayment')}
+              לתשלום →
             </Link>
           </div>
         )}
 
         {/* Cancellation policy summary — always visible */}
         <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
-          <h3 className="font-semibold text-amber-900 text-sm mb-1.5">{t('cancellationPolicy.title')}</h3>
+          <h3 className="font-semibold text-amber-900 text-sm mb-1.5">מדיניות ביטול</h3>
           <ul className="text-xs text-amber-800 space-y-1 list-disc list-inside">
-            <li>{t('cancellationPolicy.item1')}</li>
-            <li>{t('cancellationPolicy.item2')}</li>
-            <li>{t('cancellationPolicy.item3')}</li>
+            <li>ניתן לעזוב את ההצעה בחינם עד לשלב התאמת הקבלן</li>
+            <li>לאחר אישור קבלן — ביטול דרך תמיכת לקוחות בלבד</li>
+            <li>לאחר תשלום — כפוף למדיניות ההחזרים</li>
           </ul>
           <Link href="/terms" className="text-xs text-amber-700 underline mt-1.5 inline-block">
-            {t('cancellationPolicy.fullTerms')}
+            תנאי שימוש מלאים ←
           </Link>
         </div>
 
@@ -599,7 +597,7 @@ export default function OfferDetailPage(props: PageParamsProps) {
           className="w-full flex items-center justify-center gap-2 mt-4 py-3 rounded-xl border-2 border-dashed border-primary-200 bg-primary-50/50 text-primary-700 font-semibold text-sm hover:bg-primary-50 transition-colors"
         >
           <Share2 className="h-4 w-4" />
-          {t('shareWithNeighborsCTA')}
+          שתפו עם השכנים — ככל שמצטרפים יותר, המחיר יורד!
         </button>
       </div>
 
@@ -621,11 +619,33 @@ export default function OfferDetailPage(props: PageParamsProps) {
           {/* Pricing rationale (Task 3.4) */}
           <details className="mt-4 text-sm text-gray-500">
             <summary className="cursor-pointer font-medium text-primary-600 hover:text-primary-700">
-              {t('pricingRationale.summary')}
+              כיצד חושב המחיר?
             </summary>
             <p className="mt-2 leading-relaxed">
               {(offer as { pricingRationale?: string }).pricingRationale ||
-                t('pricingRationale.defaultText')}
+                'המחיר חושב על ידי AI על בסיס מספר משתתפים, קטגוריה, ומחירי שוק.'}
+            </p>
+          </details>
+
+          {/* Pricing rationale (Task 3.4) */}
+          <details className="mt-4 text-sm text-gray-500">
+            <summary className="cursor-pointer font-medium text-primary-600 hover:text-primary-700">
+              כיצד חושב המחיר?
+            </summary>
+            <p className="mt-2 leading-relaxed">
+              {(offer as { pricingRationale?: string }).pricingRationale ||
+                'המחיר חושב על ידי AI על בסיס מספר משתתפים, קטגוריה, ומחירי שוק.'}
+            </p>
+          </details>
+
+          {/* Pricing rationale (Task 3.4) */}
+          <details className="mt-4 text-sm text-gray-500">
+            <summary className="cursor-pointer font-medium text-primary-600 hover:text-primary-700">
+              כיצד חושב המחיר?
+            </summary>
+            <p className="mt-2 leading-relaxed">
+              {(offer as { pricingRationale?: string }).pricingRationale ||
+                'המחיר חושב על ידי AI על בסיס מספר משתתפים, קטגוריה, ומחירי שוק.'}
             </p>
           </details>
 
@@ -697,7 +717,7 @@ export default function OfferDetailPage(props: PageParamsProps) {
                 </div>
                 {contractor.trustScore != null && (
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-500">{t('trustScore')}</span>
+                    <span className="text-gray-500">ציון אמינות</span>
                     <span
                       className={cn(
                         'font-semibold px-2 py-0.5 rounded-full text-xs',

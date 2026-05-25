@@ -45,7 +45,6 @@ interface CreateOfferPayload {
 
 interface JoinOfferPayload {
   offerId: string;
-  userId: string;
   unitCount?: number;
   inviteToken?: string;
 }
@@ -131,8 +130,8 @@ export function useJoinOffer() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ offerId, userId, unitCount, inviteToken }: JoinOfferPayload) => {
-      return apiClient.joinOffer(offerId, { userId, unitCount, inviteToken });
+    mutationFn: async ({ offerId, unitCount, inviteToken }: JoinOfferPayload) => {
+      return apiClient.joinOffer(offerId, { unitCount, inviteToken });
     },
     onSuccess: (_data, variables) => {
       // Optimistically update the participant count in the cache

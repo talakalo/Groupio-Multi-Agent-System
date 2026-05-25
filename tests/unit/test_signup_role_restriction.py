@@ -16,6 +16,7 @@ from pydantic import ValidationError
 
 from src.models.user import SELF_REGISTERABLE_ROLES, UserCreate, UserRole
 
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -95,7 +96,10 @@ def test_user_create_rejects_privileged_roles(privileged_role: str):
         UserCreate(**{**_VALID_REGISTER_BASE, "role": privileged_role})
     errors = exc_info.value.errors()
     role_errors = [e for e in errors if "role" in e.get("loc", ())]
-    assert role_errors, f"Expected a ValidationError on 'role' for '{privileged_role}', got: {errors}"
+    assert role_errors, (
+        f"Expected a ValidationError on 'role' for '{privileged_role}', "
+        f"got: {errors}"
+    )
 
 
 def test_user_create_rejects_admin_explicit():

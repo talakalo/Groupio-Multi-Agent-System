@@ -14,6 +14,11 @@ vi.mock('next/font/google', () => ({
   Inter: () => ({ className: 'font-inter', variable: '--font-inter' }),
 }));
 
+// ---- next/font/google (layout uses Inter) ----
+vi.mock('next/font/google', () => ({
+  Inter: () => ({ className: 'font-inter', variable: '--font-inter' }),
+}));
+
 // ---- next/navigation ----
 const mockPush = vi.fn();
 const mockRefresh = vi.fn();

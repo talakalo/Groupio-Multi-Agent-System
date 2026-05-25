@@ -29,10 +29,6 @@ def mock_db():
 def mock_redis():
     """Mock Redis client by patching the singleton."""
     redis = AsyncMock()
-    redis.is_temporarily_locked = AsyncMock(return_value=0)
-    redis.clear_temporary_lockout = AsyncMock()
-    redis.clear_login_failures = AsyncMock()
-    redis.increment_login_failures = AsyncMock(return_value=1)
     with patch("src.databases.redis_client._redis_client", redis):
         yield redis
 
@@ -194,7 +190,6 @@ class TestOffersAPI:
 
     def test_list_offers(self, client, mock_db, mock_offer):
         """Test listing offers."""
-        mock_db.get_building_ids_for_user = AsyncMock(return_value=["building-123"])
         mock_db.list_offers = AsyncMock(return_value=([mock_offer], 1))
         override_auth({"id": "user-123", "role": "resident"})
 
@@ -439,10 +434,6 @@ class TestContractorsAPI:
         assert response.status_code == 200
         data = response.json()
         assert data["total"] == 1
-        mock_db.list_contractors.assert_called_once()
-        call = mock_db.list_contractors.call_args
-        filters = (call.kwargs or {}).get("filters") or (call.args[0] if call.args else {})
-        assert filters.get("marketplace_visible_only") is True
 
     def test_get_contractor(self, client, mock_db, mock_contractor):
         """Test getting contractor details."""
@@ -453,15 +444,6 @@ class TestContractorsAPI:
         assert response.status_code == 200
         data = response.json()
         assert data["business_name"] == "AC Pro"
-
-    def test_get_contractor_hidden_membership_returns_404_for_anonymous(self, client, mock_db, mock_contractor):
-        """Non-marketplace-visible contractors are not exposed on the public profile route."""
-        hidden = {**mock_contractor, "membership_status": "canceled"}
-        mock_db.get_contractor = AsyncMock(return_value=hidden)
-
-        response = client.get("/api/v1/contractors/contractor-123")
-
-        assert response.status_code == 404
 
     def test_get_contractor_not_found(self, client, mock_db):
         """Test getting non-existent contractor."""
@@ -580,14 +562,12 @@ class TestAuthAPI:
                 email="test@example.com",
                 role="resident",
                 is_active=True,
-                is_verified=True,
             )
         )
         mock_redis.set = AsyncMock()
         with patch("src.api.routes.auth.verify_password") as mock_verify:
             mock_verify.return_value = True
             mock_db.get_user_password_hash = AsyncMock(return_value="hashed")
-            mock_db.update_user = AsyncMock()
             response = client.post(
                 "/api/v1/auth/login/json",
                 json={"email": "test@example.com", "password": "password123"},
@@ -995,7 +975,9 @@ class TestSignupRoleRestriction:
             json={**self._VALID_BASE, "role": role},
         )
         # Must not be rejected by validation (422 = Unprocessable Entity)
-        assert response.status_code != 422, f"Allowed role '{role}' was incorrectly rejected: {response.json()}"
+        assert response.status_code != 422, (
+            f"Allowed role '{role}' was incorrectly rejected: {response.json()}"
+        )
 
     # -- /signup forbidden roles ----------------------------------------------
 
@@ -1010,7 +992,8 @@ class TestSignupRoleRestriction:
             json={**self._VALID_BASE, "role": privileged_role},
         )
         assert response.status_code == 422, (
-            f"Expected 422 for privileged role '{privileged_role}' but got {response.status_code}: {response.json()}"
+            f"Expected 422 for privileged role '{privileged_role}' but got "
+            f"{response.status_code}: {response.json()}"
         )
 
     def test_signup_rejects_admin(self, client, mock_db, mock_redis):

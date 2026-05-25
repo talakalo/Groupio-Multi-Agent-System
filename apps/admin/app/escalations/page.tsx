@@ -14,10 +14,6 @@ import { useState, useMemo, useCallback } from "react";
 
 import { EscalationsTable } from "@/components/features/escalations/EscalationsTable";
 import { MetricCard } from "@/components/features/metrics/MetricCard";
-import {
-  getEscalationActionsTaken,
-  getEscalationIntent,
-} from "@/lib/escalation-context";
 import { useEscalations, useResolveEscalation } from "@/lib/hooks";
 
 // ---------------------------------------------------------------------------
@@ -27,45 +23,12 @@ import { useEscalations, useResolveEscalation } from "@/lib/hooks";
 type PriorityFilter = "all" | "urgent" | "high" | "normal" | "low";
 type StatusFilter = "all" | "open" | "assigned" | "resolved";
 
-const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/+$/, "");
-const API_BASE_V1 = API_BASE.endsWith("/api/v1") ? API_BASE : `${API_BASE}/api/v1`;
-
 const PRIORITY_ESCALATION_MAP: Record<string, string> = {
   low: "normal",
   normal: "high",
   high: "urgent",
   urgent: "urgent",
-  /** If list data ever bypasses UI normalization */
-  medium: "high",
-  critical: "urgent",
 };
-
-/** UI priority → FastAPI ``EscalationPriority`` (medium/high/critical, not "urgent"). */
-function priorityUiToApi(p: string): string {
-  const m: Record<string, string> = {
-    low: "low",
-    normal: "medium",
-    high: "high",
-    urgent: "critical",
-  };
-  return m[p] ?? p;
-}
-
-async function adminJsonRequest(path: string, init: RequestInit = {}) {
-  const res = await fetch(`${API_BASE_V1}${path}`, {
-    ...init,
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...(init.headers ?? {}),
-    },
-  });
-  if (!res.ok) {
-    const detail = await res.text().catch(() => "");
-    throw new Error(detail || `Request failed with ${res.status}`);
-  }
-  return res.json().catch(() => ({}));
-}
 
 // ---------------------------------------------------------------------------
 // Page component
@@ -88,6 +51,15 @@ export default function EscalationsPage() {
 
   const resolveMutation = useResolveEscalation();
 
+  // ---- API helpers ----
+  const rawApiUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "") || "http://localhost:8000";
+  const API_BASE = rawApiUrl.endsWith("/api/v1") ? rawApiUrl : `${rawApiUrl}/api/v1`;
+
+  const fetchOpts = (): RequestInit => ({
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+  });
+
   const allEscalations = useMemo(
     () => escalationsData?.escalations ?? [],
     [escalationsData?.escalations]
@@ -102,25 +74,18 @@ export default function EscalationsPage() {
       result = result.filter((e) => e.priority === priorityFilter);
     }
 
-    // Status filter (API may still send in_progress; normalized client uses assigned)
+    // Status filter
     if (statusFilter !== "all") {
-      if (statusFilter === "assigned") {
-        result = result.filter((e) => {
-          const s = e.status as string;
-          return s === "assigned" || s === "in_progress";
-        });
-      } else {
-        result = result.filter((e) => e.status === statusFilter);
-      }
+      result = result.filter((e) => e.status === statusFilter);
     }
 
     // Agent source filter
     if (agentFilter !== "all") {
       result = result.filter((e) => {
-        const actions = getEscalationActionsTaken(e.context);
-        const fromAction = actions.length > 0 ? actions[0].agent : "";
-        const fromApi = (e as { sourceAgent?: string }).sourceAgent ?? "";
-        const sourceAgent = fromAction || fromApi;
+        const sourceAgent =
+          e.context.actionsTaken.length > 0
+            ? e.context.actionsTaken[0].agent
+            : "";
         return sourceAgent === agentFilter;
       });
     }
@@ -132,7 +97,7 @@ export default function EscalationsPage() {
         (e) =>
           e.reason.toLowerCase().includes(q) ||
           e.id.toLowerCase().includes(q) ||
-          getEscalationIntent(e.context).toLowerCase().includes(q)
+          e.context.intent.toLowerCase().includes(q)
       );
     }
 
@@ -164,10 +129,9 @@ export default function EscalationsPage() {
   // ---- Statistics ----
   const stats = useMemo(() => {
     const open = allEscalations.filter((e) => e.status === "open").length;
-    const assigned = allEscalations.filter((e) => {
-      const s = e.status as string;
-      return s === "assigned" || s === "in_progress";
-    }).length;
+    const assigned = allEscalations.filter(
+      (e) => e.status === "assigned"
+    ).length;
     const resolved = allEscalations.filter(
       (e) => e.status === "resolved"
     ).length;
@@ -181,11 +145,8 @@ export default function EscalationsPage() {
   const agentSources = useMemo(() => {
     const sources = new Set<string>();
     allEscalations.forEach((e) => {
-      const actions = getEscalationActionsTaken(e.context);
-      if (actions.length > 0) sources.add(actions[0].agent);
-      else {
-        const sa = (e as { sourceAgent?: string }).sourceAgent;
-        if (sa) sources.add(sa);
+      if (e.context.actionsTaken.length > 0) {
+        sources.add(e.context.actionsTaken[0].agent);
       }
     });
     return Array.from(sources).sort();
@@ -203,22 +164,26 @@ export default function EscalationsPage() {
     async (id: string) => {
       try {
         // Use the current admin user id from localStorage (or fallback to "admin")
-        const raw =
+        const adminUserId =
           typeof window !== "undefined"
-            ? localStorage.getItem("admin_user_id")
-            : null;
-        const adminUserId = raw?.trim() || "admin";
+            ? localStorage.getItem("admin_user_id") ?? "admin"
+            : "admin";
 
-        await adminJsonRequest(`/escalations/${encodeURIComponent(id)}/assign`, {
-          method: "POST",
-          body: JSON.stringify({ assigned_to: adminUserId }),
-        });
+        const res = await fetch(
+          `${API_BASE}/escalations/${encodeURIComponent(id)}/assign`,
+          {
+            method: "POST",
+            ...fetchOpts(),
+            body: JSON.stringify({ assigned_to: adminUserId }),
+          }
+        );
+        if (!res.ok) throw new Error(`Failed to reassign escalation ${id}: ${res.status}`);
         await queryClient.invalidateQueries({ queryKey: ["admin", "escalations"] });
       } catch (err) {
         alert(err instanceof Error ? err.message : "Failed to reassign escalation");
       }
     },
-    [queryClient]
+    [API_BASE, queryClient]
   );
 
   const handleEscalate = useCallback(
@@ -234,20 +199,22 @@ export default function EscalationsPage() {
           return;
         }
 
-        const apiPriority = priorityUiToApi(newPriority);
-        if (!apiPriority) {
-          throw new Error("Invalid priority mapping");
-        }
-        await adminJsonRequest(`/escalations/${encodeURIComponent(id)}`, {
-          method: "PUT",
-          body: JSON.stringify({ priority: apiPriority }),
-        });
+        const res = await fetch(
+          `${API_BASE}/escalations/${encodeURIComponent(id)}`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ priority: newPriority }),
+          }
+        );
+        if (!res.ok) throw new Error(`Failed to escalate ${id}: ${res.status}`);
         await queryClient.invalidateQueries({ queryKey: ["admin", "escalations"] });
       } catch (err) {
         alert(err instanceof Error ? err.message : "Failed to escalate further");
       }
     },
-    [allEscalations, queryClient]
+    [API_BASE, allEscalations, queryClient]
   );
 
   const handleExport = useCallback(() => {
@@ -264,7 +231,7 @@ export default function EscalationsPage() {
       e.priority,
       e.status,
       `"${e.reason.replace(/"/g, '""')}"`,
-      getEscalationActionsTaken(e.context)[0]?.agent ?? "",
+      e.context.actionsTaken[0]?.agent ?? "",
       e.createdAt,
     ]);
     const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");

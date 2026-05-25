@@ -2,25 +2,6 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// ---- next-intl mock (Hebrew strings from locale files) ----
-vi.mock('next-intl', async () => {
-  const he = await import('../messages/he.json');
-  const messages = he.default ?? he;
-  const resolve =
-    (namespace: string) =>
-    (key: string): string => {
-      let node: unknown = messages;
-      for (const part of namespace.split('.')) {
-        node = (node as Record<string, unknown>)?.[part];
-      }
-      return (node as Record<string, string>)?.[key] ?? key;
-    };
-  return {
-    useTranslations: (namespace: string) => resolve(namespace),
-    useLocale: () => 'he',
-  };
-});
-
 // ---- next/navigation mock ----
 const mockPush = vi.fn();
 vi.mock('next/navigation', () => ({
@@ -72,26 +53,9 @@ vi.mock('@/lib/stores/authStore', () => {
 import LoginPage from '../app/(auth)/login/page';
 
 describe('Web LoginPage — navigation', () => {
-  let locationHref = '';
-
   beforeEach(() => {
     vi.clearAllMocks();
     global.fetch = vi.fn();
-    locationHref = '';
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: {
-        set href(url: string) {
-          locationHref = url;
-        },
-        get href() {
-          return locationHref;
-        },
-        assign: vi.fn(),
-        replace: vi.fn(),
-        reload: vi.fn(),
-      },
-    });
   });
 
   it('redirects to /dashboard after a successful login as resident', async () => {
@@ -124,7 +88,7 @@ describe('Web LoginPage — navigation', () => {
     });
   });
 
-  it('redirects admin to NEXT_PUBLIC_ADMIN_URL dashboard', async () => {
+  it('redirects to /admin/dashboard after login as admin', async () => {
     mockApiLogin.mockResolvedValueOnce({ token: 'auth-token-123' });
     (global.fetch as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce({
@@ -152,12 +116,11 @@ describe('Web LoginPage — navigation', () => {
     fireEvent.click(screen.getByRole('button', { name: /התחברות/i }));
 
     await waitFor(() => {
-      expect(locationHref).toMatch(/\/dashboard$/);
-      expect(locationHref).not.toContain('#token=');
+      expect(mockPush).toHaveBeenCalledWith('/admin/dashboard');
     });
   });
 
-  it('redirects super_admin to admin app dashboard', async () => {
+  it('redirects to /admin/dashboard after login as super_admin', async () => {
     mockApiLogin.mockResolvedValueOnce({ token: 'auth-token-123' });
     (global.fetch as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce({
@@ -185,12 +148,11 @@ describe('Web LoginPage — navigation', () => {
     fireEvent.click(screen.getByRole('button', { name: /התחברות/i }));
 
     await waitFor(() => {
-      expect(locationHref).toMatch(/\/dashboard$/);
-      expect(locationHref).not.toContain('#token=');
+      expect(mockPush).toHaveBeenCalledWith('/admin/dashboard');
     });
   });
 
-  it('redirects buildings_manager to admin app dashboard', async () => {
+  it('redirects to /buildings-manager/dashboard after login as buildings_manager', async () => {
     mockApiLogin.mockResolvedValueOnce({ token: 'auth-token-123' });
     (global.fetch as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce({
@@ -218,8 +180,7 @@ describe('Web LoginPage — navigation', () => {
     fireEvent.click(screen.getByRole('button', { name: /התחברות/i }));
 
     await waitFor(() => {
-      expect(locationHref).toMatch(/\/dashboard$/);
-      expect(locationHref).not.toContain('#token=');
+      expect(mockPush).toHaveBeenCalledWith('/buildings-manager/dashboard');
     });
   });
 
@@ -252,12 +213,9 @@ describe('Web LoginPage — navigation', () => {
     expect(signupLink).toBeDefined();
   });
 
-  it('has a logo link pointing to the home page (/ — in auth layout)', () => {
-    // The home logo link lives in (auth)/layout.tsx, not in the page component.
-    // Rendering LoginPage in isolation (no layout) means no href="/" is present.
+  it('has a logo link pointing to the home page (/)', () => {
     render(<LoginPage />);
-    const links = screen.getAllByRole('link').map((l) => l.getAttribute('href'));
-    // Page should have /signup and /forgot-password links at minimum
-    expect(links.some((href) => href === '/signup' || href === '/forgot-password')).toBe(true);
+    const homeLink = screen.getAllByRole('link').find((l) => l.getAttribute('href') === '/');
+    expect(homeLink).toBeDefined();
   });
 });

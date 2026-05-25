@@ -2,7 +2,12 @@
 
 import clsx from "clsx";
 import { Check } from "lucide-react";
-import { useTranslations } from "next-intl";
+
+interface TimelineStep {
+  key: string;
+  label: string;
+  date?: string;
+}
 
 type StepStatus = "complete" | "current" | "upcoming";
 
@@ -12,8 +17,13 @@ interface OrderTimelineProps {
   className?: string;
 }
 
-const STEP_KEYS = ["orderCreated", "paymentReceived", "contractorApproved", "workInProgress", "workCompleted"] as const;
-type StepKey = (typeof STEP_KEYS)[number];
+const STEPS: TimelineStep[] = [
+  { key: "created", label: "הזמנה נוצרה" },
+  { key: "paid", label: "תשלום התקבל" },
+  { key: "contractor", label: "קבלן אושר" },
+  { key: "in_progress", label: "עבודה בביצוע" },
+  { key: "completed", label: "עבודה הושלמה" },
+];
 
 const STATUS_TO_STEP: Record<string, number> = {
   pending: 0,
@@ -41,19 +51,18 @@ function formatDate(dateStr: string) {
 }
 
 export function OrderTimeline({ status, dates, className }: OrderTimelineProps) {
-  const t = useTranslations("orders");
   const activeStep = STATUS_TO_STEP[status] ?? 0;
 
   return (
     <div className={clsx("relative", className)}>
       <ol className="space-y-0">
-        {STEP_KEYS.map((stepKey, index) => {
+        {STEPS.map((step, index) => {
           const stepStatus = getStepStatus(index, activeStep);
-          const dateStr = dates?.[stepKey];
-          const isLast = index === STEP_KEYS.length - 1;
+          const dateStr = dates?.[step.key];
+          const isLast = index === STEPS.length - 1;
 
           return (
-            <li key={stepKey} className="relative flex gap-3">
+            <li key={step.key} className="relative flex gap-3">
               {/* Vertical connector line */}
               {!isLast && (
                 <div
@@ -91,7 +100,7 @@ export function OrderTimeline({ status, dates, className }: OrderTimelineProps) 
                     stepStatus === "upcoming" && "text-gray-400"
                   )}
                 >
-                  {t(`timeline.${stepKey as StepKey}`)}
+                  {step.label}
                 </p>
                 {dateStr && (
                   <p className="text-xs text-gray-500 mt-0.5">{formatDate(dateStr)}</p>

@@ -144,9 +144,7 @@ class TestHigh01WebhookFailClosed:
     rejected with 403 (fail-closed), not accepted."""
 
     def test_no_secret_rejects_post(self):
-        payload = {
-            "entry": [{"changes": [{"value": {"messages": [{"from": "972501234567", "text": {"body": "Hi"}}]}}]}]
-        }
+        payload = {"entry": [{"changes": [{"value": {"messages": [{"from": "972501234567", "text": {"body": "Hi"}}]}}]}]}
         payload_bytes = json.dumps(payload).encode()
 
         from src.api.main import app
@@ -224,10 +222,7 @@ class TestHigh02AdminEscalation:
         from src.api.main import app
         from src.api.middleware.auth import get_admin_user
 
-        async def _admin_dep():
-            return admin
-
-        app.dependency_overrides[get_admin_user] = _admin_dep
+        app.dependency_overrides[get_admin_user] = lambda: admin
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 client = TestClient(app, raise_server_exceptions=False)
@@ -257,10 +252,7 @@ class TestHigh02AdminEscalation:
         from src.api.main import app
         from src.api.middleware.auth import get_admin_user
 
-        async def _admin_dep():
-            return admin
-
-        app.dependency_overrides[get_admin_user] = _admin_dep
+        app.dependency_overrides[get_admin_user] = lambda: admin
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 client = TestClient(app, raise_server_exceptions=False)
@@ -285,10 +277,7 @@ class TestHigh02AdminEscalation:
         from src.api.main import app
         from src.api.middleware.auth import get_admin_user
 
-        async def _super_dep():
-            return super_admin
-
-        app.dependency_overrides[get_admin_user] = _super_dep
+        app.dependency_overrides[get_admin_user] = lambda: super_admin
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 client = TestClient(app, raise_server_exceptions=False)
@@ -476,8 +465,7 @@ class TestMedium04AtomicRefreshTokenSwap:
         try:
             with patch("src.api.routes.auth.get_postgres_client", return_value=db):
                 with patch("src.api.routes.auth.get_redis_client", return_value=redis):
-                    tok = {"sub": "user-1", "type": "refresh"}
-                    with patch("src.api.routes.auth.verify_refresh_token", return_value=tok):
+                    with patch("src.api.routes.auth.verify_refresh_token", return_value={"sub": "user-1", "type": "refresh"}):
                         client = TestClient(app, raise_server_exceptions=False)
                         resp = client.post(
                             "/api/v1/auth/refresh",
@@ -502,8 +490,7 @@ class TestMedium04AtomicRefreshTokenSwap:
         try:
             with patch("src.api.routes.auth.get_postgres_client", return_value=db):
                 with patch("src.api.routes.auth.get_redis_client", return_value=redis):
-                    tok = {"sub": "user-1", "type": "refresh"}
-                    with patch("src.api.routes.auth.verify_refresh_token", return_value=tok):
+                    with patch("src.api.routes.auth.verify_refresh_token", return_value={"sub": "user-1", "type": "refresh"}):
                         client = TestClient(app, raise_server_exceptions=False)
                         resp = client.post(
                             "/api/v1/auth/refresh",
@@ -523,12 +510,11 @@ class TestMedium05CspNoUnsafeInline:
     """The production CSP must not include 'unsafe-inline' in style-src."""
 
     def _get_csp(self) -> str:
+        from src.api.middleware.security import SecurityHeadersMiddleware
         from starlette.applications import Starlette
         from starlette.requests import Request
         from starlette.responses import PlainTextResponse
         from starlette.testclient import TestClient
-
-        from src.api.middleware.security import SecurityHeadersMiddleware
 
         async def homepage(request: Request):
             return PlainTextResponse("ok")
@@ -614,7 +600,7 @@ class TestLow02TemporaryBruteForce:
         redis = AsyncMock()
         redis.check_ip_rate_limit = AsyncMock(return_value=True)
         redis.is_temporarily_locked = AsyncMock(return_value=0)
-        # Single request: failed password with counter already at 5 triggers lockout
+        # 5th failure triggers lockout
         redis.increment_login_failures = AsyncMock(return_value=5)
         redis.set_temporary_lockout = AsyncMock()
         redis.clear_login_failures = AsyncMock()
@@ -708,7 +694,9 @@ class TestLow04E164PhoneValidation:
     """Phone numbers not matching E.164 digits-only format are silently ignored."""
 
     def _post_webhook(self, phone: str, secret: str = "test-secret"):
-        payload = {"entry": [{"changes": [{"value": {"messages": [{"from": phone, "text": {"body": "Hello"}}]}}]}]}
+        payload = {
+            "entry": [{"changes": [{"value": {"messages": [{"from": phone, "text": {"body": "Hello"}}]}}]}]
+        }
         payload_bytes = json.dumps(payload).encode()
         sig = _whatsapp_sig(secret, payload_bytes)
 
@@ -766,13 +754,12 @@ class TestLow05RequestIdInjection:
     """X-Request-ID containing control characters or newlines must be replaced."""
 
     def _get_request_id(self, header_value: str | None) -> str:
+        from src.api.middleware.logging import RequestLoggingMiddleware
         from starlette.applications import Starlette
         from starlette.requests import Request
         from starlette.responses import PlainTextResponse
         from starlette.routing import Route
         from starlette.testclient import TestClient
-
-        from src.api.middleware.logging import RequestLoggingMiddleware
 
         async def homepage(request: Request):
             return PlainTextResponse(request.state.request_id)

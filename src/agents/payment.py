@@ -146,7 +146,11 @@ class PaymentAgent(BaseAgent):
         await db.list_payments_for_user(user_id)
 
         # Find the most relevant offer_id from state or payments
-        offer_id = state.get("offer_id")
+        offer_id = None
+        for entity_key in ("offer_id",):
+            if state.get(entity_key):
+                offer_id = state[entity_key]
+                break
 
         invoice = None
         if offer_id:
@@ -221,7 +225,9 @@ class PaymentAgent(BaseAgent):
             return await self._handle_refund_gated(state, user_id, user_message, mode)
         return await self._handle_refund_auto(state, user_id, user_message)
 
-    async def _handle_refund_gated(self, state: AgentState, user_id: str, user_message: str, mode: str) -> AgentState:
+    async def _handle_refund_gated(
+        self, state: AgentState, user_id: str, user_message: str, mode: str
+    ) -> AgentState:
         """Queue a refund request for admin approval without moving any money."""
         db = get_postgres_client()
         payments = await db.list_payments_for_user(user_id)

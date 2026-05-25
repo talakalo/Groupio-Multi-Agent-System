@@ -161,35 +161,23 @@ class BaseAgent(ABC):
     async def run(self, state: AgentState) -> AgentState:
         """Execute agent logic with timing and audit persistence.
 
-        Wraps _run_impl with timing and calls _persist_audit on completion,
-        including when _run_impl raises so exceptions are always audited.
+        Wraps _run_impl with timing and calls _persist_audit on completion.
         """
         start = time.perf_counter()
-        exc_caught: BaseException | None = None
-        result: AgentState = state
-        try:
-            result = await self._run_impl(state)
-        except Exception as exc:
-            exc_caught = exc
-            self._metrics["errors"] += 1
-
+        result = await self._run_impl(state)
         latency_ms = int((time.perf_counter() - start) * 1000)
+
         input_summary = self._get_last_user_message(state)
-
-        if exc_caught is not None:
-            action = "error"
-            output_summary = f"ERROR: {type(exc_caught).__name__}: {exc_caught}"
-        else:
-            actions = result.get("actions_taken", [])
-            last_action = actions[-1] if actions else {}
-            action = last_action.get("action", "run")
-            resp = last_action.get("response") or {}
-            msg = resp.get("message", "") if isinstance(resp.get("message"), str) else ""
-            output_summary = msg or last_action.get("summary_for_next_agent", "") or ""
-            if not output_summary and result.get("intent"):
-                output_summary = f"intent={result.get('intent')}"
-
+        actions = result.get("actions_taken", [])
+        last_action = actions[-1] if actions else {}
+        action = last_action.get("action", "run")
+        resp = last_action.get("response") or {}
+        msg = resp.get("message", "") if isinstance(resp.get("message"), str) else ""
+        output_summary = msg or last_action.get("summary_for_next_agent", "") or ""
+        if not output_summary and result.get("intent"):
+            output_summary = f"intent={result.get('intent')}"
         tokens_used = self._metrics.get("tokens", 0)
+
         self._persist_audit(
             state=result,
             action=action,
@@ -198,9 +186,6 @@ class BaseAgent(ABC):
             latency_ms=latency_ms,
             tokens_used=tokens_used,
         )
-
-        if exc_caught is not None:
-            raise exc_caught
         return result
 
     @abstractmethod
@@ -216,29 +201,16 @@ class BaseAgent(ABC):
         top_k: int = 10,
         strategy: str = "semantic",
     ) -> list[dict[str, Any]]:
-        """Retrieve relevant context from the RAG pipeline.
-
-        Returns an empty list rather than raising when Qdrant is unreachable
-        or the collection does not yet exist, so agents degrade gracefully.
-        """
+        """Retrieve relevant context from the RAG pipeline."""
         if not self.rag:
             return []
-        try:
-            return await self.rag.retrieve(
-                query=query,
-                namespace=namespace,
-                filters=filters,
-                top_k=top_k,
-                strategy=strategy,
-            )
-        except Exception as exc:
-            logger.warning(
-                "RAG retrieve failed (namespace=%s strategy=%s): %s — continuing without context",
-                namespace,
-                strategy,
-                exc,
-            )
-            return []
+        return await self.rag.retrieve(
+            query=query,
+            namespace=namespace,
+            filters=filters,
+            top_k=top_k,
+            strategy=strategy,
+        )
 
     @retry(
         stop=stop_after_attempt(3),

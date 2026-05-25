@@ -2,22 +2,8 @@ import type { Offer } from "@groupio/types";
 import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 
-vi.mock("next-intl", () => ({
-  useTranslations: () => (key: string, vars?: Record<string, unknown>) => {
-    if (key === "participants") return `${vars?.count} שכנים הצטרפו`;
-    if (key === "nextTier") return `עוד ${vars?.needed} שכנים ל-${vars?.discount}% הנחה`;
-    if (key === "joinOffer") return "הצטרף להצעה";
-    if (key === "joined") return "הצטרפת";
-    if (key === "details") return "פרטים";
-    if (key === "currentPrice") return "מחיר נוכחי";
-    if (key === "verifiedContractor") return "קבלן מאומת";
-    if (key === "expiresIn") return `פג תוקף בעוד ${vars?.days} ימים`;
-    // categories and status keys — return the key itself for assertion flexibility
-    return key;
-  },
-}));
-
 import { OfferCard } from "../components/features/offers/OfferCard";
+
 
 const mockOffer: Offer = {
   id: "offer_001",
@@ -66,13 +52,16 @@ describe("OfferCard", () => {
 
   it("renders participant count", () => {
     render(<OfferCard offer={mockOffer} />);
+    // Look for the Hebrew text "5 שכנים הצטרפו" (5 neighbors joined)
     expect(screen.getByText(/שכנים הצטרפו/)).toBeDefined();
   });
 
   it("renders join button", () => {
     render(<OfferCard offer={mockOffer} />);
+    // Use getAllByRole since there are multiple buttons (join and details)
     const buttons = screen.getAllByRole("button");
     expect(buttons.length).toBeGreaterThan(0);
+    // Check that the join button exists
     expect(screen.getByText(/הצטרף להצעה/)).toBeDefined();
   });
 

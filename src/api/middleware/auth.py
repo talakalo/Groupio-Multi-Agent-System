@@ -18,54 +18,6 @@ logger = logging.getLogger(__name__)
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
 
-# PERF-2: auth-user Redis cache. Keeps typical authenticated-request DB load
-# off Postgres while honoring a short TTL for token freshness (profile edits
-# invalidate the key explicitly — see invalidate_cached_user below).
-AUTH_CACHE_PREFIX = "auth:user:"
-AUTH_CACHE_TTL_SECONDS = 300
-
-
-async def _get_cached_user(user_id: str) -> UserInDB | None:
-    """Best-effort Redis read. Returns None on any failure (falls back to DB)."""
-    try:
-        from src.databases.redis_client import get_redis_client
-
-        raw = await get_redis_client().get(f"{AUTH_CACHE_PREFIX}{user_id}")
-    except Exception as exc:
-        logger.debug("auth cache read failed; falling back to DB: %s", exc)
-        return None
-    if not raw:
-        return None
-    try:
-        return UserInDB.model_validate_json(raw)
-    except Exception as exc:
-        logger.debug("auth cache payload invalid for %s; discarding: %s", user_id, exc)
-        return None
-
-
-async def _set_cached_user(user: UserInDB) -> None:
-    """Best-effort Redis write. Swallow failures so auth never breaks on cache outages."""
-    try:
-        from src.databases.redis_client import get_redis_client
-
-        await get_redis_client().set(
-            f"{AUTH_CACHE_PREFIX}{user.id}",
-            user.model_dump_json(),
-            ex=AUTH_CACHE_TTL_SECONDS,
-        )
-    except Exception as exc:
-        logger.debug("auth cache write failed: %s", exc)
-
-
-async def invalidate_cached_user(user_id: str) -> None:
-    """Invalidate the auth cache for a user. Call from profile/admin mutations."""
-    try:
-        from src.databases.redis_client import get_redis_client
-
-        await get_redis_client().delete(f"{AUTH_CACHE_PREFIX}{user_id}")
-    except Exception as exc:
-        logger.debug("auth cache invalidate failed for %s: %s", user_id, exc)
-
 
 async def _get_token_from_header_or_cookie(
     request: Request,
@@ -219,7 +171,6 @@ async def get_current_user(
     if payload.jti:
         try:
             from src.databases.redis_client import get_redis_client
-
             redis = get_redis_client()
             if await redis.is_token_denylisted(payload.jti):
                 raise HTTPException(
@@ -232,18 +183,7 @@ async def get_current_user(
         except Exception as exc:
             logger.warning("Redis unavailable for denylist check — allowing token: %s", exc)
 
-    cached_user = await _get_cached_user(payload.sub)
-    if cached_user is not None:
-        if not cached_user.is_active:
-            raise HTTPException(status_code=403, detail="User is disabled")
-        settings = get_settings()
-        if settings.ENFORCE_EMAIL_VERIFICATION and not cached_user.is_verified:
-            raise HTTPException(
-                status_code=403,
-                detail="Email not verified. Please verify your email before continuing.",
-            )
-        return cached_user
-
+    # Fetch user from database
     from src.databases.postgres import get_postgres_client
 
     db = get_postgres_client()
@@ -259,7 +199,6 @@ async def get_current_user(
     if settings.ENFORCE_EMAIL_VERIFICATION and not user.is_verified:
         raise HTTPException(status_code=403, detail="Email not verified. Please verify your email before continuing.")
 
-    await _set_cached_user(user)
     return user
 
 
@@ -275,45 +214,6 @@ async def get_token_jti(
         return None
     payload = verify_access_token(token)
     return payload.jti if payload else None
-
-
-async def get_current_user_optional(
-    token: str | None = Depends(_get_token_from_header_or_cookie),
-) -> UserInDB | None:
-    """Return the current user when a valid token is present; otherwise None."""
-    if not token:
-        return None
-    payload = verify_access_token(token)
-    if not payload:
-        return None
-        # Optional auth must still honor denylisted/revoked tokens.
-    if payload.jti:
-        try:
-            from src.databases.redis_client import get_redis_client
-
-            redis = get_redis_client()
-            if await redis.is_token_denylisted(payload.jti):
-                return None
-        except Exception as exc:
-            logger.warning("Redis unavailable for optional-auth denylist check: %s", exc)
-    # Optional auth must still honor denylisted/revoked tokens.
-    if payload.jti:
-        try:
-            from src.databases.redis_client import get_redis_client
-
-            redis = get_redis_client()
-            if await redis.is_token_denylisted(payload.jti):
-                return None
-        except Exception as exc:
-            logger.warning("Redis unavailable for optional-auth denylist check: %s", exc)
-
-    from src.databases.postgres import get_postgres_client
-
-    db = get_postgres_client()
-    user = await db.get_user(payload.sub)
-    if not user or not user.is_active:
-        return None
-    return user
 
 
 async def get_current_active_user(
@@ -362,15 +262,6 @@ async def require_admin_only(
     """
     if current_user.role not in (UserRole.ADMIN, UserRole.SUPER_ADMIN):
         raise HTTPException(status_code=403, detail="Admin-only access required")
-    return current_user
-
-
-async def require_super_admin(
-    current_user: UserInDB = Depends(get_current_user),
-) -> UserInDB:
-    """Strict dependency: only ``super_admin`` (platform operator)."""
-    if current_user.role != UserRole.SUPER_ADMIN:
-        raise HTTPException(status_code=403, detail="Super-admin access required")
     return current_user
 
 
@@ -428,11 +319,3 @@ def is_admin(user: UserInDB) -> bool:
     inline checks where a dependency isn't convenient.
     """
     return user.role in ADMIN_ROLES
-
-
-def is_platform_admin(user: UserInDB) -> bool:
-    """True only for system operators (admin, super_admin).
-
-    Use for destructive or global operations. Excludes buildings_manager.
-    """
-    return user.role in (UserRole.ADMIN, UserRole.SUPER_ADMIN)

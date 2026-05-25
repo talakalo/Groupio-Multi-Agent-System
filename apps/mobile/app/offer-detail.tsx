@@ -1,3 +1,4 @@
+import type { ServiceCategory } from "@groupio/types";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useState } from "react";
 import { View, ScrollView, StyleSheet } from "react-native";
@@ -15,8 +16,21 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 
-import { CATEGORY_LABELS } from "../lib/categoryLabels";
 import { useOffer, useJoinOffer } from "../lib/hooks";
+
+const CATEGORY_LABELS: Record<ServiceCategory, string> = {
+  ac_installation: "\u05D4\u05EA\u05E7\u05E0\u05EA \u05DE\u05D6\u05D2\u05E0\u05D9\u05DD",
+  ac_maintenance: "\u05EA\u05D7\u05D6\u05D5\u05E7\u05EA \u05DE\u05D6\u05D2\u05E0\u05D9\u05DD",
+  kitchen: "\u05DE\u05D8\u05D1\u05D7\u05D9\u05DD",
+  electrical: "\u05D7\u05E9\u05DE\u05DC",
+  plumbing: "\u05D0\u05D9\u05E0\u05E1\u05D8\u05DC\u05E6\u05D9\u05D4",
+  heating: "\u05D7\u05D9\u05DE\u05D5\u05DD",
+  renovations: "\u05E9\u05D9\u05E4\u05D5\u05E6\u05D9\u05DD",
+  painting: "\u05E6\u05D1\u05D9\u05E2\u05D4",
+  flooring: "\u05E8\u05D9\u05E6\u05D5\u05E3",
+  windows: "\u05D7\u05DC\u05D5\u05E0\u05D5\u05EA",
+  security: "\u05D0\u05D1\u05D8\u05D7\u05D4",
+};
 
 export default function OfferDetailScreen() {
   const theme = useTheme();

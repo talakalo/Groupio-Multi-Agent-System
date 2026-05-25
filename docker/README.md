@@ -11,19 +11,7 @@
    (From host against port-mapped Postgres: `python scripts/seed_user_accounts.py` — only if your 127.0.0.1:5432 is the Docker Postgres, not a local install.)
    Creates: tal.akalo@gmail.com / T220782al!@#, takalo878@gmail.com / T2207al!@#, etc.
 
-   **Important:** This script seeds **only `users` rows** (accounts you can log in with). It does **not** insert buildings, offers, contractors, payments, or escalations. The admin app’s **Users** page will list those accounts; **Offers**, **Contractors**, **Buildings**, etc. will stay empty until you add more data.
-
-3. **Optional — full demo data** (buildings, residents, contractors, offers, escalations):
-
-   ```bash
-   docker compose -f docker/docker-compose.yml run --rm api python scripts/seed_test_data.py
-   ```
-
-   Uses `@example.com` seed emails and password `TestSeed123!` (override with `SEED_TEST_PASSWORD`). Inspect counts with `--dry-run`. Safe to re-run: existing emails are skipped.
-
-   **Host vs API DB:** Running `uv run python scripts/seed_test_data.py` on your Mac uses `docker/.env` (often **cloud Supabase**). The Admin app at `localhost:3001` still talks to **`NEXT_PUBLIC_API_URL`** (default `localhost:8000`). If that API points at **local Docker Postgres** or a different project, Offers/Users will look **empty** even after a successful seed. Fix: use the same `DATABASE_URL` / Supabase settings for the API as for the seed, restart the API, or run the seed command **inside** the `api` container (snippet above).
-
-4. **Metrics**: `/metrics` returns 403 when `API_KEYS` is set (Prometheus must send auth). For local dev, set `API_KEYS=[]` in docker/.env to allow unauthenticated scraping.
+3. **Metrics**: `/metrics` returns 403 when `API_KEYS` is set (Prometheus must send auth). For local dev, set `API_KEYS=[]` in docker/.env to allow unauthenticated scraping.
 
 ## Run
 

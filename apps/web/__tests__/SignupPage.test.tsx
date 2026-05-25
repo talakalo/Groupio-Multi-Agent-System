@@ -2,29 +2,6 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// ---- next-intl mock (Hebrew strings from locale files) ----
-vi.mock('next-intl', async () => {
-  const he = await import('../messages/he.json');
-  const messages = he.default ?? he;
-  const resolve =
-    (namespace: string) =>
-    (key: string): string => {
-      let node: unknown = messages;
-      for (const part of namespace.split('.')) {
-        node = (node as Record<string, unknown>)?.[part];
-      }
-      return (node as Record<string, string>)?.[key] ?? key;
-    };
-  return {
-    useTranslations: (namespace: string) => resolve(namespace),
-    useLocale: () => 'he',
-  };
-});
-
-vi.mock('@/lib/utils/unwrapPageParams', () => ({
-  useUnwrapPageParams: vi.fn(),
-}));
-
 // ---- next/navigation mock ----
 const mockPush = vi.fn();
 vi.mock('next/navigation', () => ({
@@ -145,11 +122,11 @@ describe('Web SignupPage — navigation', () => {
     expect(loginLink).toBeDefined();
   });
 
-  it('does not expose a home logo link on signup (only auth/legal links)', () => {
+  it('has a logo link pointing to the home page (/)', () => {
     render(<SignupPage />);
     const links = screen.getAllByRole('link');
-    expect(links.some((l) => l.getAttribute('href') === '/')).toBe(false);
-    expect(links.some((l) => l.getAttribute('href') === '/login')).toBe(true);
+    const homeLink = links.find((l) => l.getAttribute('href') === '/');
+    expect(homeLink).toBeDefined();
   });
 
   it('back button returns from step 2 to step 1 without navigating', async () => {

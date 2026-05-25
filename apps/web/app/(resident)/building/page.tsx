@@ -29,7 +29,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { apiClient, ApiError } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
-import { useUnwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
+import { unwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
 
 
 // ---------------------------------------------------------------------------
@@ -122,7 +122,7 @@ function GroupOfferCard({ offer }: { offer: Offer }) {
 // ---------------------------------------------------------------------------
 
 export default function BuildingPage(props: PageParamsProps) {
-  useUnwrapPageParams(props);
+  unwrapPageParams(props);
   const t = useTranslations('building');
   const tCommon = useTranslations('common');
   const [copiedCode, setCopiedCode] = useState(false);

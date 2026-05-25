@@ -17,19 +17,6 @@
     "management": "Management",
     "system": "System"
   },
-  "shell": {
-    "productTitle": "Groupio",
-    "productSubtitle": "Admin",
-    "dashboardTitle": "Admin Dashboard",
-    "versionBadge": "v0.1.0",
-    "expandSidebar": "Expand sidebar",
-    "collapseSidebar": "Collapse sidebar",
-    "notificationsAria": "Notifications",
-    "settingsAria": "Settings",
-    "signOutAria": "Sign out",
-    "localeEn": "English",
-    "localeHe": "עברית"
-  },
   "common": {
     "search": "Search...",
     "loading": "Loading...",

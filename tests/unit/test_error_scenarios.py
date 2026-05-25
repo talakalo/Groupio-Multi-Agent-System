@@ -7,7 +7,6 @@ edge cases, and circuit breaker behavior.
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from fastapi.testclient import TestClient
 
 
 class TestLLMErrorScenarios:
@@ -175,7 +174,7 @@ class TestSchemaNotReady:
 
         from src.api.main import _is_schema_not_ready
 
-        exc = asyncpg.exceptions.UndefinedTableError('relation "users" does not exist')
+        exc = asyncpg.exceptions.UndefinedTableError("relation \"users\" does not exist")
         assert _is_schema_not_ready(exc) is True
 
     def test_login_returns_503_when_users_table_missing(self):
@@ -183,17 +182,17 @@ class TestSchemaNotReady:
         import asyncpg.exceptions
 
         from src.api.main import app
+        from src.api.routes.auth import get_postgres_client
 
         db = MagicMock()
         db.get_user_by_email = AsyncMock(
-            side_effect=asyncpg.exceptions.UndefinedTableError('relation "users" does not exist')
+            side_effect=asyncpg.exceptions.UndefinedTableError("relation \"users\" does not exist")
         )
 
-        redis = AsyncMock()
-        redis.is_temporarily_locked = AsyncMock(return_value=0)
-        redis.increment_login_failures = AsyncMock(return_value=1)
         with patch("src.api.routes.auth.get_postgres_client", return_value=db):
-            with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+            with patch("src.api.routes.auth.get_redis_client"):
+                from fastapi.testclient import TestClient
+
                 client = TestClient(app, raise_server_exceptions=False)
                 resp = client.post(
                     "/api/v1/auth/login/json",

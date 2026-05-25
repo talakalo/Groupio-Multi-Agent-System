@@ -123,13 +123,7 @@
     "resendSuccess": "Verification email resent successfully",
     "resendFailed": "Failed to resend. Try again.",
     "resendVerification": "Resend verification link",
-    "continueToLogin": "Continue to login",
-    "forgotPasswordTitle": "Reset password",
-    "forgotPasswordHint": "Enter your email and we will send a reset link if an account exists.",
-    "forgotPasswordSubmit": "Send reset link",
-    "forgotPasswordSuccess": "If an account exists for this email, you will receive reset instructions shortly.",
-    "forgotPasswordError": "Could not send reset email. Try again.",
-    "forgotPasswordBack": "Back to sign in"
+    "continueToLogin": "Continue to login"
   },
   "contractor": {
     "quickActions": "Quick Actions",
@@ -141,7 +135,6 @@
     "viewAll": "View All",
     "recentProjects": "Recent Projects",
     "earnings": "Earnings",
-    "revenue": "Revenue",
     "participants": "Participants",
     "searchOffers": "Search offers...",
     "noOffers": "No offers",
@@ -190,6 +183,15 @@
     "security": "Security"
   },
   "orders": {
+    "noOrders": "No orders",
+    "ordersWillAppear": "Your orders will appear here",
+    "statusPending": "Pending",
+    "statusConfirmed": "Confirmed",
+    "statusInProgress": "In Progress",
+    "statusCompleted": "Completed",
+    "statusCancelled": "Cancelled"
+  },
+  "orders": {
     "title": "Orders",
     "noOrders": "No orders",
     "ordersWillAppear": "Your orders will appear here",
@@ -208,12 +210,7 @@
     "paymentPending": "Awaiting payment",
     "paymentEscrow": "In escrow",
     "paymentReleased": "Released",
-    "paymentRefunded": "Refunded",
-    "statusPending": "Pending",
-    "statusConfirmed": "Confirmed",
-    "statusInProgress": "In Progress",
-    "statusCompleted": "Completed",
-    "statusCancelled": "Cancelled"
+    "paymentRefunded": "Refunded"
   },
   "checkout": {
     "title": "Checkout",
@@ -265,6 +262,27 @@
     "next": "Next",
     "done": "Done",
     "comingSoon": "Coming Soon"
+  },
+  "contractor": {
+    "createOffer": "Create Offer",
+    "myOffers": "My Offers",
+    "projects": "Projects",
+    "messages": "Messages",
+    "activeOffers": "Active Offers",
+    "recentProjects": "Recent Projects",
+    "revenue": "Revenue",
+    "quickActions": "Quick Actions",
+    "participants": "participants",
+    "trustScore": "Trust Score",
+    "outOf100": "out of 100",
+    "noTrustData": "No trust data available",
+    "verificationStatus": "Verification Status",
+    "businessLicense": "Business License",
+    "verified": "Verified",
+    "insurance": "Insurance",
+    "valid": "Valid",
+    "documents": "Documents",
+    "uploaded": "Uploaded"
   },
   "status": {
     "active": "Active",

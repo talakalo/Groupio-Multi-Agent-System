@@ -45,7 +45,8 @@ def _detect_magic_type(data: bytes) -> str | None:
     """Return MIME type detected from magic bytes, or None if unknown."""
     for mime, sigs in _MAGIC_SIGNATURES:
         if all(
-            len(data) >= offset + len(magic) and data[offset : offset + len(magic)] == magic for offset, magic in sigs
+            len(data) >= offset + len(magic) and data[offset : offset + len(magic)] == magic
+            for offset, magic in sigs
         ):
             return mime
     return None

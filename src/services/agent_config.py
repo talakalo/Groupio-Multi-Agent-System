@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import logging
 import time
+from typing import Dict, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ logger = logging.getLogger(__name__)
 _CACHE_TTL: float = 10.0  # seconds
 
 # Map agent short-name → settings key
-_AGENT_KEY_MAP: dict[str, str] = {
+_AGENT_KEY_MAP: Dict[str, str] = {
     "matching": "MATCHING_AGENT_MODE",
     "pricing": "PRICING_AGENT_MODE",
     "vetting": "VETTING_AGENT_MODE",
@@ -42,10 +43,10 @@ _AGENT_KEY_MAP: dict[str, str] = {
 # Internal cache: key → (value, expiry_timestamp)
 # ---------------------------------------------------------------------------
 
-_cache: dict[str, tuple[str, float]] = {}
+_cache: Dict[str, Tuple[str, float]] = {}
 
 
-def _cache_get(key: str) -> str | None:
+def _cache_get(key: str) -> Optional[str]:
     entry = _cache.get(key)
     if entry is None:
         return None

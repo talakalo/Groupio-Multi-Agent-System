@@ -1,16 +1,15 @@
 """File upload API routes."""
 
-import asyncio
 import logging
 from uuid import uuid4
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 
 from src.api.middleware.auth import get_current_user
 from src.databases.postgres import get_postgres_client
 from src.databases.redis_client import get_redis_client
 from src.models.user import UserInDB
-from src.services.storage import MAX_FILE_SIZE, StorageError, get_storage_service
+from src.services.storage import StorageError, get_storage_service
 
 logger = logging.getLogger(__name__)
 
@@ -19,20 +18,8 @@ router = APIRouter(tags=["uploads"])
 # File uploads are rate-limited separately from the main message endpoint.
 # Uploads are heavier operations (disk I/O, storage API calls) and must be
 # throttled more aggressively to prevent abuse/DoS.
-_UPLOAD_RATE_LIMIT = 10  # requests
+_UPLOAD_RATE_LIMIT = 10   # requests
 _UPLOAD_RATE_WINDOW = 60  # per 60 seconds
-MAX_UPLOAD_BYTES = MAX_FILE_SIZE
-
-
-async def _read_upload_file(file: UploadFile) -> bytes:
-    """Read upload body and reject oversize files before storage processing."""
-    data = await file.read()
-    if len(data) > MAX_UPLOAD_BYTES:
-        raise HTTPException(
-            status_code=413,
-            detail=f"File too large ({len(data)} bytes). Max {MAX_UPLOAD_BYTES} bytes.",
-        )
-    return data
 
 
 async def _check_upload_rate_limit(current_user: UserInDB) -> None:
@@ -61,33 +48,8 @@ async def _check_upload_rate_limit(current_user: UserInDB) -> None:
 # ------------------------------------------------------------------
 
 
-async def _run_architecture_analysis(file_id: str, user_id: str, building_id: str | None) -> None:
-    """Background task: run ArchitectureAgent on an uploaded floor plan."""
-    try:
-        from src.agents.architecture import ArchitectureAgent
-        from src.orchestration.state import create_initial_state
-
-        state = create_initial_state(
-            user_message="Analyze uploaded floor plan",
-            user_id=user_id,
-            building_id=building_id,
-        )
-        state["architecture_file_id"] = file_id
-
-        agent = ArchitectureAgent()
-        await agent.run(state)
-    except Exception as exc:
-        logger.error("Background architecture analysis failed for %s: %s", file_id, exc)
-        try:
-            db = get_postgres_client()
-            await db.update_file_upload(file_id, {"analysis_status": "failed"})
-        except Exception as status_exc:
-            logger.error("Failed to update upload status to failed for %s: %s", file_id, status_exc)
-
-
 @router.post("/architecture")
 async def upload_architecture_plan(
-    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     building_id: str | None = Query(None),
     current_user: UserInDB = Depends(get_current_user),
@@ -95,7 +57,7 @@ async def upload_architecture_plan(
     """Upload a floor plan / architecture document for AI analysis."""
     await _check_upload_rate_limit(current_user)
     storage = get_storage_service()
-    data = await _read_upload_file(file)
+    data = await file.read()
 
     try:
         storage.validate_file(
@@ -132,12 +94,6 @@ async def upload_architecture_plan(
     }
     await db.create_file_upload(record)
 
-    # Kick off analysis in the background so the upload returns immediately
-    if background_tasks is not None:
-        background_tasks.add_task(_run_architecture_analysis, file_id, current_user.id, building_id)
-    else:
-        asyncio.create_task(_run_architecture_analysis(file_id, current_user.id, building_id))
-
     return {
         "id": file_id,
         "file_name": file.filename,
@@ -160,7 +116,7 @@ async def upload_contractor_doc(
     """Upload a contractor document (license, insurance, certificate)."""
     await _check_upload_rate_limit(current_user)
     storage = get_storage_service()
-    data = await _read_upload_file(file)
+    data = await file.read()
 
     try:
         storage.validate_file("contractor-docs", file.filename or "", len(data), file.content_type, file_data=data)
@@ -206,7 +162,7 @@ async def upload_avatar(
     """Upload user avatar."""
     await _check_upload_rate_limit(current_user)
     storage = get_storage_service()
-    data = await _read_upload_file(file)
+    data = await file.read()
 
     try:
         storage.validate_file("avatars", file.filename or "", len(data), file.content_type, file_data=data)

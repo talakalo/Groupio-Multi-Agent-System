@@ -5,13 +5,12 @@ import logging
 from typing import Any
 
 import redis.asyncio as redis
-from tenacity import retry, stop_after_attempt, wait_exponential
-
 from src.config.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
-_REDIS_TRANSIENT_ERRORS = (redis.ConnectionError, redis.TimeoutError, OSError)
+
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 
 def _normalize_redis_url(url: str) -> str:
@@ -77,12 +76,7 @@ class RedisClient:
 
     async def close(self) -> None:
         """Close the Redis connection."""
-        r = self._redis
-        aclose = getattr(r, "aclose", None)
-        if callable(aclose):
-            await aclose()
-        else:
-            await r.close()
+        await self._redis.close()
 
     # -- Conversation Memory --
 
@@ -128,14 +122,6 @@ class RedisClient:
 
     # -- Rate Limiting --
 
-    async def _eval_rate_limit(self, key: str, limit: int, window: int) -> int | None:
-        """Run the rate-limit Lua script; return None when Redis is unreachable."""
-        try:
-            return int(await self._redis.eval(_RATE_LIMIT_SCRIPT, 1, key, limit, window))
-        except _REDIS_TRANSIENT_ERRORS as exc:
-            logger.warning("Redis unavailable for rate limit on %s; allowing request: %s", key, exc)
-            return None
-
     async def check_rate_limit(self, user_id: str, limit: int = 60, window: int = 60) -> bool:
         """Check if a user has exceeded their rate limit (atomic via Lua).
 
@@ -144,10 +130,8 @@ class RedisClient:
         GET and INCR in high-concurrency scenarios.
         """
         key = f"rate:{user_id}"
-        count = await self._eval_rate_limit(key, limit, window)
-        if count is None:
-            return True
-        return count <= limit
+        count = await self._redis.eval(_RATE_LIMIT_SCRIPT, 1, key, limit, window)
+        return int(count) <= limit
 
     async def check_ip_rate_limit(self, ip: str, limit: int = 20, window: int = 60) -> bool:
         """Check if an IP has exceeded the rate limit (atomic via Lua).
@@ -156,18 +140,14 @@ class RedisClient:
         Uses the same atomic Lua script as check_rate_limit.
         """
         key = f"auth_ip:{ip}"
-        count = await self._eval_rate_limit(key, limit, window)
-        if count is None:
-            return True
-        return count <= limit
+        count = await self._redis.eval(_RATE_LIMIT_SCRIPT, 1, key, limit, window)
+        return int(count) <= limit
 
     async def increment_login_failures(self, user_id: str, window: int = 900) -> int:
         """Increment failed login counter for a user. Returns new count."""
         key = f"login_fail:{user_id}"
-        count = await self._eval_rate_limit(key, 9999, window)
-        if count is None:
-            return 0
-        return count
+        count = await self._redis.eval(_RATE_LIMIT_SCRIPT, 1, key, 9999, window)
+        return int(count)
 
     async def clear_login_failures(self, user_id: str) -> None:
         """Clear the failed login counter after a successful login."""
@@ -221,11 +201,7 @@ class RedisClient:
             kwargs["ex"] = ex
         if nx:
             kwargs["nx"] = nx
-        try:
-            result = await self._redis.set(key, value, **kwargs)
-        except _REDIS_TRANSIENT_ERRORS as exc:
-            logger.warning("Redis unavailable; could not set %s: %s", key, exc)
-            return False
+        result = await self._redis.set(key, value, **kwargs)
         return result is not None
 
     async def get(self, key: str) -> str | None:
@@ -267,7 +243,9 @@ class RedisClient:
             -1 — token mismatch (race condition or replay attempt)
         """
         key = f"refresh_token:{user_id}"
-        result = await self._redis.eval(_REFRESH_TOKEN_SWAP_SCRIPT, 1, key, old_token, new_token, ttl)
+        result = await self._redis.eval(
+            _REFRESH_TOKEN_SWAP_SCRIPT, 1, key, old_token, new_token, ttl
+        )
         return int(result)
 
     # -- Temporary account lockout (brute-force protection) --
@@ -287,23 +265,6 @@ class RedisClient:
     async def clear_temporary_lockout(self, user_id: str) -> None:
         """Remove a temporary lockout (called on successful login)."""
         await self._redis.delete(f"temp_lock:{user_id}")
-
-    # -- Pub/Sub --
-
-    async def publish(self, channel: str, message: str) -> int:
-        """Publish a message to a Redis channel.
-
-        Returns the number of subscribers that received the message.
-        """
-        return int(await self._redis.publish(channel, message))
-
-    def make_pubsub(self) -> Any:
-        """Create a new PubSub instance for subscribing to channels.
-
-        Each subscriber needs its own PubSub object because the subscribe
-        command puts the connection into a mode that cannot issue other commands.
-        """
-        return self._redis.pubsub()
 
     # -- Health --
 

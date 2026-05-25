@@ -9,7 +9,6 @@ import asyncio
 import json
 import signal
 import sys
-from datetime import UTC, datetime
 from typing import Any
 
 import redis.asyncio as redis
@@ -55,7 +54,7 @@ class AgentWorker:
     async def disconnect(self):
         """Disconnect from Redis."""
         if self.redis_client:
-            await self.redis_client.aclose()
+            await self.redis_client.close()
             logger.info("Disconnected from Redis")
 
     async def process_task(self, task_data: dict[str, Any]) -> dict[str, Any]:
@@ -86,37 +85,16 @@ class AgentWorker:
             if self.router_agent is None:
                 raise RuntimeError("Router agent not initialized")
 
-            state: AgentState = {
+            state: AgentState = {  # type: ignore[typeddict-item]
                 "messages": [{"role": "user", "content": message}] if message else [],
                 "user_id": user_id or "",
-                "building_id": context.get("building_id"),
+                "building_id": None,
                 "conversation_id": session_id or "",
                 "current_agent": "router",
                 "intent": None,
                 "confidence": 0.0,
-                "user_profile": context.get("user_profile") or {},
-                "building_context": context.get("building_context") or {},
-                "active_offers": context.get("active_offers") or [],
-                "entities": context.get("entities"),
-                "last_agent_handoff": None,
-                "context_for_next_agent": {
-                    k: v
-                    for k, v in context.items()
-                    if k not in {"building_id", "user_profile", "building_context", "active_offers", "entities"}
-                }
-                or None,
-                "rag_results": [],
+                "context": context,
                 "actions_taken": [],
-                "needs_human": False,
-                "escalation_reason": None,
-                "viral_invite_chain": None,
-                "invite_momentum": None,
-                "building_similarity_clusters": None,
-                "influencer_data": None,
-                "final_response": None,
-                "start_time": datetime.now(UTC).isoformat(),
-                "tokens_used": 0,
-                "state_contract_version": 1,
             }
             result = await self.router_agent.run(state)
 

@@ -2,12 +2,6 @@
 
 import type { Escalation } from "@groupio/types";
 import { clsx } from "clsx";
-
-import {
-  getEscalationActionsTaken,
-  getEscalationIntent,
-  getEscalationRagSummary,
-} from "@/lib/escalation-context";
 import {
   ChevronDown,
   ChevronUp,
@@ -68,29 +62,11 @@ const PRIORITY_BADGE: Record<string, string> = {
 const STATUS_BADGE: Record<string, string> = {
   open: "badge badge-open",
   assigned: "badge badge-assigned",
-  in_progress: "badge badge-assigned",
-  waiting_customer: "badge badge-assigned",
   resolved: "badge badge-resolved",
-  closed: "badge badge-resolved",
 };
-
-const STATUS_LABEL: Record<string, string> = {
-  open: "Open",
-  assigned: "In progress",
-  in_progress: "In progress",
-  waiting_customer: "Waiting",
-  resolved: "Resolved",
-  closed: "Closed",
-};
-
-function displayEscalationStatus(status: string): string {
-  return STATUS_LABEL[status] ?? status.replace(/_/g, " ");
-}
 
 function formatRelativeTime(iso: string): string {
-  const t = new Date(iso).getTime();
-  if (!Number.isFinite(t)) return "—";
-  const diff = Date.now() - t;
+  const diff = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diff / 60_000);
   if (mins < 1) return "just now";
   if (mins < 60) return `${mins}m ago`;
@@ -101,10 +77,8 @@ function formatRelativeTime(iso: string): string {
 }
 
 function getSourceAgent(esc: Escalation): string {
-  const actions = getEscalationActionsTaken(esc.context);
+  const actions = esc.context.actionsTaken;
   if (actions.length > 0) return actions[0].agent;
-  const fromApi = (esc as Escalation & { sourceAgent?: string }).sourceAgent;
-  if (fromApi) return fromApi;
   return "unknown";
 }
 
@@ -278,8 +252,6 @@ export function EscalationsTable({
             )}
             {pageData.map((esc) => {
               const isExpanded = expandedId === esc.id;
-              const actionsTaken = getEscalationActionsTaken(esc.context);
-              const ragSummary = getEscalationRagSummary(esc.context);
               return (
                 <Fragment key={esc.id}>
                   <tr
@@ -334,11 +306,9 @@ export function EscalationsTable({
                     {/* Status */}
                     <td className="table-cell">
                       <span
-                        className={
-                          STATUS_BADGE[esc.status] ?? "badge badge-low"
-                        }
+                        className={STATUS_BADGE[esc.status] ?? "badge badge-low"}
                       >
-                        {displayEscalationStatus(esc.status)}
+                        {esc.status}
                       </span>
                     </td>
                     {/* Actions */}
@@ -408,16 +378,16 @@ export function EscalationsTable({
                                   Intent:
                                 </dt>
                                 <dd className="text-surface-700">
-                                  {getEscalationIntent(esc.context) || "—"}
+                                  {esc.context.intent}
                                 </dd>
                               </div>
-                              {ragSummary && (
+                              {esc.context.ragSummary && (
                                 <div className="flex gap-2">
                                   <dt className="text-surface-400 min-w-[100px]">
                                     RAG Summary:
                                   </dt>
                                   <dd className="text-surface-700">
-                                    {ragSummary}
+                                    {esc.context.ragSummary}
                                   </dd>
                                 </div>
                               )}
@@ -430,33 +400,27 @@ export function EscalationsTable({
                               Agent Actions Taken
                             </h4>
                             <ol className="space-y-1.5">
-                              {actionsTaken.length === 0 ? (
-                                <li className="text-sm text-surface-500">
-                                  No actions recorded
-                                </li>
-                              ) : (
-                                actionsTaken.map((action, idx) => (
-                                  <li
-                                    key={idx}
-                                    className="flex items-start gap-2 text-sm"
-                                  >
-                                    <span className="flex-shrink-0 flex items-center justify-center w-5 h-5 rounded-full bg-primary-100 text-primary-700 text-[10px] font-bold mt-0.5">
-                                      {idx + 1}
+                              {esc.context.actionsTaken.map((action, idx) => (
+                                <li
+                                  key={idx}
+                                  className="flex items-start gap-2 text-sm"
+                                >
+                                  <span className="flex-shrink-0 flex items-center justify-center w-5 h-5 rounded-full bg-primary-100 text-primary-700 text-[10px] font-bold mt-0.5">
+                                    {idx + 1}
+                                  </span>
+                                  <div>
+                                    <span className="font-medium text-surface-700 capitalize">
+                                      {action.agent}
                                     </span>
-                                    <div>
-                                      <span className="font-medium text-surface-700 capitalize">
-                                        {action.agent}
-                                      </span>
-                                      <span className="text-surface-400 mx-1">
-                                        &mdash;
-                                      </span>
-                                      <span className="text-surface-600">
-                                        {action.action}
-                                      </span>
-                                    </div>
-                                  </li>
-                                ))
-                              )}
+                                    <span className="text-surface-400 mx-1">
+                                      &mdash;
+                                    </span>
+                                    <span className="text-surface-600">
+                                      {action.action}
+                                    </span>
+                                  </div>
+                                </li>
+                              ))}
                             </ol>
                           </div>
                         </div>

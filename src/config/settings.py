@@ -3,16 +3,11 @@
 import logging
 import secrets
 from functools import lru_cache
-from pathlib import Path
-from urllib.parse import quote
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings
 
 logger = logging.getLogger(__name__)
-
-# Resolve .env from repo root so CLI scripts work regardless of cwd.
-_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
 _INSECURE_JWT_DEFAULTS = frozenset(
     {
@@ -35,14 +30,6 @@ class Settings(BaseSettings):
     QDRANT_URL: str = "http://localhost:6333"
     QDRANT_API_KEY: str | None = None
 
-    # Vector database provider: "qdrant" (default, self-hosted) or "pinecone" (managed cloud)
-    VECTOR_DB_PROVIDER: str = "qdrant"
-    # Pinecone (required when VECTOR_DB_PROVIDER=pinecone)
-    # Get API key from: https://app.pinecone.io → API Keys
-    PINECONE_API_KEY: str = ""
-    PINECONE_INDEX_NAME: str = "groupio"
-    PINECONE_ENVIRONMENT: str = ""  # only for legacy non-serverless regions
-
     # Neo4j
     NEO4J_URI: str = "bolt://localhost:7687"
     NEO4J_USER: str = "neo4j"
@@ -51,25 +38,10 @@ class Settings(BaseSettings):
     # Supabase / PostgreSQL
     SUPABASE_URL: str = ""
     SUPABASE_KEY: str = ""
-    # Server-only (seed scripts). Never expose to browsers. If set, seed_test_data uses it as SUPABASE_KEY.
-    SUPABASE_SERVICE_ROLE_KEY: str = ""
-    # Alternate env name some teams use; seed_test_data also reads os.environ["SERVICE_ROLE_KEY"].
-    SERVICE_ROLE_KEY: str = ""
-    # Some templates use this for the sb_secret_… / legacy server key.
-    SUPABASE_SECRET_KEY: str = ""
     # Local PostgreSQL (used when SUPABASE_URL is empty or USE_LOCAL_POSTGRES=1)
     DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/groupio"
     # Set to "1" or "true" to force local PostgreSQL (useful when Supabase has connection issues)
     USE_LOCAL_POSTGRES: str = ""
-    # Docker Compose passes these so DATABASE_URL can target the `postgres` service instead of
-    # a Supabase URL from .env (avoids asyncpg SSL / routing errors inside the container).
-    DOCKER_POSTGRES_HOST: str = ""
-    DOCKER_POSTGRES_USER: str = ""
-    DOCKER_POSTGRES_PASSWORD: str = ""
-    DOCKER_POSTGRES_DB: str = ""
-    # Set to "1"/"true" to force asyncpg IPv4 + TLS SNI (see postgres._asyncpg_should_prefer_ipv4).
-    # Supabase hosts (*.supabase.co, *pooler.supabase.com) already prefer IPv4 by default.
-    DATABASE_PREFER_IPV4: str = ""
 
     # Redis
     # In production, set REDIS_URL to include credentials, e.g.:
@@ -115,54 +87,10 @@ class Settings(BaseSettings):
     ENABLE_WEB_SEARCH: bool = True
     ENABLE_GRAPH_QUERIES: bool = True
     ENABLE_PREDICTIVE_MODELS: bool = False
-    # PERF-11: when True, building similarity materialisation uses a top-K
-    # bounded Cypher projection (LIMIT + similarity threshold). When False,
-    # falls back to the original all-to-all computation.
-    ENABLE_GDS_SIMILARITY: bool = False
-    GDS_SIMILARITY_TOP_K: int = 15
-    GDS_SIMILARITY_MIN_SCORE: float = 0.7
-
-    # Async messaging / CRM (all default off — enable per environment after verification)
-    # RabbitMQ: set ENABLE_RABBITMQ=true and RABBITMQ_URL when using workers + dispatcher.
-    ENABLE_RABBITMQ: bool = False
-    # Transactional outbox (Postgres outbox_events + dispatcher worker).
-    ENABLE_OUTBOX: bool = False
-    # Route selected notifications through outbox → RabbitMQ → worker-notifications.
-    ENABLE_NOTIFICATION_QUEUE: bool = False
-    # CRM sync worker (EspoCRM projection; Groupio DB remains authoritative).
-    ENABLE_CRM_SYNC: bool = False
-    # Outbox rows for payment / invoice derived events (after Stripe webhook DB success).
-    ENABLE_PAYMENT_EVENTS: bool = False
-
-    # RabbitMQ (AMQP URL, e.g. amqp://guest:guest@localhost:5672/)
-    RABBITMQ_URL: str = ""
-    RABBITMQ_EXCHANGE_EVENTS: str = "groupio.events"
-    # Outbox dispatcher poll interval when running as standalone worker.
-    OUTBOX_POLL_INTERVAL_MS: int = 500
-
-    # EspoCRM REST API (optional; used only when ENABLE_CRM_SYNC and workers run).
-    ESPOCRM_BASE_URL: str = ""
-    ESPOCRM_API_KEY: str = ""
-    # Entity type names in Espo API paths (e.g. custom module C_GroupioContractor, or native Account).
-    ESPOCRM_ENTITY_CONTRACTOR: str = "C_GroupioContractor"
-    ESPOCRM_ENTITY_BUILDING: str = "C_GroupioBuilding"
-    ESPOCRM_ENTITY_NOTE: str = "Note"
-    # Attribute keys sent in JSON bodies — must exist on the target entities in Espo.
-    ESPOCRM_FIELD_CONTRACTOR_EXTERNAL_ID: str = "cGroupioContractorId"
-    ESPOCRM_FIELD_CONTRACTOR_VERIFICATION: str = "cGroupioVerificationStatus"
-    ESPOCRM_FIELD_BUILDING_EXTERNAL_ID: str = "cGroupioBuildingId"
-    ESPOCRM_FIELD_BUILDING_ADDRESS: str = "cGroupioAddress"
-    ESPOCRM_FIELD_BUILDING_CITY: str = "cGroupioCity"
-    ESPOCRM_FIELD_BUILDING_REGION: str = "cGroupioRegion"
 
     # Monitoring
     SENTRY_DSN: str | None = None
     LOG_LEVEL: str = "INFO"
-
-    # PostgreSQL statement timeout in milliseconds. 0 disables the timeout.
-    # Prevents runaway queries from holding connections indefinitely.
-    # Default: 30 000 ms (30 s). Tune down for read-heavy list endpoints.
-    DB_STATEMENT_TIMEOUT_MS: int = 30_000
 
     # Rate Limiting
     RATE_LIMIT_PER_USER: int = 60  # requests per minute
@@ -194,18 +122,6 @@ class Settings(BaseSettings):
     GOV_MUNICIPALITY_API_URL: str = ""
     # Phase 3: data.gov.il integration. Set to "1" or "true" to enable.
     ENABLE_DATAGOV_IL: str = "1"
-    # Gov cache TTLs (seconds)
-    GOV_CACHE_TTL_COMPANIES_SEC: int = 86_400  # 24h
-    GOV_CACHE_TTL_MUNICIPALITIES_SEC: int = 604_800  # 7d
-    # Gov HTTP timeouts (seconds)
-    GOV_HTTP_CONNECT_TIMEOUT_SEC: float = 5.0
-    GOV_HTTP_READ_TIMEOUT_SEC: float = 10.0
-    # Gov circuit breaker
-    GOV_CIRCUIT_FAIL_THRESHOLD: int = 5
-    GOV_CIRCUIT_COOLDOWN_SEC: float = 60.0
-    # Confidence thresholds (replaces hard-coded 0.5)
-    ENRICHMENT_MIN_CONFIDENCE_ACCEPT: float = 0.5
-    ENRICHMENT_MIN_CONFIDENCE_HIGH: float = 0.8
 
     # Email Settings (for verification emails)
     SMTP_HOST: str = ""
@@ -221,10 +137,6 @@ class Settings(BaseSettings):
     FRONTEND_URL: str = "https://groupio.co.il"
     # Admin inbox for system alerts (vetting escalations, expiry errors, etc.)
     ADMIN_EMAIL: str = ""
-    # Resend email API (preferred over SMTP in non-dev environments).
-    # Get key from: https://resend.com/api-keys
-    # When set, SMTP settings are ignored.
-    RESEND_API_KEY: str = ""
 
     # Push Notifications (Firebase Cloud Messaging)
     # Set FCM_SERVER_KEY to your Firebase project's server key to enable push notifications.
@@ -245,9 +157,6 @@ class Settings(BaseSettings):
     # Stripe webhook signing secret (from Stripe Dashboard → Webhooks → Signing secret)
     # Used by POST /payments/webhook/stripe to verify authentic Stripe events.
     STRIPE_WEBHOOK_SECRET: str = ""
-    # Stripe Price ID for recurring contractor marketplace membership (subscription mode checkout).
-    # Required to call POST /contractors/me/membership/checkout-session when PAYMENT_PROVIDER=stripe.
-    STRIPE_CONTRACTOR_MEMBERSHIP_PRICE_ID: str = ""
 
     # Shared HMAC webhook signing secret — must be set in non-dev environments
     # to prevent fraudulent webhook forgery. Generate with:
@@ -278,10 +187,7 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
 
     model_config = {
-        "env_file": [
-            str(_REPO_ROOT / ".env"),
-            str(_REPO_ROOT / "docker" / ".env"),
-        ],
+        "env_file": [".env", "docker/.env"],
         "env_file_encoding": "utf-8",
         "extra": "ignore",
     }
@@ -290,17 +196,6 @@ class Settings(BaseSettings):
     def _validate_production_config(self) -> "Settings":
         """Prevent insecure defaults in production/staging."""
         is_prod = self.ENVIRONMENT in ("production", "staging")
-
-        # --- Docker: local Postgres service (overrides DATABASE_URL from .env) ---
-        force_local_pg = (self.USE_LOCAL_POSTGRES or "").lower() in ("1", "true", "yes")
-        if force_local_pg and (self.DOCKER_POSTGRES_HOST or "").strip():
-            user = (self.DOCKER_POSTGRES_USER or "postgres").strip()
-            password = self.DOCKER_POSTGRES_PASSWORD or ""
-            db = (self.DOCKER_POSTGRES_DB or "groupio").strip()
-            host = self.DOCKER_POSTGRES_HOST.strip()
-            self.DATABASE_URL = (
-                f"postgresql://{quote(user, safe='')}:{quote(password, safe='')}@{host}:5432/{quote(db, safe='')}"
-            )
 
         # --- JWT secret ---
         if self.ENVIRONMENT not in ("development", "test") and self.JWT_SECRET_KEY in _INSECURE_JWT_DEFAULTS:
@@ -311,20 +206,9 @@ class Settings(BaseSettings):
                 "invalidating all active user sessions. "
                 'Generate a persistent key with: python -c "import secrets; print(secrets.token_urlsafe(64))"'
             )
-        # Enforce minimum length in all non-dev environments (staging and prod).
-        # 32 chars = 256-bit HMAC key minimum; 64 chars (512-bit) recommended.
-        _min_jwt_len = 32
-        if self.ENVIRONMENT not in ("development", "test") and self.JWT_SECRET_KEY not in _INSECURE_JWT_DEFAULTS:
-            if len(self.JWT_SECRET_KEY) < _min_jwt_len:
-                raise ValueError(
-                    f"JWT_SECRET_KEY must be at least {_min_jwt_len} characters in "
-                    f"{self.ENVIRONMENT}. Current length: {len(self.JWT_SECRET_KEY)}. "
-                    'Generate a secure key with: python -c "import secrets; print(secrets.token_urlsafe(64))"'
-                )
-        if is_prod and len(self.JWT_SECRET_KEY) < _min_jwt_len:
+        if is_prod and len(self.JWT_SECRET_KEY) < 32:
             raise ValueError(
-                f"JWT_SECRET_KEY must be at least {_min_jwt_len} characters"
-                f" in {self.ENVIRONMENT} for adequate security."
+                f"JWT_SECRET_KEY must be at least 32 characters in {self.ENVIRONMENT} for adequate security."
             )
         if self.JWT_SECRET_KEY in _INSECURE_JWT_DEFAULTS:
             if self.ENVIRONMENT in ("development", "test"):
@@ -345,61 +229,6 @@ class Settings(BaseSettings):
                 "Unverified users can log in. Enable it to protect the platform.",
                 self.ENVIRONMENT,
             )
-
-        # --- Outbound email (staging/production): required when verification is enforced ---
-        if is_prod and self.ENFORCE_EMAIL_VERIFICATION:
-            has_resend = bool((self.RESEND_API_KEY or "").strip())
-            has_smtp = bool(
-                (self.SMTP_HOST or "").strip() and (self.SMTP_USER or "").strip() and (self.SMTP_PASSWORD or "").strip()
-            )
-            if not has_resend and not has_smtp:
-                raise ValueError(
-                    f"ENFORCE_EMAIL_VERIFICATION is True in {self.ENVIRONMENT} but no email transport is configured. "
-                    "Set RESEND_API_KEY (recommended) or SMTP_HOST + SMTP_USER + SMTP_PASSWORD. "
-                    "Verification and password-reset emails will not be delivered otherwise."
-                )
-
-        # --- Payments: publishable environments (staging + production) ---
-        if self.ENVIRONMENT in ("production", "staging"):
-            prov = (self.PAYMENT_PROVIDER or "").lower()
-            if prov == "mock":
-                raise ValueError(
-                    f"PAYMENT_PROVIDER=mock is not allowed when ENVIRONMENT={self.ENVIRONMENT!r}. "
-                    "Use PAYMENT_PROVIDER=stripe with real Stripe credentials for any publishable deploy."
-                )
-            if prov in ("bit", "paybox"):
-                raise ValueError(
-                    f"PAYMENT_PROVIDER={prov!r} is not launch-ready (integration incomplete). "
-                    f"Set PAYMENT_PROVIDER=stripe when ENVIRONMENT={self.ENVIRONMENT!r}."
-                )
-            if prov == "stripe":
-                if not self.STRIPE_SECRET_KEY or not self.STRIPE_SECRET_KEY.strip():
-                    raise ValueError(
-                        "STRIPE_SECRET_KEY must be set when PAYMENT_PROVIDER=stripe "
-                        f"and ENVIRONMENT={self.ENVIRONMENT!r}."
-                    )
-                if not self.STRIPE_WEBHOOK_SECRET or not self.STRIPE_WEBHOOK_SECRET.strip():
-                    raise ValueError(
-                        "STRIPE_WEBHOOK_SECRET must be set when PAYMENT_PROVIDER=stripe "
-                        f"and ENVIRONMENT={self.ENVIRONMENT!r} "
-                        "(required for payment + subscription webhook verification)."
-                    )
-
-        # --- Data enrichment (staging/production): warn when disabled ---
-        # When ENABLE_DATAGOV_IL is off the enrichment service returns
-        # stub responses (source="stub", confidence=0.0). The frontend
-        # already hides stubs on the onboarding address-suggestion flow,
-        # but any downstream consumer treating a stub as a valid result
-        # would persist useless data. Fail the boot so ops fixes the flag.
-        if is_prod:
-            enable_datagov = str(self.ENABLE_DATAGOV_IL or "").lower() in ("1", "true", "yes")
-            if not enable_datagov:
-                raise ValueError(
-                    f"ENABLE_DATAGOV_IL is disabled in {self.ENVIRONMENT}. "
-                    "Address / municipality enrichment would return stub "
-                    "responses (confidence=0.0). Set ENABLE_DATAGOV_IL=1 or "
-                    "remove enrichment UI surfaces before deploying."
-                )
 
         # --- Required secrets in production ---
         if is_prod:

@@ -17,19 +17,6 @@
     "management": "ניהול",
     "system": "מערכת"
   },
-  "shell": {
-    "productTitle": "Groupio",
-    "productSubtitle": "ניהול",
-    "dashboardTitle": "לוח בקרת ניהול",
-    "versionBadge": "גרסה 0.1.0",
-    "expandSidebar": "הרחבת תפריט צד",
-    "collapseSidebar": "כיווץ תפריט צד",
-    "notificationsAria": "התראות",
-    "settingsAria": "הגדרות",
-    "signOutAria": "התנתקות",
-    "localeEn": "English",
-    "localeHe": "עברית"
-  },
   "common": {
     "search": "חיפוש...",
     "loading": "טוען...",

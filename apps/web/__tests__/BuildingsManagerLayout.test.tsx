@@ -1,7 +1,8 @@
 /**
  * BuildingsManagerLayout — role-based redirects.
+ * - Admin/super_admin on /buildings-manager/dashboard → /admin/dashboard
  * - Resident/contractor → /dashboard
- * - buildings_manager, admin, super_admin may use buildings-manager routes (no auto-redirect to admin app)
+ * - buildings_manager stays on buildings-manager routes
  */
 import { render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
@@ -16,7 +17,6 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
-  useLocale: () => 'he',
 }));
 
 vi.mock('@/components/shared/NotificationPanel', () => ({
@@ -33,17 +33,14 @@ vi.mock('@/lib/stores/authStore', () => ({
     selector({
       accessToken: mockToken,
       user: mockUser,
-      isAuthenticated: Boolean(mockToken),
       logout: vi.fn(() => Promise.resolve()),
-      refreshAccessToken: vi.fn(() => Promise.resolve()),
     })
   ),
-  useAuthHasHydrated: () => true,
 }));
 
-// useUnwrapPageParams is a no-op in tests (no props.params/searchParams)
+// unwrapPageParams is a no-op in tests (no props.params/searchParams)
 vi.mock('@/lib/utils/unwrapPageParams', () => ({
-  useUnwrapPageParams: vi.fn(),
+  unwrapPageParams: vi.fn(),
 }));
 
 import BuildingsManagerLayout from '../app/buildings-manager/layout';
@@ -56,24 +53,22 @@ describe('BuildingsManagerLayout — admin/super_admin redirect', () => {
     mockPathname = '/buildings-manager/dashboard';
   });
 
-  it('allows super_admin on /buildings-manager/dashboard (no forced redirect)', async () => {
+  it('redirects super_admin from /buildings-manager/dashboard to /admin/dashboard', async () => {
     mockUser = { role: 'super_admin' };
     render(<BuildingsManagerLayout><div>child</div></BuildingsManagerLayout>);
 
     await waitFor(() => {
-      expect(screen.getByText('child')).toBeInTheDocument();
+      expect(mockReplace).toHaveBeenCalledWith('/admin/dashboard');
     });
-    expect(mockReplace).not.toHaveBeenCalledWith('/admin/dashboard');
   });
 
-  it('allows admin on /buildings-manager/dashboard (no forced redirect)', async () => {
+  it('redirects admin from /buildings-manager/dashboard to /admin/dashboard', async () => {
     mockUser = { role: 'admin' };
     render(<BuildingsManagerLayout><div>child</div></BuildingsManagerLayout>);
 
     await waitFor(() => {
-      expect(screen.getByText('child')).toBeInTheDocument();
+      expect(mockReplace).toHaveBeenCalledWith('/admin/dashboard');
     });
-    expect(mockReplace).not.toHaveBeenCalledWith('/admin/dashboard');
   });
 
   it('does NOT redirect buildings_manager from /buildings-manager/dashboard', async () => {

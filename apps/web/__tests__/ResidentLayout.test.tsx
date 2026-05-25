@@ -24,12 +24,10 @@ vi.mock('@/components/shared/NotificationPanel', () => ({
 // ---- Auth store — token is controlled per-test via this variable ----
 let mockAccessToken: string | null = 'test-token';
 const mockLogout = vi.fn(() => Promise.resolve());
-// refreshAccessToken succeeds only when a token exists (mirrors real behaviour)
-const mockRefreshAccessToken = vi.fn(() => Promise.resolve(!!mockAccessToken));
 
 vi.mock('@/lib/stores/authStore', () => ({
   useAuthStore: vi.fn((selector: (s: Record<string, unknown>) => unknown) =>
-    selector({ accessToken: mockAccessToken, logout: mockLogout, refreshAccessToken: mockRefreshAccessToken, isAuthenticated: !!mockAccessToken, user: { role: 'resident', isVerified: true } })
+    selector({ accessToken: mockAccessToken, logout: mockLogout, isAuthenticated: !!mockAccessToken, user: { role: 'resident', isVerified: true } })
   ),
   useAuthHasHydrated: vi.fn(() => true),
 }));
@@ -45,9 +43,9 @@ describe('ResidentLayout — sidebar navigation links', () => {
   const EXPECTED_HREFS = [
     '/dashboard',
     '/offers',
-    '/contractors',
-    '/architecture',
+    '/orders',
     '/building',
+    '/contractors',
     '/profile',
     '/payments',
     '/chat',
@@ -72,8 +70,11 @@ describe('ResidentLayout — logout navigation', () => {
   it('calls router.push("/login") after clicking the logout button', async () => {
     render(<ResidentLayout><div>page</div></ResidentLayout>);
 
-    fireEvent.click(screen.getByRole('button', { name: /accountMenu/i }));
-    fireEvent.click(screen.getByRole('button', { name: /logout/i }));
+    // The layout renders two sidebars (mobile + desktop), so the logout button
+    // appears twice. Click the first occurrence.
+    const logoutBtns = screen.getAllByRole('button', { name: /myAccount/i });
+    expect(logoutBtns.length).toBeGreaterThanOrEqual(1);
+    fireEvent.click(logoutBtns[0]);
 
     await waitFor(() => {
       expect(mockLogout).toHaveBeenCalled();

@@ -27,12 +27,10 @@ dependencies = [
     "langchain-community>=0.0.10",
     "langgraph>=0.0.30",
     "qdrant-client>=1.7.0",
-    "pinecone>=3.0.0",
     "neo4j>=5.15.0",
     "supabase>=2.3.0",
     "asyncpg>=0.29.0",
     "redis[hiredis]>=5.0.0",
-    "aio-pika>=9.4.0",
     "httpx>=0.25.0",
     "python-multipart>=0.0.6",
     "tiktoken>=0.5.0",
@@ -42,15 +40,10 @@ dependencies = [
     "prometheus-client>=0.19.0",
     "PyJWT>=2.8.0",
     "aiosmtplib>=3.0.0",
-    "resend>=2.0.0",
     "structlog>=23.2.0",
     "bcrypt>=4.0.0",
     "stripe>=7.0.0",
     "typing-extensions>=4.15.0",
-    "rapidfuzz>=3.0.0",
-    "urllib3>=2.7.0",
-    "langchain-classic>=1.0.7",
-    "langsmith>=0.8.0",
 ]
 
 [project.optional-dependencies]
@@ -75,19 +68,6 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = "--cov-fail-under=50 --timeout=120"  # Per-test timeout to avoid CI SIGTERM on slow/hanging tests
-
-[tool.coverage.run]
-# Async-events scope from PR #167 is fully covered — see:
-#   tests/unit/test_messaging_layer.py            (connection, constants,
-#                                                  publisher, topology)
-#   tests/unit/test_outbox_dispatcher_branches.py / _failures.py
-#   tests/unit/test_worker_crm_sync.py            (incl. espocrm/service.py)
-#   tests/unit/test_worker_notifications.py
-#   tests/unit/test_worker_payments.py
-#   tests/unit/test_stripe_contractor_webhooks.py
-#   tests/unit/test_espocrm_client.py             (httpx MockTransport)
-# All previously-omitted files now have dedicated tests; nothing to omit.
-omit = []
 
 [tool.ruff]
 target-version = "py311"
@@ -125,10 +105,7 @@ module = [
     "src.agents.vetting",
     "src.agents.notification",
     "src.databases.graph_store",
-    "src.databases.vector_store",
     "src.orchestration.graph",
-    "src.api.routes.auth",
-    "src.api.routes.onboarding",
 ]
 disable_error_code = ["return-value", "assignment", "arg-type", "attr-defined", "index", "union-attr", "dict-item", "typeddict-item", "misc"]
 

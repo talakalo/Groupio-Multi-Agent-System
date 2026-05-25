@@ -10,8 +10,6 @@ See docs/PAYMENT_PROVIDER_ONBOARDING.md for how to obtain credentials and go liv
 with bit or PayBox.
 """
 
-import hashlib
-import hmac
 import logging
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime
@@ -19,10 +17,6 @@ from typing import Any
 from uuid import uuid4
 
 logger = logging.getLogger(__name__)
-
-
-class PaymentProviderUnavailableError(RuntimeError):
-    """Raised when PAYMENT_PROVIDER selects a gateway that cannot process charges yet."""
 
 
 class PaymentProvider(ABC):
@@ -299,22 +293,11 @@ class BitPaymentProvider(PaymentProvider):
         self._api_key = api_key
         self._merchant_id = merchant_id
         self._base_url = (
-            "https://sandbox.bitpay.co.il/api" if environment == "sandbox" else "https://api.bitpay.co.il/api"
+            "https://sandbox.bitpay.co.il/api"
+            if environment == "sandbox"
+            else "https://api.bitpay.co.il/api"
         )
         logger.info("BitPaymentProvider initialized (environment=%s)", environment)
-
-    def _auth_headers(self) -> dict[str, str]:
-        return {
-            "Authorization": f"Bearer {self._api_key}",
-            "X-Merchant-Id": self._merchant_id,
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-        }
-
-    def verify_webhook_signature(self, payload: bytes, signature: str, secret: str) -> bool:
-        """Verify HMAC-SHA256 signature on a bit webhook callback."""
-        expected = hmac.new(secret.encode(), payload, hashlib.sha256).hexdigest()
-        return hmac.compare_digest(expected, signature)
 
     async def create_charge(
         self,
@@ -323,120 +306,44 @@ class BitPaymentProvider(PaymentProvider):
         customer_id: str,
         metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Initiate a bit payment request via POST /v1/payments.
+        """Initiate a bit payment request.
 
-        Returns a dict with ``payment_link`` (bit deep-link the resident opens
+        Returns a dict with ``payment_link`` (deep-link URL the resident opens
         in the bit app), ``transaction_id`` (provider reference), and ``status``.
+
+        NOTE: This method raises NotImplementedError until real API credentials
+        are obtained and the full integration is implemented.
+        See docs/PAYMENT_PROVIDER_ONBOARDING.md — section "bit Integration".
         """
-        import httpx
-
-        amount_agorot = int(round(amount * 100))  # bit API expects amount in agorot
-        payload = {
-            "merchantId": self._merchant_id,
-            "amount": amount_agorot,
-            "currency": currency.upper(),
-            "referenceId": metadata.get("payment_id", str(uuid4())) if metadata else str(uuid4()),
-            "description": metadata.get("description", "Groupio payment") if metadata else "Groupio payment",
-            "customerId": customer_id,
-            "metadata": metadata or {},
-        }
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            try:
-                resp = await client.post(
-                    f"{self._base_url}/v1/payments",
-                    json=payload,
-                    headers=self._auth_headers(),
-                )
-                resp.raise_for_status()
-                data = resp.json()
-            except httpx.HTTPStatusError as exc:
-                logger.error("bit create_charge HTTP error: %s %s", exc.response.status_code, exc.response.text)
-                raise RuntimeError(f"bit payment failed: HTTP {exc.response.status_code}") from exc
-            except httpx.RequestError as exc:
-                logger.error("bit create_charge request error: %s", exc)
-                raise RuntimeError(f"bit payment connection error: {exc}") from exc
-
-        reference = data.get("reference") or data.get("id") or data.get("paymentId")
-        payment_link = data.get("paymentLink") or data.get("deepLink") or data.get("url", "")
-        logger.info(
-            "bit charge created: reference=%s amount=%s %s customer=%s",
-            reference,
-            amount,
-            currency,
-            customer_id,
+        raise NotImplementedError(
+            "BitPaymentProvider.create_charge is not yet implemented. "
+            "Complete bit merchant onboarding and implement the REST API call. "
+            "See docs/PAYMENT_PROVIDER_ONBOARDING.md."
         )
-        return {
-            "transaction_id": reference,
-            "status": "processing",
-            "amount": amount,
-            "currency": currency,
-            "customer_id": customer_id,
-            "payment_link": payment_link,
-            "provider": "bit",
-            "raw": data,
-            "created_at": datetime.now(UTC).isoformat(),
-        }
 
     async def refund(self, transaction_id: str, amount: float | None = None) -> dict[str, Any]:
-        """Issue a bit payment refund via POST /v1/payments/{reference}/refund."""
-        import httpx
+        """Issue a bit payment refund.
 
-        payload: dict[str, Any] = {"merchantId": self._merchant_id}
-        if amount is not None:
-            payload["amount"] = int(round(amount * 100))
-
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            try:
-                resp = await client.post(
-                    f"{self._base_url}/v1/payments/{transaction_id}/refund",
-                    json=payload,
-                    headers=self._auth_headers(),
-                )
-                resp.raise_for_status()
-                data = resp.json()
-            except httpx.HTTPStatusError as exc:
-                logger.error("bit refund HTTP error: %s %s", exc.response.status_code, exc.response.text)
-                raise RuntimeError(f"bit refund failed: HTTP {exc.response.status_code}") from exc
-
-        refund_id = data.get("refundId") or data.get("id") or f"rfd_{uuid4().hex}"
-        logger.info("bit refund issued: refund=%s txn=%s amount=%s", refund_id, transaction_id, amount)
-        return {
-            "refund_id": refund_id,
-            "transaction_id": transaction_id,
-            "status": "refunded",
-            "amount": amount,
-            "provider": "bit",
-            "created_at": datetime.now(UTC).isoformat(),
-        }
+        NOTE: bit refund flow depends on the merchant API contract.
+        Implement after completing onboarding.
+        """
+        raise NotImplementedError(
+            "BitPaymentProvider.refund is not yet implemented. "
+            "See docs/PAYMENT_PROVIDER_ONBOARDING.md."
+        )
 
     async def get_status(self, transaction_id: str) -> dict[str, Any]:
-        """Retrieve bit payment status via GET /v1/payments/{reference}."""
-        import httpx
-
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            try:
-                resp = await client.get(
-                    f"{self._base_url}/v1/payments/{transaction_id}",
-                    headers=self._auth_headers(),
-                )
-                resp.raise_for_status()
-                data = resp.json()
-            except httpx.HTTPStatusError as exc:
-                raise RuntimeError(f"bit get_status failed: HTTP {exc.response.status_code}") from exc
-
-        # Map bit status strings to our local statuses
-        bit_status = data.get("status", "").lower()
-        status_map = {"completed": "succeeded", "paid": "succeeded", "failed": "failed", "cancelled": "failed"}
-        local_status = status_map.get(bit_status, "processing")
-        return {
-            "transaction_id": transaction_id,
-            "status": local_status,
-            "provider_status": bit_status,
-            "checked_at": datetime.now(UTC).isoformat(),
-        }
+        """Retrieve the current status of a bit payment request."""
+        raise NotImplementedError(
+            "BitPaymentProvider.get_status is not yet implemented. "
+            "See docs/PAYMENT_PROVIDER_ONBOARDING.md."
+        )
 
     async def create_customer(self, user_id: str, email: str) -> str:
-        """bit does not require a separate customer registration step."""
+        """bit does not have a customer registration step.
+
+        Returns the user_id directly as the customer identifier.
+        """
         return user_id
 
 
@@ -494,153 +401,47 @@ class PayBoxPaymentProvider(PaymentProvider):
         )
         logger.info("PayBoxPaymentProvider initialized (environment=%s)", environment)
 
-    def _auth_headers(self) -> dict[str, str]:
-        return {
-            "Authorization": f"Bearer {self._api_key}",
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-        }
-
-    def verify_webhook_signature(self, payload: bytes, signature: str, secret: str) -> bool:
-        """Verify HMAC-SHA256 signature on a PayBox webhook callback."""
-        expected = hmac.new(secret.encode(), payload, hashlib.sha256).hexdigest()
-        return hmac.compare_digest(expected, signature)
-
     async def create_charge(
         self,
         amount: float,
         currency: str,
         customer_id: str,
         metadata: dict[str, Any] | None = None,
-        success_url: str = "",
-        cancel_url: str = "",
-        notify_url: str = "",
     ) -> dict[str, Any]:
-        """Create a PayBox hosted payment page via POST /Transaction/Payment.
+        """Create a PayBox hosted payment page.
 
-        Returns a dict with ``checkout_url`` (the hosted page URL the resident is
-        redirected to), ``transaction_id`` (PayBox reference), and ``status``.
+        Returns a dict with ``checkout_url`` (the URL the resident is redirected to),
+        ``transaction_id`` (PayBox reference), and ``status``.
+
+        NOTE: This method raises NotImplementedError until real API credentials
+        are obtained and the full integration is implemented.
+        See docs/PAYMENT_PROVIDER_ONBOARDING.md — section "PayBox Integration".
         """
-        import httpx
-
-        amount_agorot = int(round(amount * 100))
-        payload: dict[str, Any] = {
-            "terminal": self._terminal,
-            "amount": amount_agorot,
-            "currency": currency.upper(),
-            "customerId": customer_id,
-            "description": metadata.get("description", "Groupio payment") if metadata else "Groupio payment",
-            "referenceId": metadata.get("payment_id", str(uuid4())) if metadata else str(uuid4()),
-        }
-        if success_url:
-            payload["successUrl"] = success_url
-        if cancel_url:
-            payload["cancelUrl"] = cancel_url
-        if notify_url:
-            payload["notifyUrl"] = notify_url
-        if metadata:
-            payload["metadata"] = metadata
-
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            try:
-                resp = await client.post(
-                    f"{self._base_url}/Transaction/Payment",
-                    json=payload,
-                    headers=self._auth_headers(),
-                )
-                resp.raise_for_status()
-                data = resp.json()
-            except httpx.HTTPStatusError as exc:
-                logger.error("PayBox create_charge HTTP error: %s %s", exc.response.status_code, exc.response.text)
-                raise RuntimeError(f"PayBox payment failed: HTTP {exc.response.status_code}") from exc
-            except httpx.RequestError as exc:
-                logger.error("PayBox create_charge request error: %s", exc)
-                raise RuntimeError(f"PayBox payment connection error: {exc}") from exc
-
-        transaction_id = str(data.get("transactionId") or data.get("id") or uuid4())
-        checkout_url = data.get("checkoutUrl") or data.get("url") or data.get("paymentUrl", "")
-        logger.info(
-            "PayBox charge created: txn=%s amount=%s %s customer=%s",
-            transaction_id,
-            amount,
-            currency,
-            customer_id,
+        raise NotImplementedError(
+            "PayBoxPaymentProvider.create_charge is not yet implemented. "
+            "Complete PayBox merchant onboarding and implement the REST API call. "
+            "See docs/PAYMENT_PROVIDER_ONBOARDING.md."
         )
-        return {
-            "transaction_id": transaction_id,
-            "status": "processing",
-            "amount": amount,
-            "currency": currency,
-            "customer_id": customer_id,
-            "checkout_url": checkout_url,
-            "provider": "paybox",
-            "raw": data,
-            "created_at": datetime.now(UTC).isoformat(),
-        }
 
     async def refund(self, transaction_id: str, amount: float | None = None) -> dict[str, Any]:
-        """Issue a PayBox refund via POST /Transaction/Refund."""
-        import httpx
-
-        payload: dict[str, Any] = {
-            "terminal": self._terminal,
-            "transactionId": transaction_id,
-        }
-        if amount is not None:
-            payload["amount"] = int(round(amount * 100))
-
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            try:
-                resp = await client.post(
-                    f"{self._base_url}/Transaction/Refund",
-                    json=payload,
-                    headers=self._auth_headers(),
-                )
-                resp.raise_for_status()
-                data = resp.json()
-            except httpx.HTTPStatusError as exc:
-                logger.error("PayBox refund HTTP error: %s %s", exc.response.status_code, exc.response.text)
-                raise RuntimeError(f"PayBox refund failed: HTTP {exc.response.status_code}") from exc
-
-        refund_id = str(data.get("refundId") or data.get("id") or uuid4())
-        logger.info("PayBox refund issued: refund=%s txn=%s amount=%s", refund_id, transaction_id, amount)
-        return {
-            "refund_id": refund_id,
-            "transaction_id": transaction_id,
-            "status": "refunded",
-            "amount": amount,
-            "provider": "paybox",
-            "created_at": datetime.now(UTC).isoformat(),
-        }
+        """Issue a PayBox refund."""
+        raise NotImplementedError(
+            "PayBoxPaymentProvider.refund is not yet implemented. "
+            "See docs/PAYMENT_PROVIDER_ONBOARDING.md."
+        )
 
     async def get_status(self, transaction_id: str) -> dict[str, Any]:
-        """Retrieve PayBox transaction status via GET /Transaction/GetTransaction."""
-        import httpx
-
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            try:
-                resp = await client.get(
-                    f"{self._base_url}/Transaction/GetTransaction",
-                    params={"terminal": self._terminal, "id": transaction_id},
-                    headers=self._auth_headers(),
-                )
-                resp.raise_for_status()
-                data = resp.json()
-            except httpx.HTTPStatusError as exc:
-                raise RuntimeError(f"PayBox get_status failed: HTTP {exc.response.status_code}") from exc
-
-        pb_status = str(data.get("status") or data.get("transactionStatus") or "").lower()
-        status_map = {"approved": "succeeded", "completed": "succeeded", "declined": "failed", "cancelled": "failed"}
-        local_status = status_map.get(pb_status, "processing")
-        return {
-            "transaction_id": transaction_id,
-            "status": local_status,
-            "provider_status": pb_status,
-            "checked_at": datetime.now(UTC).isoformat(),
-        }
+        """Retrieve the current status of a PayBox transaction."""
+        raise NotImplementedError(
+            "PayBoxPaymentProvider.get_status is not yet implemented. "
+            "See docs/PAYMENT_PROVIDER_ONBOARDING.md."
+        )
 
     async def create_customer(self, user_id: str, email: str) -> str:
-        """PayBox does not require a separate customer registration step."""
+        """PayBox does not require a separate customer registration step.
+
+        Returns the user_id directly as the customer identifier.
+        """
         return user_id
 
 
@@ -661,8 +462,8 @@ def get_payment_provider() -> PaymentProvider:
     - ``paybox`` — PayBoxPaymentProvider (requires ENABLE_PAYBOX_PAYMENT=true + PAYBOX_TERMINAL + PAYBOX_API_KEY)
 
     In production, the ``mock`` provider is blocked.
-    ``bit`` and ``paybox`` raise :class:`PaymentProviderUnavailableError` until
-    the charge APIs are implemented (do not use in production).
+    ``bit`` and ``paybox`` are architecture-ready but raise NotImplementedError
+    until onboarding is complete and the API integration is implemented.
     See docs/PAYMENT_PROVIDER_ONBOARDING.md for onboarding instructions.
     """
     global _payment_provider
@@ -691,28 +492,55 @@ def get_payment_provider() -> PaymentProvider:
             _payment_provider = MockPaymentProvider()
 
         elif provider_name == "bit":
-            logger.warning(
-                "PAYMENT_PROVIDER=bit is not supported: charge API is not implemented. "
-                "Use PAYMENT_PROVIDER=stripe (with STRIPE_SECRET_KEY) or mock in development."
+            if not settings.ENABLE_BIT_PAYMENT:
+                raise RuntimeError(
+                    "PAYMENT_PROVIDER=bit but ENABLE_BIT_PAYMENT is not set to true. "
+                    "bit integration is not yet live. Complete merchant onboarding first. "
+                    "See docs/PAYMENT_PROVIDER_ONBOARDING.md."
+                )
+            if not settings.BIT_API_KEY or not settings.BIT_MERCHANT_ID:
+                raise RuntimeError(
+                    "PAYMENT_PROVIDER=bit but BIT_API_KEY or BIT_MERCHANT_ID is not set. "
+                    "Obtain credentials by completing bit merchant onboarding. "
+                    "See docs/PAYMENT_PROVIDER_ONBOARDING.md."
+                )
+            logger.info(
+                "Using BitPaymentProvider (environment=%s) — NOTE: API integration not yet complete",
+                settings.BIT_ENVIRONMENT,
             )
-            raise PaymentProviderUnavailableError(
-                "Bit payments are not available yet — integration is incomplete. "
-                "Use stripe or mock (development only). See docs/PAYMENT_PROVIDER_ONBOARDING.md."
+            _payment_provider = BitPaymentProvider(
+                api_key=settings.BIT_API_KEY,
+                merchant_id=settings.BIT_MERCHANT_ID,
+                environment=settings.BIT_ENVIRONMENT,
             )
 
         elif provider_name == "paybox":
-            logger.warning(
-                "PAYMENT_PROVIDER=paybox is not supported: charge API is not implemented. "
-                "Use PAYMENT_PROVIDER=stripe (with STRIPE_SECRET_KEY) or mock in development."
+            if not settings.ENABLE_PAYBOX_PAYMENT:
+                raise RuntimeError(
+                    "PAYMENT_PROVIDER=paybox but ENABLE_PAYBOX_PAYMENT is not set to true. "
+                    "PayBox integration is not yet live. Complete merchant onboarding first. "
+                    "See docs/PAYMENT_PROVIDER_ONBOARDING.md."
+                )
+            if not settings.PAYBOX_TERMINAL or not settings.PAYBOX_API_KEY:
+                raise RuntimeError(
+                    "PAYMENT_PROVIDER=paybox but PAYBOX_TERMINAL or PAYBOX_API_KEY is not set. "
+                    "Obtain credentials by completing PayBox merchant onboarding. "
+                    "See docs/PAYMENT_PROVIDER_ONBOARDING.md."
+                )
+            logger.info(
+                "Using PayBoxPaymentProvider (environment=%s) — NOTE: API integration not yet complete",
+                settings.PAYBOX_ENVIRONMENT,
             )
-            raise PaymentProviderUnavailableError(
-                "PayBox payments are not available yet — integration is incomplete. "
-                "Use stripe or mock (development only). See docs/PAYMENT_PROVIDER_ONBOARDING.md."
+            _payment_provider = PayBoxPaymentProvider(
+                terminal=settings.PAYBOX_TERMINAL,
+                api_key=settings.PAYBOX_API_KEY,
+                environment=settings.PAYBOX_ENVIRONMENT,
             )
 
         else:
             raise RuntimeError(
-                f"Unknown PAYMENT_PROVIDER={provider_name!r}. Supported values: 'mock', 'stripe', 'bit', 'paybox'."
+                f"Unknown PAYMENT_PROVIDER={provider_name!r}. "
+                "Supported values: 'mock', 'stripe', 'bit', 'paybox'."
             )
 
     return _payment_provider

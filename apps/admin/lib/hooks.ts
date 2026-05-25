@@ -6,8 +6,6 @@ import {
   type EscalationsResponse,
   type HealthStatus,
 } from "@groupio/api-client";
-
-import { fetchWithSessionRefresh } from "./fetch-with-session-refresh";
 import type {
   SystemStatus,
   Contractor,
@@ -19,7 +17,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 let apiClient: GroupioApiClient | undefined;
 
 /** Admin uses HTTP-only cookies for auth. No token in JS (reduces XSS exposure). */
-export function getApiClient(): GroupioApiClient {
+function getApiClient(): GroupioApiClient {
   const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "") || "http://localhost:8000";
   const baseUrlWithPrefix = baseUrl.endsWith("/api/v1") ? baseUrl : `${baseUrl}/api/v1`;
   if (!apiClient) {
@@ -74,7 +72,7 @@ export function useDashboardMetrics() {
         : `${baseUrl}/api/v1/admin/analytics`;
 
       try {
-        const res = await fetchWithSessionRefresh(analyticsUrl);
+        const res = await fetch(analyticsUrl, { credentials: "include" });
         if (res.ok) {
           const data = await res.json();
           return {
@@ -150,11 +148,19 @@ export function useResolveEscalation() {
       escalationId: string;
       resolution_notes?: string;
     }) => {
-      const client = getApiClient();
-      return (await client.resolveEscalation(escalationId, resolution_notes)) as Record<
-        string,
-        unknown
-      >;
+      const rawBase = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "") || "http://localhost:8000";
+      const base = rawBase.endsWith("/api/v1") ? rawBase : `${rawBase}/api/v1`;
+      const response = await fetch(
+        `${base}/escalations/${escalationId}/resolve`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: resolution_notes ? JSON.stringify({ resolution_notes }) : undefined,
+        }
+      );
+      if (!response.ok) throw new Error("Failed to resolve escalation");
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.escalations });
@@ -348,7 +354,7 @@ export function useContractors(filters?: {
       }
       if (filters?.category) params.category = filters.category;
       if (filters?.region) params.region = filters.region;
-      const res = await client.getAdminContractors({ ...params, page: 1, page_size: 500 });
+      const res = await client.getContractors(params);
       return res.items.map(mapContractorToListItem);
     },
   });
@@ -365,16 +371,6 @@ export interface AdminAnalyticsDashboard {
   openTicketsChange?: number;
   resolvedToday?: number;
   totalContractors?: number;
-  categoryBreakdown?: Record<string, number>;
-  regionalData?: Record<string, number>;
-  dailyOffers?: { date: string; count: number }[];
-  dailyRevenue?: { date: string; amount: number }[];
-  agentPerformance?: {
-    agent: string;
-    accuracy: number;
-    responseTime: number;
-    throughput: number;
-  }[];
 }
 
 export function useAdminAnalyticsDashboard() {
@@ -385,7 +381,7 @@ export function useAdminAnalyticsDashboard() {
       const backendUrl = baseUrl.endsWith("/api/v1") ? `${baseUrl.replace(/\/api\/v1$/, "")}/api/v1/admin/analytics` : `${baseUrl}/api/v1/admin/analytics`;
 
       // Try the backend first, fall back to the Next.js proxy route
-      const res = await fetchWithSessionRefresh(backendUrl).catch(() => null);
+      const res = await fetch(backendUrl, { credentials: "include" }).catch(() => null);
       if (res?.ok) return res.json() as Promise<AdminAnalyticsDashboard>;
 
       const proxyRes = await fetch("/api/admin/analytics", { credentials: "include" });
@@ -428,7 +424,7 @@ export function useActivityLog() {
         ? `${baseUrl.replace(/\/api\/v1$/, "")}/api/v1/admin/audit-logs?page_size=10`
         : `${baseUrl}/api/v1/admin/audit-logs?page_size=10`;
 
-      const res = await fetchWithSessionRefresh(url);
+      const res = await fetch(url, { credentials: "include" });
       if (!res.ok) return [];
 
       const data = await res.json();
@@ -543,7 +539,7 @@ export function useAgentAutonomy() {
     queryKey: agentAutonomyKey,
     queryFn: async () => {
       const base = getAdminBase();
-      const res = await fetchWithSessionRefresh(`${base}/admin/agents/autonomy`);
+      const res = await fetch(`${base}/admin/agents/autonomy`, { credentials: "include" });
       if (!res.ok) return {};
       return res.json();
     },
@@ -600,7 +596,7 @@ export function useAdminUser() {
     queryFn: async (): Promise<AdminUser | null> => {
       const baseUrl = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "") || "http://localhost:8000";
       const url = baseUrl.endsWith("/api/v1") ? `${baseUrl.replace(/\/api\/v1$/, "")}/api/v1/auth/me` : `${baseUrl}/api/v1/auth/me`;
-      const res = await fetchWithSessionRefresh(url);
+      const res = await fetch(url, { credentials: "include" });
       if (!res.ok) return null;
       return res.json();
     },
@@ -629,7 +625,7 @@ export function useVettingStatus() {
       const url = baseUrl.endsWith("/api/v1")
         ? `${baseUrl.replace(/\/api\/v1$/, "")}/api/v1/admin/vetting/status`
         : `${baseUrl}/api/v1/admin/vetting/status`;
-      const res = await fetchWithSessionRefresh(url);
+      const res = await fetch(url, { credentials: "include" });
       if (!res.ok) return { pendingReview: 0, approved: 0, rejected: 0, pendingContractors: [] };
       return res.json();
     },

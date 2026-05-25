@@ -23,7 +23,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { ApiError, apiClient } from "@/lib/api/client";
 import { useApiData } from "@/lib/hooks/useApiData";
-import { useUnwrapPageParams, PageParamsProps } from "@/lib/utils/unwrapPageParams";
+import { unwrapPageParams, PageParamsProps } from "@/lib/utils/unwrapPageParams";
 
 interface OrderDetail {
   id: string;
@@ -84,7 +84,7 @@ function formatDate(dateStr: string) {
 }
 
 export default function OrderDetailPage(props: PageParamsProps) {
-  useUnwrapPageParams(props);
+  unwrapPageParams(props);
   const t = useTranslations("orders");
   const { id } = useParams<{ id: string }>();
   const queryClient = useQueryClient();

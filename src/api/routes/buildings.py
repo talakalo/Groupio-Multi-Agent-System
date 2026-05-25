@@ -6,11 +6,7 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
-from src.api.middleware.auth import (
-    get_buildings_manager_user,
-    get_current_user,
-    is_admin,
-)
+from src.api.middleware.auth import get_current_user, is_admin
 from src.databases.postgres import get_postgres_client
 from src.models.building import (
     BuildingCreate,
@@ -21,7 +17,7 @@ from src.models.building import (
     BuildingUpdate,
 )
 from src.models.contractor import Region
-from src.models.user import UserInDB, UserRole
+from src.models.user import UserInDB
 
 logger = logging.getLogger(__name__)
 
@@ -62,10 +58,8 @@ async def get_my_building(
             }
         )
 
-    # Shareable invite code: prefer the stored column populated by migration
-    # 038. Fall back to the legacy id-derived form so existing share links
-    # keep working during the deploy window before the column is backfilled.
-    invite_code = building.get("invite_code") or (building_id.replace("-", "")[:8].upper() if building_id else "")
+    # Shareable invite code (short id for now; can be from invitations table later)
+    invite_code = building_id.replace("-", "")[:8].upper() if building_id else ""
 
     return {
         **building,
@@ -102,20 +96,12 @@ async def join_building(
         building_id = request.building_id
     else:
         code = (request.invite_code or "").strip().upper()
-        if len(code) < 6:
-            raise HTTPException(status_code=400, detail="Invite code must be at least 6 characters")
-        # Prefer the stored invite_code (migration 038), fall back to the
-        # legacy id-derived form so codes shared before the migration still
-        # resolve.
+        if len(code) < 8:
+            raise HTTPException(status_code=400, detail="Invite code must be at least 8 characters")
         rows = await db.execute_query(
-            "SELECT id FROM buildings WHERE invite_code = $1 LIMIT 1",
+            "SELECT id FROM buildings WHERE UPPER(LEFT(REPLACE(id::text, '-', ''), 8)) = $1 LIMIT 1",
             {"code": code},
         )
-        if not rows:
-            rows = await db.execute_query(
-                "SELECT id FROM buildings WHERE UPPER(LEFT(REPLACE(id::text, '-', ''), 8)) = $1 LIMIT 1",
-                {"code": code},
-            )
         if not rows:
             raise HTTPException(status_code=404, detail="No building found for this invite code")
         building_id = rows[0]["id"]
@@ -139,14 +125,9 @@ async def join_building(
 @router.post("/", response_model=BuildingResponse)
 async def create_building(
     request: BuildingCreate,
-    current_user: UserInDB = Depends(get_buildings_manager_user),
+    current_user: UserInDB = Depends(get_current_user),
 ) -> BuildingResponse:
-    """Create a new building.
-
-    Restricted to ``buildings_manager``, ``admin`` and ``super_admin``. Before
-    this guard was added any authenticated user — including a resident —
-    could create a building and silently become its ``admin_user_id``.
-    """
+    """Create a new building."""
     db = get_postgres_client()
 
     building_id = str(uuid4())
@@ -164,31 +145,6 @@ async def create_building(
         floor=1,
         is_owner=True,
     )
-
-    # Index in vector DB for semantic building search
-    try:
-        from src.databases.vector_store import get_vector_store
-        from src.rag.embeddings import get_embedding_client
-
-        parts = [building.get(k, "") for k in ("name", "address", "city", "neighborhood")]
-        text = " ".join(p for p in parts if p)
-        embedding = await get_embedding_client().embed_text(text)
-        vs = get_vector_store()
-        await vs.upsert(
-            collection="buildings",
-            ids=[building_id],
-            vectors=[embedding],
-            payloads=[
-                {
-                    "text": text,
-                    "city": building.get("city", ""),
-                    "neighborhood": building.get("neighborhood", ""),
-                    "address": building.get("address", ""),
-                }
-            ],
-        )
-    except Exception as e:
-        logger.warning("Failed to index building in vector DB: %s", e)
 
     return building
 
@@ -220,32 +176,6 @@ async def list_buildings(
         page_size=page_size,
     )
 
-    return BuildingListResponse(
-        items=buildings,
-        total=total,
-        page=page,
-        page_size=page_size,
-        has_more=(page * page_size) < total,
-    )
-
-
-@router.get("/search", response_model=BuildingListResponse)
-async def search_buildings(
-    q: str = Query(..., min_length=1, description="Search by address or city"),
-    page: int = Query(default=1, ge=1),
-    page_size: int = Query(default=20, ge=1, le=100),
-    current_user: UserInDB = Depends(get_current_user),
-) -> BuildingListResponse:
-    """Search buildings by address or city substring."""
-    db = get_postgres_client()
-    filters: dict = {"search": q}
-    if not is_admin(current_user):
-        filters["user_id"] = current_user.id
-    buildings, total = await db.list_buildings(
-        filters=filters,
-        page=page,
-        page_size=page_size,
-    )
     return BuildingListResponse(
         items=buildings,
         total=total,
@@ -428,32 +358,6 @@ async def remove_resident(
     await db.remove_resident_from_building(user_id, building_id)
 
     return {"status": "removed", "user_id": user_id, "building_id": building_id}
-
-
-@router.post("/{building_id}/regenerate-invite")
-async def regenerate_building_invite(
-    building_id: str,
-    current_user: UserInDB = Depends(get_buildings_manager_user),
-) -> dict[str, str]:
-    """Rotate the invite code for a building. Restricted to BM/admin.
-
-    Existing share links using the old code stop resolving immediately —
-    that's the whole point of rotation (a leaked code becomes invalid).
-    """
-    db = get_postgres_client()
-    building = await db.get_building(building_id)
-    if not building:
-        raise HTTPException(status_code=404, detail="Building not found")
-
-    # BM users can rotate only their own buildings; admin/super_admin can rotate any.
-    if current_user.role == UserRole.BUILDINGS_MANAGER and building.get("admin_user_id") != current_user.id:
-        raise HTTPException(
-            status_code=403,
-            detail="Buildings managers can only rotate codes for their own buildings",
-        )
-
-    new_code = await db.regenerate_building_invite_code(building_id)
-    return {"building_id": building_id, "invite_code": new_code}
 
 
 @router.get("/{building_id}/stats", response_model=BuildingStats)

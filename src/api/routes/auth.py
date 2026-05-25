@@ -31,6 +31,7 @@ from src.models.user import (
     UserResponse,
     UserRole,
     UserUpdate,
+    SELF_REGISTERABLE_ROLES,
 )
 from src.services.email import get_email_service
 from src.utils.monitoring import capture_exception_safe, get_logger
@@ -76,7 +77,8 @@ class SignupRequest(BaseModel):
     def _block_privileged_roles(cls, v: UserRole) -> UserRole:
         if v not in SELF_REGISTERABLE_ROLES:
             raise ValueError(
-                f"Cannot self-register with role '{v}'. Allowed: {', '.join(sorted(SELF_REGISTERABLE_ROLES))}"
+                f"Cannot self-register with role '{v}'. "
+                f"Allowed: {', '.join(sorted(SELF_REGISTERABLE_ROLES))}"
             )
         return v
 

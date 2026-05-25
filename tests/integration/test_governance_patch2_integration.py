@@ -18,11 +18,13 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from fastapi.testclient import TestClient
 
 from src.api.main import app
 from src.api.middleware.auth import get_admin_user, get_current_user
 from src.models.user import UserInDB, UserRole
+
 
 # ---------------------------------------------------------------------------
 # Shared helpers
@@ -95,7 +97,9 @@ def _build_admin_db(
     """Return a fully-configured mock DB for admin route tests."""
     db = AsyncMock()
     db.get_pending_decision = AsyncMock(return_value=entry)
-    db.update_pending_decision = AsyncMock(return_value=update_decision_result or {**entry, "status": entry["status"]})
+    db.update_pending_decision = AsyncMock(
+        return_value=update_decision_result or {**entry, "status": entry["status"]}
+    )
     db.get_payment = AsyncMock(return_value=payment or _payment_record())
     db.update_payment = AsyncMock(return_value={**(payment or _payment_record()), "status": "refunded"})
     db.update_invoice = AsyncMock(return_value={})
@@ -172,7 +176,6 @@ class TestEmailVerificationEnforcedAtMiddleware:
         mock_db_auth = AsyncMock()
         mock_db_auth.get_user = AsyncMock(return_value=verified)
         mock_db_auth.list_payments_for_user = AsyncMock(return_value=[])
-        mock_db_auth.list_payments_for_user_paginated = AsyncMock(return_value=([], 0))
 
         mock_settings = MagicMock()
         mock_settings.ENFORCE_EMAIL_VERIFICATION = True
@@ -427,7 +430,9 @@ class TestRejectDecision:
 
         with patch("src.api.routes.admin.get_postgres_client", return_value=db):
             client = TestClient(app)
-            resp = client.post("/api/v1/admin/agents/pending-decisions/decision-1/reject?note=denied")
+            resp = client.post(
+                "/api/v1/admin/agents/pending-decisions/decision-1/reject?note=denied"
+            )
 
         assert resp.status_code == 200
         db.create_audit_log.assert_awaited_once()

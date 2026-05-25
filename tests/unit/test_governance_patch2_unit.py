@@ -20,6 +20,7 @@ import pytest
 
 from src.models.user import UserInDB, UserRole
 
+
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
@@ -430,7 +431,7 @@ class TestAutonomyModeDBFirst:
 
             assert resp.status_code == 200
             data = resp.json()
-            assert data["payment"] == "gated"  # env fallback
+            assert data["payment"] == "gated"   # env fallback
             assert data["matching"] == "recommend"  # env fallback
         finally:
             app.dependency_overrides.clear()

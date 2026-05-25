@@ -260,6 +260,39 @@ function SettingsToggle({
   );
 }
 
+function SettingsToggle({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+}) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-sm text-surface-700">{label}</span>
+      <button
+        onClick={() => onChange(!checked)}
+        className={clsx(
+          "relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200",
+          checked ? "bg-primary-600" : "bg-surface-300"
+        )}
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
+      >
+        <span
+          className={clsx(
+            "inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200",
+            checked ? "translate-x-6" : "translate-x-1"
+          )}
+        />
+      </button>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Page component
 // ---------------------------------------------------------------------------

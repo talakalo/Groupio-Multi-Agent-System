@@ -10,39 +10,32 @@ import {
   AlertCircle,
 } from "lucide-react";
 import Link from "next/link";
-import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { apiClient, ApiError } from "@/lib/api/client";
-import { useUnwrapPageParams, PageParamsProps } from "@/lib/utils/unwrapPageParams";
+import { unwrapPageParams, PageParamsProps } from "@/lib/utils/unwrapPageParams";
 
-type ChangePasswordData = {
-  currentPassword: string;
-  newPassword: string;
-  confirmPassword: string;
-};
+const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, "נא להזין את הסיסמה הנוכחית"),
+    newPassword: z
+      .string()
+      .min(8, "הסיסמה חייבת להכיל לפחות 8 תווים")
+      .regex(/[A-Z]/, "הסיסמה חייבת להכיל אות גדולה")
+      .regex(/[0-9]/, "הסיסמה חייבת להכיל ספרה"),
+    confirmPassword: z.string(),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: "הסיסמאות אינן תואמות",
+    path: ["confirmPassword"],
+  });
+
+type ChangePasswordData = z.infer<typeof changePasswordSchema>;
 
 export default function ChangePasswordPage(props: PageParamsProps) {
-  useUnwrapPageParams(props);
-  const t = useTranslations("profile");
-
-  const changePasswordSchema = z
-    .object({
-      currentPassword: z.string().min(1, t("currentPasswordRequired")),
-      newPassword: z
-        .string()
-        .min(8, t("passwordMinLength"))
-        .regex(/[A-Z]/, t("passwordUppercaseRequired"))
-        .regex(/[0-9]/, t("passwordNumberRequired")),
-      confirmPassword: z.string(),
-    })
-    .refine((data) => data.newPassword === data.confirmPassword, {
-      message: t("passwordMismatch"),
-      path: ["confirmPassword"],
-    });
-
+  unwrapPageParams(props);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -68,14 +61,14 @@ export default function ChangePasswordPage(props: PageParamsProps) {
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.status === 400) {
-          setError(t("currentPasswordWrong"));
+          setError("הסיסמה הנוכחית שגויה");
         } else if (err.status === 429) {
-          setError(t("passwordUpdateFailed"));
+          setError("יותר מדי ניסיונות. נסו שוב מאוחר יותר.");
         } else {
-          setError(t("passwordUpdateFailed"));
+          setError("שגיאה בשינוי הסיסמה. נסו שוב.");
         }
       } else {
-        setError(t("unexpectedError"));
+        setError("שגיאה בלתי צפויה. נסו שוב.");
       }
     } finally {
       setIsLoading(false);
@@ -84,13 +77,13 @@ export default function ChangePasswordPage(props: PageParamsProps) {
 
   if (success) {
     return (
-      <main className="max-w-md mx-auto p-6">
+      <main className="max-w-md mx-auto p-6" dir="rtl">
         <div className="bg-white rounded-xl border border-gray-200 p-8 text-center space-y-4">
           <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto" />
-          <h1 className="text-xl font-bold text-gray-900">{t("passwordUpdated")}</h1>
-          <p className="text-gray-600">{t("passwordSaved")}</p>
+          <h1 className="text-xl font-bold text-gray-900">הסיסמה שונתה בהצלחה</h1>
+          <p className="text-gray-600">הסיסמה החדשה שלך נשמרה.</p>
           <Link href="/profile" className="btn-primary inline-block">
-            {t("backToProfile")}
+            חזרה לפרופיל
           </Link>
         </div>
       </main>
@@ -98,12 +91,14 @@ export default function ChangePasswordPage(props: PageParamsProps) {
   }
 
   return (
-    <main className="max-w-md mx-auto p-6">
+    <main className="max-w-md mx-auto p-6" dir="rtl">
       <div className="bg-white rounded-xl border border-gray-200 p-8 space-y-6">
         <div className="text-center">
           <Lock className="w-10 h-10 text-primary-600 mx-auto mb-3" />
-          <h1 className="text-xl font-bold text-gray-900">{t("changePassword")}</h1>
-          <p className="text-sm text-gray-500 mt-1">{t("passwordSubtitle")}</p>
+          <h1 className="text-xl font-bold text-gray-900">שינוי סיסמה</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            הזינו את הסיסמה הנוכחית ואת הסיסמה החדשה
+          </p>
         </div>
 
         {error && (
@@ -117,9 +112,10 @@ export default function ChangePasswordPage(props: PageParamsProps) {
         )}
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          {/* Current Password */}
           <div>
             <label htmlFor="currentPassword" className="block text-sm font-medium text-gray-700 mb-1">
-              {t("currentPassword")}
+              סיסמה נוכחית
             </label>
             <div className="relative">
               <input
@@ -147,9 +143,10 @@ export default function ChangePasswordPage(props: PageParamsProps) {
             )}
           </div>
 
+          {/* New Password */}
           <div>
             <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 mb-1">
-              {t("newPassword")}
+              סיסמה חדשה
             </label>
             <div className="relative">
               <input
@@ -177,9 +174,10 @@ export default function ChangePasswordPage(props: PageParamsProps) {
             )}
           </div>
 
+          {/* Confirm Password */}
           <div>
             <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
-              {t("confirmPassword")}
+              אימות סיסמה חדשה
             </label>
             <input
               id="confirmPassword"
@@ -207,13 +205,13 @@ export default function ChangePasswordPage(props: PageParamsProps) {
             ) : (
               <Lock className="w-5 h-5" />
             )}
-            {isLoading ? t("changing") : t("changePasswordBtn")}
+            {isLoading ? "משנה סיסמה..." : "שנה סיסמה"}
           </button>
         </form>
 
         <div className="text-center">
           <Link href="/profile" className="text-sm text-gray-500 hover:text-gray-700">
-            {t("cancel")}
+            ביטול
           </Link>
         </div>
       </div>
