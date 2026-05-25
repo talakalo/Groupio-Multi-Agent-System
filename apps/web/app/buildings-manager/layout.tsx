@@ -54,10 +54,19 @@ export default function BuildingsManagerLayout({ children }: { children: React.R
       });
       return;
     }
-    if (user && user.role !== 'buildings_manager' && user.role !== 'admin' && user.role !== 'super_admin') {
-      router.replace('/dashboard');
+    if (user) {
+      if (user.role === 'admin' || user.role === 'super_admin') {
+        // Admin/super_admin landing on BM dashboard → send them to admin area
+        if (pathname === '/buildings-manager/dashboard') {
+          router.replace('/admin/dashboard');
+        }
+        return;
+      }
+      if (user.role !== 'buildings_manager') {
+        router.replace('/dashboard');
+      }
     }
-  }, [hasHydrated, token, user, router, refreshAccessToken]);
+  }, [hasHydrated, token, user, router, refreshAccessToken, pathname]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {

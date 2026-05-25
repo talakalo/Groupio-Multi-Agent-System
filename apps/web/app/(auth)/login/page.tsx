@@ -104,9 +104,12 @@ export default function LoginPage() {
       setAuthCookie(response.token, user);
       Analytics.userLoggedIn({ role: user?.role ?? "unknown" });
       const role = user?.role ?? "";
-      if (["admin", "super_admin", "buildings_manager"].includes(role)) {
-        const adminUrl = process.env.NEXT_PUBLIC_ADMIN_URL || "http://localhost:3001";
-        window.location.href = `${adminUrl}/dashboard`;
+      if (role === "admin" || role === "super_admin") {
+        router.push("/admin/dashboard");
+        return;
+      }
+      if (role === "buildings_manager") {
+        router.push("/buildings-manager/dashboard");
         return;
       }
       if (role === "contractor") {

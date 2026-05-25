@@ -42,16 +42,21 @@ router = APIRouter(tags=["auth"])
 
 
 async def check_auth_rate_limit(request: Request) -> None:
-    """Enforce IP-based rate limit on auth endpoints (20 req/min)."""
-    redis = get_redis_client()
-    client_ip = request.client.host if request.client else "unknown"
-    allowed = await redis.check_ip_rate_limit(client_ip, limit=20, window=60)
-    if not allowed:
-        raise HTTPException(
-            status_code=429,
-            detail="Too many authentication attempts. Try again in a minute.",
-            headers={"Retry-After": "60"},
-        )
+    """Enforce IP-based rate limit on auth endpoints (20 req/min). Fails open on Redis errors."""
+    try:
+        redis = get_redis_client()
+        client_ip = request.client.host if request.client else "unknown"
+        allowed = await redis.check_ip_rate_limit(client_ip, limit=20, window=60)
+        if not allowed:
+            raise HTTPException(
+                status_code=429,
+                detail="Too many authentication attempts. Try again in a minute.",
+                headers={"Retry-After": "60"},
+            )
+    except HTTPException:
+        raise
+    except Exception:
+        pass  # fail-open: don't block auth when Redis is unavailable
 
 
 class SignupRequest(BaseModel):

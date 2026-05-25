@@ -15,6 +15,7 @@ import {
   FileImage,
   Mail,
   Loader2,
+  ShoppingBag,
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -40,6 +41,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/architecture', labelKey: 'architecture', icon: FileImage },
   { href: '/building', labelKey: 'building', icon: Building2 },
   { href: '/payments', labelKey: 'payments', icon: CreditCard },
+  { href: '/orders', labelKey: 'orders', icon: ShoppingBag },
 ];
 
 const ALLOWED_RESIDENT_ROLES = new Set(['resident', 'admin', 'super_admin']);

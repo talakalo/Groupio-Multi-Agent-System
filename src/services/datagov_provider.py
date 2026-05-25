@@ -6,6 +6,8 @@ All logic has moved to src/integrations/gov/client.py.
 
 import warnings as _warnings
 
+import httpx  # noqa: F401 — re-exported so patch targets like src.services.datagov_provider.httpx still work
+
 from src.integrations.gov.client import (
     DATAGOV_BASE,
     FLD_LISHKA,
@@ -64,6 +66,9 @@ class DataGovIlProvider:
             DeprecationWarning,
             stacklevel=2,
         )
+        self._base_url = base_url.rstrip("/")
+        self._timeout = timeout
+        self._user_agent = user_agent
         self._client = _GovDataClient(
             base_url=base_url,
             connect_timeout=5.0,
@@ -71,18 +76,64 @@ class DataGovIlProvider:
             user_agent=user_agent,
         )
 
-    def get_municipality_info(self, city: str) -> dict | None:
-        result = self._client.resolve_municipality(city)
-        if not result.ok or result.value is None:
+    def _post(self, action: str, params: dict) -> dict | None:
+        """POST to CKAN action endpoint. Returns result dict or None on failure."""
+        url = f"{self._base_url}/{action}"
+        try:
+            with httpx.Client(
+                timeout=self._timeout,
+                headers={"User-Agent": self._user_agent, "Content-Type": "application/json"},
+            ) as client:
+                resp = client.post(url, json=params)
+                resp.raise_for_status()
+                data = resp.json()
+                if not data.get("success"):
+                    return None
+                return data.get("result")
+        except httpx.HTTPError:
             return None
-        m = result.value
-        return {
-            "city": m.municipality_name_he,
-            "municipality_name": m.municipality_name_he,
-            "district": m.district,
-            "region": m.region,
-            "symbol": m.municipality_code,
-        }
+
+    def datastore_search(
+        self,
+        resource_id: str,
+        filters: dict | None = None,
+        fields: list | None = None,
+        limit: int = 10,
+        q: str | None = None,
+    ) -> list[dict]:
+        """Search CKAN datastore. Returns list of records."""
+        params: dict = {"resource_id": resource_id, "limit": limit}
+        if filters:
+            params["filters"] = filters
+        if fields:
+            params["fields"] = fields
+        if q:
+            params["q"] = q
+        result = self._post("datastore_search", params)
+        if result is None:
+            return []
+        return result.get("records", [])
+
+    def get_municipality_info(self, city: str) -> dict | None:
+        if not city:
+            return None
+        records = self.datastore_search(
+            RESOURCE_SETTLEMENTS,
+            fields=[FLD_SYMBOL_YESHUV, FLD_NAME_YESHUV, FLD_NAME_NAFA, FLD_LISHKA],
+            limit=10,
+            q=_normalize_hebrew(city),
+        )
+        for rec in records:
+            name = _normalize_hebrew(rec.get(FLD_NAME_YESHUV))
+            if _fuzzy_match(city, name):
+                return {
+                    "city": name,
+                    "municipality_name": name,
+                    "symbol": str(rec.get(FLD_SYMBOL_YESHUV, "")),
+                    "district": _normalize_hebrew(rec.get(FLD_NAME_NAFA, "")),
+                    "region": _normalize_hebrew(rec.get(FLD_LISHKA, "")),
+                }
+        return None
 
     def normalize_address(
         self,
@@ -91,18 +142,43 @@ class DataGovIlProvider:
         house_number: str | None = None,
         free_text: str | None = None,
     ) -> dict | None:
-        result = self._client.normalize_address(city, street, house_number, free_text)
-        if not result.ok or result.value is None:
+        if not city:
             return None
-        v = result.value
+        muni = self.get_municipality_info(city)
+        if muni is None:
+            return None
+        symbol = muni.get("symbol", "")
+        if not symbol:
+            addr = f"{street or free_text or ''} {city}".strip()
+            return {
+                "address": addr,
+                "city": city,
+                "street": street,
+                "house_number": house_number,
+                "municipality": muni.get("municipality_name"),
+                "confidence": 0.6,
+                "source": "settlements",
+            }
+        street_name: str | None = None
+        if street or free_text:
+            q_street = street or free_text or ""
+            filters = {FLD_SYMBOL_YESHUV: int(symbol)} if symbol.isdigit() else None
+            records = self.datastore_search(RESOURCE_STREETS, filters=filters, limit=100)
+            for rec in records:
+                name = _normalize_hebrew(rec.get(FLD_NAME_REHOV))
+                if _fuzzy_match(q_street, name):
+                    street_name = name
+                    break
+        addr_parts = [street_name or street or free_text or "", house_number or ""]
+        address = " ".join(p for p in addr_parts if p).strip() or city
         return {
-            "address": v.address,
-            "city": v.city,
-            "street": v.street,
-            "house_number": v.house_number,
-            "municipality": v.municipality,
-            "confidence": result.confidence,
-            "source": result.source.value,
+            "address": address,
+            "city": city,
+            "street": street_name or street,
+            "house_number": house_number,
+            "municipality": muni.get("municipality_name"),
+            "confidence": 0.85 if street_name else 0.7,
+            "source": "settlements+streets",
         }
 
     def search_registered_entity(
@@ -111,19 +187,27 @@ class DataGovIlProvider:
         company_id: str | None = None,
         limit: int = 5,
     ) -> list[dict]:
-        result = self._client.lookup_company(name, company_id, limit)
-        if result.value is None:
+        if not name:
             return []
-        return [
-            {
-                "company_id": c.company_id,
-                "name": c.name,
-                "status": c.status,
-                "city": c.city,
-                "address": c.address,
-            }
-            for c in result.value
-        ]
-
-    def datastore_search(self, resource_id: str, **kwargs) -> list[dict]:
-        return self._client._datastore_search(resource_id, **kwargs)
+        filters: dict | None = None
+        if company_id:
+            filters = {"מספר חברה": int(company_id) if str(company_id).isdigit() else company_id}
+        records = self.datastore_search(
+            RESOURCE_COMPANIES,
+            filters=filters,
+            fields=["מספר חברה", "שם חברה", "סטטוס חברה", "שם עיר", "שם רחוב", "מספר בית"],
+            limit=limit,
+        )
+        results = []
+        for rec in records:
+            comp_name = _normalize_hebrew(rec.get("שם חברה", ""))
+            if not company_id and not _fuzzy_match(name, comp_name):
+                continue
+            results.append({
+                "company_id": str(rec.get("מספר חברה", "")),
+                "name": comp_name,
+                "status": _normalize_hebrew(rec.get("סטטוס חברה", "")),
+                "city": _normalize_hebrew(rec.get("שם עיר", "")),
+                "address": f"{_normalize_hebrew(rec.get('שם רחוב', ''))} {rec.get('מספר בית', '')}".strip(),
+            })
+        return results

@@ -189,6 +189,7 @@
     "aiAssistant": "AI Assistant",
     "myAccount": "My Account",
     "payments": "Payments",
+    "orders": "My Orders",
     "myAccountHint": "Profile, notifications & preferences",
     "accountMenu": "Account menu",
     "logout": "Log out",
@@ -1341,6 +1342,10 @@
         "title": "Operations admin (separate app)",
         "description": "Super-admin console runs on its own URL. Open it in a new tab when your team has deployed the admin app.",
         "cta": "Open admin app"
+      },
+      "systemSettingsCard": {
+        "title": "System settings",
+        "description": "Configure platform-wide settings, feature flags, and operational parameters."
       }
     },
     "account": {

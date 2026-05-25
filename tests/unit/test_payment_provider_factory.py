@@ -31,6 +31,8 @@ class _StubSettings:
         self.PAYMENT_PROVIDER = provider
         self.ENVIRONMENT = environment
         self.STRIPE_SECRET_KEY = stripe_secret
+        self.ENABLE_BIT_PAYMENT = False
+        self.ENABLE_PAYBOX_PAYMENT = False
 
 
 @pytest.fixture(autouse=True)

@@ -296,7 +296,7 @@ describe('ApiClient', () => {
         json: async () => ({ status: 'joined', offer_id: 'offer-123' }),
       });
 
-      const result = await apiClient.joinOffer('offer-123', 2);
+      const result = await apiClient.joinOffer('offer-123', { unitCount: 2 });
 
       const [url, options] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
       expect(url).toContain('/api/v1/offers/offer-123/join');

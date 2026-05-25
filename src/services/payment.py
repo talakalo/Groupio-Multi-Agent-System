@@ -496,49 +496,17 @@ def get_payment_provider() -> PaymentProvider:
             _payment_provider = MockPaymentProvider()
 
         elif provider_name == "bit":
-            if not settings.ENABLE_BIT_PAYMENT:
-                raise RuntimeError(
-                    "PAYMENT_PROVIDER=bit but ENABLE_BIT_PAYMENT is not set to true. "
-                    "bit integration is not yet live. Complete merchant onboarding first. "
-                    "See docs/PAYMENT_PROVIDER_ONBOARDING.md."
-                )
-            if not settings.BIT_API_KEY or not settings.BIT_MERCHANT_ID:
-                raise RuntimeError(
-                    "PAYMENT_PROVIDER=bit but BIT_API_KEY or BIT_MERCHANT_ID is not set. "
-                    "Obtain credentials by completing bit merchant onboarding. "
-                    "See docs/PAYMENT_PROVIDER_ONBOARDING.md."
-                )
-            logger.info(
-                "Using BitPaymentProvider (environment=%s) — NOTE: API integration not yet complete",
-                settings.BIT_ENVIRONMENT,
-            )
-            _payment_provider = BitPaymentProvider(
-                api_key=settings.BIT_API_KEY,
-                merchant_id=settings.BIT_MERCHANT_ID,
-                environment=settings.BIT_ENVIRONMENT,
+            raise PaymentProviderUnavailableError(
+                "Bit payments are not available. "
+                "Complete bit merchant onboarding and set ENABLE_BIT_PAYMENT=true. "
+                "See docs/PAYMENT_PROVIDER_ONBOARDING.md."
             )
 
         elif provider_name == "paybox":
-            if not settings.ENABLE_PAYBOX_PAYMENT:
-                raise RuntimeError(
-                    "PAYMENT_PROVIDER=paybox but ENABLE_PAYBOX_PAYMENT is not set to true. "
-                    "PayBox integration is not yet live. Complete merchant onboarding first. "
-                    "See docs/PAYMENT_PROVIDER_ONBOARDING.md."
-                )
-            if not settings.PAYBOX_TERMINAL or not settings.PAYBOX_API_KEY:
-                raise RuntimeError(
-                    "PAYMENT_PROVIDER=paybox but PAYBOX_TERMINAL or PAYBOX_API_KEY is not set. "
-                    "Obtain credentials by completing PayBox merchant onboarding. "
-                    "See docs/PAYMENT_PROVIDER_ONBOARDING.md."
-                )
-            logger.info(
-                "Using PayBoxPaymentProvider (environment=%s) — NOTE: API integration not yet complete",
-                settings.PAYBOX_ENVIRONMENT,
-            )
-            _payment_provider = PayBoxPaymentProvider(
-                terminal=settings.PAYBOX_TERMINAL,
-                api_key=settings.PAYBOX_API_KEY,
-                environment=settings.PAYBOX_ENVIRONMENT,
+            raise PaymentProviderUnavailableError(
+                "PayBox payments are not available. "
+                "Complete PayBox merchant onboarding and set ENABLE_PAYBOX_PAYMENT=true. "
+                "See docs/PAYMENT_PROVIDER_ONBOARDING.md."
             )
 
         else:

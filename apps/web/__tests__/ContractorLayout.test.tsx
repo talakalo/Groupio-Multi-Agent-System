@@ -13,6 +13,7 @@ vi.mock('next/navigation', () => ({
 // ---- next-intl mock (returns translation key as-is) ----
 vi.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
+  useLocale: () => 'he',
 }));
 
 // ---- NotificationPanel stub ----
@@ -24,9 +25,17 @@ vi.mock('@/components/shared/NotificationPanel', () => ({
 let mockAccessToken: string | null = 'contractor-token';
 const mockLogout = vi.fn(() => Promise.resolve());
 
+const mockRefreshContractorToken = vi.fn(() => Promise.resolve(!!mockAccessToken));
+
 vi.mock('@/lib/stores/authStore', () => ({
   useAuthStore: vi.fn((selector: (s: Record<string, unknown>) => unknown) =>
-    selector({ accessToken: mockAccessToken, logout: mockLogout, user: { role: 'contractor' } })
+    selector({
+      accessToken: mockAccessToken,
+      logout: mockLogout,
+      user: { role: 'contractor' },
+      isAuthenticated: !!mockAccessToken,
+      refreshAccessToken: mockRefreshContractorToken,
+    })
   ),
   useAuthHasHydrated: vi.fn(() => true),
 }));

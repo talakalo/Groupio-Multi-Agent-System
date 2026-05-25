@@ -299,8 +299,8 @@ export async function createOffer(
 /** Join an existing group offer. */
 export async function joinOffer(
   offerId: string,
-): Promise<{ success: boolean; participants: number }> {
-  return request<{ success: boolean; participants: number }>(
+): Promise<{ status: string; offer_id: string }> {
+  return request<{ status: string; offer_id: string }>(
     "POST",
     `/offers/${offerId}/join`,
   );
@@ -676,4 +676,286 @@ export interface ContractorProjectsFilters {
   status?: OfferStatus;
   page?: number;
   limit?: number;
+}
+
+// ---------------------------------------------------------------------------
+// Password reset
+// ---------------------------------------------------------------------------
+
+export async function requestPasswordReset(email: string): Promise<void> {
+  return request<void>("POST", "/auth/password/reset", { body: { email } });
+}
+
+export async function confirmPasswordReset(
+  token: string,
+  newPassword: string,
+): Promise<void> {
+  return request<void>("POST", "/auth/password/reset/confirm", {
+    body: { token, new_password: newPassword },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Onboarding
+// ---------------------------------------------------------------------------
+
+export interface NormalizedAddress {
+  address: string;
+  city: string;
+  street?: string | null;
+  house_number?: string | null;
+  municipality?: string | null;
+  confidence: number;
+  source: string;
+}
+
+export interface OnboardingPayload {
+  role: "resident" | "contractor";
+  city?: string;
+  street?: string;
+  houseNumber?: string;
+  buildingId?: string;
+  businessName?: string;
+  licenseNumber?: string;
+  phone?: string;
+  categories?: string[];
+}
+
+export async function normalizeAddress(
+  city: string,
+  street?: string,
+  houseNumber?: string,
+  freeText?: string,
+): Promise<NormalizedAddress | null> {
+  return request<NormalizedAddress | null>("POST", "/address/normalize", {
+    body: { city, street, house_number: houseNumber, free_text: freeText },
+  });
+}
+
+export async function submitOnboarding(payload: OnboardingPayload): Promise<void> {
+  return request<void>("POST", "/auth/onboarding", { body: payload });
+}
+
+// ---------------------------------------------------------------------------
+// File uploads / architecture plans
+// ---------------------------------------------------------------------------
+
+export interface FileUploadStatus {
+  id: string;
+  filename: string;
+  status: "pending" | "processing" | "ready" | "failed";
+  analysis_status: "pending" | "processing" | "done" | "failed";
+  url?: string;
+  analysis_result?: Record<string, unknown>;
+  created_at: string;
+}
+
+export async function getFileUpload(
+  fileId: string,
+  signal?: AbortSignal,
+): Promise<FileUploadStatus> {
+  return request<FileUploadStatus>("GET", `/uploads/${fileId}`, { signal });
+}
+
+export async function uploadArchitecturePlan(
+  uri: string,
+  buildingId?: string,
+): Promise<FileUploadStatus> {
+  const formData = new FormData();
+  const filename = uri.split("/").pop() ?? "plan.pdf";
+  const ext = /\.(\w+)$/.exec(filename);
+  const mime = ext ? `application/${ext[1]}` : "application/octet-stream";
+
+  formData.append("file", { uri, name: filename, type: mime } as unknown as Blob);
+  if (buildingId) formData.append("building_id", buildingId);
+
+  const uploadUrl = buildUrl("/uploads/architecture");
+  const hdrs: Record<string, string> = { Accept: "application/json" };
+  if (_authToken) hdrs["Authorization"] = `Bearer ${_authToken}`;
+
+  const resp = await fetch(uploadUrl, { method: "POST", headers: hdrs, body: formData });
+  if (!resp.ok) throw new ApiError("Upload failed", resp.status, "UPLOAD_ERROR");
+  return resp.json() as Promise<FileUploadStatus>;
+}
+
+// ---------------------------------------------------------------------------
+// Contractor profile / detail
+// ---------------------------------------------------------------------------
+
+export interface ContractorProfile {
+  id: string;
+  businessName: string;
+  ownerName: string;
+  phone: string;
+  email: string;
+  description: string;
+  licenseNumber: string;
+  categories?: string[];
+  rating?: number;
+  reviewCount?: number;
+  isVerified?: boolean;
+  avatarUrl?: string;
+}
+
+export interface ContractorReview {
+  id: string;
+  authorName: string;
+  rating: number;
+  comment: string;
+  createdAt: string;
+  offerId?: string;
+}
+
+export async function getContractor(
+  contractorId: string,
+  signal?: AbortSignal,
+): Promise<ContractorProfile> {
+  return request<ContractorProfile>("GET", `/contractors/${contractorId}`, { signal });
+}
+
+export async function getContractorReviews(
+  contractorId: string,
+  params?: { limit?: number; offset?: number },
+  signal?: AbortSignal,
+): Promise<ContractorReview[]> {
+  return request<ContractorReview[]>(
+    "GET",
+    `/contractors/${contractorId}/reviews`,
+    { params: params as Record<string, number | undefined>, signal },
+  );
+}
+
+export interface UpdateContractorPayload {
+  businessName?: string;
+  ownerName?: string;
+  phone?: string;
+  email?: string;
+  description?: string;
+  licenseNumber?: string;
+  categories?: string[];
+}
+
+export async function updateContractor(
+  contractorId: string,
+  payload: UpdateContractorPayload,
+): Promise<ContractorProfile> {
+  return request<ContractorProfile>("PUT", `/contractors/${contractorId}`, { body: payload });
+}
+
+export async function uploadContractorDoc(
+  uri: string,
+  filename?: string,
+): Promise<{ id: string; url: string }> {
+  const formData = new FormData();
+  const name = filename ?? uri.split("/").pop() ?? "document.pdf";
+  const ext = /\.(\w+)$/.exec(name);
+  const mime = ext ? `application/${ext[1]}` : "application/octet-stream";
+
+  formData.append("file", { uri, name, type: mime } as unknown as Blob);
+
+  const uploadUrl = buildUrl("/contractors/me/documents");
+  const hdrs: Record<string, string> = { Accept: "application/json" };
+  if (_authToken) hdrs["Authorization"] = `Bearer ${_authToken}`;
+
+  const resp = await fetch(uploadUrl, { method: "POST", headers: hdrs, body: formData });
+  if (!resp.ok) throw new ApiError("Document upload failed", resp.status, "UPLOAD_ERROR");
+  return resp.json() as Promise<{ id: string; url: string }>;
+}
+
+// ---------------------------------------------------------------------------
+// Contractor earnings
+// ---------------------------------------------------------------------------
+
+export interface EarningsLineItem {
+  id: string;
+  offerId: string;
+  offerTitle: string;
+  amount: number;
+  currency: string;
+  status: "pending" | "processing" | "completed" | "failed";
+  date: string;
+}
+
+export interface ContractorEarnings {
+  totalEarned: number;
+  pendingPayout: number;
+  currency: string;
+  items: EarningsLineItem[];
+}
+
+export async function getContractorEarnings(
+  signal?: AbortSignal,
+): Promise<ContractorEarnings> {
+  return request<ContractorEarnings>("GET", "/contractors/me/earnings", { signal });
+}
+
+// ---------------------------------------------------------------------------
+// Building — join by invite code
+// ---------------------------------------------------------------------------
+
+export async function joinBuilding(
+  inviteCode: string,
+): Promise<{ buildingId: string; buildingName: string }> {
+  return request<{ buildingId: string; buildingName: string }>(
+    "POST",
+    "/buildings/join",
+    { body: { invite_code: inviteCode } },
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Notifications
+// ---------------------------------------------------------------------------
+
+export interface NotificationItem {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  isRead: boolean;
+  createdAt: string;
+  data?: Record<string, unknown>;
+}
+
+export async function getNotifications(params?: {
+  limit?: number;
+  offset?: number;
+}): Promise<{ items: NotificationItem[]; total: number }> {
+  return request<{ items: NotificationItem[]; total: number }>(
+    "GET",
+    "/notifications",
+    { params: params as Record<string, number | undefined> },
+  );
+}
+
+export async function markNotificationRead(id: string): Promise<void> {
+  return request<void>("PATCH", `/notifications/${id}/read`);
+}
+
+export async function markAllNotificationsRead(): Promise<void> {
+  return request<void>("POST", "/notifications/read-all");
+}
+
+export async function deleteNotification(id: string): Promise<void> {
+  return request<void>("DELETE", `/notifications/${id}`);
+}
+
+// ---------------------------------------------------------------------------
+// Payments — initiate
+// ---------------------------------------------------------------------------
+
+export interface InitiatePaymentResponse {
+  id: string;
+  status: string;
+  client_secret?: string;
+  provider: string;
+}
+
+export async function initiatePayment(
+  offerId: string,
+  paymentMethodId?: string,
+): Promise<InitiatePaymentResponse> {
+  return request<InitiatePaymentResponse>("POST", "/payments/initiate", {
+    body: { offer_id: offerId, payment_method_id: paymentMethodId },
+  });
 }

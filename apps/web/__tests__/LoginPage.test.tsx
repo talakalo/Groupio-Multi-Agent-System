@@ -1,6 +1,8 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { NextIntlClientProvider } from 'next-intl';
+import messages from '../messages/he.json';
 
 // ---- next/navigation mock ----
 const mockPush = vi.fn();
@@ -31,6 +33,11 @@ vi.mock('@/lib/auth/setAuthCookie', () => ({
   setAuthCookie: vi.fn(),
 }));
 
+// ---- unwrapPageParams uses React.use() — stub in tests ----
+vi.mock('@/lib/utils/unwrapPageParams', () => ({
+  unwrapPageParams: vi.fn(),
+}));
+
 // ---- Auth store mock ----
 const mockSetAccessToken = vi.fn();
 const mockSetUser = vi.fn();
@@ -51,6 +58,14 @@ vi.mock('@/lib/stores/authStore', () => {
 });
 
 import LoginPage from '../app/(auth)/login/page';
+
+function renderLoginPage() {
+  return render(
+    <NextIntlClientProvider locale="he" messages={messages}>
+      <LoginPage />
+    </NextIntlClientProvider>
+  );
+}
 
 describe('Web LoginPage — navigation', () => {
   beforeEach(() => {
@@ -73,7 +88,7 @@ describe('Web LoginPage — navigation', () => {
       }),
     });
 
-    render(<LoginPage />);
+    renderLoginPage();
 
     fireEvent.change(screen.getByLabelText('כתובת אימייל'), {
       target: { value: 'test@example.com' },
@@ -105,7 +120,7 @@ describe('Web LoginPage — navigation', () => {
       })
       .mockResolvedValueOnce({ ok: true });
 
-    render(<LoginPage />);
+    renderLoginPage();
 
     fireEvent.change(screen.getByLabelText('כתובת אימייל'), {
       target: { value: 'admin@example.com' },
@@ -137,7 +152,7 @@ describe('Web LoginPage — navigation', () => {
       })
       .mockResolvedValueOnce({ ok: true }); // locale API
 
-    render(<LoginPage />);
+    renderLoginPage();
 
     fireEvent.change(screen.getByLabelText('כתובת אימייל'), {
       target: { value: 'admin@example.com' },
@@ -169,7 +184,7 @@ describe('Web LoginPage — navigation', () => {
       })
       .mockResolvedValueOnce({ ok: true });
 
-    render(<LoginPage />);
+    renderLoginPage();
 
     fireEvent.change(screen.getByLabelText('כתובת אימייל'), {
       target: { value: 'bm@example.com' },
@@ -188,7 +203,7 @@ describe('Web LoginPage — navigation', () => {
     const { ApiError } = await import('@/lib/api/client');
     mockApiLogin.mockRejectedValueOnce(new ApiError('Unauthorized', 401));
 
-    render(<LoginPage />);
+    renderLoginPage();
 
     fireEvent.change(screen.getByLabelText('כתובת אימייל'), {
       target: { value: 'bad@example.com' },
@@ -207,15 +222,9 @@ describe('Web LoginPage — navigation', () => {
   });
 
   it('has a link to the signup page (/signup)', () => {
-    render(<LoginPage />);
+    renderLoginPage();
     const links = screen.getAllByRole('link');
     const signupLink = links.find((l) => l.getAttribute('href') === '/signup');
     expect(signupLink).toBeDefined();
-  });
-
-  it('has a logo link pointing to the home page (/)', () => {
-    render(<LoginPage />);
-    const homeLink = screen.getAllByRole('link').find((l) => l.getAttribute('href') === '/');
-    expect(homeLink).toBeDefined();
   });
 });

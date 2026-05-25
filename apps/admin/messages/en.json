@@ -38,5 +38,19 @@
     "pendingPayments": "Pending Payments",
     "systemHealth": "System Health",
     "pendingActions": "Pending Actions"
+  },
+  "shell": {
+    "productTitle": "Groupio Admin",
+    "productSubtitle": "Operations Dashboard",
+    "signOutAria": "Sign out",
+    "settingsAria": "Settings",
+    "notificationsAria": "Notifications",
+    "searchPlaceholder": "Search...",
+    "expandSidebar": "Expand sidebar",
+    "collapseSidebar": "Collapse sidebar",
+    "dashboardTitle": "Operations Dashboard",
+    "versionBadge": "v1.0",
+    "localeEn": "EN",
+    "localeHe": "HE"
   }
 }

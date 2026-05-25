@@ -75,7 +75,7 @@ class RedisClient:
 
     async def close(self) -> None:
         """Close the Redis connection."""
-        await self._redis.close()
+        await self._redis.aclose()
 
     # -- Conversation Memory --
 
@@ -138,9 +138,13 @@ class RedisClient:
         Returns True if the request is allowed, False if rate limited.
         Uses the same atomic Lua script as check_rate_limit.
         """
-        key = f"auth_ip:{ip}"
-        count = await self._redis.eval(_RATE_LIMIT_SCRIPT, 1, key, limit, window)
-        return int(count) <= limit
+        # Fails open (allows) on Redis errors to avoid blocking users when Redis is down.
+        try:
+            key = f"auth_ip:{ip}"
+            count = await self._redis.eval(_RATE_LIMIT_SCRIPT, 1, key, limit, window)
+            return int(count) <= limit
+        except Exception:
+            return True
 
     async def increment_login_failures(self, user_id: str, window: int = 900) -> int:
         """Increment failed login counter for a user. Returns new count."""
