@@ -18,13 +18,11 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from fastapi.testclient import TestClient
 
 from src.api.main import app
 from src.api.middleware.auth import get_admin_user, get_current_user
 from src.models.user import UserInDB, UserRole
-
 
 # ---------------------------------------------------------------------------
 # Shared helpers

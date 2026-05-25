@@ -31,7 +31,6 @@ from src.models.user import (
     UserResponse,
     UserRole,
     UserUpdate,
-    SELF_REGISTERABLE_ROLES,
 )
 from src.services.email import get_email_service
 from src.utils.monitoring import capture_exception_safe, get_logger

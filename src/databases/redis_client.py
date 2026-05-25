@@ -5,12 +5,11 @@ import logging
 from typing import Any
 
 import redis.asyncio as redis
+from tenacity import retry, stop_after_attempt, wait_exponential
+
 from src.config.settings import get_settings
 
 logger = logging.getLogger(__name__)
-
-
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 
 def _normalize_redis_url(url: str) -> str:

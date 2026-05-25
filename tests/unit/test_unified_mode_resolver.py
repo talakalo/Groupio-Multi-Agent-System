@@ -11,11 +11,7 @@ Coverage:
 
 from __future__ import annotations
 
-import time
 from unittest.mock import AsyncMock, MagicMock, patch
-
-import pytest
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -195,7 +191,10 @@ class TestGetAgentMode:
             patch("src.config.settings.get_settings", return_value=env),
             patch("src.databases.postgres.get_postgres_client", return_value=db),
         ):
-            results = {name: await get_agent_mode(name) for name in ["matching", "pricing", "vetting", "outreach", "payment"]}
+            results = {
+                name: await get_agent_mode(name)
+                for name in ["matching", "pricing", "vetting", "outreach", "payment"]
+            }
 
         # Cache was only populated from one DB call per key
         assert results["matching"] == "auto"

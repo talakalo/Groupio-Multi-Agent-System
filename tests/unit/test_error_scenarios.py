@@ -182,7 +182,6 @@ class TestSchemaNotReady:
         import asyncpg.exceptions
 
         from src.api.main import app
-        from src.api.routes.auth import get_postgres_client
 
         db = MagicMock()
         db.get_user_by_email = AsyncMock(

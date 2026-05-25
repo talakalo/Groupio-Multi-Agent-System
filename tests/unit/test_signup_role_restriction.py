@@ -16,7 +16,6 @@ from pydantic import ValidationError
 
 from src.models.user import SELF_REGISTERABLE_ROLES, UserCreate, UserRole
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
