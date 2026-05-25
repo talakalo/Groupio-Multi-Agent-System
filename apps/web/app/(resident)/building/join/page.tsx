@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 
+import { apiClient, ApiError } from '@/lib/api/client';
 import { cn } from '@/lib/utils/cn';
 import { unwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
 
@@ -19,7 +20,7 @@ export default function BuildingJoinPage(props: PageParamsProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!code.trim()) {
-      setError(t('joinCodeRequired') ?? 'נא להזין קוד בניין');
+      setError(t('joinCodeRequired'));
       return;
     }
 
@@ -27,22 +28,17 @@ export default function BuildingJoinPage(props: PageParamsProps) {
     setError(null);
 
     try {
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      const res = await fetch(`${apiBase}/api/v1/buildings/join`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ invite_code: code.trim() }),
-        credentials: 'include',
-      });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        throw new Error(data?.detail ?? 'שגיאה בהצטרפות לבניין');
-      }
-
+      await apiClient.joinBuilding(code.trim());
       setSuccess(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'שגיאה בהצטרפות לבניין');
+      if (err instanceof ApiError) {
+        const detail = (err.body as { detail?: string } | undefined)?.detail;
+        setError(detail ?? t('joinErrorGeneric'));
+      } else if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError(t('joinErrorGeneric'));
+      }
     } finally {
       setLoading(false);
     }
@@ -55,13 +51,13 @@ export default function BuildingJoinPage(props: PageParamsProps) {
           <div className="mx-auto w-16 h-16 rounded-full bg-green-50 flex items-center justify-center">
             <Building2 className="h-8 w-8 text-green-600" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">הצטרפתם בהצלחה!</h1>
-          <p className="text-gray-600">כעת תוכלו לצפות בהצעות הקבוצתיות של הבניין שלכם.</p>
+          <h1 className="text-2xl font-bold text-gray-900">{t('joinSuccess')}</h1>
+          <p className="text-gray-600">{t('joinSuccessSubtitle')}</p>
           <Link
             href="/building"
             className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-primary-700 transition-colors"
           >
-            לדף הבניין
+            {t('joinGoToBuilding')}
             <ArrowRight className="h-4 w-4 rtl-flip" />
           </Link>
         </div>
@@ -76,21 +72,21 @@ export default function BuildingJoinPage(props: PageParamsProps) {
           <div className="mx-auto w-16 h-16 rounded-full bg-primary-50 flex items-center justify-center">
             <Building2 className="h-8 w-8 text-primary-600" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">הצטרפות לבניין</h1>
-          <p className="text-gray-600">הזינו את קוד ההזמנה שקיבלתם מוועד הבניין.</p>
+          <h1 className="text-2xl font-bold text-gray-900">{t('joinTitle')}</h1>
+          <p className="text-gray-600">{t('joinSubtitle')}</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label htmlFor="invite-code" className="block text-sm font-medium text-gray-700 mb-1.5">
-              קוד הזמנה
+              {t('joinCodeLabel')}
             </label>
             <input
               id="invite-code"
               type="text"
               value={code}
               onChange={(e) => setCode(e.target.value)}
-              placeholder="לדוגמה: ABC12345"
+              placeholder={t('joinCodePlaceholder')}
               dir="ltr"
               aria-invalid={!!error}
               aria-describedby={error ? 'join-error' : undefined}
@@ -115,14 +111,14 @@ export default function BuildingJoinPage(props: PageParamsProps) {
               'bg-primary-600 hover:bg-primary-700 disabled:bg-gray-300 disabled:cursor-not-allowed',
             )}
           >
-            {loading ? 'מצטרפים...' : 'הצטרפות'}
+            {loading ? t('joining') : t('joinSubmit')}
           </button>
         </form>
 
         <p className="text-center text-sm text-gray-500">
-          אין לכם קוד?{' '}
+          {t('joinNoCode')}{' '}
           <Link href="/building" className="text-primary-600 hover:underline font-medium">
-            חזרה לדף הבניין
+            {t('joinBack')}
           </Link>
         </p>
       </div>

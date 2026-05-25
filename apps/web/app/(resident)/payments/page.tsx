@@ -15,16 +15,17 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 
 import { EscrowBadge } from '@/components/features/payments/EscrowBadge';
 import { Badge } from '@/components/ui/Badge';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { apiClient } from '@/lib/api/client';
+import { useApiData } from '@/lib/hooks/useApiData';
 import { unwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
 
 // ---- Types ----
-// TODO: Payment duplicates @groupio/types Payment; consider importing when API shape aligns.
+// Local shape mirrors API until shared @groupio/types Payment aligns with /payments/my.
 
 interface Payment {
   id: string;
@@ -155,10 +156,10 @@ function PaymentRow({ payment }: { payment: Payment }) {
 function EscrowExplainer() {
   const t = useTranslations('payments');
   return (
-    <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-xl border border-indigo-100 p-6">
+    <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-xl border border-primary-100 p-6">
       <div className="flex items-start gap-4">
-        <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-indigo-100 flex-shrink-0">
-          <Shield className="w-5 h-5 text-indigo-600" />
+        <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary-50 flex-shrink-0">
+          <Shield className="w-5 h-5 text-primary-600" />
         </div>
         <div>
           <h3 className="font-semibold text-gray-900 mb-2">{t('yourPaymentProtected')}</h3>
@@ -192,28 +193,26 @@ function EscrowExplainer() {
 export default function PaymentsPage(props: PageParamsProps) {
   unwrapPageParams(props);
   const t = useTranslations('payments');
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'pending' | 'succeeded' | 'refunded'>('all');
 
-  const fetchPayments = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await apiClient.getMyPayments();
-      setPayments(Array.isArray(data) ? data : []);
-    } catch (err) {
-      setError(t('loadError'));
-      setPayments([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [t]);
-
-  useEffect(() => {
-    fetchPayments();
-  }, [fetchPayments]);
+  // PERF-8: react-query via shared useApiData hook. Backend returns
+  // `{ payments, total, page, pages }` after PERF-9; legacy-array shape kept
+  // as a fallback during rollout.
+  const {
+    data: payments = [],
+    isLoading: loading,
+    error,
+    refetch,
+  } = useApiData<Payment[]>(
+    ['payments', 'my', { page: 1, limit: 50 }],
+    async () => {
+      const data = await apiClient.getMyPayments({ page: 1, limit: 50 });
+      return Array.isArray((data as unknown) as Payment[])
+        ? ((data as unknown) as Payment[])
+        : (data?.payments ?? []);
+    },
+  );
+  const fetchPayments = () => { void refetch(); };
 
   const filteredPayments = payments.filter((p) => {
     if (filter === 'all') return true;
@@ -243,7 +242,7 @@ export default function PaymentsPage(props: PageParamsProps) {
         </div>
         <button
           onClick={fetchPayments}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors"
         >
           <RefreshCw className="w-4 h-4" />
           {t('refresh')}
@@ -305,7 +304,7 @@ export default function PaymentsPage(props: PageParamsProps) {
             onClick={() => setFilter(tab.key)}
             className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
               filter === tab.key
-                ? 'bg-indigo-600 text-white'
+                ? 'bg-primary-600 text-white'
                 : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
             }`}
           >
@@ -337,7 +336,7 @@ export default function PaymentsPage(props: PageParamsProps) {
         ) : error ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <AlertCircle className="w-10 h-10 text-red-400 mb-3" />
-            <p className="text-gray-600">{error}</p>
+            <p className="text-gray-600">{t('loadError')}</p>
             <button
               onClick={fetchPayments}
               className="mt-3 text-primary-600 text-sm font-medium hover:underline"

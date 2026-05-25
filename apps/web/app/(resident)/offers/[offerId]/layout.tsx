@@ -48,8 +48,8 @@ export async function generateMetadata({
     const currentTier = offer.tiers?.[offer.currentTier ?? 0] ?? offer.tiers?.[0];
     const price = currentTier?.price ?? offer.basePrice;
     const title = contractorName
-      ? `${categoryLabel} - ${contractorName} | גרופיו`
-      : `${categoryLabel} - הצעת קבוצתית | גרופיו`;
+      ? `${categoryLabel} - ${contractorName}`
+      : `${categoryLabel} - הצעת קבוצתית`;
     const description = price
       ? `הצעת קבוצתית ל${categoryLabel}. חסכו עם שכנים וקבלנים מאומתים. תשלום מוגן בנאמנות.`
       : `הצעת קבוצתית ל${categoryLabel}. הצטרפו לשכנים וחיסכו.`;
@@ -73,7 +73,7 @@ export async function generateMetadata({
 
 function fallbackMetadata(): Metadata {
   return {
-    title: "הצעה | גרופיו",
+    title: "הצעה",
     description: "הצעת קבוצתית לדיירי בניינים. חסכו עם שכנים.",
   };
 }
