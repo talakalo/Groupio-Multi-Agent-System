@@ -238,7 +238,18 @@
       "title": "ברוכים הבאים ל-Groupio!",
       "description": "עדיין לא הצטרפתם לבניין. הצטרפו לבניין שלכם כדי לגשת להצעות קבוצתיות.",
       "action": "הצטרפו לבניין"
-    }
+    },
+    "messages": "הודעות",
+    "contractorInquiries": "פניות לקבלן",
+    "upcomingInstallations": "התקנות קרובות",
+    "documentsOffers": "מסמכים והצעות",
+    "recentCommunications": "תקשורת אחרונה",
+    "startChat": "התחל שיחה",
+    "upcoming": "קרוב",
+    "noUpcoming": "אין התקנות קרובות",
+    "popularOffers": "הצעות פופולריות",
+    "errorLoadingActivity": "שגיאה בטעינת הפעילות",
+    "view": "צפה"
   },
   "offers": {
     "title": "הצעות",
@@ -336,7 +347,9 @@
       "savings": "חיסכון",
       "price": "מחיר"
     },
-    "quickAll": "הכל"
+    "quickAll": "הכל",
+    "discoverOffers": "גלה הצעות",
+    "clearFilterHint": "נסה לנקות את הסינון כדי לראות עוד הצעות"
   },
   "contractors": {
     "title": "קבלנים",
@@ -433,7 +446,11 @@
     "cancel": "ביטול",
     "deleteConfirmAriaLabel": "אישור מחיקת חשבון",
     "deleteValidationError": "יש להקליד DELETE לאישור",
-    "deleteErrorMessage": "שגיאה במחיקת החשבון. נסו שוב."
+    "deleteErrorMessage": "שגיאה במחיקת החשבון. נסו שוב.",
+    "input": "הזן",
+    "notificationsUnsaved": "יש שינויים שלא נשמרו",
+    "saveFailed": "שמירה נכשלה",
+    "updating": "מעדכן..."
   },
   "building": {
     "title": "הבניין",
@@ -466,7 +483,8 @@
     "residents": "דיירים",
     "share": "שתף",
     "inviteCodeBadge": "קוד הזמנה",
-    "inviteCodeHint": "שתפו את הקוד עם שכנים כדי שיוכלו להצטרף לבניין ולקבל הצעות קבוצתיות"
+    "inviteCodeHint": "שתפו את הקוד עם שכנים כדי שיוכלו להצטרף לבניין ולקבל הצעות קבוצתיות",
+    "municipalityVerified": "מאומת על ידי העירייה"
   },
   "checkout": {
     "breadcrumbOffers": "הצעות",
@@ -909,6 +927,50 @@
       "cancelModalConfirm": "כן, בטל הצעה",
       "publishFailed": "פרסום נכשל",
       "cancelFailed": "הביטול נכשל"
+    },
+    "resendVerification": "שלח שוב אימות",
+    "saveError": "שגיאה בשמירה",
+    "saveSuccess": "נשמר בהצלחה",
+    "requestReviewError": "שגיאה בבקשת ביקורת",
+    "cancelFailed": "ביטול נכשל",
+    "publishFailed": "פרסום נכשל",
+    "loadError": "שגיאה בטעינה",
+    "buttons": {
+      "publish": "פרסם",
+      "cancel": "ביטול",
+      "save": "שמור",
+      "submit": "שלח"
+    },
+    "errors": {
+      "createFailed": "יצירה נכשלה",
+      "loadFailed": "טעינה נכשלה"
+    },
+    "documents": {
+      "notUploaded": "לא הועלה",
+      "uploadSuccess": "הקובץ הועלה בהצלחה",
+      "uploadError": "שגיאה בהעלאת הקובץ"
+    },
+    "validation": {
+      "basePriceMin": "מחיר בסיס חייב להיות לפחות ₪100",
+      "buildingRequired": "נדרש בניין",
+      "categoryRequired": "נדרשת קטגוריה"
+    },
+    "settings": {
+      "membershipSubscribe": "הרשמה לחברות",
+      "membershipCheckoutLoading": "טוען תשלום...",
+      "membershipCheckoutError": "שגיאה בתשלום חברות",
+      "notificationsSaveError": "שגיאה בשמירת הגדרות ההתראות",
+      "membershipStates": {
+        "active": "פעיל",
+        "canceled": "בוטל",
+        "expired": "פג תוקף",
+        "grace": "תקופת חסד",
+        "inactive": "לא פעיל",
+        "past_due": "חוב",
+        "renewal": "חידוש",
+        "trialing": "תקופת ניסיון",
+        "unknown": "לא ידוע"
+      }
     }
   },
   "onboarding": {
@@ -1359,6 +1421,44 @@
       "title": "רוב השאלות כבר נענו",
       "description": "בדקו את דף שאלות ותשובות לפני שמגיעים אלינו — תחסכו זמן.",
       "button": "לדף FAQ"
+    }
+  },
+  "orders": {
+    "title": "הזמנות",
+    "subtitle": "מעקב אחרי ההזמנות שלך",
+    "tabAll": "הכל",
+    "tabActive": "פעילות",
+    "tabCompleted": "הושלמו",
+    "emptyAll": "אין הזמנות עדיין",
+    "emptyActive": "אין הזמנות פעילות",
+    "emptyCompleted": "אין הזמנות שהושלמו",
+    "emptyHint": "הצטרפו להצעה קבוצתית כדי להתחיל",
+    "discoverOffers": "גלה הצעות",
+    "loading": "טוען...",
+    "loadError": "שגיאה בטעינת ההזמנות",
+    "retry": "נסה שוב",
+    "refresh": "רענן",
+    "refreshAriaLabel": "רענן הזמנות",
+    "reportProblem": "דווח על בעיה",
+    "invoices": "חשבוניות",
+    "escrowBadge": "נאמנות",
+    "escrowActive": "כסף בנאמנות",
+    "escrowExplainer": "התשלום שלך מוחזק בנאמנות עד שהעבודה תושלם",
+    "escrowSupport": "יצירת קשר עם תמיכה",
+    "writeReview": "כתוב ביקורת",
+    "reviewPlaceholder": "שתף את חוויתך...",
+    "reviewSelectRating": "בחר דירוג",
+    "reviewSubmit": "שלח ביקורת",
+    "reviewCancel": "ביטול",
+    "reviewSent": "הביקורת נשלחה!",
+    "reviewError": "שגיאה בשליחת הביקורת",
+    "ratingAriaLabel": "דירוג {rating} מתוך 5",
+    "timeline": {
+      "joined": "הצטרפת להצעה",
+      "paid": "תשלום בוצע",
+      "scheduled": "עבודה תוזמנה",
+      "done": "עבודה הושלמה",
+      "released": "תשלום לקבלן שוחרר"
     }
   }
 }

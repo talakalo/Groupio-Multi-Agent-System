@@ -238,7 +238,18 @@
       "title": "Welcome to Groupio!",
       "description": "You haven't joined a building yet. Join your building to access group offers.",
       "action": "Join a Building"
-    }
+    },
+    "messages": "Messages",
+    "contractorInquiries": "Contractor Inquiries",
+    "upcomingInstallations": "Upcoming Installations",
+    "documentsOffers": "Documents & Offers",
+    "recentCommunications": "Recent Communications",
+    "startChat": "Start Chat",
+    "upcoming": "Upcoming",
+    "noUpcoming": "No upcoming installations",
+    "popularOffers": "Popular Offers",
+    "errorLoadingActivity": "Error loading activity",
+    "view": "View"
   },
   "offers": {
     "title": "Offers",
@@ -336,7 +347,9 @@
       "savings": "Savings",
       "price": "Price"
     },
-    "quickAll": "All"
+    "quickAll": "All",
+    "discoverOffers": "Discover Offers",
+    "clearFilterHint": "Try clearing filters to see more offers"
   },
   "contractors": {
     "title": "Contractors",
@@ -433,7 +446,11 @@
     "cancel": "Cancel",
     "deleteConfirmAriaLabel": "Confirm account deletion",
     "deleteValidationError": "Please type DELETE to confirm",
-    "deleteErrorMessage": "Error deleting account. Please try again."
+    "deleteErrorMessage": "Error deleting account. Please try again.",
+    "input": "Enter",
+    "notificationsUnsaved": "Unsaved changes",
+    "saveFailed": "Save failed",
+    "updating": "Updating..."
   },
   "building": {
     "title": "Building",
@@ -466,7 +483,8 @@
     "residents": "Residents",
     "share": "Share",
     "inviteCodeBadge": "Invite Code",
-    "inviteCodeHint": "Share this code with neighbors so they can join the building and receive group offers"
+    "inviteCodeHint": "Share this code with neighbors so they can join the building and receive group offers",
+    "municipalityVerified": "Municipality verified"
   },
   "checkout": {
     "breadcrumbOffers": "Offers",
@@ -909,6 +927,50 @@
       "cancelModalConfirm": "Yes, cancel offer",
       "publishFailed": "Publish failed",
       "cancelFailed": "Cancel failed"
+    },
+    "resendVerification": "Resend Verification",
+    "saveError": "Save error",
+    "saveSuccess": "Saved successfully",
+    "requestReviewError": "Error requesting review",
+    "cancelFailed": "Cancel failed",
+    "publishFailed": "Publish failed",
+    "loadError": "Error loading",
+    "buttons": {
+      "publish": "Publish",
+      "cancel": "Cancel",
+      "save": "Save",
+      "submit": "Submit"
+    },
+    "errors": {
+      "createFailed": "Failed to create",
+      "loadFailed": "Failed to load"
+    },
+    "documents": {
+      "notUploaded": "Not uploaded",
+      "uploadSuccess": "File uploaded successfully",
+      "uploadError": "Error uploading file"
+    },
+    "validation": {
+      "basePriceMin": "Base price must be at least ₪100",
+      "buildingRequired": "Building is required",
+      "categoryRequired": "Category is required"
+    },
+    "settings": {
+      "membershipSubscribe": "Subscribe to membership",
+      "membershipCheckoutLoading": "Loading checkout...",
+      "membershipCheckoutError": "Membership checkout error",
+      "notificationsSaveError": "Error saving notification settings",
+      "membershipStates": {
+        "active": "Active",
+        "canceled": "Canceled",
+        "expired": "Expired",
+        "grace": "Grace period",
+        "inactive": "Inactive",
+        "past_due": "Past due",
+        "renewal": "Renewal",
+        "trialing": "Trial",
+        "unknown": "Unknown"
+      }
     }
   },
   "onboarding": {
@@ -1359,6 +1421,44 @@
       "title": "Most Questions Already Answered",
       "description": "Check the FAQ page before reaching out — save yourself time.",
       "button": "Go to FAQ"
+    }
+  },
+  "orders": {
+    "title": "Orders",
+    "subtitle": "Track your orders",
+    "tabAll": "All",
+    "tabActive": "Active",
+    "tabCompleted": "Completed",
+    "emptyAll": "No orders yet",
+    "emptyActive": "No active orders",
+    "emptyCompleted": "No completed orders",
+    "emptyHint": "Join a group offer to get started",
+    "discoverOffers": "Discover Offers",
+    "loading": "Loading...",
+    "loadError": "Error loading orders",
+    "retry": "Try again",
+    "refresh": "Refresh",
+    "refreshAriaLabel": "Refresh orders",
+    "reportProblem": "Report a problem",
+    "invoices": "Invoices",
+    "escrowBadge": "Escrow",
+    "escrowActive": "Funds in escrow",
+    "escrowExplainer": "Your payment is held in escrow until work is completed",
+    "escrowSupport": "Contact support",
+    "writeReview": "Write a Review",
+    "reviewPlaceholder": "Share your experience...",
+    "reviewSelectRating": "Select a rating",
+    "reviewSubmit": "Submit Review",
+    "reviewCancel": "Cancel",
+    "reviewSent": "Review submitted!",
+    "reviewError": "Error submitting review",
+    "ratingAriaLabel": "Rate {rating} out of 5",
+    "timeline": {
+      "joined": "Joined offer",
+      "paid": "Payment made",
+      "scheduled": "Work scheduled",
+      "done": "Work completed",
+      "released": "Payment released to contractor"
     }
   }
 }

@@ -19,6 +19,10 @@ from uuid import uuid4
 logger = logging.getLogger(__name__)
 
 
+class PaymentProviderUnavailableError(RuntimeError):
+    """Raised when PAYMENT_PROVIDER selects a gateway that cannot process charges yet."""
+
+
 class PaymentProvider(ABC):
     """Abstract base class for payment providers (Stripe, PayPlus, etc.)."""
 

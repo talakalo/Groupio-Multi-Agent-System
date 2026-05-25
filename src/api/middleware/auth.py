@@ -202,6 +202,18 @@ async def get_current_user(
     return user
 
 
+async def get_current_user_optional(
+    token: str | None = Depends(_get_token_from_header_or_cookie),
+) -> UserInDB | None:
+    """Like get_current_user but returns None instead of raising 401."""
+    if not token:
+        return None
+    try:
+        return await get_current_user(token)
+    except HTTPException:
+        return None
+
+
 async def get_token_jti(
     token: str | None = Depends(_get_token_from_header_or_cookie),
 ) -> str | None:

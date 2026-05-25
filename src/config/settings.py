@@ -130,6 +130,8 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     SMTP_FROM_EMAIL: str = "noreply@groupio.co.il"
     SMTP_FROM_NAME: str = "Groupio"
+    # Resend API (preferred over SMTP when set)
+    RESEND_API_KEY: str = ""
     # When True, login rejects unverified users with 403. Enabled by default for production safety.
     # Set ENFORCE_EMAIL_VERIFICATION=false in .env to disable during local development.
     ENFORCE_EMAIL_VERIFICATION: bool = True
