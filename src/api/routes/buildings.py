@@ -8,7 +8,6 @@ from pydantic import BaseModel
 
 from src.api.middleware.auth import get_current_user, is_admin
 from src.databases.postgres import get_postgres_client
-from src.models.user import UserRole
 from src.models.building import (
     BuildingCreate,
     BuildingListResponse,
@@ -18,7 +17,7 @@ from src.models.building import (
     BuildingUpdate,
 )
 from src.models.contractor import Region
-from src.models.user import UserInDB
+from src.models.user import UserInDB, UserRole
 
 logger = logging.getLogger(__name__)
 
