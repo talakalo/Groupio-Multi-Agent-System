@@ -500,13 +500,15 @@ export class GroupioApiClient {
 
   async approveContractorPayout(payoutId: string): Promise<ContractorPayout> {
     return this.post<ContractorPayout>(
-      `/admin/payments/payouts/${encodeURIComponent(payoutId)}/approve`
+      `/admin/payments/payouts/${encodeURIComponent(payoutId)}/approve`,
+      {},
     );
   }
 
   async releaseEscrow(offerId: string): Promise<{ status: string }> {
     return this.post<{ status: string }>(
-      `/admin/payments/escrow/${encodeURIComponent(offerId)}/release`
+      `/admin/payments/escrow/${encodeURIComponent(offerId)}/release`,
+      {},
     );
   }
 
@@ -527,13 +529,7 @@ export class GroupioApiClient {
   }
 
   async unregisterPushToken(): Promise<{ status: string }> {
-    const response = await fetch(`${this.baseUrl}/auth/push-token`, {
-      method: "DELETE",
-      headers: this.buildHeaders(),
-      credentials: "include",
-    });
-    if (!response.ok) await this.handleErrorResponse(response, "/auth/push-token");
-    return response.json() as Promise<{ status: string }>;
+    return this.requestWithRetry<{ status: string }>("DELETE", "/auth/push-token");
   }
 
   // ---- Pending Agent Decisions (Admin) ----

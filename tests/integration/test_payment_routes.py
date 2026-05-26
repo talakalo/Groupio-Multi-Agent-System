@@ -213,9 +213,9 @@ class TestInitiatePayment:
         assert response.status_code == 404
 
     def test_initiate_payment_not_participant(self, client, mock_db, mock_offer):
-        """User not in the building of the offer gets 403."""
+        """User who hasn't joined the offer gets 403."""
         mock_db.get_offer = AsyncMock(return_value=mock_offer)
-        mock_db.is_user_in_building = AsyncMock(return_value=False)
+        mock_db.has_user_joined_offer = AsyncMock(return_value=False)
 
         with patch("src.api.routes.payments.get_payment_provider"):
             response = client.post(

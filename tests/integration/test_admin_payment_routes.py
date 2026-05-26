@@ -96,17 +96,16 @@ class TestPaymentSummary:
         """Summary endpoint returns aggregated payment totals."""
         mock_db.execute_query = AsyncMock(
             side_effect=[
-                # First call: payments query
+                # First call: payments GROUP BY status
                 [
-                    {"status": "succeeded", "amount": 10000},
-                    {"status": "succeeded", "amount": 15000},
-                    {"status": "refunded", "amount": 2000},
-                    {"status": "failed", "amount": 500},
+                    {"status": "succeeded", "total": 25000},
+                    {"status": "refunded", "total": 2000},
+                    {"status": "failed", "total": 500},
                 ],
-                # Second call: invoices query
+                # Second call: invoices GROUP BY status
                 [
-                    {"id": "inv-1", "total": 10000, "status": "paid", "offer_id": "o1"},
-                    {"id": "inv-2", "total": 15000, "status": "released", "offer_id": "o2"},
+                    {"status": "paid", "total": 10000, "cnt": 1},
+                    {"status": "released", "total": 15000, "cnt": 1},
                 ],
             ]
         )
@@ -236,30 +235,33 @@ class TestContractorPayouts:
 
     def test_list_payouts(self, admin_client, mock_db, mock_contractor):
         """Returns contractor payout records with fee breakdown."""
+        invoices = [
+            {
+                "id": "inv-001",
+                "offer_id": "offer-100",
+                "offer_title": "AC Installation",
+                "contractor_id": "ctr-001",
+                "total": 50000,
+                "status": "paid",
+                "created_at": "2026-01-20T10:00:00Z",
+            },
+            {
+                "id": "inv-002",
+                "offer_id": "offer-200",
+                "offer_title": "Plumbing",
+                "contractor_id": "ctr-001",
+                "total": 30000,
+                "status": "released",
+                "paid_at": "2026-02-01T12:00:00Z",
+                "created_at": "2026-01-25T10:00:00Z",
+            },
+        ]
         mock_db.execute_query = AsyncMock(
-            return_value=[
-                {
-                    "id": "inv-001",
-                    "offer_id": "offer-100",
-                    "offer_title": "AC Installation",
-                    "contractor_id": "ctr-001",
-                    "total": 50000,
-                    "status": "paid",
-                    "created_at": "2026-01-20T10:00:00Z",
-                },
-                {
-                    "id": "inv-002",
-                    "offer_id": "offer-200",
-                    "offer_title": "Plumbing",
-                    "contractor_id": "ctr-001",
-                    "total": 30000,
-                    "status": "released",
-                    "paid_at": "2026-02-01T12:00:00Z",
-                    "created_at": "2026-01-25T10:00:00Z",
-                },
+            side_effect=[
+                invoices,  # First call: invoices JOIN offers query
+                [mock_contractor],  # Second call: batch contractor names
             ]
         )
-        mock_db.get_contractor = AsyncMock(return_value=mock_contractor)
 
         response = admin_client.get("/api/v1/admin/payments/payouts")
 

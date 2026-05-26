@@ -11,11 +11,13 @@ class OfferStatus(StrEnum):
 
     DRAFT = "draft"
     PENDING = "pending"
+    ACTIVE = "active"
     MATCHING = "matching"
     MATCHED = "matched"
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
     CANCELLED = "cancelled"
+    FLAGGED = "flagged"
 
 
 class ServiceCategory(StrEnum):

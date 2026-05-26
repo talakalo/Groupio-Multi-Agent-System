@@ -177,8 +177,8 @@ def _row_to_user(row: dict) -> dict:
         "building_id": row.get("building_id"),
         "contractor_id": row.get("contractor_id"),
         "last_login": row.get("last_login"),
-        "created_at": row.get("created_at") or datetime.now(UTC),
-        "updated_at": row.get("updated_at") or datetime.now(UTC),
+        "created_at": row["created_at"] if "created_at" in row and row["created_at"] else datetime.now(UTC),
+        "updated_at": row["updated_at"] if "updated_at" in row and row["updated_at"] else datetime.now(UTC),
     }
 
 
@@ -465,6 +465,8 @@ class PostgresClient:
             "last_login",
             "role",
             "onboarded_at",
+            "push_token",
+            "notification_settings",
         }
         filtered = {k: v for k, v in update_data.items() if k in allowed}
         if not filtered:

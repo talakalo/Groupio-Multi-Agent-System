@@ -2,6 +2,7 @@
 
 import hashlib
 import hmac
+import html as _html
 import time as _time
 from datetime import UTC, datetime
 from typing import Any
@@ -11,7 +12,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
-from src.api.middleware.auth import get_admin_user, get_current_user
+from src.api.middleware.auth import get_admin_user, get_current_user, require_admin_only
 from src.config.settings import get_settings
 from src.databases.postgres import get_postgres_client
 from src.models.user import UserInDB, UserRole
@@ -338,15 +339,13 @@ async def initiate_payment(
     if not offer:
         raise HTTPException(status_code=404, detail="Offer not found")
 
-    # Check if the user is a participant of this offer's building
-    building_id = offer.get("building_id")
-    if building_id:
-        is_resident = await db.is_user_in_building(current_user.id, building_id)
-        if not is_resident:
-            raise HTTPException(
-                status_code=403,
-                detail="You are not a participant of this offer's building",
-            )
+    # Check user has joined the offer (not just in the building)
+    has_joined = await db.has_user_joined_offer(current_user.id, request.offer_id)
+    if not has_joined:
+        raise HTTPException(
+            status_code=403,
+            detail="You must join the offer before making a payment",
+        )
 
     # Determine escrow vs direct payment
     contractor_trust = None
@@ -375,7 +374,7 @@ async def initiate_payment(
     existing_invoice = await db.get_invoice_for_offer(current_user.id, request.offer_id)
     if not existing_invoice:
         invoice_id = str(uuid4())
-        amount = offer.get("price_per_unit", 0)
+        amount = offer.get("base_price", offer.get("price_per_unit", 0))
 
         # Validate payment amount
         if amount < MIN_PAYMENT_AMOUNT:
@@ -433,11 +432,30 @@ async def initiate_payment(
         "tax_amount": charge_tax,
         "amount": charge_total,
         "currency": "ILS",
-        "status": "processing",
+        "status": "pending",
         "payment_method_id": request.payment_method_id,
         "idempotency_key": request.idempotency_key,
         "created_at": datetime.now(UTC).isoformat(),
     }
+
+    # Write invoice + pending payment BEFORE calling the provider.
+    # This ensures money is never charged without a corresponding DB record.
+    async with db.transaction() as conn:
+        if not await db.get_invoice_for_offer(current_user.id, request.offer_id):
+            await db.create_invoice(existing_invoice, conn=conn)
+            from src.messaging.outbox_helpers import try_enqueue_invoice_created_event
+
+            await try_enqueue_invoice_created_event(
+                db,
+                invoice_id=str(existing_invoice["id"]),
+                offer_id=request.offer_id,
+                user_id=current_user.id,
+                amount=float(existing_invoice.get("amount", charge_total)),
+                currency=str(existing_invoice.get("currency", "ILS")),
+                payment_type=str(existing_invoice.get("payment_type", payment_type)),
+                conn=conn,
+            )
+        await db.create_payment(payment_data, conn=conn)
 
     # Call payment provider with the VAT-inclusive total
     try:
@@ -478,23 +496,11 @@ async def initiate_payment(
         capture_exception_safe(exc, flow="payment_initiate", payment_id=payment_id)
         payment_data["status"] = "failed"
 
-    # Task 3.2: wrap invoice + payment creation in a single atomic transaction
-    async with db.transaction() as conn:
-        if not await db.get_invoice_for_offer(current_user.id, request.offer_id):
-            await db.create_invoice(existing_invoice, conn=conn)
-            from src.messaging.outbox_helpers import try_enqueue_invoice_created_event
-
-            await try_enqueue_invoice_created_event(
-                db,
-                invoice_id=str(existing_invoice["id"]),
-                offer_id=request.offer_id,
-                user_id=current_user.id,
-                amount=float(existing_invoice.get("amount", charge_total)),
-                currency=str(existing_invoice.get("currency", "ILS")),
-                payment_type=str(existing_invoice.get("payment_type", payment_type)),
-                conn=conn,
-            )
-        await db.create_payment(payment_data, conn=conn)
+    # Update the pre-written payment record with the provider result
+    await db.update_payment(
+        payment_id,
+        {"status": payment_data["status"], "transaction_id": payment_data.get("transaction_id")},
+    )
 
     # For direct payments that succeeded, mark invoice as paid immediately.
     # For escrow: Stripe marks invoice paid via webhook. For mock (no webhook),
@@ -737,13 +743,23 @@ async def resident_approve_work(
         raise HTTPException(status_code=404, detail="Payment not found")
     if payment.get("user_id") != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized to approve for this payment")
+    await db.update_payment(payment_id, {"status": "work_approved"})
+    await db.create_audit_log(
+        {
+            "user_id": current_user.id,
+            "action": "work_approved",
+            "resource_type": "payment",
+            "resource_id": payment_id,
+            "details": {"offer_id": payment.get("offer_id")},
+        }
+    )
     logger.info(
         "resident_approve_work payment_id=%s user_id=%s offer_id=%s",
         payment_id,
         current_user.id,
         payment.get("offer_id"),
     )
-    return {"status": "recorded"}
+    return {"status": "recorded", "payment_id": payment_id}
 
 
 @router.get("/{payment_id}", response_model=PaymentResponse)
@@ -1100,20 +1116,23 @@ async def download_invoice_pdf(
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
 
-    # Invoices don't have user_id; verify access via payments
-    user_payments = await db.list_payments_for_user(current_user.id)
-    has_access = any(p.get("invoice_id") == invoice_id for p in user_payments)
-    if not has_access:
+    # Invoices don't have user_id; verify access via a targeted existence check
+    rows = await db.execute_query(
+        "SELECT 1 FROM payments WHERE invoice_id = $1 AND user_id = $2 LIMIT 1",
+        invoice_id,
+        current_user.id,
+    )
+    if not rows:
         raise HTTPException(status_code=403, detail="Not authorized to access this invoice")
 
     # Build printable HTML invoice
     items = invoice.get("items", [])
     items_html = ""
     for item in items:
-        desc = item.get("description", "Service")
-        qty = item.get("quantity", 1)
-        unit_price = item.get("unit_price", item.get("amount", 0))
-        total = item.get("total", unit_price * qty)
+        desc = _html.escape(str(item.get("description", "Service")))
+        qty = int(item.get("quantity", 1))
+        unit_price = float(item.get("unit_price", item.get("amount", 0)))
+        total = float(item.get("total", unit_price * qty))
         items_html += (
             f"<tr><td>{desc}</td><td style='text-align:center'>{qty}</td>"
             f"<td style='text-align:right'>{unit_price:,.2f} ILS</td>"
@@ -1133,11 +1152,11 @@ async def download_invoice_pdf(
     pdf_tax_rate = invoice.get("tax_rate", VAT_RATE)
     pdf_tax_amount = invoice.get("tax_amount", round(pdf_subtotal * pdf_tax_rate, 2))
     pdf_tax_pct = int(round(pdf_tax_rate * 100))
-    currency = invoice.get("currency", "ILS")
-    issued_at = invoice.get("issued_at", invoice.get("created_at", ""))
-    offer_id = invoice.get("offer_id", "")
-    status = invoice.get("status", "")
-    invoice_number = invoice.get("invoice_number", invoice_id[:12])
+    currency = _html.escape(str(invoice.get("currency", "ILS")))
+    issued_at = _html.escape(str(invoice.get("issued_at", invoice.get("created_at", ""))))
+    offer_id = _html.escape(str(invoice.get("offer_id", "")))
+    status = _html.escape(str(invoice.get("status", "")))
+    invoice_number = _html.escape(str(invoice.get("invoice_number", invoice_id[:12])))
     is_paid = status in ("paid", "released")
 
     html = f"""<!DOCTYPE html>
@@ -1370,25 +1389,27 @@ async def get_payment_summary(
     """Get a high-level summary of all payment activity for the platform."""
     db = get_postgres_client()
 
-    # Get all invoices to compute totals
-    all_payments_query = await db.execute_query("SELECT status, amount FROM payments")
-    payments = all_payments_query if all_payments_query else []
+    # Aggregate payment totals at DB level to avoid loading all rows
+    payment_agg = await db.execute_query(
+        "SELECT status, SUM(amount) as total FROM payments GROUP BY status"
+    ) or []
+    payment_by_status: dict[str, float] = {r["status"]: float(r["total"] or 0) for r in payment_agg}
+    total_collected = sum(payment_by_status.get(s, 0) for s in ("succeeded", "completed"))
+    total_refunded = payment_by_status.get("refunded", 0)
 
-    total_collected = sum(p.get("amount", 0) for p in payments if p.get("status") in ("succeeded", "completed"))
-    total_refunded = sum(p.get("amount", 0) for p in payments if p.get("status") == "refunded")
-
-    # Estimate escrow: payments succeeded on non-completed offers
-    all_invoices_query = await db.execute_query("SELECT id, total, status, offer_id FROM invoices")
-    invoices = all_invoices_query if all_invoices_query else []
-    paid_invoices = [i for i in invoices if i.get("status") == "paid"]
-    total_released = sum(i.get("total", 0) for i in invoices if i.get("status") == "released")
+    # Aggregate invoice totals at DB level
+    invoice_agg = await db.execute_query(
+        "SELECT status, SUM(total) as total, COUNT(*) as cnt FROM invoices GROUP BY status"
+    ) or []
+    invoice_by_status: dict[str, dict] = {r["status"]: r for r in invoice_agg}
+    total_released = float((invoice_by_status.get("released") or {}).get("total") or 0)
+    pending_payouts = int((invoice_by_status.get("paid") or {}).get("cnt") or 0)
     total_in_escrow = total_collected - total_released - total_refunded
 
     fee_rate = _platform_fee_rate()
     total_platform_fees = round(total_collected * fee_rate, 2)
 
-    # Pending payouts: invoices that are paid but not released
-    pending_payouts = len(paid_invoices)
+
 
     return PaymentSummaryResponse(
         total_collected=total_collected,
@@ -1443,14 +1464,21 @@ async def get_contractor_payouts(
     )
     invoices = paid_invoices if paid_invoices else []
 
+    # Batch-fetch all contractors in one query to avoid N+1
+    contractor_ids = list({inv.get("contractor_id") for inv in invoices if inv.get("contractor_id")})
+    contractor_names: dict[str, str] = {}
+    if contractor_ids:
+        rows = await db.execute_query(
+            "SELECT id, business_name, name FROM contractors WHERE id = ANY($1::uuid[])",
+            contractor_ids,
+        ) or []
+        for row in rows:
+            contractor_names[row["id"]] = row.get("business_name") or row.get("name") or "Unknown"
+
     results: list[ContractorPayoutResponse] = []
     for inv in invoices:
         contractor_id = inv.get("contractor_id", "")
-        contractor_name = "Unknown"
-        if contractor_id:
-            ctr = await db.get_contractor(contractor_id)
-            if ctr:
-                contractor_name = ctr.get("business_name", ctr.get("name", "Unknown"))
+        contractor_name = contractor_names.get(contractor_id, "Unknown")
 
         gross = inv.get("total", 0)
         fee_rate = _platform_fee_rate()
@@ -1481,7 +1509,7 @@ async def get_contractor_payouts(
 @admin_router.post("/payouts/{invoice_id}/approve")
 async def approve_contractor_payout(
     invoice_id: str,
-    admin_user: UserInDB = Depends(get_admin_user),
+    admin_user: UserInDB = Depends(require_admin_only),
 ) -> dict:
     """Approve a contractor payout -- marks the invoice as approved for release."""
     db = get_postgres_client()
@@ -1543,7 +1571,7 @@ async def approve_contractor_payout(
 @admin_router.post("/escrow/{offer_id}/release")
 async def release_escrow(
     offer_id: str,
-    admin_user: UserInDB = Depends(get_admin_user),
+    admin_user: UserInDB = Depends(require_admin_only),
 ) -> dict:
     """Release escrowed funds to the contractor for a given offer.
 

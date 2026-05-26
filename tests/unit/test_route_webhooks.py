@@ -139,11 +139,12 @@ class TestContractorUpdateWebhook:
         from src.api.main import app
 
         with patch("src.api.routes.webhooks.get_settings") as mock_settings:
-            mock_settings.return_value.API_KEYS = []  # no auth required
+            mock_settings.return_value.API_KEYS = ["test-key"]
             client = TestClient(app, raise_server_exceptions=False)
             resp = client.post(
                 "/api/v1/webhooks/contractor-update",
                 json={"contractor_id": "c1", "type": "profile_update"},
+                headers={"X-API-Key": "test-key"},
             )
         assert resp.status_code == 200
         assert resp.json()["status"] == "processed"
@@ -153,11 +154,12 @@ class TestContractorUpdateWebhook:
         from src.api.main import app
 
         with patch("src.api.routes.webhooks.get_settings") as mock_settings:
-            mock_settings.return_value.API_KEYS = []
+            mock_settings.return_value.API_KEYS = ["test-key"]
             client = TestClient(app, raise_server_exceptions=False)
             resp = client.post(
                 "/api/v1/webhooks/contractor-update",
                 json={"type": "profile_update"},  # no contractor_id
+                headers={"X-API-Key": "test-key"},
             )
         assert resp.status_code == 200
         assert resp.json()["status"] == "invalid"
@@ -186,7 +188,7 @@ class TestContractorUpdateWebhook:
         mock_orchestrator.agents = {"vetting": mock_vetting}
 
         with patch("src.api.routes.webhooks.get_settings") as mock_settings:
-            mock_settings.return_value.API_KEYS = []
+            mock_settings.return_value.API_KEYS = ["test-key"]
             with patch("src.api.routes.webhooks.get_orchestrator", return_value=mock_orchestrator):
                 with patch(
                     "src.api.routes.webhooks.create_initial_state", return_value={"messages": [], "actions_taken": []}
@@ -195,6 +197,7 @@ class TestContractorUpdateWebhook:
                     resp = client.post(
                         "/api/v1/webhooks/contractor-update",
                         json={"contractor_id": "c1", "type": "document_uploaded"},
+                        headers={"X-API-Key": "test-key"},
                     )
         assert resp.status_code == 200
         assert resp.json()["status"] == "processed"

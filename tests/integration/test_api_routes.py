@@ -522,6 +522,9 @@ class TestAuthAPI:
             )
         )
         mock_redis.set = AsyncMock()
+        mock_redis.is_temporarily_locked = AsyncMock(return_value=0)
+        mock_redis.clear_login_failures = AsyncMock()
+        mock_redis.clear_temporary_lockout = AsyncMock()
 
         with patch("src.api.routes.auth.verify_password") as mock_verify:
             mock_verify.return_value = True

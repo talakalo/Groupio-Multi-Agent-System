@@ -290,18 +290,30 @@ async def login(
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
+    lock_ttl = await redis.is_temporarily_locked(user.id)
+    if lock_ttl > 0:
+        raise HTTPException(
+            status_code=423,
+            detail="Account temporarily locked due to too many failed attempts",
+            headers={"Retry-After": str(lock_ttl)},
+        )
+
     # Verify password
     hashed = await db.get_user_password_hash(user.id)
     if not hashed or not verify_password(form_data.password, hashed):
-        # Brute-force lockout: increment failure counter
         _ip = http_request.client.host if http_request.client else None
         fail_count = await redis.increment_login_failures(user.id)
         security_event.failed_login(user.email, ip=_ip)
         if fail_count >= 5:
-            await db.update_user(user.id, {"is_active": False})
-            logger.warning("Account locked due to too many failed logins: %s", user.email)
-            security_event.account_locked(user.email, ip=_ip)
-            raise HTTPException(status_code=423, detail="Account locked due to too many failed attempts")
+            lock_seconds = 900
+            await redis.set_temporary_lockout(user.id, lock_seconds)
+            logger.warning("Temporary lockout after failed logins: %s", user.email)
+            security_event.account_temporarily_locked(user.email, ip=_ip)
+            raise HTTPException(
+                status_code=423,
+                detail="Account temporarily locked due to too many failed attempts",
+                headers={"Retry-After": str(lock_seconds)},
+            )
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     if not user.is_active:
@@ -329,6 +341,7 @@ async def login(
         ex=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
     )
     await redis.clear_login_failures(user.id)
+    await redis.clear_temporary_lockout(user.id)
 
     # Update last login
     await db.update_user(user.id, {"last_login": datetime.now(UTC)})
@@ -378,7 +391,8 @@ async def login_json(
     if request.email:
         user = await db.get_user_by_email(request.email)
     else:
-        assert request.phone is not None  # validated by LoginRequest
+        if request.phone is None:
+            raise HTTPException(status_code=400, detail="Email or phone required")
         user = await db.get_user_by_phone(request.phone)
     if not user:
         ident = (request.email or request.phone or "") or ""

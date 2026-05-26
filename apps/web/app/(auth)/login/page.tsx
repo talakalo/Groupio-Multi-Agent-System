@@ -5,7 +5,7 @@ import { Mail, Phone, Loader2, ArrowLeft, Shield, Lock } from "lucide-react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -25,6 +25,21 @@ type LoginMethod = "email" | "phone";
 export default function LoginPage() {
   const router = useRouter();
   const t = useTranslations("auth.loginPage");
+  const { isAuthenticated, user } = useAuthStore();
+
+  // Redirect already-authenticated users (handles bfcache back-navigation to /login)
+  useEffect(() => {
+    if (!isAuthenticated || !user?.role) return;
+    const roleRoutes: Record<string, string> = {
+      resident: "/dashboard",
+      contractor: "/contractor/dashboard",
+      buildings_manager: "/buildings-manager/dashboard",
+      admin: "/admin/dashboard",
+      super_admin: "/admin/dashboard",
+    };
+    router.replace(roleRoutes[user.role] ?? "/dashboard");
+  }, [isAuthenticated, user, router]);
+
   const [loginMethod, setLoginMethod] = useState<LoginMethod>("email");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

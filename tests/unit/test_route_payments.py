@@ -216,7 +216,7 @@ class TestDownloadInvoicePdf:
                 "items": [],
             }
         )
-        db.list_payments_for_user = AsyncMock(return_value=[_make_payment(invoice_id="inv-1")])
+        db.execute_query = AsyncMock(return_value=[{"1": 1}])
 
         from src.api.main import app
         from src.api.middleware.auth import get_current_user
@@ -251,7 +251,7 @@ class TestDownloadInvoicePdf:
         user = _make_user()
         db = AsyncMock()
         db.get_invoice = AsyncMock(return_value={"id": "inv-1", "offer_id": "o1"})
-        db.list_payments_for_user = AsyncMock(return_value=[])
+        db.execute_query = AsyncMock(return_value=[])
 
         from src.api.main import app
         from src.api.middleware.auth import get_current_user
