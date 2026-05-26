@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from src.api.middleware.auth import get_current_user, is_admin
 from src.databases.postgres import get_postgres_client
+from src.models.user import UserRole
 from src.models.building import (
     BuildingCreate,
     BuildingListResponse,
@@ -128,6 +129,8 @@ async def create_building(
     current_user: UserInDB = Depends(get_current_user),
 ) -> BuildingResponse:
     """Create a new building."""
+    if current_user.role not in (UserRole.BUILDINGS_MANAGER, UserRole.ADMIN, UserRole.SUPER_ADMIN):
+        raise HTTPException(status_code=403, detail="Only buildings managers and admins can create buildings")
     db = get_postgres_client()
 
     building_id = str(uuid4())
@@ -258,6 +261,29 @@ async def delete_building(
     await db.delete_building(building_id)
 
     return {"status": "deleted", "building_id": building_id}
+
+
+@router.post("/{building_id}/regenerate-invite")
+async def regenerate_invite_code(
+    building_id: str,
+    current_user: UserInDB = Depends(get_current_user),
+) -> dict:
+    """Regenerate the invite code for a building."""
+    if current_user.role not in (UserRole.BUILDINGS_MANAGER, UserRole.ADMIN, UserRole.SUPER_ADMIN):
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    db = get_postgres_client()
+
+    building = await db.get_building(building_id)
+    if not building:
+        raise HTTPException(status_code=404, detail="Building not found")
+
+    if current_user.role == UserRole.BUILDINGS_MANAGER and building.get("admin_user_id") != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to rotate invite code for this building")
+
+    new_code = await db.regenerate_building_invite_code(building_id)
+
+    return {"building_id": building_id, "invite_code": new_code}
 
 
 @router.get("/{building_id}/residents")
