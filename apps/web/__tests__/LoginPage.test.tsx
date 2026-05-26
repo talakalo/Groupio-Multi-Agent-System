@@ -42,10 +42,10 @@ vi.mock('@/lib/utils/unwrapPageParams', () => ({
 const mockSetAccessToken = vi.fn();
 const mockSetUser = vi.fn();
 vi.mock('@/lib/stores/authStore', () => {
+  const mockState: Record<string, unknown> = { accessToken: null, isAuthenticated: false, user: null };
   const useAuthStore = Object.assign(
-    vi.fn(
-      (selector: (s: Record<string, unknown>) => unknown) =>
-        selector({ accessToken: null, isAuthenticated: false })
+    vi.fn((selector?: (s: Record<string, unknown>) => unknown) =>
+      typeof selector === 'function' ? selector(mockState) : mockState
     ),
     {
       getState: vi.fn(() => ({

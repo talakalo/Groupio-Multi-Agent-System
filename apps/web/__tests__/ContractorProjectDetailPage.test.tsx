@@ -77,7 +77,7 @@ describe('ContractorProjectDetailPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Project not found')).toBeInTheDocument();
     });
-    expect(screen.getByRole('link', { name: /חזרה לפרויקטים/ })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /backToProjects/ })).toHaveAttribute(
       'href',
       '/contractor/projects'
     );
