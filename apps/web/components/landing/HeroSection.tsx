@@ -61,7 +61,7 @@ export default async function HeroSection() {
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link
-              href="/signup"
+              href="/signup?redirect=/building/join"
               className="inline-flex items-center gap-2 bg-emerald-400 hover:bg-emerald-300 text-emerald-950 font-bold text-base px-8 py-3.5 rounded-xl transition-all shadow-lg shadow-emerald-900/40 active:scale-[0.98]"
             >
               <span>{t("hero.ctaResident")}</span>

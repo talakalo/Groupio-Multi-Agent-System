@@ -59,7 +59,7 @@ export default async function HowItWorksSection() {
 
         <div className="text-center mt-14">
           <a
-            href="/signup"
+            href="/signup?redirect=/building/join"
             className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-7 py-3 rounded-xl transition-all shadow-sm active:scale-[0.98]"
           >
             <span>{t("cta")}</span>
