@@ -119,14 +119,15 @@ export default function ArchitectureScreen() {
       setUploading(true);
       const uploaded = await uploadArchitecturePlan(
         asset.uri,
-        buildingId ?? "",
-        asset.name,
+        buildingId ?? undefined,
       );
       setUploading(false);
       setUpload({
         id: uploaded.id,
+        filename: uploaded.filename,
+        status: uploaded.status,
         analysis_status: uploaded.analysis_status,
-        analysis_result: null,
+        created_at: uploaded.created_at,
       });
       // Kick off polling regardless — pending status flows through here.
       pollFor(uploaded.id);
@@ -186,7 +187,7 @@ export default function ArchitectureScreen() {
               <View style={styles.statusHead}>
                 <Icon
                   name={
-                    isReady
+                    status === "done"
                       ? "check-circle"
                       : status === "failed"
                         ? "alert-circle"
@@ -194,7 +195,7 @@ export default function ArchitectureScreen() {
                   }
                   size={24}
                   color={
-                    isReady
+                    status === "done"
                       ? theme.colors.tertiary
                       : status === "failed"
                         ? theme.colors.error

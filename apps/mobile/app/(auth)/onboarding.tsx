@@ -80,7 +80,7 @@ export default function OnboardingScreen() {
       );
       // Only show stub-confidence suggestions to the user — the backend
       // already returns confidence=0 from the offline fallback.
-      if (data.confidence >= 0.5) {
+      if (data && data.confidence >= 0.5) {
         setSuggestion(data);
       } else {
         setSuggestion(null);

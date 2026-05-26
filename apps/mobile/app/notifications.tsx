@@ -84,13 +84,13 @@ export default function NotificationsScreen() {
   }
 
   async function handleMarkRead(notif: NotificationItem) {
-    if (notif.read_at) return;
+    if (notif.isRead) return;
     setActioning(notif.id);
     try {
       await markNotificationRead(notif.id);
       setItems((prev) =>
         prev.map((n) =>
-          n.id === notif.id ? { ...n, read_at: new Date().toISOString() } : n,
+          n.id === notif.id ? { ...n, isRead: true } : n,
         ),
       );
     } catch (err: unknown) {
@@ -108,8 +108,7 @@ export default function NotificationsScreen() {
     setActioning("all");
     try {
       await markAllNotificationsRead();
-      const now = new Date().toISOString();
-      setItems((prev) => prev.map((n) => ({ ...n, read_at: n.read_at ?? now })));
+      setItems((prev) => prev.map((n) => ({ ...n, isRead: true })));
     } catch (err: unknown) {
       setError(
         err instanceof ApiError
@@ -138,7 +137,7 @@ export default function NotificationsScreen() {
     }
   }
 
-  const unreadCount = items.filter((n) => !n.read_at).length;
+  const unreadCount = items.filter((n) => !n.isRead).length;
 
   if (loading) {
     return (
@@ -202,10 +201,10 @@ export default function NotificationsScreen() {
         }
         renderItem={({ item }) => (
           <Card
-            mode={item.read_at ? "outlined" : "contained"}
+            mode={item.isRead ? "outlined" : "contained"}
             style={[
               styles.row,
-              !item.read_at ? { backgroundColor: theme.colors.primaryContainer } : null,
+              !item.isRead ? { backgroundColor: theme.colors.primaryContainer } : null,
             ]}
             onPress={() => handleMarkRead(item)}
             testID={`notification-${item.id}`}
@@ -230,7 +229,7 @@ export default function NotificationsScreen() {
                 </Text>
               ) : null}
               <Text style={styles.muted}>
-                {new Date(item.created_at).toLocaleString()}
+                {new Date(item.createdAt).toLocaleString()}
               </Text>
             </Card.Content>
           </Card>

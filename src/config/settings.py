@@ -289,7 +289,11 @@ class Settings(BaseSettings):
                         f"STRIPE_WEBHOOK_SECRET must be set when PAYMENT_PROVIDER=stripe in {self.ENVIRONMENT}. "
                         "Obtain it from the Stripe Dashboard → Webhooks → Signing secret."
                     )
-            if self.ENFORCE_EMAIL_VERIFICATION and not self.RESEND_API_KEY and not (self.SMTP_HOST and self.SMTP_USER and self.SMTP_PASSWORD):
+            if (
+                self.ENFORCE_EMAIL_VERIFICATION
+                and not self.RESEND_API_KEY
+                and not (self.SMTP_HOST and self.SMTP_USER and self.SMTP_PASSWORD)
+            ):
                 raise ValueError(
                     f"ENFORCE_EMAIL_VERIFICATION is enabled in {self.ENVIRONMENT} but no email transport "
                     "is configured. Set RESEND_API_KEY or SMTP_HOST + SMTP_USER + SMTP_PASSWORD."

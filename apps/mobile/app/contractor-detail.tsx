@@ -52,8 +52,8 @@ export default function ContractorDetailScreen() {
         if (p.status === "fulfilled") setProfile(p.value);
         else setError((p.reason as Error)?.message ?? "Failed to load");
         if (r.status === "fulfilled") {
-          setReviews(r.value.items);
-          setReviewsTotal(r.value.total);
+          setReviews(r.value);
+          setReviewsTotal(r.value.length);
         } else {
           setReviews([]);
         }
@@ -122,7 +122,7 @@ export default function ContractorDetailScreen() {
                 />
                 <View style={styles.headText}>
                   <Text variant="titleMedium">{profile.businessName ?? "—"}</Text>
-                  {profile.verified ? (
+                  {profile.isVerified ? (
                     <View style={styles.verifiedRow}>
                       <Icon
                         name="check-decagram"
@@ -186,7 +186,7 @@ export default function ContractorDetailScreen() {
                     />
                   ))}
                   <Text style={styles.reviewDate}>
-                    {new Date(r.created_at).toLocaleDateString()}
+                    {new Date(r.createdAt).toLocaleDateString()}
                   </Text>
                 </View>
                 {r.comment ? (

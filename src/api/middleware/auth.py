@@ -154,8 +154,9 @@ _USER_CACHE_TTL = 300  # seconds
 async def _get_cached_user(user_id: str) -> UserInDB | None:
     """Return a cached UserInDB from Redis, or None on cache miss or any Redis error."""
     try:
-        from src.databases.redis_client import get_redis_client
         import json as _json
+
+        from src.databases.redis_client import get_redis_client
 
         redis = get_redis_client()
         raw = await redis._redis.get(f"user_cache:{user_id}")
@@ -170,8 +171,9 @@ async def _get_cached_user(user_id: str) -> UserInDB | None:
 async def _set_cached_user(user: UserInDB) -> None:
     """Write a UserInDB into Redis cache. Silently swallows any Redis errors."""
     try:
-        from src.databases.redis_client import get_redis_client
         import json as _json
+
+        from src.databases.redis_client import get_redis_client
 
         redis = get_redis_client()
         await redis._redis.set(

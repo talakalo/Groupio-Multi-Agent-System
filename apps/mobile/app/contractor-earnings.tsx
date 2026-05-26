@@ -99,7 +99,7 @@ export default function ContractorEarningsScreen() {
       />
       <FlatList
         data={data?.items ?? []}
-        keyExtractor={(item) => item.payment_id}
+        keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -117,22 +117,15 @@ export default function ContractorEarningsScreen() {
                   {i18n.t("contractor.totalEarnings") || "Total earnings"}
                 </Text>
                 <Text variant="headlineMedium" style={styles.amount}>
-                  {formatAmount(data?.total_earnings ?? 0, "ILS")}
+                  {formatAmount(data?.totalEarned ?? 0, "ILS")}
                 </Text>
                 <Divider style={styles.divider} />
                 <Text variant="labelLarge">
                   {i18n.t("contractor.pendingPayouts") || "Pending payouts"}
                 </Text>
                 <Text variant="titleMedium">
-                  {formatAmount(data?.pending_payouts ?? 0, "ILS")}
+                  {formatAmount(data?.pendingPayout ?? 0, "ILS")}
                 </Text>
-                {data?.current_period ? (
-                  <Text style={styles.muted}>
-                    {i18n.t("contractor.currentPeriod") || "Current period"}:{" "}
-                    {new Date(data.current_period.start).toLocaleDateString()} —{" "}
-                    {new Date(data.current_period.end).toLocaleDateString()}
-                  </Text>
-                ) : null}
               </Card.Content>
             </Card>
             <Text variant="titleMedium" style={styles.sectionTitle}>
@@ -141,11 +134,11 @@ export default function ContractorEarningsScreen() {
           </View>
         }
         renderItem={({ item }) => (
-          <Card style={styles.row} mode="outlined" testID={`earnings-row-${item.payment_id}`}>
+          <Card style={styles.row} mode="outlined" testID={`earnings-row-${item.id}`}>
             <Card.Content>
               <View style={styles.rowHead}>
                 <Text variant="titleSmall" numberOfLines={1}>
-                  {item.offer_title ?? item.offer_id ?? item.payment_id}
+                  {item.offerTitle ?? item.offerId ?? item.id}
                 </Text>
                 <Chip compact mode="flat" style={styles.statusChip}>
                   {item.status}
@@ -154,9 +147,9 @@ export default function ContractorEarningsScreen() {
               <Text variant="bodyMedium">
                 {formatAmount(item.amount, item.currency || "ILS")}
               </Text>
-              {item.paid_at ? (
+              {item.date ? (
                 <Text style={styles.muted}>
-                  {new Date(item.paid_at).toLocaleString()}
+                  {new Date(item.date).toLocaleString()}
                 </Text>
               ) : null}
             </Card.Content>
