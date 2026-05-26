@@ -3,6 +3,7 @@
 import json
 import logging
 import re
+import secrets
 from collections.abc import AsyncIterator as _AsyncIterator
 from contextlib import asynccontextmanager as _acm
 from datetime import UTC, datetime
@@ -16,6 +17,130 @@ from src.models.user import UserInDB
 
 # Regex for safe SQL column names (letters, digits, underscores)
 _SAFE_COLUMN_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
+
+# Building invite codes — uppercase alphanumerics, no ambiguous chars (0/O, 1/I/L).
+_INVITE_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+
+
+def generate_invite_code(length: int = 8) -> str:
+    """Generate a building invite code (uppercase, unambiguous characters)."""
+    return "".join(secrets.choice(_INVITE_CODE_ALPHABET) for _ in range(length))
+
+
+# ---------------------------------------------------------------------------
+# Named column lists — never use SELECT * in queries.
+# Add new column lists here when new tables or columns are introduced.
+# ---------------------------------------------------------------------------
+
+# users (excludes hashed_password for security; use SELECT hashed_password explicitly when needed)
+_USER_COLS = (
+    "id, email, full_name, phone, role, preferred_language, is_active, is_verified, "
+    "avatar_url, building_id, contractor_id, last_login, created_at, updated_at, "
+    "totp_secret, onboarded_at, push_token, notification_settings"
+)
+
+# buildings (includes municipality enrichment columns added in migration 016)
+_BUILDING_COLS = (
+    "id, name, address, city, region, total_units, floors, year_built, admin_user_id, "
+    "resident_count, active_offers, completed_offers, total_savings, whatsapp_group_id, "
+    "created_at, updated_at, municipality_code, municipality_name, address_normalized, "
+    "enrichment_confidence, enrichment_source, enriched_at, invite_code"
+)
+
+# offers (includes pricing_rationale added in migration 011)
+_OFFER_COLS = (
+    "id, title, description, category, base_price, min_participants, max_participants, "
+    "deadline, building_id, created_by, status, current_participants, matched_contractor_id, "
+    "pricing_tiers, created_at, updated_at, pricing_rationale"
+)
+
+# contractors
+_CONTRACTOR_COLS = (
+    "id, user_id, business_name, contact_name, email, phone, description, categories, "
+    "regions, years_experience, employee_count, website, verification_status, trust_score, "
+    "trust_score_breakdown, license_number, license_verified, insurance_expiry, "
+    "insurance_verified, certifications, average_rating, total_reviews, completed_projects, "
+    "response_rate, average_response_time_hours, created_at, updated_at"
+)
+
+# contractor_reviews
+_CONTRACTOR_REVIEW_COLS = "id, contractor_id, user_id, offer_id, rating, comment, created_at"
+
+# conversation_logs
+_CONVERSATION_LOG_COLS = "id, user_id, message, response, metadata, created_at"
+
+# escalations
+_ESCALATION_COLS = (
+    "id, user_id, conversation_id, source_agent, reason, priority, summary, status, "
+    "assigned_to, context, agent_reasoning, resolution_notes, created_at, updated_at, resolved_at"
+)
+
+# escalation_messages
+_ESCALATION_MESSAGE_COLS = "id, escalation_id, sender_type, sender_id, content, created_at"
+
+# file_uploads (includes building_id added in migration 003)
+_FILE_UPLOAD_COLS = (
+    "id, user_id, bucket, file_name, file_type, file_size, storage_path, thumbnail_path, "
+    "analysis_status, analysis_result, building_id, metadata, created_at, updated_at"
+)
+
+# audit_logs
+_AUDIT_LOG_COLS = "id, user_id, action, resource_type, resource_id, details, ip_address, created_at"
+
+# system_settings
+_SYSTEM_SETTING_COLS = "id, key, value, description, updated_by, updated_at"
+
+# agent_audit_log (includes columns added in migrations 010 and 012)
+_AGENT_AUDIT_LOG_COLS = (
+    "id, session_id, user_id, agent_name, action, input_summary, output_summary, "
+    "model_used, tokens_used, latency_ms, confidence_score, requires_human_review, "
+    "reasoning_chain, cited_sources, alternatives_considered, created_at"
+)
+
+# agent_metrics
+_AGENT_METRIC_COLS = "id, agent_name, metric_type, value, metadata, recorded_at"
+
+# outreach_queue
+_OUTREACH_QUEUE_COLS = (
+    "id, user_id, campaign_type, message, variant, status, approved_by, approved_at, sent_at, created_at"
+)
+
+# invoices (includes columns added in migration 022 and 029)
+_INVOICE_COLS = (
+    "id, offer_id, contractor_id, invoice_number, type, status, subtotal, tax_rate, "
+    "tax_amount, tax, total, platform_fee, platform_fee_rate, currency, due_date, paid_at, "
+    "pdf_path, metadata, created_at, updated_at, transaction_id, payment_method, "
+    "payment_type, items, amount, provider_name"
+)
+
+# payments (includes columns added in migrations 022 and 029)
+_PAYMENT_COLS = (
+    "id, invoice_id, user_id, amount, currency, status, provider, "
+    "provider_transaction_id, payment_method_id, metadata, created_at, updated_at, "
+    "offer_id, transaction_id, payment_method, provider_data, subtotal, tax_rate, "
+    "tax_amount, provider_name, provider_ref"
+)
+
+# payment_splits (includes columns added in migration 022)
+_PAYMENT_SPLIT_COLS = "id, payment_id, participant_user_id, amount, status, created_at, invoice_id, user_id, unit_count"
+
+# credit_awards
+_CREDIT_AWARD_COLS = "id, resident_id, amount, reason, status, approved_by, approved_at, created_at"
+
+# pending_agent_decisions
+_PENDING_DECISION_COLS = (
+    "id, agent_name, conversation_id, user_id, action_type, payload, escalation_reason, "
+    "status, decided_by, decision_note, decided_at, created_at"
+)
+
+# outbox_events
+_OUTBOX_EVENT_COLS = "id, routing_key, event_name, payload, idempotency_key, status, created_at, processed_at"
+
+# notifications
+_NOTIFICATION_COLS = "id, user_id, type, title, body, data, read, read_at, created_at"
+
+# crm_external_refs
+_CRM_EXTERNAL_REF_COLS = "id, entity_type, entity_id, crm_entity_type, crm_id, updated_at"
 
 logger = logging.getLogger(__name__)
 
@@ -52,8 +177,8 @@ def _row_to_user(row: dict) -> dict:
         "building_id": row.get("building_id"),
         "contractor_id": row.get("contractor_id"),
         "last_login": row.get("last_login"),
-        "created_at": row.get("created_at") or datetime.now(UTC),
-        "updated_at": row.get("updated_at") or datetime.now(UTC),
+        "created_at": row["created_at"] if "created_at" in row and row["created_at"] else datetime.now(UTC),
+        "updated_at": row["updated_at"] if "updated_at" in row and row["updated_at"] else datetime.now(UTC),
     }
 
 
@@ -160,6 +285,20 @@ class PostgresClient:
             await self._asyncpg_pool.close()
             self._asyncpg_pool = None
 
+    async def auth_tables_exist(self) -> bool:
+        """Check if auth-critical tables (e.g. users) exist. Used for startup readiness."""
+        if self._use_supabase_client():
+            return True
+        try:
+            pool = await self._get_client()
+            async with pool.acquire() as conn:
+                row = await conn.fetchrow(
+                    "SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'users'"
+                )
+                return row is not None
+        except Exception:
+            return False
+
     async def _pg_execute(self, query: str, *args: Any) -> None:
         """Execute query via asyncpg."""
         pool = await self._get_client()
@@ -188,6 +327,22 @@ class PostgresClient:
             async with conn.transaction():
                 yield conn
 
+    @_acm
+    async def tenant_scope(self, user_id: str) -> "_AsyncIterator[Any]":
+        """Run a block with app.current_user_id set for RLS tenant policies."""
+        if self._use_supabase_client():
+            yield None
+            return
+
+        pool = await self._get_client()
+        async with pool.acquire() as conn:
+            async with conn.transaction():
+                await conn.execute(
+                    "SELECT set_config('app.current_user_id', $1, true)",
+                    str(user_id),
+                )
+                yield conn
+
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=10),
@@ -212,7 +367,7 @@ class PostgresClient:
             client = await self._get_client()
             result = await client.table("users").select("*").eq("id", user_id).execute()
             return result.data[0] if result.data else None
-        row = await self._pg_fetch_one("SELECT * FROM users WHERE id = $1", user_id)
+        row = await self._pg_fetch_one(f"SELECT {_USER_COLS} FROM users WHERE id = $1", user_id)
         return row
 
     async def get_user_by_email(self, email: str) -> UserInDB | None:
@@ -222,7 +377,7 @@ class PostgresClient:
             result = await client.table("users").select("*").eq("email", email).limit(1).execute()
             row = result.data[0] if result.data else None
         else:
-            row = await self._pg_fetch_one("SELECT * FROM users WHERE email = $1", email)
+            row = await self._pg_fetch_one(f"SELECT {_USER_COLS} FROM users WHERE email = $1", email)
         return UserInDB(**_row_to_user(row)) if row else None
 
     async def get_user_by_phone(self, phone: str) -> UserInDB | None:
@@ -232,7 +387,7 @@ class PostgresClient:
             result = await client.table("users").select("*").eq("phone", phone).limit(1).execute()
             row = result.data[0] if result.data else None
         else:
-            row = await self._pg_fetch_one("SELECT * FROM users WHERE phone = $1", phone)
+            row = await self._pg_fetch_one(f"SELECT {_USER_COLS} FROM users WHERE phone = $1", phone)
         return UserInDB(**_row_to_user(row)) if row else None
 
     async def get_user(self, user_id: str) -> UserInDB | None:
@@ -242,7 +397,7 @@ class PostgresClient:
             result = await client.table("users").select("*").eq("id", user_id).limit(1).execute()
             row = result.data[0] if result.data else None
         else:
-            row = await self._pg_fetch_one("SELECT * FROM users WHERE id = $1", user_id)
+            row = await self._pg_fetch_one(f"SELECT {_USER_COLS} FROM users WHERE id = $1", user_id)
         return UserInDB(**_row_to_user(row)) if row else None
 
     async def get_user_password_hash(self, user_id: str) -> str | None:
@@ -291,7 +446,7 @@ class PostgresClient:
                 user_data.get("building_id"),
                 user_data.get("contractor_id"),
             )
-            row = await self._pg_fetch_one("SELECT * FROM users WHERE id = $1", user_data["id"])
+            row = await self._pg_fetch_one(f"SELECT {_USER_COLS} FROM users WHERE id = $1", user_data["id"])
         if not row:
             raise RuntimeError("Failed to create user")
         return UserInDB(**_row_to_user(row))
@@ -310,6 +465,8 @@ class PostgresClient:
             "last_login",
             "role",
             "onboarded_at",
+            "push_token",
+            "notification_settings",
         }
         filtered = {k: v for k, v in update_data.items() if k in allowed}
         if not filtered:
@@ -325,7 +482,7 @@ class PostgresClient:
         else:
             query, args = self._build_safe_update("users", filtered, "id", user_id)
             await self._pg_execute(query, *args)
-            row = await self._pg_fetch_one("SELECT * FROM users WHERE id = $1", user_id)
+            row = await self._pg_fetch_one(f"SELECT {_USER_COLS} FROM users WHERE id = $1", user_id)
         if row:
             return UserInDB(**_row_to_user(row))
         user = await self.get_user(user_id)
@@ -351,7 +508,7 @@ class PostgresClient:
             client = await self._get_client()
             result = await client.table("buildings").select("*").eq("id", building_id).execute()
             return result.data[0] if result.data else None
-        return await self._pg_fetch_one("SELECT * FROM buildings WHERE id = $1", building_id)
+        return await self._pg_fetch_one(f"SELECT {_BUILDING_COLS} FROM buildings WHERE id = $1", building_id)
 
     async def get_building_by_phone(self, phone: str) -> str | None:
         """Look up building ID from a phone number."""
@@ -404,6 +561,8 @@ class PostgresClient:
 
     async def create_building(self, building_data: dict[str, Any]) -> dict[str, Any]:
         """Create a new building."""
+        if not building_data.get("invite_code"):
+            building_data["invite_code"] = generate_invite_code()
         if self._use_supabase_client():
             client = await self._get_client()
             result = await client.table("buildings").insert(building_data).execute()
@@ -412,11 +571,14 @@ class PostgresClient:
             "id, name, address, city, region, total_units, floors, year_built, admin_user_id, "
             "resident_count, active_offers, completed_offers, total_savings, whatsapp_group_id, "
             "municipality_code, municipality_name, address_normalized, enrichment_confidence, "
-            "enrichment_source, enriched_at"
+            "enrichment_source, enriched_at, invite_code"
         )
         await self._pg_execute(
             f"""INSERT INTO buildings ({cols})
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)""",
+               VALUES (
+                   $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+                   $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21
+               )""",
             building_data["id"],
             building_data["name"],
             building_data["address"],
@@ -437,8 +599,23 @@ class PostgresClient:
             building_data.get("enrichment_confidence"),
             building_data.get("enrichment_source"),
             building_data.get("enriched_at"),
+            building_data["invite_code"],
         )
         return await self.get_building(building_data["id"]) or building_data
+
+    async def regenerate_building_invite_code(self, building_id: str, new_code: str | None = None) -> str:
+        """Rotate the invite code for a building. Returns the new code."""
+        code = new_code or generate_invite_code()
+        if self._use_supabase_client():
+            client = await self._get_client()
+            await client.table("buildings").update({"invite_code": code}).eq("id", building_id).execute()
+        else:
+            await self._pg_execute(
+                "UPDATE buildings SET invite_code = $1 WHERE id = $2",
+                code,
+                building_id,
+            )
+        return code
 
     async def list_buildings(
         self,
@@ -481,7 +658,9 @@ class PostgresClient:
         args.extend([page_size, (page - 1) * page_size])
         n1, n2 = len(args) - 1, len(args)
         rows = await self._pg_fetch_all(
-            "SELECT * FROM buildings WHERE " + where_sql + " ORDER BY created_at DESC LIMIT $%d OFFSET $%d" % (n1, n2),
+            f"SELECT {_BUILDING_COLS} FROM buildings WHERE "
+            + where_sql
+            + " ORDER BY created_at DESC LIMIT $%d OFFSET $%d" % (n1, n2),
             *args,
         )
         return (rows or [], total)
@@ -832,7 +1011,9 @@ class PostgresClient:
         args.extend([page_size, (page - 1) * page_size])
         n1, n2 = len(args) - 1, len(args)
         rows = await self._pg_fetch_all(
-            "SELECT * FROM offers WHERE " + where_sql + " ORDER BY created_at DESC LIMIT $%d OFFSET $%d" % (n1, n2),
+            f"SELECT {_OFFER_COLS} FROM offers WHERE "
+            + where_sql
+            + " ORDER BY created_at DESC LIMIT $%d OFFSET $%d" % (n1, n2),
             *args,
         )
         return (rows or [], total)
@@ -843,7 +1024,7 @@ class PostgresClient:
             client = await self._get_client()
             result = await client.table("offers").select("*").eq("id", offer_id).limit(1).execute()
             return result.data[0] if result.data else None
-        return await self._pg_fetch_one("SELECT * FROM offers WHERE id = $1", offer_id)
+        return await self._pg_fetch_one(f"SELECT {_OFFER_COLS} FROM offers WHERE id = $1", offer_id)
 
     async def update_offer(self, offer_id: str, update_data: dict[str, Any]) -> dict[str, Any]:
         """Update an offer."""
@@ -1097,7 +1278,8 @@ class PostgresClient:
         total = count_row["c"] if count_row else 0
         args.append(limit)
         rows = await self._pg_fetch_all(
-            f"SELECT * FROM conversation_logs WHERE user_id = $1{extra} ORDER BY created_at ASC LIMIT ${len(args)}",
+            f"SELECT {_CONVERSATION_LOG_COLS} FROM conversation_logs "
+            f"WHERE user_id = $1{extra} ORDER BY created_at ASC LIMIT ${len(args)}",
             *args,
         )
         return (rows or [], total)
@@ -1224,7 +1406,7 @@ class PostgresClient:
         args.extend([page_size, (page - 1) * page_size])
         n1, n2 = len(args) - 1, len(args)
         rows = await self._pg_fetch_all(
-            "SELECT * FROM contractors WHERE "
+            f"SELECT {_CONTRACTOR_COLS} FROM contractors WHERE "
             + where_sql
             + " ORDER BY trust_score DESC NULLS LAST LIMIT $%d OFFSET $%d" % (n1, n2),
             *args,
@@ -1237,7 +1419,7 @@ class PostgresClient:
             client = await self._get_client()
             result = await client.table("contractors").select("*").eq("id", contractor_id).limit(1).execute()
             return result.data[0] if result.data else None
-        return await self._pg_fetch_one("SELECT * FROM contractors WHERE id = $1", contractor_id)
+        return await self._pg_fetch_one(f"SELECT {_CONTRACTOR_COLS} FROM contractors WHERE id = $1", contractor_id)
 
     async def get_contractor_verification_metadata(self, contractor_id: str) -> list[dict[str, Any]]:
         """Get verification metadata for a contractor (Phase 2)."""
@@ -1272,7 +1454,10 @@ class PostgresClient:
             order = {cid: i for i, cid in enumerate(contractor_ids)}
             return sorted(data, key=lambda x: order.get(x["id"], 999))
         placeholders = ", ".join("$%d" % (i + 1) for i in range(len(contractor_ids)))
-        rows = await self._pg_fetch_all("SELECT * FROM contractors WHERE id IN (" + placeholders + ")", *contractor_ids)
+        rows = await self._pg_fetch_all(
+            f"SELECT {_CONTRACTOR_COLS} FROM contractors WHERE id IN (" + placeholders + ")",
+            *contractor_ids,
+        )
         order = {cid: i for i, cid in enumerate(contractor_ids)}
         return sorted(rows or [], key=lambda x: order.get(x["id"], 999))
 
@@ -1313,6 +1498,37 @@ class PostgresClient:
             await self._pg_execute(query, *args)
         return await self.get_contractor(contractor_id) or {}
 
+    async def admin_update_contractor_membership(
+        self, contractor_id: str, update_data: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Update marketplace membership columns (admin / system only)."""
+        allowed = {
+            "membership_status",
+            "membership_plan",
+            "membership_provider",
+            "provider_customer_id",
+            "provider_subscription_id",
+            "current_period_start",
+            "current_period_end",
+            "next_billing_at",
+            "cancel_at_period_end",
+            "canceled_at",
+            "billing_failure_count",
+            "membership_grace_until",
+            "trial_ends_at",
+            "last_payment_at",
+        }
+        filtered = {k: v for k, v in update_data.items() if k in allowed}
+        if not filtered:
+            return await self.get_contractor(contractor_id) or {}
+        if self._use_supabase_client():
+            client = await self._get_client()
+            await client.table("contractors").update(filtered).eq("id", contractor_id).execute()
+        else:
+            query, args = self._build_safe_update("contractors", filtered, "id", contractor_id)
+            await self._pg_execute(query, *args)
+        return await self.get_contractor(contractor_id) or {}
+
     async def get_contractor_reviews(
         self, contractor_id: str, page: int = 1, page_size: int = 20
     ) -> tuple[list[dict[str, Any]], int]:
@@ -1334,7 +1550,8 @@ class PostgresClient:
         )
         total = count_row["c"] if count_row else 0
         rows = await self._pg_fetch_all(
-            "SELECT * FROM contractor_reviews WHERE contractor_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
+            f"SELECT {_CONTRACTOR_REVIEW_COLS} FROM contractor_reviews "
+            "WHERE contractor_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
             contractor_id,
             page_size,
             (page - 1) * page_size,
@@ -1527,7 +1744,7 @@ class PostgresClient:
         args.extend([page_size, (page - 1) * page_size])
         n1, n2 = len(args) - 1, len(args)
         rows = await self._pg_fetch_all(
-            "SELECT * FROM escalations WHERE "
+            f"SELECT {_ESCALATION_COLS} FROM escalations WHERE "
             + where_sql
             + " ORDER BY created_at DESC LIMIT $%d OFFSET $%d" % (n1, n2),
             *args,
@@ -1540,7 +1757,7 @@ class PostgresClient:
             client = await self._get_client()
             result = await client.table("escalations").select("*").eq("id", escalation_id).limit(1).execute()
             return result.data[0] if result.data else None
-        return await self._pg_fetch_one("SELECT * FROM escalations WHERE id = $1", escalation_id)
+        return await self._pg_fetch_one(f"SELECT {_ESCALATION_COLS} FROM escalations WHERE id = $1", escalation_id)
 
     async def update_escalation(self, escalation_id: str, update_data: dict[str, Any]) -> dict[str, Any]:
         """Update an escalation."""
@@ -1674,7 +1891,8 @@ class PostgresClient:
             return result.data or []
         return (
             await self._pg_fetch_all(
-                "SELECT * FROM escalation_messages WHERE escalation_id = $1 ORDER BY created_at",
+                f"SELECT {_ESCALATION_MESSAGE_COLS} FROM escalation_messages "
+                "WHERE escalation_id = $1 ORDER BY created_at",
                 escalation_id,
             )
             or []
@@ -1724,7 +1942,7 @@ class PostgresClient:
             client = await self._get_client()
             result = await client.table("file_uploads").select("*").eq("id", file_id).limit(1).execute()
             return result.data[0] if result.data else None
-        return await self._pg_fetch_one("SELECT * FROM file_uploads WHERE id = $1", file_id)
+        return await self._pg_fetch_one(f"SELECT {_FILE_UPLOAD_COLS} FROM file_uploads WHERE id = $1", file_id)
 
     async def update_file_upload(self, file_id: str, update_data: dict[str, Any]) -> dict[str, Any]:
         if self._use_supabase_client():
@@ -1778,7 +1996,9 @@ class PostgresClient:
             args.append(building_id)
             where_parts.append(f"building_id = ${len(args)}")
         return await self._pg_fetch_all(
-            "SELECT * FROM file_uploads WHERE " + " AND ".join(where_parts) + " ORDER BY created_at DESC",
+            f"SELECT {_FILE_UPLOAD_COLS} FROM file_uploads WHERE "
+            + " AND ".join(where_parts)
+            + " ORDER BY created_at DESC",
             *args,
         )
 
@@ -1821,7 +2041,9 @@ class PostgresClient:
         args.extend([page_size, (page - 1) * page_size])
         n1, n2 = len(args) - 1, len(args)
         rows = await self._pg_fetch_all(
-            "SELECT * FROM users WHERE " + where_sql + " ORDER BY created_at DESC LIMIT $%d OFFSET $%d" % (n1, n2),
+            f"SELECT {_USER_COLS} FROM users WHERE "
+            + where_sql
+            + " ORDER BY created_at DESC LIMIT $%d OFFSET $%d" % (n1, n2),
             *args,
         )
         return (rows or [], total)
@@ -1866,7 +2088,9 @@ class PostgresClient:
         args.extend([page_size, (page - 1) * page_size])
         n1, n2 = len(args) - 1, len(args)
         rows = await self._pg_fetch_all(
-            "SELECT * FROM offers WHERE " + where_sql + " ORDER BY created_at DESC LIMIT $%d OFFSET $%d" % (n1, n2),
+            f"SELECT {_OFFER_COLS} FROM offers WHERE "
+            + where_sql
+            + " ORDER BY created_at DESC LIMIT $%d OFFSET $%d" % (n1, n2),
             *args,
         )
         return (rows or [], total)
@@ -1877,7 +2101,7 @@ class PostgresClient:
             client = await self._get_client()
             result = await client.table("system_settings").select("*").execute()
             return result.data or []
-        return await self._pg_fetch_all("SELECT * FROM system_settings ORDER BY key")
+        return await self._pg_fetch_all(f"SELECT {_SYSTEM_SETTING_COLS} FROM system_settings ORDER BY key")
 
     async def upsert_system_setting(
         self,
@@ -1910,7 +2134,7 @@ class PostgresClient:
             res = await client.table("system_settings").insert(insert_payload).execute()
             return res.data[0] if res.data else insert_payload
 
-        existing = await self._pg_fetch_one("SELECT * FROM system_settings WHERE key = $1", key)
+        existing = await self._pg_fetch_one(f"SELECT {_SYSTEM_SETTING_COLS} FROM system_settings WHERE key = $1", key)
         if existing:
             set_parts = ['"value" = $1']
             args: list[Any] = [json.dumps(value)]
@@ -1925,7 +2149,13 @@ class PostgresClient:
                 "UPDATE system_settings SET " + ", ".join(set_parts) + " WHERE id = $%d" % len(args),
                 *args,
             )
-            return await self._pg_fetch_one("SELECT * FROM system_settings WHERE id = $1", existing["id"]) or existing
+            return (
+                await self._pg_fetch_one(
+                    f"SELECT {_SYSTEM_SETTING_COLS} FROM system_settings WHERE id = $1",
+                    existing["id"],
+                )
+                or existing
+            )
         await self._pg_execute(
             """INSERT INTO system_settings (id, key, value, description, updated_by)
                VALUES ($1, $2, $3::jsonb, $4, $5)""",
@@ -1935,7 +2165,9 @@ class PostgresClient:
             description,
             updated_by,
         )
-        return await self._pg_fetch_one("SELECT * FROM system_settings WHERE id = $1", setting_id) or {
+        return await self._pg_fetch_one(
+            f"SELECT {_SYSTEM_SETTING_COLS} FROM system_settings WHERE id = $1", setting_id
+        ) or {
             "id": setting_id,
             "key": key,
             "value": value,
@@ -1996,7 +2228,9 @@ class PostgresClient:
         args.extend([page_size, (page - 1) * page_size])
         n1, n2 = len(args) - 1, len(args)
         rows = await self._pg_fetch_all(
-            "SELECT * FROM audit_logs WHERE " + where_sql + " ORDER BY created_at DESC LIMIT $%d OFFSET $%d" % (n1, n2),
+            f"SELECT {_AUDIT_LOG_COLS} FROM audit_logs WHERE "
+            + where_sql
+            + " ORDER BY created_at DESC LIMIT $%d OFFSET $%d" % (n1, n2),
             *args,
         )
         return (rows or [], total)
@@ -2070,7 +2304,8 @@ class PostgresClient:
         args.extend([page_size, (page - 1) * page_size])
         n1, n2 = len(args) - 1, len(args)
         rows = await self._pg_fetch_all(
-            f"SELECT * FROM agent_audit_log WHERE {where_sql} ORDER BY created_at DESC LIMIT ${n1} OFFSET ${n2}",
+            f"SELECT {_AGENT_AUDIT_LOG_COLS} FROM agent_audit_log "
+            f"WHERE {where_sql} ORDER BY created_at DESC LIMIT ${n1} OFFSET ${n2}",
             *args,
         )
         return (rows or [], total)
@@ -2112,7 +2347,7 @@ class PostgresClient:
             )
             return result.data or []
         return await self._pg_fetch_all(
-            "SELECT * FROM outreach_queue WHERE status = $1 ORDER BY created_at DESC",
+            f"SELECT {_OUTREACH_QUEUE_COLS} FROM outreach_queue WHERE status = $1 ORDER BY created_at DESC",
             status,
         )
 
@@ -2157,7 +2392,7 @@ class PostgresClient:
                 status,
                 pending_id,
             )
-        return await self._pg_fetch_one("SELECT * FROM outreach_queue WHERE id=$1", pending_id)
+        return await self._pg_fetch_one(f"SELECT {_OUTREACH_QUEUE_COLS} FROM outreach_queue WHERE id=$1", pending_id)
 
     async def get_outreach_pending(self, pending_id: str) -> dict[str, Any] | None:
         """Get a single outreach queue entry by ID."""
@@ -2165,7 +2400,7 @@ class PostgresClient:
             client = await self._get_client()
             result = await client.table("outreach_queue").select("*").eq("id", pending_id).execute()
             return result.data[0] if result.data else None
-        return await self._pg_fetch_one("SELECT * FROM outreach_queue WHERE id=$1", pending_id)
+        return await self._pg_fetch_one(f"SELECT {_OUTREACH_QUEUE_COLS} FROM outreach_queue WHERE id=$1", pending_id)
 
     # ------------------------------------------------------------------
     # Invoices
@@ -2211,7 +2446,7 @@ class PostgresClient:
             client = await self._get_client()
             result = await client.table("invoices").select("*").eq("id", invoice_id).limit(1).execute()
             return result.data[0] if result.data else None
-        return await self._pg_fetch_one("SELECT * FROM invoices WHERE id = $1", invoice_id)
+        return await self._pg_fetch_one(f"SELECT {_INVOICE_COLS} FROM invoices WHERE id = $1", invoice_id)
 
     async def update_invoice(self, invoice_id: str, update_data: dict[str, Any]) -> dict[str, Any]:
         """Update an invoice."""
@@ -2269,7 +2504,7 @@ class PostgresClient:
             client = await self._get_client()
             result = await client.table("invoices").select("*").eq("offer_id", offer_id).limit(1).execute()
             return result.data[0] if result.data else None
-        return await self._pg_fetch_one("SELECT * FROM invoices WHERE offer_id = $1", offer_id)
+        return await self._pg_fetch_one(f"SELECT {_INVOICE_COLS} FROM invoices WHERE offer_id = $1", offer_id)
 
     async def get_invoice_for_offer(self, user_id: str, offer_id: str) -> dict[str, Any] | None:
         """Get the invoice for a specific offer and user (via payment_splits)."""
@@ -2386,7 +2621,7 @@ class PostgresClient:
             client = await self._get_client()
             result = await client.table("payments").select("*").eq("id", payment_id).limit(1).execute()
             return result.data[0] if result.data else None
-        return await self._pg_fetch_one("SELECT * FROM payments WHERE id = $1", payment_id)
+        return await self._pg_fetch_one(f"SELECT {_PAYMENT_COLS} FROM payments WHERE id = $1", payment_id)
 
     async def update_payment(self, payment_id: str, update_data: dict[str, Any]) -> dict[str, Any]:
         """Update a payment record."""
@@ -2425,7 +2660,7 @@ class PostgresClient:
             return result.data or []
         return (
             await self._pg_fetch_all(
-                "SELECT * FROM payments WHERE user_id = $1 ORDER BY created_at DESC",
+                f"SELECT {_PAYMENT_COLS} FROM payments WHERE user_id = $1 ORDER BY created_at DESC",
                 user_id,
             )
             or []
@@ -2437,7 +2672,9 @@ class PostgresClient:
             client = await self._get_client()
             result = await client.table("payments").select("*").eq("transaction_id", transaction_id).limit(1).execute()
             return result.data[0] if result.data else None
-        return await self._pg_fetch_one("SELECT * FROM payments WHERE transaction_id = $1", transaction_id)
+        return await self._pg_fetch_one(
+            f"SELECT {_PAYMENT_COLS} FROM payments WHERE transaction_id = $1", transaction_id
+        )
 
     # ------------------------------------------------------------------
     # Payment Splits
@@ -2471,7 +2708,7 @@ class PostgresClient:
             return result.data or []
         return (
             await self._pg_fetch_all(
-                "SELECT * FROM payment_splits WHERE invoice_id = $1",
+                f"SELECT {_PAYMENT_SPLIT_COLS} FROM payment_splits WHERE invoice_id = $1",
                 payment_id,
             )
             or []
@@ -2552,7 +2789,11 @@ class PostgresClient:
             conditions.append("status = $%d" % len(args))
         where = " AND ".join(conditions) if conditions else "1=1"
         return (
-            await self._pg_fetch_all(f"SELECT * FROM credit_awards WHERE {where} ORDER BY created_at DESC", *args) or []
+            await self._pg_fetch_all(
+                f"SELECT {_CREDIT_AWARD_COLS} FROM credit_awards WHERE {where} ORDER BY created_at DESC",
+                *args,
+            )
+            or []
         )
 
     async def update_credit_award(self, award_id: str, update_data: dict[str, Any]) -> dict[str, Any]:
@@ -2572,7 +2813,7 @@ class PostgresClient:
             "UPDATE credit_awards SET " + ", ".join(set_parts) + f" WHERE id = ${len(args)}",
             *args,
         )
-        return await self._pg_fetch_one("SELECT * FROM credit_awards WHERE id = $1", award_id) or {
+        return await self._pg_fetch_one(f"SELECT {_CREDIT_AWARD_COLS} FROM credit_awards WHERE id = $1", award_id) or {
             "id": award_id,
             **update_data,
         }
@@ -2668,7 +2909,8 @@ class PostgresClient:
             return result.data or []
         return (
             await self._pg_fetch_all(
-                "SELECT * FROM agent_metrics WHERE agent_name = $1 ORDER BY recorded_at DESC LIMIT $2",
+                f"SELECT {_AGENT_METRIC_COLS} FROM agent_metrics "
+                "WHERE agent_name = $1 ORDER BY recorded_at DESC LIMIT $2",
                 agent_name,
                 limit,
             )
@@ -2725,7 +2967,7 @@ class PostgresClient:
         args.extend([limit, offset])
         n1, n2 = len(args) - 1, len(args)
         rows = await self._pg_fetch_all(
-            f"SELECT * FROM pending_agent_decisions WHERE status = $1{extra} "
+            f"SELECT {_PENDING_DECISION_COLS} FROM pending_agent_decisions WHERE status = $1{extra} "
             f"ORDER BY created_at DESC LIMIT ${n1} OFFSET ${n2}",
             *args,
         )
@@ -2752,10 +2994,10 @@ class PostgresClient:
             "UPDATE pending_agent_decisions SET " + ", ".join(set_parts) + f" WHERE id = ${len(args)}",
             *args,
         )
-        return await self._pg_fetch_one("SELECT * FROM pending_agent_decisions WHERE id = $1", decision_id) or {
-            "id": decision_id,
-            **update_data,
-        }
+        return await self._pg_fetch_one(
+            f"SELECT {_PENDING_DECISION_COLS} FROM pending_agent_decisions WHERE id = $1",
+            decision_id,
+        ) or {"id": decision_id, **update_data}
 
     async def get_pending_decision(self, decision_id: str) -> dict[str, Any] | None:
         """Fetch a single pending decision by ID."""
@@ -2763,7 +3005,10 @@ class PostgresClient:
             client = await self._get_client()
             result = await client.table("pending_agent_decisions").select("*").eq("id", decision_id).execute()
             return result.data[0] if result.data else None
-        return await self._pg_fetch_one("SELECT * FROM pending_agent_decisions WHERE id = $1", decision_id)
+        return await self._pg_fetch_one(
+            f"SELECT {_PENDING_DECISION_COLS} FROM pending_agent_decisions WHERE id = $1",
+            decision_id,
+        )
 
     async def get_agent_system_prompt(self, agent_name: str) -> str | None:
         """Load an agent's system prompt override from system_settings (key: agent_prompt_{name})."""
@@ -2784,6 +3029,218 @@ class PostgresClient:
             if isinstance(val, dict) and "v" in val:
                 return str(val["v"])
         return None
+
+    # ------------------------------------------------------------------
+    # Outbox / messaging
+    # ------------------------------------------------------------------
+
+    async def insert_outbox_event(
+        self,
+        routing_key: str,
+        event_name: str,
+        payload: dict[str, Any],
+        idempotency_key: str | None = None,
+        conn: Any | None = None,
+    ) -> str | None:
+        row = await self._pg_fetch_one(
+            "INSERT INTO outbox_events (routing_key, event_name, payload, idempotency_key, status)"
+            " VALUES ($1, $2, $3::jsonb, $4, 'pending') RETURNING id",
+            routing_key,
+            event_name,
+            json.dumps(payload),
+            idempotency_key,
+        )
+        return str(row["id"]) if row else None
+
+    async def fetch_pending_outbox_events(self, limit: int = 50) -> list[dict[str, Any]]:
+        rows = await self._pg_fetch_all(
+            f"SELECT {_OUTBOX_EVENT_COLS} FROM outbox_events WHERE status = 'pending' ORDER BY created_at LIMIT $1",
+            limit,
+        )
+        return [dict(r) for r in rows]
+
+    # ------------------------------------------------------------------
+    # Notifications
+    # ------------------------------------------------------------------
+
+    async def list_notifications(
+        self,
+        user_id: str,
+        limit: int = 50,
+        offset: int = 0,
+        unread_only: bool = False,
+    ) -> tuple[list[dict[str, Any]], int]:
+        where = "user_id = $1" + (" AND read = FALSE" if unread_only else "")
+        rows = await self._pg_fetch_all(
+            f"SELECT {_NOTIFICATION_COLS} FROM notifications WHERE {where} ORDER BY created_at DESC LIMIT $2 OFFSET $3",
+            user_id,
+            limit,
+            offset,
+        )
+        count_row = await self._pg_fetch_one(f"SELECT COUNT(*) AS n FROM notifications WHERE {where}", user_id)
+        total = int(count_row["n"]) if count_row else 0
+        return [dict(r) for r in rows], total
+
+    async def get_unread_notification_count(self, user_id: str) -> int:
+        row = await self._pg_fetch_one(
+            "SELECT COUNT(*) AS n FROM notifications WHERE user_id = $1 AND read = FALSE", user_id
+        )
+        return int(row["n"]) if row else 0
+
+    async def mark_all_notifications_read(self, user_id: str) -> None:
+        await self._pg_execute(
+            "UPDATE notifications SET read = TRUE, read_at = NOW() WHERE user_id = $1 AND read = FALSE",
+            user_id,
+        )
+
+    async def mark_notification_read(self, notification_id: str, user_id: str) -> bool:
+        row = await self._pg_fetch_one(
+            "UPDATE notifications SET read = TRUE, read_at = NOW() WHERE id = $1 AND user_id = $2 RETURNING id",
+            notification_id,
+            user_id,
+        )
+        return row is not None
+
+    # ------------------------------------------------------------------
+    # Payments — additional helpers
+    # ------------------------------------------------------------------
+
+    async def list_payments_for_user_paginated(
+        self,
+        user_id: str,
+        page: int = 1,
+        page_size: int = 20,
+        status: str | None = None,
+    ) -> tuple[list[dict[str, Any]], int]:
+        offset = (page - 1) * page_size
+        args: list[Any] = [user_id]
+        where = "user_id = $1"
+        if status:
+            args.append(status)
+            where += f" AND status = ${len(args)}"
+        rows = await self._pg_fetch_all(
+            f"SELECT {_PAYMENT_COLS} FROM payments WHERE {where}"
+            f" ORDER BY created_at DESC LIMIT ${len(args) + 1} OFFSET ${len(args) + 2}",
+            *args,
+            page_size,
+            offset,
+        )
+        count_row = await self._pg_fetch_one(f"SELECT COUNT(*) AS n FROM payments WHERE {where}", *args)
+        total = int(count_row["n"]) if count_row else 0
+        return [dict(r) for r in rows], total
+
+    async def list_invoices_for_contractor(self, contractor_id: str) -> list[dict[str, Any]]:
+        rows = await self._pg_fetch_all(
+            f"SELECT {_INVOICE_COLS} FROM invoices WHERE contractor_id = $1 ORDER BY created_at DESC",
+            contractor_id,
+        )
+        return [dict(r) for r in rows]
+
+    async def get_payment_by_idempotency_key(self, user_id: str, key: str) -> dict[str, Any] | None:
+        row = await self._pg_fetch_one(
+            f"SELECT {_PAYMENT_COLS} FROM payments WHERE user_id = $1 AND idempotency_key = $2 LIMIT 1",
+            user_id,
+            key,
+        )
+        return dict(row) if row else None
+
+    async def count_succeeded_payments_for_invoice(self, invoice_id: str) -> int:
+        row = await self._pg_fetch_one(
+            "SELECT COUNT(*) AS n FROM payments WHERE invoice_id = $1 AND status = 'succeeded'",
+            invoice_id,
+        )
+        return int(row["n"]) if row else 0
+
+    async def try_claim_stripe_webhook_event(self, event_id: str) -> bool:
+        """Insert idempotency record; returns False if the event was already processed."""
+        try:
+            await self._pg_execute(
+                "INSERT INTO stripe_webhook_events (event_id, processed_at) VALUES ($1, NOW())",
+                event_id,
+            )
+            return True
+        except Exception:
+            return False
+
+    async def update_payment_and_invoice_for_webhook(
+        self,
+        payment_id: str,
+        invoice_id: str | None,
+        payment_status: str,
+        invoice_status: str | None,
+    ) -> None:
+        await self._pg_execute(
+            "UPDATE payments SET status = $1, updated_at = NOW() WHERE id = $2",
+            payment_status,
+            payment_id,
+        )
+        if invoice_id and invoice_status:
+            await self._pg_execute(
+                "UPDATE invoices SET status = $1, updated_at = NOW() WHERE id = $2",
+                invoice_status,
+                invoice_id,
+            )
+
+    # ------------------------------------------------------------------
+    # Contractor verification
+    # ------------------------------------------------------------------
+
+    async def upsert_contractor_verification(
+        self,
+        contractor_id: str,
+        source: str,
+        verified: bool,
+        confidence: float,
+        raw_response: dict[str, Any],
+    ) -> None:
+        await self._pg_execute(
+            "INSERT INTO contractor_verification_metadata"
+            " (contractor_id, source, verified, confidence, raw_response, verified_at)"
+            " VALUES ($1, $2, $3, $4, $5::jsonb, NOW())"
+            " ON CONFLICT (contractor_id, source)"
+            " DO UPDATE SET verified = EXCLUDED.verified,"
+            "               confidence = EXCLUDED.confidence,"
+            "               raw_response = EXCLUDED.raw_response,"
+            "               verified_at = NOW()",
+            contractor_id,
+            source,
+            verified,
+            confidence,
+            json.dumps(raw_response),
+        )
+
+    # ------------------------------------------------------------------
+    # CRM external refs
+    # ------------------------------------------------------------------
+
+    async def get_crm_external_ref(self, entity_type: str, entity_id: str) -> dict[str, Any] | None:
+        row = await self._pg_fetch_one(
+            f"SELECT {_CRM_EXTERNAL_REF_COLS} FROM crm_external_refs WHERE entity_type = $1 AND entity_id = $2 LIMIT 1",
+            entity_type,
+            entity_id,
+        )
+        return dict(row) if row else None
+
+    async def upsert_crm_external_ref(
+        self,
+        entity_type: str,
+        entity_id: str,
+        crm_entity_type: str,
+        crm_id: str,
+    ) -> None:
+        await self._pg_execute(
+            "INSERT INTO crm_external_refs"
+            " (entity_type, entity_id, crm_entity_type, crm_id, updated_at)"
+            " VALUES ($1, $2, $3, $4, NOW())"
+            " ON CONFLICT (entity_type, entity_id)"
+            " DO UPDATE SET crm_entity_type = EXCLUDED.crm_entity_type,"
+            "               crm_id = EXCLUDED.crm_id,"
+            "               updated_at = NOW()",
+            entity_type,
+            entity_id,
+            crm_entity_type,
+            crm_id,
+        )
 
     async def health_check(self) -> bool:
         """Check if PostgreSQL is accessible."""

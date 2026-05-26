@@ -17,6 +17,7 @@ import { useTranslations } from 'next-intl';
 import { useState, useMemo } from 'react';
 
 import { ContractorTrustBadge } from '@/components/features/ContractorTrustBadge';
+import { ContractorReviewsList } from '@/components/shared/ContractorReviewsList';
 import { apiClient } from '@/lib/api/client';
 import { cn } from '@/lib/utils/cn';
 
@@ -197,6 +198,17 @@ function ContractorCard({ contractor }: { contractor: ContractorWithScore }) {
           )}
         </div>
       )}
+
+      {/* Reviews — load on demand when the card is expanded so the list
+          page doesn't N+1 every contractor row. */}
+      {expanded && contractor.id ? (
+        <div className="mt-4 border-t border-gray-50 pt-4">
+          <h4 className="text-sm font-bold text-gray-900 mb-3">
+            {t('reviewsHeading')}
+          </h4>
+          <ContractorReviewsList contractorId={contractor.id} limit={5} />
+        </div>
+      ) : null}
 
       {/* Actions */}
       <div className="flex gap-3 mt-4 pt-4 border-t border-gray-50">

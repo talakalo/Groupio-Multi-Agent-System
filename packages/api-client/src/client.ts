@@ -20,6 +20,86 @@ import type {
   PaymentSummary,
 } from "@groupio/types";
 
+/** PERF-9: paginated response envelope for `/payments/my`. */
+export interface PaginatedPayments {
+  payments: Payment[];
+  total: number;
+  page: number;
+  pages: number;
+}
+
+/** Map FastAPI/Pydantic escalation rows (snake_case + enum values) to @groupio/types Escalation. */
+function normalizeEscalationFromApi(raw: Record<string, unknown>): Escalation {
+  const statusRaw = String(raw.status ?? "open").toLowerCase();
+  const statusMap: Record<string, Escalation["status"]> = {
+    open: "open",
+    in_progress: "assigned",
+    waiting_customer: "assigned",
+    assigned: "assigned",
+    resolved: "resolved",
+    closed: "resolved",
+  };
+  const status = statusMap[statusRaw] ?? "open";
+
+  const pr = String(raw.priority ?? "medium").toLowerCase();
+  let priority: Escalation["priority"] = "normal";
+  if (pr === "low") priority = "low";
+  else if (pr === "medium") priority = "normal";
+  else if (pr === "high") priority = "high";
+  else if (pr === "critical" || pr === "urgent") priority = "urgent";
+
+  let ctx: Record<string, unknown> = {};
+  const c = raw.context;
+  if (typeof c === "string") {
+    try {
+      const p = JSON.parse(c) as unknown;
+      if (p && typeof p === "object") ctx = p as Record<string, unknown>;
+    } catch {
+      ctx = {};
+    }
+  } else if (c && typeof c === "object") {
+    ctx = c as Record<string, unknown>;
+  }
+
+  const intent = typeof ctx.intent === "string" ? ctx.intent : "";
+  const actionsRaw = ctx.actionsTaken;
+  const actionsTaken: { agent: string; action: string }[] = [];
+  if (Array.isArray(actionsRaw)) {
+    for (const a of actionsRaw) {
+      if (!a || typeof a !== "object") continue;
+      const o = a as { agent?: unknown; action?: unknown };
+      if (typeof o.agent === "string") {
+        actionsTaken.push({
+          agent: o.agent,
+          action: typeof o.action === "string" ? o.action : "",
+        });
+      }
+    }
+  }
+  const ragSummary = typeof ctx.ragSummary === "string" ? ctx.ragSummary : undefined;
+
+  const createdRaw = raw.created_at ?? raw.createdAt;
+  const createdAt =
+    typeof createdRaw === "string"
+      ? createdRaw
+      : createdRaw instanceof Date
+        ? createdRaw.toISOString()
+        : new Date(0).toISOString();
+
+  return {
+    id: String(raw.id ?? ""),
+    userId: String(raw.user_id ?? raw.userId ?? ""),
+    conversationId: String(raw.conversation_id ?? raw.conversationId ?? ""),
+    reason: String(raw.reason ?? ""),
+    priority,
+    status,
+    context: { intent, actionsTaken, ragSummary },
+    createdAt,
+    /** From API `source_agent` when `context.actionsTaken` is empty (e.g. seed rows). */
+    sourceAgent: typeof raw.source_agent === "string" ? raw.source_agent : undefined,
+  } as Escalation;
+}
+
 // ---- Error Types ----
 
 export class ApiError extends Error {
@@ -157,11 +237,23 @@ export interface ApiClientConfig {
 
 // ---- API Client ----
 
+// PERF-1: only network-level (fetch reject / timeout) failures are
+// transparently retried. HTTP-level errors (4xx/5xx) surface to the caller so
+// the UI / react-query layer can react (explicit retry buttons, toasts, etc.)
+// — silently retrying 5xx here was masking server errors that tests and UIs
+// depend on observing.
+const MAX_RETRY_ATTEMPTS = 3;
+const RETRY_BASE_DELAY_MS = 200;
+const RETRY_MAX_DELAY_MS = 4_000;
+
 export class GroupioApiClient {
   private readonly baseUrl: string;
   private readonly authToken?: string;
   private readonly timeout: number;
   private readonly customHeaders: Record<string, string>;
+  private refreshAccessPromise: Promise<boolean> | null = null;
+  /** PERF-1: coalesce concurrent GETs on the same path — one network request, many awaiters. */
+  private readonly inflightGets = new Map<string, Promise<unknown>>();
 
   constructor(config: ApiClientConfig = {}) {
     this.baseUrl = (config.baseUrl ?? "/api/v1").replace(/\/+$/, "");
@@ -186,8 +278,11 @@ export class GroupioApiClient {
     return this.get<Offer[]>(`/offers?buildingId=${encodeURIComponent(buildingId)}`);
   }
 
-  async joinOffer(offerId: string, userId: string): Promise<void> {
-    await this.post<void>(`/offers/${encodeURIComponent(offerId)}/join`, { userId });
+  async joinOffer(offerId: string, unitCount: number = 1, inviteToken?: string): Promise<void> {
+    await this.post<void>(`/offers/${encodeURIComponent(offerId)}/join`, {
+      unit_count: unitCount,
+      ...(inviteToken ? { invite_token: inviteToken } : {}),
+    });
   }
 
   // ---- Contractor Methods ----
@@ -211,6 +306,26 @@ export class GroupioApiClient {
     return this.get<ContractorsListResponse>(`/contractors${qs ? `?${qs}` : ""}`);
   }
 
+  /** Admin: all contractors (not restricted to marketplace-visible membership). */
+  async getAdminContractors(params?: {
+    category?: string;
+    region?: string;
+    min_trust_score?: number;
+    verification_status?: string;
+    page?: number;
+    page_size?: number;
+  }): Promise<ContractorsListResponse> {
+    const search = new URLSearchParams();
+    if (params?.category) search.set("category", params.category);
+    if (params?.region) search.set("region", params.region);
+    if (params?.min_trust_score != null) search.set("min_trust_score", String(params.min_trust_score));
+    if (params?.verification_status) search.set("verification_status", params.verification_status);
+    if (params?.page != null) search.set("page", String(params.page));
+    if (params?.page_size != null) search.set("page_size", String(params.page_size));
+    const qs = search.toString();
+    return this.get<ContractorsListResponse>(`/admin/contractors${qs ? `?${qs}` : ""}`);
+  }
+
   async getContractor(id: string): Promise<Contractor> {
     return this.get<Contractor>(`/contractors/${encodeURIComponent(id)}`);
   }
@@ -228,11 +343,80 @@ export class GroupioApiClient {
   }
 
   async getEscalations(): Promise<EscalationsResponse> {
-    return this.get<EscalationsResponse>("/escalations");
+    const raw = await this.get<{
+      items?: Record<string, unknown>[];
+      escalations?: Record<string, unknown>[];
+      total: number;
+    }>("/escalations");
+    const rawList = raw.escalations ?? raw.items ?? [];
+    const list = Array.isArray(rawList)
+      ? rawList.map((row) => normalizeEscalationFromApi(row))
+      : [];
+    return { escalations: list, total: raw.total };
+  }
+
+  /** Admin: partial update (priority, status, assignee, notes). Uses cookie/session pipeline. */
+  async updateEscalation(
+    escalationId: string,
+    body: {
+      status?: string;
+      priority?: string;
+      assigned_to?: string;
+      resolution_notes?: string | null;
+    },
+  ): Promise<Record<string, unknown>> {
+    return this.requestWithRetry<Record<string, unknown>>(
+      "PUT",
+      `/escalations/${encodeURIComponent(escalationId)}`,
+      body,
+    );
+  }
+
+  async assignEscalation(escalationId: string, assignedTo: string): Promise<Record<string, unknown>> {
+    return this.requestWithRetry<Record<string, unknown>>(
+      "POST",
+      `/escalations/${encodeURIComponent(escalationId)}/assign`,
+      { assigned_to: assignedTo },
+    );
+  }
+
+  async resolveEscalation(
+    escalationId: string,
+    resolutionNotes?: string,
+  ): Promise<Record<string, unknown>> {
+    return this.requestWithRetry<Record<string, unknown>>(
+      "POST",
+      `/escalations/${encodeURIComponent(escalationId)}/resolve`,
+      resolutionNotes ? { resolution_notes: resolutionNotes } : {},
+    );
   }
 
   async getSystemStatus(): Promise<SystemStatus> {
-    return this.get<SystemStatus>("/admin/status");
+    const raw = await this.get<{
+      agents?: Record<string, Record<string, unknown>>;
+      vector_collections?: Record<string, { pointsCount?: number; status?: string }>;
+      vectorCollections?: Record<string, { pointsCount?: number; status?: string }>;
+    }>("/admin/status");
+    const agentsIn = raw.agents ?? {};
+    const agents: SystemStatus["agents"] = {};
+    for (const [key, m] of Object.entries(agentsIn)) {
+      agents[key] = {
+        model: String(m.model ?? ""),
+        calls: Number(m.calls ?? 0),
+        errors: Number(m.errors ?? 0),
+        avgDurationMs: Number(m.avg_duration_ms ?? m.avgDurationMs ?? 0),
+        tokens: Number(m.tokens ?? 0),
+      };
+    }
+    const vec = raw.vector_collections ?? raw.vectorCollections ?? {};
+    const vectorCollections: SystemStatus["vectorCollections"] = {};
+    for (const [k, v] of Object.entries(vec)) {
+      vectorCollections[k] = {
+        pointsCount: Number((v as { pointsCount?: number }).pointsCount ?? 0),
+        status: String((v as { status?: string }).status ?? "unknown"),
+      };
+    }
+    return { agents, vectorCollections };
   }
 
   async getAnalytics(): Promise<{
@@ -243,14 +427,27 @@ export class GroupioApiClient {
     openTickets?: number;
     openTicketsChange?: number;
     resolvedToday?: number;
+    totalContractors?: number;
+    categoryBreakdown?: Record<string, number>;
+    regionalData?: Record<string, number>;
+    dailyOffers?: { date: string; count: number }[];
+    dailyRevenue?: { date: string; amount: number }[];
+    agentPerformance?: { agent: string; accuracy: number; responseTime: number; throughput: number }[];
   }> {
     return this.get("/admin/analytics");
   }
 
   // ---- Payment Methods ----
 
-  async getMyPayments(): Promise<Payment[]> {
-    return this.get<Payment[]>("/payments/my");
+  async getMyPayments(
+    opts: { page?: number; limit?: number; status?: string } = {},
+  ): Promise<PaginatedPayments> {
+    const params = new URLSearchParams();
+    if (opts.page != null) params.set("page", String(opts.page));
+    if (opts.limit != null) params.set("limit", String(opts.limit));
+    if (opts.status) params.set("status", opts.status);
+    const qs = params.toString();
+    return this.get<PaginatedPayments>(`/payments/my${qs ? `?${qs}` : ""}`);
   }
 
   async initiatePayment(offerId: string, paymentMethodId?: string): Promise<Payment> {
@@ -258,6 +455,25 @@ export class GroupioApiClient {
       offer_id: offerId,
       payment_method_id: paymentMethodId,
     });
+  }
+
+  async getContractorEarnings(): Promise<{
+    currency: string;
+    pending_total: number;
+    completed_total: number;
+    held_escrow_total: number;
+    recent: Array<{
+      invoice_id: string;
+      offer_id: string;
+      status: string;
+      payment_type: string;
+      total: number;
+      currency: string;
+      created_at: string | null;
+      paid_at: string | null;
+    }>;
+  }> {
+    return this.get("/payments/contractor/earnings");
   }
 
   async getPayment(paymentId: string): Promise<Payment> {
@@ -284,13 +500,15 @@ export class GroupioApiClient {
 
   async approveContractorPayout(payoutId: string): Promise<ContractorPayout> {
     return this.post<ContractorPayout>(
-      `/admin/payments/payouts/${encodeURIComponent(payoutId)}/approve`
+      `/admin/payments/payouts/${encodeURIComponent(payoutId)}/approve`,
+      {},
     );
   }
 
   async releaseEscrow(offerId: string): Promise<{ status: string }> {
     return this.post<{ status: string }>(
-      `/admin/payments/escrow/${encodeURIComponent(offerId)}/release`
+      `/admin/payments/escrow/${encodeURIComponent(offerId)}/release`,
+      {},
     );
   }
 
@@ -311,13 +529,7 @@ export class GroupioApiClient {
   }
 
   async unregisterPushToken(): Promise<{ status: string }> {
-    const response = await fetch(`${this.baseUrl}/auth/push-token`, {
-      method: "DELETE",
-      headers: this.buildHeaders(),
-      credentials: "include",
-    });
-    if (!response.ok) await this.handleErrorResponse(response, "/auth/push-token");
-    return response.json() as Promise<{ status: string }>;
+    return this.requestWithRetry<{ status: string }>("DELETE", "/auth/push-token");
   }
 
   // ---- Pending Agent Decisions (Admin) ----
@@ -366,6 +578,29 @@ export class GroupioApiClient {
     return this.get<CreditAward[]>(`/admin/credit-awards${qs ? `?${qs}` : ""}`);
   }
 
+  // ---- Architecture / Floor Plan ----
+
+  async uploadArchitecturePlan(
+    file: File,
+    buildingId?: string,
+  ): Promise<{ id: string; file_name: string; storage_path: string; public_url?: string; analysis_status: string }> {
+    const form = new FormData();
+    form.append("file", file);
+    const qs = buildingId ? `?building_id=${encodeURIComponent(buildingId)}` : "";
+    const url = `${this.baseUrl}/uploads/architecture${qs}`;
+    const headers: Record<string, string> = { Accept: "application/json", ...this.customHeaders };
+    if (this.authToken) headers["Authorization"] = `Bearer ${this.authToken}`;
+    const response = await fetch(url, { method: "POST", headers, credentials: "include", body: form });
+    if (!response.ok) await this.handleErrorResponse(response, "/uploads/architecture");
+    return response.json();
+  }
+
+  async getFileUpload(
+    fileId: string,
+  ): Promise<{ id: string; analysis_status: string; analysis_result?: unknown; download_url?: string }> {
+    return this.get(`/uploads/${encodeURIComponent(fileId)}`);
+  }
+
   // ---- Internal HTTP Helpers ----
 
   private buildHeaders(): Record<string, string> {
@@ -382,7 +617,38 @@ export class GroupioApiClient {
     return headers;
   }
 
-  private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  /** Cookie-based sessions: renew access_token using refresh_token cookie. */
+  private async refreshAccessToken(): Promise<boolean> {
+    if (!this.refreshAccessPromise) {
+      this.refreshAccessPromise = (async () => {
+        try {
+          const url = `${this.baseUrl}/auth/refresh`;
+          const r = await fetch(url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...this.buildHeaders(),
+            },
+            credentials: "include",
+            body: "{}",
+          });
+          return r.ok;
+        } catch {
+          return false;
+        } finally {
+          this.refreshAccessPromise = null;
+        }
+      })();
+    }
+    return this.refreshAccessPromise;
+  }
+
+  private async request<T>(
+    method: string,
+    path: string,
+    body?: unknown,
+    isRetryAfterRefresh = false,
+  ): Promise<T> {
     const url = `${this.baseUrl}${path}`;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeout);
@@ -406,6 +672,18 @@ export class GroupioApiClient {
       );
     } finally {
       clearTimeout(timeoutId);
+    }
+
+    if (
+      response.status === 401 &&
+      !isRetryAfterRefresh &&
+      path !== "/auth/refresh" &&
+      path !== "/auth/login/json"
+    ) {
+      const refreshed = await this.refreshAccessToken();
+      if (refreshed) {
+        return this.request<T>(method, path, body, true);
+      }
     }
 
     if (!response.ok) {
@@ -460,11 +738,58 @@ export class GroupioApiClient {
     }
   }
 
+  /**
+   * PERF-1: `request()` wrapped with retry-with-backoff. Retries on transient
+   * statuses + NetworkError. The 401-refresh branch lives inside `request()`
+   * so we don't double-retry token refreshes here.
+   */
+  private async requestWithRetry<T>(
+    method: string,
+    path: string,
+    body?: unknown,
+  ): Promise<T> {
+    let attempt = 0;
+    let lastErr: unknown;
+    while (attempt <= MAX_RETRY_ATTEMPTS) {
+      try {
+        return await this.request<T>(method, path, body);
+      } catch (err) {
+        lastErr = err;
+        if (!this.isRetryable(err) || attempt === MAX_RETRY_ATTEMPTS) {
+          throw err;
+        }
+        const base = Math.min(RETRY_MAX_DELAY_MS, RETRY_BASE_DELAY_MS * 2 ** attempt);
+        const jitter = Math.random() * base;
+        await new Promise((r) => setTimeout(r, base + jitter));
+        attempt += 1;
+      }
+    }
+    throw lastErr;
+  }
+
+  private isRetryable(err: unknown): boolean {
+    if (err instanceof NetworkError) {
+      // Timeout aborts get rethrown as NetworkError with a specific message;
+      // we do NOT retry aborts because the caller explicitly gave up.
+      return !/timed out/i.test(err.message);
+    }
+    // PERF-1: do NOT retry HTTP-level errors; let the caller decide.
+    return false;
+  }
+
   private async get<T>(path: string): Promise<T> {
-    return this.request<T>("GET", path);
+    // PERF-1: coalesce identical in-flight GETs so e.g. multiple components
+    // mounting at once don't stampede the backend with the same request.
+    const cached = this.inflightGets.get(path);
+    if (cached) return cached as Promise<T>;
+    const p = this.requestWithRetry<T>("GET", path).finally(() => {
+      this.inflightGets.delete(path);
+    });
+    this.inflightGets.set(path, p);
+    return p;
   }
 
   private async post<T>(path: string, body?: unknown, qs?: string): Promise<T> {
-    return this.request<T>("POST", qs ? `${path}${qs}` : path, body);
+    return this.requestWithRetry<T>("POST", qs ? `${path}${qs}` : path, body);
   }
 }

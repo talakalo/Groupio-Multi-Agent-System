@@ -9,7 +9,7 @@ export interface Session {
     id: string;
     email: string;
     fullName: string;
-    role: 'resident' | 'contractor' | 'admin' | 'super_admin';
+    role: 'resident' | 'contractor' | 'admin' | 'super_admin' | 'buildings_manager';
     buildingId?: string;
     contractorId?: string;
   } | null;
@@ -114,7 +114,7 @@ export function getTokenExpiration(token: string): number | null {
  */
 export function hasRole(
   session: Session,
-  roles: Array<'resident' | 'contractor' | 'admin' | 'super_admin'>
+  roles: Array<'resident' | 'contractor' | 'admin' | 'super_admin' | 'buildings_manager'>
 ): boolean {
   if (!session.user) {
     return false;

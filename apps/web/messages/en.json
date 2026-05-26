@@ -12,7 +12,8 @@
     "search": "Search",
     "filter": "Filter",
     "share": "Share",
-    "close": "Close"
+    "close": "Close",
+    "stepOf": "Step {current} of {total}"
   },
   "auth": {
     "login": "Log In",
@@ -24,17 +25,178 @@
     "forgotPassword": "Forgot Password",
     "iAmResident": "I'm a Resident",
     "iAmContractor": "I'm a Contractor",
-    "welcome": "Welcome to Groupio"
+    "welcome": "Welcome to Groupio",
+    "nav": {
+      "howItWorks": "How It Works",
+      "offers": "Offers",
+      "login": "Log In",
+      "signupFree": "Sign Up Free"
+    },
+    "layout": {
+      "tosAgreement": "By signing in or signing up, you agree to our",
+      "terms": "Terms of Service",
+      "and": " and ",
+      "privacy": "Privacy Policy"
+    },
+    "trustBadges": {
+      "escrow": "Escrow-protected payment"
+    },
+    "loginPage": {
+      "securedBadge": "Secure & encrypted",
+      "welcomeBack": "Welcome back",
+      "welcomeSubtext": "Sign in to keep saving with your neighbors",
+      "byEmail": "Email",
+      "byPhone": "Phone",
+      "identifierRequired": "Please enter an email or phone number",
+      "identifierInvalid": "Please enter a valid email or Israeli phone number",
+      "passwordMinLength": "Password must be at least 6 characters",
+      "emailLabel": "Email address",
+      "phoneLabel": "Phone number",
+      "emailPlaceholder": "your@email.com",
+      "phonePlaceholder": "050-1234567",
+      "passwordLabel": "Password",
+      "passwordPlaceholder": "Enter your password",
+      "forgotPassword": "Forgot password",
+      "rememberMe": "Remember me",
+      "submitBtn": "Log In",
+      "submitting": "Signing in...",
+      "noAccount": "Don't have an account?",
+      "signupFree": "Sign up free for Groupio",
+      "errorEmailNotVerified": "Email not verified. Check your inbox or resend the verification link.",
+      "errorWrongCredentials": "Incorrect email or password. Please try again.",
+      "errorDbUnavailable": "Database unavailable. Please try again later.",
+      "errorServer": "Cannot connect to the server. Ensure the API (port 8000) and database are running.",
+      "errorGeneric": "Sign-in failed. Please try again.",
+      "verificationSent": "Verification link sent. Check your inbox.",
+      "resendFailed": "Failed to resend link. Please try again later.",
+      "resending": "Sending...",
+      "resendVerification": "Resend verification link"
+    },
+    "signupPage": {
+      "joinBadge": "Join thousands of neighbors already saving",
+      "title": "Join Groupio",
+      "subtext": "Start saving with your neighbors",
+      "stepRole": "Choose role",
+      "stepDetails": "Your details",
+      "continueBtn": "Continue",
+      "nameRequired": "Please enter your full name (at least 2 characters)",
+      "emailInvalid": "Please enter a valid email address",
+      "phoneInvalid": "Please enter a valid Israeli phone number (e.g. 0501234567)",
+      "passwordLength": "Password must be at least 8 characters",
+      "passwordUppercase": "Password must include at least one uppercase letter",
+      "passwordNumber": "Password must include at least one number",
+      "roleResidentTitle": "Resident",
+      "roleResidentDesc": "I live in a building and want to join group offers",
+      "roleResidentFeature1": "Access group offers",
+      "roleResidentFeature2": "Smart AI contractor matching",
+      "roleResidentFeature3": "Savings tracking",
+      "roleContractorTitle": "Contractor",
+      "roleContractorDesc": "I am a contractor offering services to buildings",
+      "roleContractorFeature1": "Proven demand access",
+      "roleContractorFeature2": "Quote management",
+      "roleContractorFeature3": "Exposure to new residents",
+      "roleManagerTitle": "Building Manager",
+      "roleManagerDesc": "I manage a building and want to oversee it on Groupio",
+      "roleManagerFeature1": "Resident & committee management",
+      "roleManagerFeature2": "Maintenance request tracking",
+      "roleManagerFeature3": "Reports and insights",
+      "fullNameLabel": "Full name",
+      "fullNamePlaceholder": "Jane Doe",
+      "emailLabel": "Email address",
+      "phoneLabel": "Phone number",
+      "phonePlaceholder": "0501234567",
+      "passwordLabel": "Password",
+      "passwordPlaceholder": "At least 8 chars, uppercase and number",
+      "buildingCodeLabel": "Building code (optional)",
+      "buildingCodePlaceholder": "Enter building code if provided by committee",
+      "tosText": "I agree to the",
+      "tosLink": "Terms of Service",
+      "and": " and ",
+      "privacyLink": "Privacy Policy",
+      "backBtn": "Back",
+      "signingUp": "Signing up...",
+      "signupBtn": "Sign Up",
+      "alreadyHaveAccount": "Already have an account?",
+      "loginExisting": "Sign in to existing account",
+      "errorConnection": "Cannot connect to the server. Check your connection and try again.",
+      "errorUnavailable": "Service unavailable right now.",
+      "errorServer": "A server error occurred.",
+      "errorTooManyRequests": "Too many attempts.",
+      "errorEmailExists": "This email is already registered.",
+      "errorGeneric": "Sign-up failed."
+    }
+  },
+  "forgotPassword": {
+    "title": "Forgot Password",
+    "subtitle": "Enter your email address and we will send you a password reset link.",
+    "emailLabel": "Email Address",
+    "sendButton": "Send Reset Link",
+    "sending": "Sending...",
+    "backToLogin": "Back to Login",
+    "tooManyRequests": "Too many requests. Please wait a few minutes and try again.",
+    "successTitle": "Check your inbox",
+    "successMessage": "If this email address exists in our system, a reset link will be sent within a few minutes.",
+    "successSpamNote": "Check your spam folder too. The link is valid for one hour.",
+    "backToLoginButton": "Back to Login",
+    "emailValidation": "Please enter a valid email address"
+  },
+  "resetPassword": {
+    "title": "Reset Password",
+    "subtitle": "Enter a new password for your account. The password must contain at least 8 characters, an uppercase letter, and a digit.",
+    "newPasswordLabel": "New Password",
+    "newPasswordPlaceholder": "At least 8 characters",
+    "confirmPasswordLabel": "Confirm Password",
+    "confirmPasswordPlaceholder": "Enter password again",
+    "submitButton": "Reset Password",
+    "resetting": "Resetting...",
+    "backToLogin": "Back to Login",
+    "requestNewLink": "Request New Link",
+    "invalidLinkTitle": "Invalid Link",
+    "invalidLinkMessage": "The reset link is missing or incorrect. Make sure you copied the full link from the email.",
+    "successTitle": "Password Reset Successfully!",
+    "successMessage": "Your password has been changed. Redirecting to login...",
+    "loginButton": "Log In",
+    "loading": "Loading...",
+    "errorExpired": "The link has expired or is invalid. Request a new reset link.",
+    "errorTooManyAttempts": "Too many attempts. Please wait a few minutes and try again.",
+    "errorGeneral": "An error occurred. Please try again later.",
+    "validationMinLength": "Password must be at least 8 characters",
+    "validationUppercase": "Password must include at least one uppercase letter",
+    "validationDigit": "Password must include at least one digit",
+    "validationMismatch": "Passwords do not match",
+    "invalidLinkRef": "Request New Link"
+  },
+  "verifyEmail": {
+    "pendingTitle": "Verifying your email...",
+    "pendingSubtitle": "Please wait",
+    "successTitle": "Email verified successfully",
+    "successMessage": "You can now log in to your account",
+    "proceedToLogin": "Proceed to Login",
+    "errorTitle": "Verification failed",
+    "invalidToken": "Invalid verification link.",
+    "defaultError": "Verification error. Please try again or request a new link.",
+    "backToLogin": "Back to Login",
+    "resendLink": "Resend Verification Link",
+    "loading": "Loading..."
   },
   "residentNav": {
     "dashboard": "Dashboard",
     "offers": "Offers",
     "contractors": "Contractors",
+    "architecture": "My Home Plan",
     "building": "Building",
     "profile": "Profile",
-    "payments": "Payments",
     "aiAssistant": "AI Assistant",
-    "myAccount": "My Account"
+    "myAccount": "My Account",
+    "payments": "Payments",
+    "orders": "My Orders",
+    "myAccountHint": "Profile, notifications & preferences",
+    "accountMenu": "Account menu",
+    "logout": "Log out",
+    "verifyEmailBanner": "Please verify your email address. Check your inbox and click the verification link.",
+    "resendVerification": "Resend Verification Link",
+    "resendSending": "Sending...",
+    "resendSent": "Sent! Check your email."
   },
   "contractorNav": {
     "dashboard": "Dashboard",
@@ -44,7 +206,14 @@
     "profile": "Profile",
     "contractorBadge": "Contractor",
     "newOffer": "New Offer",
-    "myBusiness": "My Business"
+    "myBusiness": "My Business",
+    "logout": "Log out",
+    "verifyEmailBanner": "Please verify your email address. Check your inbox and click the verification link.",
+    "resendVerification": "Resend Verification Link",
+    "resendSending": "Sending...",
+    "resendSent": "Sent! Check your email.",
+    "accountMenu": "Account menu",
+    "earnings": "Earnings"
   },
   "dashboard": {
     "welcome": "Hello, {name}!",
@@ -65,7 +234,23 @@
     "noActiveOffers": "No active offers",
     "browseOffers": "Browse Offers",
     "recentActivity": "Recent Activity",
-    "noRecentActivity": "No recent activity"
+    "noRecentActivity": "No recent activity",
+    "noBuilding": {
+      "title": "Welcome to Groupio!",
+      "description": "You haven't joined a building yet. Join your building to access group offers.",
+      "action": "Join a Building"
+    },
+    "messages": "Messages",
+    "contractorInquiries": "Contractor Inquiries",
+    "upcomingInstallations": "Upcoming Installations",
+    "documentsOffers": "Documents & Offers",
+    "recentCommunications": "Recent Communications",
+    "startChat": "Start Chat",
+    "upcoming": "Upcoming",
+    "noUpcoming": "No upcoming installations",
+    "popularOffers": "Popular Offers",
+    "errorLoadingActivity": "Error loading activity",
+    "view": "View"
   },
   "offers": {
     "title": "Offers",
@@ -99,7 +284,73 @@
     "noLimit": "No Limit",
     "noOffersDescription": "No offers match your search",
     "errorLoadingOffers": "Error loading offers. Please try again.",
-    "retry": "Retry"
+    "retry": "Retry",
+    "home": "Home",
+    "tierLevel": "Tier {level}",
+    "currentTier": "Current Tier",
+    "residents": "residents",
+    "participantsLabel": "Joined",
+    "daysRemaining": "Days Left",
+    "currentDiscount": "Current Discount",
+    "shareText": "Join the group offer for {category} and save more!",
+    "linkCopied": "Link copied!",
+    "linkCopiedDescription": "Link copied to clipboard — share with your neighbors",
+    "offerNotFound": "Offer not found",
+    "backToOffers": "Back to Offers",
+    "timeline": "Timeline",
+    "offerCreated": "Offer Created",
+    "collectingParticipants": "Collecting Participants",
+    "contractorConfirmation": "Contractor Confirmation",
+    "workBegins": "Work Begins",
+    "joining": "Joining...",
+    "joinError": "Failed to join offer. Please try again.",
+    "joinConfirmation": {
+      "title": "Confirm Joining Offer",
+      "offerLabel": "Offer:",
+      "policyTitle": "Cancellation Policy",
+      "policyFree": "You can leave the offer freely until contractor matching — no charge.",
+      "policyAfterContractor": "After a contractor is matched — cancellation via customer support only.",
+      "policyAfterPayment": "After payment — subject to refund policy.",
+      "fullTerms": "Full Terms of Use",
+      "checkboxLabel": "I have read the cancellation policy and agree to the terms",
+      "confirmButton": "Confirm Join",
+      "cancelButton": "Cancel"
+    },
+    "savings": {
+      "title": "Your Savings",
+      "currentPerUnit": "Current savings per unit",
+      "moreNeighbors": "{count} more neighbors = savings of {amount}",
+      "maxDiscount": "You've reached the highest discount level!"
+    },
+    "joinSuccess": {
+      "title": "Joined successfully!",
+      "subtitle": "To secure your spot, please complete the payment.",
+      "proceedToPayment": "Proceed to Payment"
+    },
+    "cancellationPolicy": {
+      "title": "Cancellation Policy",
+      "item1": "You can leave the offer for free until contractor matching",
+      "item2": "After contractor approval — cancellation via customer support only",
+      "item3": "After payment — subject to refund policy",
+      "fullTerms": "Full Terms of Use"
+    },
+    "shareWithNeighborsCTA": "Share with your neighbors — the more who join, the lower the price!",
+    "pricingRationale": {
+      "summary": "How was the price calculated?",
+      "defaultText": "The price was calculated by AI based on participant count, category, and market prices."
+    },
+    "joinNow": "Join Now",
+    "trustScore": "Trust Score",
+    "sortBy": "Sort by",
+    "sort": {
+      "popularity": "Popularity",
+      "new": "Newest",
+      "savings": "Savings",
+      "price": "Price"
+    },
+    "quickAll": "All",
+    "discoverOffers": "Discover Offers",
+    "clearFilterHint": "Try clearing filters to see more offers"
   },
   "contractors": {
     "title": "Contractors",
@@ -127,7 +378,8 @@
     "sortByTrust": "By Trust",
     "sortByExperience": "By Experience",
     "verifiedOnly": "Verified Only",
-    "noContractorsDescription": "No contractors match your search"
+    "noContractorsDescription": "No contractors match your search",
+    "reviewsHeading": "Reviews"
   },
   "profile": {
     "title": "Profile",
@@ -175,7 +427,32 @@
     "deleteAccountWarning": "Deleting your account is irreversible",
     "deleteAccount": "Delete Account",
     "logout": "Log Out",
-    "saved": "Saved successfully"
+    "saved": "Saved successfully",
+    "currentPasswordRequired": "Please enter your current password",
+    "passwordMinLength": "Password must be at least 8 characters",
+    "passwordUppercaseRequired": "Password must include an uppercase letter",
+    "passwordNumberRequired": "Password must include a number",
+    "passwordMismatch": "Passwords do not match",
+    "currentPasswordWrong": "Current password is incorrect",
+    "passwordUpdateFailed": "Failed to change password. Please try again.",
+    "unexpectedError": "Unexpected error. Please try again.",
+    "passwordUpdated": "Password changed successfully",
+    "passwordSaved": "Your new password has been saved.",
+    "backToProfile": "Back to profile",
+    "passwordSubtitle": "Enter your current password and new password",
+    "changing": "Changing...",
+    "changePasswordBtn": "Change password",
+    "deleteIrreversible": "⚠️ This action cannot be undone",
+    "deleteConfirmInstruction": "Type DELETE to confirm account deletion:",
+    "deleteButton": "Delete My Account",
+    "cancel": "Cancel",
+    "deleteConfirmAriaLabel": "Confirm account deletion",
+    "deleteValidationError": "Please type DELETE to confirm",
+    "deleteErrorMessage": "Error deleting account. Please try again.",
+    "input": "Enter",
+    "notificationsUnsaved": "Unsaved changes",
+    "saveFailed": "Save failed",
+    "updating": "Updating..."
   },
   "building": {
     "title": "Building",
@@ -199,7 +476,82 @@
     "city": "City",
     "buildingAge": "Building Age",
     "yearsOld": "years old",
-    "contactCommittee": "Contact Committee"
+    "contactCommittee": "Contact Committee",
+    "noBuilding": "No Building Assigned",
+    "noBuildingDescription": "Join your building to see neighbors and group offers.",
+    "joinBuilding": "Join a Building",
+    "shareTitle": "Invitation to Groupio",
+    "shareText": "Join our building on Groupio! Invite code: {code}",
+    "residents": "Residents",
+    "share": "Share",
+    "inviteCodeBadge": "Invite Code",
+    "inviteCodeHint": "Share this code with neighbors so they can join the building and receive group offers",
+    "municipalityVerified": "Municipality verified"
+  },
+  "checkout": {
+    "breadcrumbOffers": "Offers",
+    "breadcrumbPayment": "Payment",
+    "breadcrumbNav": "Navigation",
+    "loadingPayment": "Preparing secure payment...",
+    "loadingStripeForm": "Loading secure payment form...",
+    "completePayment": "Complete Payment",
+    "securityFooter": "Secured with Stripe — card details are not stored on Groupio's servers",
+    "escrowProtection": "Payment is protected in escrow (Escrow) — funds are released to the contractor only after you confirm completion of the work.",
+    "orderSummary": "Order Summary",
+    "subtotal": "Price before VAT",
+    "vat": "VAT {percent}%",
+    "total": "Total to pay",
+    "creditCardTitle": "Credit Card Payment",
+    "successTitle": "Payment successful!",
+    "successEmailNote": "You will receive a confirmation email shortly.",
+    "paid": "Paid",
+    "myOrders": "My Orders",
+    "backToOffer": "Back to Offer",
+    "shareOfferTitle": "Groupio — Join the group offer!",
+    "shareCopied": "Link copied!",
+    "shareWithNeighbors": "Share with Neighbors",
+    "moreNeighborsTip": "More neighbors = bigger discount for everyone!",
+    "errorTitle": "Payment Processing Error",
+    "errorRetry": "Try Again",
+    "errorMyPayments": "My Payments",
+    "missingOfferId": "No offer ID specified. Go back to the offers page and select an offer.",
+    "alreadyPaid": "You have already paid for this offer. You can view it in your payment history.",
+    "offerNotFound": "Offer not found. It may have ended.",
+    "unknownError": "An unknown error occurred",
+    "cannotProcess": "Payment could not be processed. Please try again.",
+    "unexpectedError": "An unexpected error occurred.",
+    "stripe": {
+      "cardError": "Card details error. Please check and try again.",
+      "paymentFailed": "Payment failed. Please try again or use a different card.",
+      "processing": "Processing payment...",
+      "confirm": "Confirm Payment",
+      "notConfiguredTitle": "Stripe payment not configured",
+      "notConfiguredDesc": "The NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY key is not set. Contact the system admin to configure Stripe."
+    }
+  },
+  "notificationPanel": {
+    "title": "Notifications",
+    "panel": "Notifications panel",
+    "markAsRead": "Mark as read",
+    "deleteNotification": "Delete notification",
+    "timeNow": "Just now",
+    "timeMinutesAgo": "{minutes} min ago",
+    "timeHoursAgo": "{hours} hr ago",
+    "networkError": "Could not load notifications",
+    "markAllError": "Could not mark all as read",
+    "markOneError": "Could not mark as read",
+    "deleteError": "Could not delete notification",
+    "clearError": "Could not clear notifications",
+    "markAllRead": "Mark all as read",
+    "markAllReadButton": "Mark all read",
+    "clearAll": "Clear all",
+    "clearAllButton": "Clear all",
+    "loginToSee": "Sign in to see notifications",
+    "loading": "Loading notifications...",
+    "retry": "Retry",
+    "empty": "No notifications yet",
+    "emptyHint": "Updates about offers and payments will appear here",
+    "count": "{count} notifications"
   },
   "contractor": {
     "dashboard": {
@@ -218,7 +570,9 @@
         "experience": "Experience",
         "reputation": "Reputation",
         "completion": "Completion",
-        "response": "Response"
+        "response": "Response",
+        "basis": "Based on license, insurance, experience, and reviews",
+        "outOf100": "out of 100"
       },
       "pendingOffers": {
         "title": "Pending Offers",
@@ -226,13 +580,15 @@
       },
       "assistant": {
         "title": "AI Assistant",
-        "placeholder": "Ask me something..."
+        "placeholder": "Ask me something...",
+        "welcomeMessage": "Hi! I'm your Groupio assistant. Ask me about offers, pricing, or how to grow your business."
       },
       "activeProjects": {
         "title": "Active Projects",
         "viewAll": "View All",
         "empty": "No active projects"
-      }
+      },
+      "newOffer": "New Offer"
     },
     "offers": {
       "create": {
@@ -241,7 +597,9 @@
         "sections": {
           "basicInfo": "Basic Info",
           "pricing": "Pricing",
-          "services": "Services & Requirements"
+          "services": "Services & Requirements",
+          "details": "Details",
+          "target": "Target & additional details"
         },
         "fields": {
           "title": "Title",
@@ -254,7 +612,8 @@
           "maxParticipants": "Max Participants",
           "includedServices": "Included Services",
           "requirements": "Requirements",
-          "validUntil": "Valid Until"
+          "validUntil": "Valid Until",
+          "timeline": "Timeline"
         },
         "placeholders": {
           "title": "Enter offer title",
@@ -262,7 +621,8 @@
           "category": "Select category",
           "region": "Select region",
           "buildingId": "Enter building ID",
-          "requirements": "Additional requirements (optional)"
+          "requirements": "Additional requirements (optional)",
+          "timeline": "e.g. 2-3 weeks after contractor approval"
         },
         "hints": {
           "basePrice": "Price per unit. More participants = lower price."
@@ -298,12 +658,71 @@
         "buttons": {
           "cancel": "Cancel",
           "create": "Create Offer",
-          "creating": "Creating..."
+          "creating": "Creating...",
+          "back": "Back",
+          "next": "Next",
+          "publish": "Publish offer"
         },
         "hidePricingPreview": "Hide pricing preview",
         "showPricingPreview": "Show pricing preview",
         "errors": {
           "createFailed": "Failed to create offer. Please try again."
+        },
+        "validation": {
+          "minResidents": "Minimum 1 resident",
+          "pricePositive": "Price must be positive",
+          "titleMin": "Title must be at least 10 characters",
+          "descriptionMin": "Description must be at least 50 characters",
+          "categoryRequired": "Please select a category",
+          "timelineRequired": "Timeline is required",
+          "basePriceMin": "Minimum price ₪100",
+          "buildingRequired": "Please select a building",
+          "regionRequired": "Region is required",
+          "minParticipantsMin": "Minimum 3 participants",
+          "maxParticipantsMax": "Maximum 100 participants",
+          "validUntilRequired": "Expiry date is required",
+          "serviceRequired": "Select at least one service"
+        },
+        "steps": {
+          "0": {
+            "label": "Details",
+            "description": "Category, title and description"
+          },
+          "1": {
+            "label": "Pricing",
+            "description": "Base price and tiers"
+          },
+          "2": {
+            "label": "Target",
+            "description": "Building and audience"
+          },
+          "3": {
+            "label": "Preview",
+            "description": "Review before publishing"
+          }
+        },
+        "pricingTiers": {
+          "label": "Pricing tiers",
+          "add": "Add tier",
+          "fromResidentsLabel": "From residents count",
+          "pricePerUnitLabel": "Price per unit (₪)",
+          "removeAria": "Remove pricing tier",
+          "emptyHint": "Add pricing tiers to offer group discounts"
+        },
+        "preview": {
+          "badge": "Preview",
+          "offerTitlePlaceholder": "Offer title",
+          "description": "Description",
+          "noDescription": "No description provided",
+          "basePrice": "Base price",
+          "minParticipants": "Min participants",
+          "maxParticipants": "Max participants",
+          "validUntil": "Valid until",
+          "pricingTiers": "Pricing tiers",
+          "fromResidents": "From {count} residents",
+          "includedServices": "Included services",
+          "building": "Building",
+          "region": "Region"
         }
       },
       "active": {
@@ -339,7 +758,17 @@
           "title": "No offers",
           "description": "You don't have any offers yet. Create a new offer to get started.",
           "cta": "Create Offer"
-        }
+        },
+        "participants": "Participants",
+        "revenue": "Revenue:",
+        "basePrice": "Base price:",
+        "hideParticipants": "Hide Participants",
+        "showParticipants": "Show Participants",
+        "loadingParticipants": "Loading participants...",
+        "errorParticipants": "Error loading participants. Click to retry.",
+        "noParticipants": "No participants yet.",
+        "residentLabel": "Resident",
+        "apartmentLabel": "Apartment {number}"
       }
     },
     "profile": {
@@ -347,7 +776,27 @@
       "subtitle": "Manage your business details and documents",
       "trustScore": {
         "title": "Trust Score",
-        "description": "Your trust score affects your ranking in offers"
+        "description": "Your trust score affects your ranking in offers",
+        "scoreLabels": {
+          "excellent": "Excellent",
+          "good": "Good",
+          "needsImprovement": "Needs improvement"
+        },
+        "categories": {
+          "documents": "Documents",
+          "insurance": "Insurance",
+          "rating": "Rating",
+          "responseTime": "Response time"
+        },
+        "tips": {
+          "insurance": "Keep insurance up to date",
+          "profile": "Complete your profile",
+          "response": "Reply quickly to customers",
+          "reviews": "Collect positive reviews"
+        },
+        "yourTrustScore": "Your Trust Score",
+        "scoreBreakdown": "Score Breakdown",
+        "improvementTips": "Improvement Tips"
       },
       "sections": {
         "business": "Business Details",
@@ -389,12 +838,77 @@
         "availability": "Availability",
         "acceptingOffers": "Accepting new offers",
         "dangerZone": "Danger Zone",
-        "deactivate": "Deactivate account"
+        "deactivate": "Deactivate account",
+        "notificationsHint": "Choose how we may contact you about new leads and offers.",
+        "notificationsSave": "Save notification preferences",
+        "notificationsSaving": "Saving…",
+        "notificationsSaved": "Preferences saved.",
+        "notificationsSaveError": "Could not save preferences. Try again.",
+        "membershipTitle": "Marketplace membership",
+        "membershipDescription": "An active subscription is required to publish offers on Groupio. Secure payment is processed by Stripe.",
+        "membershipStatusLabel": "Status",
+        "membershipPeriodEnd": "Current period ends",
+        "membershipNextBilling": "Next billing",
+        "membershipSubscribe": "Subscribe or renew with Stripe",
+        "membershipStatusLoading": "Loading membership status…",
+        "membershipCheckoutLoading": "Opening checkout…",
+        "membershipCheckoutError": "Could not start checkout. Check that billing is configured or try again later.",
+        "membershipLoadError": "Could not load membership status.",
+        "membershipSuccessBanner": "Payment received. Your membership will update shortly.",
+        "membershipCanceledBanner": "Checkout was canceled. You can try again when ready.",
+        "membershipStates": {
+          "active": "Active",
+          "trialing": "Trial",
+          "renewal": "Renewal",
+          "past_due": "Past due",
+          "grace": "Grace period",
+          "canceled": "Canceled",
+          "expired": "Expired",
+          "inactive": "No active subscription",
+          "unknown": "Unknown"
+        }
       },
       "save": "Save",
       "saving": "Saving...",
       "saveSuccess": "Profile saved successfully",
-      "saveError": "Save failed"
+      "saveError": "Save failed",
+      "tabs": {
+        "info": "Business information",
+        "documents": "Documents",
+        "settings": "Settings"
+      },
+      "categories": {
+        "ac_installation": "AC Installation",
+        "kitchen": "Kitchen",
+        "electrical": "Electrical",
+        "plumbing": "Plumbing",
+        "painting": "Painting",
+        "flooring": "Flooring",
+        "windows": "Windows",
+        "security": "Security"
+      },
+      "regions": {
+        "center": "Center",
+        "tel_aviv": "Tel Aviv",
+        "jerusalem": "Jerusalem",
+        "north": "North",
+        "south": "South",
+        "sharon": "Sharon",
+        "shfela": "Shfela"
+      },
+      "vetting": {
+        "documentSubmission": "Document submission",
+        "documentSubmissionDesc": "Upload required business documents.",
+        "licenseCheck": "License verification",
+        "licenseCheckDesc": "We verify your business license.",
+        "insuranceCheck": "Insurance check",
+        "insuranceCheckDesc": "We verify your liability insurance.",
+        "finalVerification": "Final verification",
+        "finalVerificationDesc": "Manual review before full approval.",
+        "statusComplete": "Complete",
+        "statusFailed": "Failed",
+        "statusInProgress": "In progress"
+      }
     },
     "projects": {
       "title": "Projects",
@@ -429,7 +943,74 @@
         "completed": "Completed",
         "cancelled": "Cancelled",
         "active": "Active"
+      },
+      "cancelConfirm": "This action cannot be undone. The offer and all participants will be notified.",
+      "cancelConfirmTitle": "Cancel this offer?",
+      "cancelModalBack": "Go back",
+      "cancelModalConfirm": "Yes, cancel offer",
+      "publishFailed": "Publish failed",
+      "cancelFailed": "Cancel failed",
+      "publish": "Publish",
+      "cancel": "Cancel",
+      "cancelOffer": "Cancel Offer",
+      "description": "Description",
+      "targetDate": "Target Date",
+      "category": "Category",
+      "currentTier": "Current Discount Tier",
+      "pricingTiers": "Pricing Tiers",
+      "backToProjects": "Back to Projects"
+    },
+    "resendVerification": "Resend Verification",
+    "saveError": "Save error",
+    "saveSuccess": "Saved successfully",
+    "requestReviewError": "Error requesting review",
+    "cancelFailed": "Cancel failed",
+    "publishFailed": "Publish failed",
+    "loadError": "Error loading",
+    "buttons": {
+      "publish": "Publish",
+      "cancel": "Cancel",
+      "save": "Save",
+      "submit": "Submit"
+    },
+    "errors": {
+      "createFailed": "Failed to create",
+      "loadFailed": "Failed to load"
+    },
+    "documents": {
+      "notUploaded": "Not uploaded",
+      "uploadSuccess": "File uploaded successfully",
+      "uploadError": "Error uploading file"
+    },
+    "validation": {
+      "basePriceMin": "Base price must be at least ₪100",
+      "buildingRequired": "Building is required",
+      "categoryRequired": "Category is required"
+    },
+    "settings": {
+      "membershipSubscribe": "Subscribe to membership",
+      "membershipCheckoutLoading": "Loading checkout...",
+      "membershipCheckoutError": "Membership checkout error",
+      "notificationsSaveError": "Error saving notification settings",
+      "membershipStates": {
+        "active": "Active",
+        "canceled": "Canceled",
+        "expired": "Expired",
+        "grace": "Grace period",
+        "inactive": "Inactive",
+        "past_due": "Past due",
+        "renewal": "Renewal",
+        "trialing": "Trial",
+        "unknown": "Unknown"
       }
+    },
+    "trust": {
+      "verified": "Verified",
+      "pending": "Under Review",
+      "rejected": "Not Verified",
+      "reliable": "Reliable",
+      "completedJobs": "{count} completed jobs",
+      "license": "License: {number}"
     }
   },
   "onboarding": {
@@ -482,7 +1063,17 @@
       "orderStatus": "What's my order status?",
       "help": "Help"
     },
-    "welcome": "Hi! I'm Groupio's digital assistant. How can I help?"
+    "welcome": "Hi! I'm Groupio's digital assistant. How can I help?",
+    "assistantName": "Groupio Assistant",
+    "ready": "Ready to help",
+    "loadOlder": "Load older messages",
+    "loading": "Loading...",
+    "error": "Sorry, something went wrong. Please try again.",
+    "aiDisclaimer": "Results from this search are generated by AI and may require human review.",
+    "thinkingSearch": "Finding contractors...",
+    "thinkingPrices": "Checking prices...",
+    "thinkingHistory": "Analyzing history...",
+    "thinkingRecommendations": "Preparing recommendations..."
   },
   "categories": {
     "ac_installation": "AC Installation",
@@ -549,27 +1140,6 @@
       "refunded": "Refunded"
     }
   },
-  "contractorNav": {
-    "dashboard": "Dashboard",
-    "activeOffers": "Active Offers",
-    "createOffer": "Create Offer",
-    "projects": "Projects",
-    "profile": "Profile",
-    "contractorBadge": "Contractor",
-    "newOffer": "New Offer",
-    "myBusiness": "My Business",
-    "logout": "Log out"
-  },
-  "residentNav": {
-    "dashboard": "Dashboard",
-    "offers": "Offers",
-    "contractors": "Contractors",
-    "architecture": "My Home Plan",
-    "building": "Building",
-    "profile": "Profile",
-    "aiAssistant": "AI Assistant",
-    "myAccount": "My Account"
-  },
   "architecture": {
     "title": "My Home Plan",
     "subtitle": "Upload your floor plan and get AI-powered renovation suggestions",
@@ -611,5 +1181,360 @@
     },
     "tryAgain": "Try again",
     "uploadAnother": "Upload another plan"
+  },
+  "landing": {
+    "stats": {
+      "activeResidents": "active residents",
+      "verifiedContractors": "verified contractors",
+      "totalSaved": "total saved",
+      "activeBuildings": "active buildings"
+    },
+    "hero": {
+      "badge": "Smart group savings for buildings",
+      "headline": "Residents in your building are already saving",
+      "headlineHighlight": "thousands of shekels",
+      "subtext": "Groupio brings neighbors together for group purchases of maintenance and renovation services — the more who join, the lower the price for everyone.",
+      "ctaResident": "Join your building",
+      "ctaContractor": "I'm a contractor",
+      "trustEscrow": "Escrow-protected payment",
+      "sampleLabel": "Sample savings — Ramat Gan building",
+      "sampleDiscount": "40% off",
+      "sampleTitle": "Roof sealing",
+      "sampleFrom": "From ₪4,800 to ",
+      "samplePrice": "₪2,880",
+      "samplePerUnit": "per unit",
+      "sampleProgress": "18 of 24 residents joined",
+      "samplePct": "75%",
+      "sampleMore": "6 more residents until the next discount tier"
+    },
+    "nav": {
+      "howItWorks": "How It Works",
+      "offers": "Offers",
+      "login": "Log In",
+      "signupFree": "Sign Up Free",
+      "openMenu": "Open menu",
+      "closeMenu": "Close menu"
+    },
+    "featuredOffers": {
+      "badge": "Available now",
+      "title": "Popular offers right now",
+      "viewAll": "View all offers",
+      "offer1Title": "AC installation",
+      "offer1Subtitle": "Split / mini-central AC — prep and install",
+      "offer1Contractor": "Pro HVAC & Electric",
+      "offer2Title": "Kitchen upgrade",
+      "offer2Subtitle": "Cabinets, stone, island, demolition & extras",
+      "offer2Contractor": "Boutique Carpentry Israel",
+      "offer3Title": "Showers & glass",
+      "offer3Subtitle": "Showers, mirrors, glass and bathroom cladding",
+      "offer3Contractor": "Glass For New Home",
+      "residents": "{participants}/{total} residents",
+      "days": "{days} days"
+    },
+    "howItWorks": {
+      "badgeLabel": "Three simple steps",
+      "title": "How it works",
+      "subtitle": "From sign-up to real savings — a simple, transparent process",
+      "step1Title": "Join your building",
+      "step1Description": "Register and add your building in minutes. Invite neighbors to join.",
+      "step2Title": "Choose a group offer",
+      "step2Description": "Browse verified contractor offers and join the deal that fits you.",
+      "step3Title": "Pay and save",
+      "step3Description": "Pay securely via escrow — funds release only after work is done.",
+      "cta": "Start saving now"
+    },
+    "trust": {
+      "badgeLabel": "The Groupio promise",
+      "title": "Why trust Groupio?",
+      "subtitle": "We built the platform on transparency and trust — save without worry",
+      "card1Title": "Verified contractors",
+      "card1Description": "Every contractor is vetted for license, insurance and background before joining.",
+      "card2Title": "Escrow-protected payment",
+      "card2Description": "Your money is held in escrow and released only after work is completed.",
+      "card3Title": "Transparent pricing",
+      "card3Description": "No hidden fees. Tier pricing by participants — what you see is what you pay.",
+      "card4Title": "Full support",
+      "card4Description": "Smart AI assistant at every step, with human escalation when needed."
+    },
+    "contractorCTA": {
+      "badge": "For contractors & service providers",
+      "title": "Reach new customers",
+      "titleHighlight": "every day",
+      "subtext": "Join the platform and meet residents looking for your services — no cold outreach, no expensive ads.",
+      "step1": "Register as a contractor and pass quick verification",
+      "step2": "Get access to buildings seeking services",
+      "step3": "Submit quotes and manage deals",
+      "cta": "Join as a verified contractor",
+      "value1Title": "Access thousands of customers",
+      "value1Text": "Reach hundreds of buildings and thousands of potential residents",
+      "value2Title": "Stable income",
+      "value2Text": "High-volume deals with recurring, secured projects",
+      "value3Title": "Verified badge",
+      "value3Text": "Verified contractor badge that builds trust and conversions"
+    },
+    "footer": {
+      "about": "About",
+      "howItWorks": "How It Works",
+      "faq": "FAQ",
+      "contact": "Contact",
+      "terms": "Terms",
+      "privacy": "Privacy",
+      "tagline": "Smart group buying for Israeli buildings — save together, win together.",
+      "joinFree": "Join free",
+      "copyright": "All rights reserved © 2026 Groupio",
+      "madeIn": "Built in Israel with love"
+    }
+  },
+  "buildingsManager": {
+    "dashboard": {
+      "title": "Buildings overview",
+      "subtitle": "Monitor buildings, residents, offers, and open escalations",
+      "stats": {
+        "totalBuildings": "Total buildings",
+        "totalResidents": "Total residents",
+        "activeOffers": "Active offers",
+        "openEscalations": "Open escalations"
+      },
+      "viewAll": "View all",
+      "recentBuildings": "Recent buildings",
+      "openEscalations": "Open escalations",
+      "noBuildings": "No buildings yet",
+      "noEscalations": "No open escalations",
+      "units": "units",
+      "open": "open"
+    },
+    "buildings": {
+      "title": "Buildings",
+      "total": "{count, plural, =0 {No buildings} one {# building} other {# buildings}}",
+      "searchPlaceholder": "Search by name or city…",
+      "noResults": "No buildings match your search",
+      "empty": "No buildings to show",
+      "units": "{count, plural, one {# unit} other {# units}}",
+      "activeOffers": "{count, plural, =0 {No active offers} one {# active offer} other {# active offers}}",
+      "createCta": "Create building",
+      "inviteCta": "Share invite code"
+    },
+    "escalations": {
+      "title": "Escalations",
+      "total": "{count, plural, =0 {No escalations} one {# escalation} other {# escalations}}",
+      "filters": {
+        "allStatuses": "All statuses",
+        "open": "Open",
+        "inProgress": "In progress",
+        "resolved": "Resolved",
+        "allPriorities": "All priorities",
+        "critical": "Critical",
+        "high": "High",
+        "medium": "Medium",
+        "low": "Low"
+      },
+      "empty": "No escalations match your filters",
+      "resolve": "Resolve",
+      "resolving": "Resolving…"
+    },
+    "account": {
+      "title": "Account",
+      "subtitle": "Your signed-in user for this console.",
+      "name": "Name",
+      "email": "Email",
+      "role": "Role",
+      "signOut": "Sign out",
+      "backToDashboard": "Back to dashboard"
+    },
+    "invite": {
+      "label": "Invite code",
+      "copy": "Copy",
+      "copied": "Copied!",
+      "share": "Share",
+      "shareMessage": "Join {buildingName} with code: {code}",
+      "rotate": "Rotate code",
+      "rotateHint": "Rotating the code will immediately invalidate the previous one.",
+      "rotateError": "Failed to rotate invite code"
+    },
+    "create": {
+      "title": "Create a building",
+      "subtitle": "Once created, you can share the invite code with residents.",
+      "nameLabel": "Building name",
+      "addressLabel": "Address",
+      "cityLabel": "City",
+      "regionLabel": "Region",
+      "totalUnitsLabel": "Total units",
+      "floorsLabel": "Floors",
+      "submit": "Create",
+      "close": "Close",
+      "errorForbidden": "Buildings manager / admin role required",
+      "errorGeneric": "Failed to create building",
+      "errorMissingFields": "Name, address and city are required"
+    }
+  },
+  "buildingsManagerNav": {
+    "dashboard": "Dashboard",
+    "buildings": "Buildings",
+    "escalations": "Escalations",
+    "role": "Buildings manager",
+    "roleSuperAdmin": "Super admin",
+    "roleAdmin": "Admin",
+    "myAccount": "My account",
+    "myAccountHint": "Name, email & sign out",
+    "profile": "Account",
+    "logout": "Log out"
+  },
+  "admin": {
+    "dashboard": {
+      "title": "Admin home",
+      "subtitle": "Shortcuts to operational tools",
+      "buildingsManagerCard": {
+        "title": "Buildings manager",
+        "description": "Open the buildings manager console for buildings, residents, and escalations."
+      },
+      "standaloneAdminCard": {
+        "title": "Operations admin (separate app)",
+        "description": "Super-admin console runs on its own URL. Open it in a new tab when your team has deployed the admin app.",
+        "cta": "Open admin app"
+      },
+      "systemSettingsCard": {
+        "title": "System settings",
+        "description": "Configure platform-wide settings, feature flags, and operational parameters."
+      }
+    },
+    "account": {
+      "title": "Account",
+      "subtitle": "Your signed-in admin user.",
+      "name": "Name",
+      "email": "Email",
+      "role": "Role",
+      "signOut": "Sign out",
+      "backToDashboard": "Back to dashboard"
+    }
+  },
+  "adminNav": {
+    "dashboard": "Dashboard",
+    "buildingsManager": "Buildings manager",
+    "roleSuperAdmin": "Super admin",
+    "roleAdmin": "Admin",
+    "myAccount": "My account",
+    "myAccountHint": "Name, email & sign out",
+    "profile": "Account",
+    "logout": "Log out"
+  },
+  "resendVerification": {
+    "title": "Resend Verification Email",
+    "subtitle": "Enter your email address and we'll send you a new verification link.",
+    "emailLabel": "Email Address",
+    "sendButton": "Send Verification Link",
+    "sending": "Sending...",
+    "successMessage": "We've sent you a verification email. Check your spam folder if you don't see it.",
+    "backToLogin": "Back to Login",
+    "errorMessage": "An error occurred. Please try again later.",
+    "validEmailRequired": "Please enter a valid email address"
+  },
+  "contact": {
+    "pageTitle": "Contact Us",
+    "pageDescription": "Contact the Groupio team — we're happy to help",
+    "hero": {
+      "badge": "Contact",
+      "title": "We're Here for You",
+      "description": "We'll get back to you within one business day. For common questions see our",
+      "faqLink": "FAQ page"
+    },
+    "channels": {
+      "sectionTitle": "Contact Channels",
+      "general": {
+        "label": "General Support",
+        "desc": "Any question or platform issue"
+      },
+      "billing": {
+        "label": "Payments & Billing",
+        "desc": "Charges, refunds, commissions"
+      },
+      "privacy": {
+        "label": "Privacy & Data Deletion",
+        "desc": "GDPR requests and account deletion"
+      },
+      "contractors": {
+        "label": "Contractors — Join Platform",
+        "desc": "Registration and contractor verification"
+      }
+    },
+    "responseTimes": {
+      "sectionTitle": "Guaranteed Response Times",
+      "support": {
+        "label": "Support enquiries",
+        "time": "Within 1 business day"
+      },
+      "payment": {
+        "label": "Urgent payment issues",
+        "time": "Within 4 hours on weekdays"
+      },
+      "gdpr": {
+        "label": "GDPR / Data deletion requests",
+        "time": "Within 30 days (as required by law)"
+      }
+    },
+    "faqNudge": {
+      "title": "Most Questions Already Answered",
+      "description": "Check the FAQ page before reaching out — save yourself time.",
+      "button": "Go to FAQ"
+    }
+  },
+  "orders": {
+    "title": "Orders",
+    "subtitle": "Track your orders",
+    "tabAll": "All",
+    "tabActive": "Active",
+    "tabCompleted": "Completed",
+    "emptyAll": "No orders yet",
+    "emptyActive": "No active orders",
+    "emptyCompleted": "No completed orders",
+    "emptyHint": "Join a group offer to get started",
+    "discoverOffers": "Discover Offers",
+    "loading": "Loading...",
+    "loadError": "Error loading orders",
+    "retry": "Try again",
+    "refresh": "Refresh",
+    "refreshAriaLabel": "Refresh orders",
+    "reportProblem": "Report a problem",
+    "invoices": "Invoices",
+    "escrowBadge": "Escrow",
+    "escrowActive": "Funds in escrow",
+    "escrowExplainer": "Your payment is held in escrow until work is completed",
+    "escrowSupport": "Contact support",
+    "writeReview": "Write a Review",
+    "reviewPlaceholder": "Share your experience...",
+    "reviewSelectRating": "Select a rating",
+    "reviewSubmit": "Submit Review",
+    "reviewCancel": "Cancel",
+    "reviewSent": "Review submitted!",
+    "reviewError": "Error submitting review",
+    "ratingAriaLabel": "Rate {rating} out of 5",
+    "timeline": {
+      "joined": "Joined offer",
+      "paid": "Payment made",
+      "scheduled": "Work scheduled",
+      "done": "Work completed",
+      "released": "Payment released to contractor"
+    }
+  },
+  "escrow": {
+    "protectedTitle": "Payment Protected in Escrow",
+    "protectedDescription": "Your money is held in a secure escrow account and released to the contractor only after the work is completed to your satisfaction",
+    "protected": "Payment Protected"
+  },
+  "contractorEarnings": {
+    "title": "Earnings",
+    "subtitle": "Financial activity and earnings summary",
+    "loading": "Loading…",
+    "loadError": "Error loading data",
+    "retry": "Retry",
+    "pending": "Pending",
+    "completed": "Completed",
+    "heldEscrow": "In Escrow",
+    "recent": "Recent Transactions",
+    "empty": "No transactions",
+    "offer": "Offer",
+    "status": "Status",
+    "type": "Type",
+    "amount": "Amount",
+    "paidAt": "Date"
   }
 }

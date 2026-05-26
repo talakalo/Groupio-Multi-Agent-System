@@ -81,6 +81,16 @@ export default function AnalyticsPage() {
       activeContractors: totalContractors,
       escalationRate: openTickets > 0 ? 2.5 : 0,
       insights,
+      categoryBreakdown: backendAnalytics.categoryBreakdown ?? {},
+      regionalData: backendAnalytics.regionalData ?? {},
+      dailyOffers: backendAnalytics.dailyOffers ?? [],
+      dailyRevenue: backendAnalytics.dailyRevenue ?? [],
+      agentPerformance: (backendAnalytics.agentPerformance ?? []).map((ap) => ({
+        agent: String(ap.agent ?? ap.name ?? ''),
+        accuracy: typeof ap.accuracy === 'number' ? ap.accuracy : 0,
+        responseTime: typeof ap.responseTime === 'number' ? ap.responseTime : 0,
+        throughput: typeof ap.throughput === 'number' ? ap.throughput : 0,
+      })),
     };
   }, [backendAnalytics]);
 
@@ -316,7 +326,7 @@ export default function AnalyticsPage() {
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div
-                      className="h-2 rounded-full bg-violet-500 transition-all duration-500"
+                      className="h-2 rounded-full bg-primary-500 transition-all duration-500"
                       style={{ width: `${percentage}%` }}
                     />
                   </div>
@@ -333,7 +343,7 @@ export default function AnalyticsPage() {
             {(data?.insights ?? []).map((insight, index) => (
               <div
                 key={index}
-                className="flex items-start gap-3 p-3 bg-gradient-to-r from-sky-50 to-violet-50 rounded-lg"
+                className="flex items-start gap-3 p-3 bg-gradient-to-r from-primary-50 to-blue-50 rounded-lg"
               >
                 <span className="text-sky-500 mt-0.5">💡</span>
                 <p className="text-sm text-gray-700">{insight}</p>
@@ -367,6 +377,14 @@ export default function AnalyticsPage() {
               </tr>
             </thead>
             <tbody>
+              {(data?.agentPerformance ?? []).length === 0 && (
+                <tr>
+                  <td colSpan={5} className="py-8 text-center text-gray-500 text-sm">
+                    No agent metrics yet. Start the API and process traffic, or use PostgreSQL for analytics
+                    rollups.
+                  </td>
+                </tr>
+              )}
               {(data?.agentPerformance ?? []).map((agent) => (
                 <tr key={agent.agent} className="border-b hover:bg-gray-50">
                   <td className="py-3 px-4 font-medium capitalize">{agent.agent}</td>

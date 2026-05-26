@@ -1,0 +1,26 @@
+# Flow: Contractor — Projects
+# Verifies the projects screen loads.
+#
+# Run: maestro test .maestro/flows/03-contractor/projects.yaml
+
+appId: ${APP_ID}
+tags:
+  - contractor
+  - projects
+---
+
+- runFlow: ../../subflows/launch-fresh.yaml
+- runFlow: ../../subflows/login-contractor.yaml
+
+# Navigate via Quick Actions → Projects on home screen
+- assertVisible: "Quick Actions"
+- tapOn: "Projects"
+- assertVisible:
+    text: "My Projects"
+    timeout: 8000
+
+# Either shows projects or empty state
+- assertTrue:
+    visible: "No projects"
+    orVisible: "In Progress"
+    timeout: 8000

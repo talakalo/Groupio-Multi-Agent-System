@@ -38,5 +38,19 @@
     "pendingPayments": "תשלומים ממתינים",
     "systemHealth": "תקינות מערכת",
     "pendingActions": "פעולות ממתינות"
+  },
+  "shell": {
+    "productTitle": "Groupio Admin",
+    "productSubtitle": "לוח בקרה תפעולי",
+    "signOutAria": "התנתקות",
+    "settingsAria": "הגדרות",
+    "notificationsAria": "התראות",
+    "searchPlaceholder": "חיפוש...",
+    "expandSidebar": "הרחבת תפריט",
+    "collapseSidebar": "כיווץ תפריט",
+    "dashboardTitle": "לוח בקרה תפעולי",
+    "versionBadge": "v1.0",
+    "localeEn": "EN",
+    "localeHe": "HE"
   }
 }

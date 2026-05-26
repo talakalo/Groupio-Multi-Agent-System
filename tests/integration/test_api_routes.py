@@ -191,6 +191,7 @@ class TestOffersAPI:
     def test_list_offers(self, client, mock_db, mock_offer):
         """Test listing offers."""
         mock_db.list_offers = AsyncMock(return_value=([mock_offer], 1))
+        mock_db.get_building_ids_for_user = AsyncMock(return_value=["building-123"])
         override_auth({"id": "user-123", "role": "resident"})
 
         response = client.get(
@@ -521,6 +522,9 @@ class TestAuthAPI:
             )
         )
         mock_redis.set = AsyncMock()
+        mock_redis.is_temporarily_locked = AsyncMock(return_value=0)
+        mock_redis.clear_login_failures = AsyncMock()
+        mock_redis.clear_temporary_lockout = AsyncMock()
 
         with patch("src.api.routes.auth.verify_password") as mock_verify:
             mock_verify.return_value = True
@@ -562,9 +566,14 @@ class TestAuthAPI:
                 email="test@example.com",
                 role="resident",
                 is_active=True,
+                is_verified=True,
             )
         )
         mock_redis.set = AsyncMock()
+        mock_redis.is_temporarily_locked = AsyncMock(return_value=0)
+        mock_redis.clear_login_failures = AsyncMock()
+        mock_redis.clear_temporary_lockout = AsyncMock()
+        mock_db.update_user = AsyncMock()
         with patch("src.api.routes.auth.verify_password") as mock_verify:
             mock_verify.return_value = True
             mock_db.get_user_password_hash = AsyncMock(return_value="hashed")
@@ -975,9 +984,7 @@ class TestSignupRoleRestriction:
             json={**self._VALID_BASE, "role": role},
         )
         # Must not be rejected by validation (422 = Unprocessable Entity)
-        assert response.status_code != 422, (
-            f"Allowed role '{role}' was incorrectly rejected: {response.json()}"
-        )
+        assert response.status_code != 422, f"Allowed role '{role}' was incorrectly rejected: {response.json()}"
 
     # -- /signup forbidden roles ----------------------------------------------
 
@@ -992,8 +999,7 @@ class TestSignupRoleRestriction:
             json={**self._VALID_BASE, "role": privileged_role},
         )
         assert response.status_code == 422, (
-            f"Expected 422 for privileged role '{privileged_role}' but got "
-            f"{response.status_code}: {response.json()}"
+            f"Expected 422 for privileged role '{privileged_role}' but got {response.status_code}: {response.json()}"
         )
 
     def test_signup_rejects_admin(self, client, mock_db, mock_redis):

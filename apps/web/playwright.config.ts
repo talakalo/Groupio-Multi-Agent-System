@@ -1,19 +1,27 @@
 import { defineConfig, devices } from "@playwright/test";
+import { envConfig } from "./e2e/config/env.config";
 
 export default defineConfig({
   testDir: "./e2e",
+  globalSetup: "./e2e/global-setup.ts",
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  retries: process.env.CI ? 1 : 0,
+  workers: process.env.CI ? 2 : undefined,
+  // Next.js JIT-compiles pages on first request; 60 s gives the dev server
+  // enough headroom to compile even the heaviest page bundles before failing.
+  timeout: 60_000,
   reporter: [
     ["html", { open: "never", outputFolder: "playwright-report" }],
     ["junit", { outputFile: "playwright-report/junit-e2e.xml" }],
+    ["./e2e/reports/custom-reporter.ts"],
   ],
   use: {
-    baseURL: "http://localhost:3000",
+    baseURL: envConfig.baseURL,
     trace: "on-first-retry",
-    locale: "he-IL",
+    locale: envConfig.locale,
+    actionTimeout: envConfig.actionTimeout,
+    navigationTimeout: envConfig.navigationTimeout,
   },
   projects: [
     {
@@ -30,8 +38,10 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "pnpm dev",
-    url: "http://localhost:3000",
+    // In CI the app is pre-built by the workflow step; serve the production build.
+    // Locally, dev server is used and reused across runs.
+    command: process.env.CI ? "pnpm start" : "pnpm dev",
+    url: envConfig.baseURL,
     reuseExistingServer: !process.env.CI,
   },
 });

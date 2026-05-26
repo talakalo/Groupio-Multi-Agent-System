@@ -64,12 +64,12 @@ const METRIC_OPTIONS: { value: MetricType; label: string; unit: string }[] = [
 ];
 
 const AGENT_COLORS = [
-  "#4f46e5", // primary (indigo)
+  "#1a9a76", // primary (brand green)
   "#22c55e", // success (green)
   "#f59e0b", // warning (amber)
   "#ef4444", // danger (red)
-  "#8b5cf6", // purple
   "#06b6d4", // cyan
+  "#3b82f6", // blue
   "#ec4899", // pink
 ];
 

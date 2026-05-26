@@ -14,6 +14,7 @@ import {
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 import { cn } from '@/lib/utils/cn';
 
@@ -31,36 +32,29 @@ interface ContractorLayoutProps {
   notificationCount?: number;
 }
 
-interface NavItem {
-  label: string;
-  href: string;
-  icon: React.ElementType;
-}
-
-// ---------------------------------------------------------------------------
-// Navigation links
-// ---------------------------------------------------------------------------
-
-const NAV_ITEMS: NavItem[] = [
-  { label: 'לוח בקרה', href: '/contractor/dashboard', icon: LayoutDashboard },
-  { label: 'הצעות פעילות', href: '/contractor/offers/active', icon: Tag },
-  { label: 'צור הצעה', href: '/contractor/offers/create', icon: PlusCircle },
-  { label: 'פרויקטים', href: '/contractor/projects', icon: FolderKanban },
-  { label: 'פרופיל', href: '/contractor/profile', icon: UserCircle },
-];
-
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
 export function ContractorLayout({
   children,
-  businessName = 'קבלן',
+  businessName,
   logoUrl,
   notificationCount = 0,
 }: ContractorLayoutProps) {
+  const t = useTranslations('contractorNav');
+  const tc = useTranslations('common');
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const displayName = businessName ?? t('contractorBadge');
+
+  const NAV_ITEMS = [
+    { label: t('dashboard'), href: '/contractor/dashboard', icon: LayoutDashboard },
+    { label: t('activeOffers'), href: '/contractor/offers/active', icon: Tag },
+    { label: t('createOffer'), href: '/contractor/offers/create', icon: PlusCircle },
+    { label: t('projects'), href: '/contractor/projects', icon: FolderKanban },
+    { label: t('profile'), href: '/contractor/profile', icon: UserCircle },
+  ];
 
   return (
     <div className="flex min-h-screen">
@@ -87,13 +81,13 @@ export function ContractorLayout({
             href="/contractor/dashboard"
             className="text-xl font-bold text-accent-600"
           >
-            גרופיו <span className="text-sm font-normal text-gray-400">קבלנים</span>
+            {tc('appName')} <span className="text-sm font-normal text-gray-400">{t('contractors')}</span>
           </Link>
           <button
             type="button"
             onClick={() => setSidebarOpen(false)}
             className="lg:hidden rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-            aria-label="סגור תפריט"
+            aria-label={tc('closeMenu')}
           >
             <X className="h-5 w-5" />
           </button>
@@ -104,19 +98,19 @@ export function ContractorLayout({
           {logoUrl ? (
             <img
               src={logoUrl}
-              alt={businessName}
+              alt={displayName}
               className="h-10 w-10 rounded-xl object-cover"
             />
           ) : (
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent-100 text-accent-700 font-bold">
-              {businessName.charAt(0)}
+              {displayName.charAt(0)}
             </div>
           )}
           <div className="flex flex-col min-w-0">
             <span className="text-sm font-semibold text-gray-900 truncate">
-              {businessName}
+              {displayName}
             </span>
-            <span className="text-xs text-gray-500">חשבון קבלן</span>
+            <span className="text-xs text-gray-500">{t('contractorAccount')}</span>
           </div>
         </div>
 
@@ -169,7 +163,7 @@ export function ContractorLayout({
             type="button"
             onClick={() => setSidebarOpen(true)}
             className="lg:hidden rounded-lg p-2 text-gray-500 hover:bg-gray-100"
-            aria-label="פתח תפריט"
+            aria-label={tc('openMenu')}
           >
             <Menu className="h-5 w-5" />
           </button>
@@ -180,7 +174,7 @@ export function ContractorLayout({
           <button
             type="button"
             className="relative rounded-xl p-2 text-gray-500 hover:bg-gray-100 transition-colors"
-            aria-label="התראות"
+            aria-label={tc('notifications')}
           >
             <Bell className="h-5 w-5" />
             {notificationCount > 0 && (

@@ -1,4 +1,5 @@
-import { test, expect, Page } from "@playwright/test";
+import { expect, test } from "./fixtures/auth-fixtures";
+import type { Page } from "@playwright/test";
 
 /**
  * E2E tests for Contractor user flows
@@ -58,6 +59,9 @@ const MOCK_CONTRACTOR_OFFERS = [
     minParticipants: 5,
     maxParticipants: 30,
     discount: 15,
+    tiers: [],
+    currentTier: 0,
+    createdAt: "2026-01-10T14:00:00Z",
     completedAt: "2026-01-10T14:00:00Z",
     revenue: 3187.5,
   },
@@ -119,7 +123,7 @@ async function setupContractorAuth(page: Page) {
 // ============================================================================
 
 test.describe("Contractor Dashboard", () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, dashboardPage }) => {
     await setupCommonMocks(page);
     await setupContractorAuth(page);
 
@@ -158,10 +162,11 @@ test.describe("Contractor Dashboard", () => {
         body: JSON.stringify({ items: MOCK_CONTRACTOR_OFFERS, offers: MOCK_CONTRACTOR_OFFERS }),
       })
     );
+
+    await dashboardPage.gotoContractor();
   });
 
   test("should display contractor dashboard with stats", async ({ page }) => {
-    await page.goto("/contractor/dashboard");
 
     // Wait for dashboard to load — heading then stat value in main content
     await expect(page.getByRole("heading", { name: "לוח בקרה" })).toBeVisible({ timeout: 5000 });
@@ -169,7 +174,6 @@ test.describe("Contractor Dashboard", () => {
   });
 
   test("should navigate to create offer", async ({ page }) => {
-    await page.goto("/contractor/dashboard");
 
     // Sidebar or quick action link to create offer
     const createLink = page.locator('a[href="/contractor/offers/create"]');
@@ -180,7 +184,6 @@ test.describe("Contractor Dashboard", () => {
   });
 
   test("should navigate to active offers", async ({ page }) => {
-    await page.goto("/contractor/dashboard");
 
     const offersLink = page.locator('a[href="/contractor/offers/active"]');
     if (await offersLink.first().isVisible()) {
@@ -208,16 +211,19 @@ test.describe("Contractor Create Offer Flow", () => {
     );
   });
 
-  test("should display offer creation form", async ({ page }) => {
-    await page.goto("/contractor/offers/create");
+  test("should display offer creation form", async ({ page, offersPage }) => {
+    await offersPage.gotoCreateOffer();
 
-    // Form inputs are registered via react-hook-form (name attr only, no id)
+    // Step 1 of the wizard shows category chips + title/description; basePrice
+    // lives on Step 2 ("תמחור") and is not in the DOM until we advance. Keep
+    // assertions limited to what Step 1 actually renders.
     await expect(page.locator('input[name="title"]')).toBeVisible({ timeout: 10000 });
-    await expect(page.locator('select[name="category"]')).toBeVisible();
-    await expect(page.locator('input[name="basePrice"]')).toBeVisible();
+    await expect(page.locator('textarea[name="description"]')).toBeVisible();
+    // Category is rendered as a CategoryChips button group, not a native select.
+    await expect(page.getByRole("button", { name: "מטבחים", exact: true })).toBeVisible();
   });
 
-  test("should fill in and submit offer form", async ({ page }) => {
+  test("should fill in and submit offer form", async ({ page, offersPage }) => {
     test.setTimeout(60000);
     await page.route("**/api/v1/offers", (route) => {
       if (route.request().method() === "POST") {
@@ -227,7 +233,17 @@ test.describe("Contractor Create Offer Flow", () => {
           body: JSON.stringify({ id: "offer_new", status: "active" }),
         });
       }
-      return route.continue();
+      // Fulfill OPTIONS (CORS preflight) and GET requests with Playwright's own
+      // response rather than route.continue(), so the browser never attempts to
+      // reach the dead backend (port 8000).  A route.continue() to a closed port
+      // causes a network error on the OPTIONS preflight, which makes the browser
+      // cancel the real POST before it is ever sent — the mock never fires and
+      // waitForResponse times out.
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ items: [], offers: [] }),
+      });
     });
     await page.route("**/api/v1/offers/offer_new", (route) =>
       route.fulfill({
@@ -244,36 +260,57 @@ test.describe("Contractor Create Offer Flow", () => {
       })
     );
 
-    await page.goto("/contractor/offers/create");
+    await offersPage.gotoCreateOffer();
     await expect(page).toHaveURL(/contractor\/offers\/create/, { timeout: 20000 });
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("networkidle");
 
-    // Wait for create form (title input only exists on create page, not login)
-    const titleInput = page.locator('input[name="title"]');
-    await expect(titleInput).toBeVisible({ timeout: 20000 });
-    await titleInput.scrollIntoViewIfNeeded();
-    await titleInput.fill("התקנת מזגנים מקצועית", { timeout: 10000 });
-    await page.locator('textarea[name="description"]').scrollIntoViewIfNeeded();
-    await page.locator('textarea[name="description"]').fill("שירות מקצועי ואחריות מלאה. התקנה מקצועית עם אחריות לשנה. לפחות 50 תווים נדרשים כאן.", { timeout: 10000 });
-    await page.locator('select[name="category"]').selectOption("ac_installation");
+    // Step 1 — details: pick a category, fill title/description/timeline.
+    await expect(page.locator('input[name="title"]')).toBeVisible({ timeout: 20000 });
+    await page.getByRole("button", { name: "מטבחים", exact: true }).click();
+    await page.locator('input[name="title"]').fill("התקנת מזגנים מקצועית");
+    await page
+      .locator('textarea[name="description"]')
+      .fill(
+        "שירות מקצועי ואחריות מלאה. התקנה מקצועית עם אחריות לשנה. לפחות 50 תווים נדרשים כאן.",
+      );
+    await page.locator('input[name="timeline"]').fill("2-3 שבועות");
+    await page.getByRole("button", { name: /^הבא/ }).click();
+
+    // Step 2 — pricing: fill base price and make the default tier valid.
+    // The default tier has pricePerUnit=0 which fails z.number().min(1) at full
+    // submit validation.  Fill pricePerUnit via its ID — more reliable in CI
+    // than clicking the "הסר דרגה" remove-tier button (which has proven flaky).
+    await expect(page.locator('input[name="basePrice"]')).toBeVisible({ timeout: 10000 });
+    await page.locator('input[name="basePrice"]').fill("4500");
+    await page.locator('#create-tier-price-0').fill('4000');
+    await page.getByRole("button", { name: /^הבא/ }).click();
+
+    // Step 3 — target / participants / validity.
+    await expect(page.locator('input[name="buildingId"]')).toBeVisible({ timeout: 10000 });
+    await page.locator('input[name="buildingId"]').fill("bld_001");
     await page.locator('select[name="region"]').selectOption("center");
-    await page.locator('input[name="buildingId"]').fill("bld_001", { timeout: 10000 });
-
-    // Pricing section may be below fold; scroll and fill (re-query to avoid detached refs)
-    await page.locator('input[name="basePrice"]').scrollIntoViewIfNeeded();
-    await page.locator('input[name="basePrice"]').fill("4500", { timeout: 15000 });
-
+    await page.locator('input[name="minParticipants"]').fill("3");
+    await page.locator('input[name="maxParticipants"]').fill("10");
+    await page.locator('input[type="checkbox"][value="installation"]').check({ force: true });
     const futureDate = new Date();
     futureDate.setMonth(futureDate.getMonth() + 2);
-    await page.locator('input[name="validUntil"]').scrollIntoViewIfNeeded();
-    await page.locator('input[name="validUntil"]').fill(futureDate.toISOString().split("T")[0]!, { timeout: 15000 });
+    await page.locator('input[name="validUntil"]').fill(futureDate.toISOString().split("T")[0]!);
+    await page.getByRole("button", { name: /^הבא/ }).click();
 
-    await page.locator('input[value="installation"]').scrollIntoViewIfNeeded();
-    await page.locator('input[value="installation"]').check({ force: true });
-
-    await page.locator('button[type="submit"]').click();
-    await expect(page).toHaveURL(/contractor\/projects\//, { timeout: 10000 });
+    // Step 4 — preview + publish.
+    // The publish button only renders when currentStep === 3.
+    // Auto-dismiss any alert() that onSubmit might show on API error.
+    page.on('dialog', (dialog) => dialog.dismiss().catch(() => {}));
+    const publishBtn = page.locator('[data-testid="publish-offer-btn"]');
+    await expect(publishBtn).toBeVisible({ timeout: 25000 });
+    // force:true bypasses Playwright's stability check — the button re-renders
+    // rapidly (React state on step 3) and keeps detaching before each click
+    // attempt.  The form is valid and the element IS present; we just need to
+    // fire the click without waiting for DOM quiescence.
+    await publishBtn.click({ force: true });
+    // URL navigation confirms the POST succeeded; waitForResponse is omitted
+    // because the mocked response can race with Playwright's event listener.
+    await expect(page).toHaveURL(/contractor\/projects\//, { timeout: 30000 });
   });
 });
 
@@ -303,22 +340,26 @@ test.describe("Contractor Manage Offers", () => {
     );
   });
 
-  test("should display active offers list", async ({ page }) => {
-    await page.goto("/contractor/offers/active");
+  test("should display active offers list", async ({ page, offersPage }) => {
+    await offersPage.gotoActiveOffers();
     await page.waitForLoadState("domcontentloaded");
 
     await expect(page.locator("main")).toBeVisible({ timeout: 15000 });
-    // Wait for data/route ready: heading indicates content loaded (prefer over animate-spin)
-    await expect(
-      page.locator("main").getByRole("heading", { name: /הצעות פעילות|הצעות/ })
-    ).toBeVisible({ timeout: 15000 });
+    // Wait for the page heading inside main. The contractor layout goes through a
+    // token-refresh cycle in CI before rendering <main>, and then the page chunk
+    // may stream briefly (loading.tsx). 30 s is enough headroom while keeping
+    // the total test time under the 60 s test timeout.
+    await expect(page.locator("main h1").first()).toBeVisible({ timeout: 30000 });
   });
 
-  test("should have filter controls", async ({ page }) => {
-    await page.goto("/contractor/offers/active");
+  test("should have filter controls", async ({ page, offersPage }) => {
+    await offersPage.gotoActiveOffers();
+    await page.waitForLoadState("domcontentloaded");
 
-    // Status filter dropdown exists
-    await expect(page.locator("select").first()).toBeVisible({ timeout: 10000 });
+    // Wait for the layout to fully render before looking for filter controls.
+    await expect(page.locator("main")).toBeVisible({ timeout: 15000 });
+    // The three <select> filters (status, category, sort) render with the heading.
+    await expect(page.locator("select").first()).toBeVisible({ timeout: 20000 });
   });
 });
 
@@ -348,8 +389,8 @@ test.describe("Contractor Projects", () => {
     );
   });
 
-  test("should display projects page", async ({ page }) => {
-    await page.goto("/contractor/projects");
+  test("should display projects page", async ({ page, dashboardPage }) => {
+    await dashboardPage.gotoContractorProjects();
 
     await expect(page.locator("h1, h2").first()).toBeVisible({ timeout: 10000 });
   });
@@ -399,8 +440,8 @@ test.describe("Contractor Profile Settings", () => {
     );
   });
 
-  test("should display profile settings page", async ({ page }) => {
-    await page.goto("/contractor/profile");
+  test("should display profile settings page", async ({ page, contractorProfilePage }) => {
+    await contractorProfilePage.goto();
 
     // Profile page renders with tabs
     await expect(page.locator("h1, h2").first()).toBeVisible({ timeout: 10000 });

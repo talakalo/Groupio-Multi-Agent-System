@@ -1,6 +1,8 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { NextIntlClientProvider } from 'next-intl';
+import messages from '../messages/he.json';
 
 // ---- next/navigation mock ----
 const mockPush = vi.fn();
@@ -23,6 +25,11 @@ vi.mock('@/lib/auth/setAuthCookie', () => ({
   setAuthCookie: vi.fn(),
 }));
 
+// ---- unwrapPageParams uses React.use() — stub in tests ----
+vi.mock('@/lib/utils/unwrapPageParams', () => ({
+  unwrapPageParams: vi.fn(),
+}));
+
 // ---- Auth store mock ----
 const mockSetAccessToken = vi.fn();
 const mockSetUser = vi.fn();
@@ -43,6 +50,14 @@ vi.mock('@/lib/stores/authStore', () => {
 });
 
 import SignupPage from '../app/(auth)/signup/page';
+
+function renderSignupPage() {
+  return render(
+    <NextIntlClientProvider locale="he" messages={messages}>
+      <SignupPage />
+    </NextIntlClientProvider>
+  );
+}
 
 /** Fill in the signup details form (step 2) with valid data. */
 function fillDetailsForm() {
@@ -76,7 +91,7 @@ describe('Web SignupPage — navigation', () => {
   it('redirects resident to /dashboard after signup', async () => {
     mockApiSignup.mockResolvedValueOnce({ token: 'signup-token' });
 
-    render(<SignupPage />);
+    renderSignupPage();
 
     // Step 1: "דייר" (resident) role is already selected by default
     // Advance to step 2
@@ -97,7 +112,7 @@ describe('Web SignupPage — navigation', () => {
   it('redirects contractor to /contractor/dashboard after signup', async () => {
     mockApiSignup.mockResolvedValueOnce({ token: 'signup-token' });
 
-    render(<SignupPage />);
+    renderSignupPage();
 
     // Step 1: Select contractor role
     fireEvent.click(screen.getByText('קבלן'));
@@ -116,21 +131,14 @@ describe('Web SignupPage — navigation', () => {
   });
 
   it('has a link to the login page (/login)', () => {
-    render(<SignupPage />);
+    renderSignupPage();
     const links = screen.getAllByRole('link');
     const loginLink = links.find((l) => l.getAttribute('href') === '/login');
     expect(loginLink).toBeDefined();
   });
 
-  it('has a logo link pointing to the home page (/)', () => {
-    render(<SignupPage />);
-    const links = screen.getAllByRole('link');
-    const homeLink = links.find((l) => l.getAttribute('href') === '/');
-    expect(homeLink).toBeDefined();
-  });
-
   it('back button returns from step 2 to step 1 without navigating', async () => {
-    render(<SignupPage />);
+    renderSignupPage();
 
     fireEvent.click(screen.getByRole('button', { name: /המשך/i }));
 

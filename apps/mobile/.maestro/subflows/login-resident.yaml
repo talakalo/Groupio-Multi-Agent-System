@@ -1,0 +1,30 @@
+# Subflow: login-resident
+# Performs the login steps for a resident user.
+# Assumes the app is already on the login screen.
+#
+# Usage:
+#   - runFlow: ../subflows/login-resident.yaml
+#   - runFlow: ./subflows/login-resident.yaml  (from flows/ root)
+
+# Wait for the login screen to be ready
+- assertVisible:
+    text: "Sign in to your account"
+    timeout: 10000
+
+# Enter credentials
+- tapOn:
+    id: "login-email-input"
+- inputText: ${TEST_RESIDENT_EMAIL}
+
+- tapOn:
+    id: "login-password-input"
+- inputText: ${TEST_RESIDENT_PASSWORD}
+
+# Submit
+- tapOn:
+    id: "login-submit-button"
+
+# Wait for navigation to home tabs
+- assertVisible:
+    text: "Home"
+    timeout: 15000

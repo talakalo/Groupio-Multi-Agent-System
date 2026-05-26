@@ -160,9 +160,19 @@ class TestGetAnalytics:
     def test_get_analytics_ok(self):
         admin = _make_admin()
         db = AsyncMock()
-        db.get_escalation_stats = AsyncMock(return_value={"by_status": {"open": 3, "resolved": 2}})
+        db.get_escalation_stats = AsyncMock(
+            return_value={
+                "by_status": {"open": 2, "in_progress": 1, "resolved": 4},
+            }
+        )
         db.get_all_offers_admin = AsyncMock(return_value=([], 5))
         db.list_contractors = AsyncMock(return_value=([], 10))
+        db.get_admin_analytics_aggregates = AsyncMock(return_value={})
+
+        mock_agent = MagicMock()
+        mock_agent.get_metrics = AsyncMock(return_value={"calls": 10, "errors": 0, "avg_duration_ms": 5})
+        mock_orch = MagicMock()
+        mock_orch.agents = {"support": mock_agent}
 
         from src.api.main import app
         from src.api.middleware.auth import get_admin_user
@@ -170,11 +180,15 @@ class TestGetAnalytics:
         app.dependency_overrides[get_admin_user] = lambda: admin
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
-                client = TestClient(app, raise_server_exceptions=False)
-                resp = client.get("/api/v1/admin/analytics")
+                with patch("src.api.routes.admin.get_orchestrator", return_value=mock_orch):
+                    client = TestClient(app, raise_server_exceptions=False)
+                    resp = client.get("/api/v1/admin/analytics")
             assert resp.status_code == 200
             data = resp.json()
             assert "activeOffers" in data
+            assert data["openTickets"] == 3
+            assert data["resolvedToday"] == 4
+            assert data["totalContractors"] == 10
         finally:
             app.dependency_overrides.clear()
 
@@ -184,6 +198,10 @@ class TestGetAnalytics:
         db.get_escalation_stats = AsyncMock(side_effect=RuntimeError("db error"))
         db.get_all_offers_admin = AsyncMock(side_effect=RuntimeError("db error"))
         db.list_contractors = AsyncMock(side_effect=RuntimeError("db error"))
+        db.get_admin_analytics_aggregates = AsyncMock(side_effect=RuntimeError("db error"))
+
+        mock_orch = MagicMock()
+        mock_orch.agents = {}
 
         from src.api.main import app
         from src.api.middleware.auth import get_admin_user
@@ -191,8 +209,9 @@ class TestGetAnalytics:
         app.dependency_overrides[get_admin_user] = lambda: admin
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
-                client = TestClient(app, raise_server_exceptions=False)
-                resp = client.get("/api/v1/admin/analytics")
+                with patch("src.api.routes.admin.get_orchestrator", return_value=mock_orch):
+                    client = TestClient(app, raise_server_exceptions=False)
+                    resp = client.get("/api/v1/admin/analytics")
             assert resp.status_code == 200  # errors are caught and defaults used
         finally:
             app.dependency_overrides.clear()
@@ -893,5 +912,34 @@ class TestOutreachQueue:
                 resp = client.get("/api/v1/admin/outreach/queue")
             assert resp.status_code == 200
             assert resp.json()["total"] == 1
+        finally:
+            app.dependency_overrides.clear()
+
+
+class TestContractorMembershipAdminPatch:
+    def test_patch_contractor_membership_ok(self):
+        admin = _make_admin()
+        db = AsyncMock()
+        db.get_contractor = AsyncMock(return_value={"id": "c1", "membership_status": "canceled"})
+        db.admin_update_contractor_membership = AsyncMock(
+            return_value={"id": "c1", "membership_status": "active"},
+        )
+        db.create_audit_log = AsyncMock()
+
+        from src.api.main import app
+        from src.api.middleware.auth import get_admin_user
+
+        app.dependency_overrides[get_admin_user] = lambda: admin
+        try:
+            with patch("src.api.routes.admin.get_postgres_client", return_value=db):
+                client = TestClient(app, raise_server_exceptions=False)
+                resp = client.patch(
+                    "/api/v1/admin/contractors/c1/membership",
+                    json={"membership_status": "active"},
+                )
+            assert resp.status_code == 200
+            assert resp.json()["membership_status"] == "active"
+            db.admin_update_contractor_membership.assert_awaited_once()
+            db.create_audit_log.assert_awaited_once()
         finally:
             app.dependency_overrides.clear()

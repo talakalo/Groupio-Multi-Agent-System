@@ -5,12 +5,15 @@ import type { NextRequest } from 'next/server';
 const protectedRoutes = [
   '/dashboard',
   '/offers',
+  '/orders',
   '/contractors',
   '/building',
   '/profile',
   '/chat',
   '/architecture',
   '/payments',
+  '/checkout',
+  '/change-password',
   '/contractor',
   '/admin',
   '/buildings-manager',
@@ -20,9 +23,34 @@ const protectedRoutes = [
 const authRoutes = ['/login', '/signup'];
 
 // Routes that require specific roles (authentication already enforced above)
+const residentRoutes = [
+  '/dashboard',
+  '/offers',
+  '/orders',
+  '/contractors',
+  '/building',
+  '/profile',
+  '/chat',
+  '/architecture',
+  '/payments',
+  '/checkout',
+  '/change-password',
+];
 const contractorRoutes = ['/contractor'];
 const adminRoutes = ['/admin'];
 const buildingsManagerRoutes = ['/buildings-manager'];
+
+const roleDefaultRoutes: Record<string, string> = {
+  resident: '/dashboard',
+  contractor: '/contractor/dashboard',
+  buildings_manager: '/buildings-manager/dashboard',
+  admin: '/admin/dashboard',
+  super_admin: '/admin/dashboard',
+};
+
+function matchesRoute(pathname: string, route: string): boolean {
+  return pathname === route || pathname.startsWith(`${route}/`);
+}
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -65,17 +93,12 @@ export function middleware(request: NextRequest) {
   }
 
   // Handle protected routes
-  const isProtectedRoute = protectedRoutes.some((route) =>
-    pathname.startsWith(route)
-  );
-  const isAuthRoute = authRoutes.some((route) => pathname.startsWith(route));
-  const isContractorRoute = contractorRoutes.some((route) =>
-    pathname.startsWith(route)
-  );
-  const isAdminRoute = adminRoutes.some((route) => pathname.startsWith(route));
-  const isBuildingsManagerRoute = buildingsManagerRoutes.some((route) =>
-    pathname.startsWith(route)
-  );
+  const isProtectedRoute = protectedRoutes.some((route) => matchesRoute(pathname, route));
+  const isAuthRoute = authRoutes.some((route) => matchesRoute(pathname, route));
+  const isResidentRoute = residentRoutes.some((route) => matchesRoute(pathname, route));
+  const isContractorRoute = contractorRoutes.some((route) => matchesRoute(pathname, route));
+  const isAdminRoute = adminRoutes.some((route) => matchesRoute(pathname, route));
+  const isBuildingsManagerRoute = buildingsManagerRoutes.some((route) => matchesRoute(pathname, route));
 
   // Redirect unauthenticated users from protected routes
   if (isProtectedRoute && !isAuthenticated) {
@@ -94,34 +117,55 @@ export function middleware(request: NextRequest) {
     } else if (['admin', 'super_admin', 'buildings_manager'].includes(userRole || '')) {
       const adminUrl = process.env.NEXT_PUBLIC_ADMIN_URL || 'http://localhost:3001';
       return NextResponse.redirect(`${adminUrl}/dashboard`);
-    } else if (userRole === 'contractor') {
-      url.pathname = '/contractor/dashboard';
     } else {
-      url.pathname = '/dashboard';
+      url.pathname = roleDefaultRoutes[userRole || 'resident'] || '/dashboard';
     }
     url.searchParams.delete('redirect');
     return NextResponse.redirect(url);
   }
 
+  // If role hint is unavailable/corrupt, do not block here. Client layouts and API RBAC enforce access.
+  if (!userRole) {
+    const response = NextResponse.next();
+    response.headers.set('x-locale', locale);
+    response.headers.set('X-Frame-Options', 'DENY');
+    response.headers.set('X-Content-Type-Options', 'nosniff');
+    response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+    return response;
+  }
+
   // Check role-gated routes (only reached when authenticated)
-  if (isContractorRoute && userRole !== 'contractor') {
+  if (isResidentRoute && !['resident', 'admin', 'super_admin'].includes(userRole)) {
     const url = request.nextUrl.clone();
-    url.pathname = '/dashboard';
+    url.pathname = roleDefaultRoutes[userRole] || '/login';
     return NextResponse.redirect(url);
   }
 
-  if (isAdminRoute && !['admin', 'super_admin'].includes(userRole || '')) {
+  if (isContractorRoute && !['contractor', 'admin', 'super_admin'].includes(userRole)) {
     const url = request.nextUrl.clone();
-    url.pathname = '/dashboard';
+    url.pathname = roleDefaultRoutes[userRole] || '/dashboard';
+    return NextResponse.redirect(url);
+  }
+
+  if (isAdminRoute && !['admin', 'super_admin'].includes(userRole)) {
+    const url = request.nextUrl.clone();
+    url.pathname = roleDefaultRoutes[userRole] || '/dashboard';
     return NextResponse.redirect(url);
   }
 
   if (
     isBuildingsManagerRoute &&
-    !['buildings_manager', 'admin', 'super_admin'].includes(userRole || '')
+    !['buildings_manager', 'admin', 'super_admin'].includes(userRole)
   ) {
     const url = request.nextUrl.clone();
-    url.pathname = '/dashboard';
+    url.pathname = roleDefaultRoutes[userRole] || '/dashboard';
+    return NextResponse.redirect(url);
+  }
+
+  // Admin shortcut — redirect after auth/role checks (more reliable than client-only redirect).
+  if (pathname === '/admin/buildings' && ['admin', 'super_admin'].includes(userRole)) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/buildings-manager/buildings';
     return NextResponse.redirect(url);
   }
 

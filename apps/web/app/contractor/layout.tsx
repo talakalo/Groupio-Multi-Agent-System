@@ -13,6 +13,7 @@ import {
   ClipboardList,
   Mail,
   Loader2,
+  DollarSign,
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -20,9 +21,10 @@ import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 
 import { apiClient } from '@/lib/api/client';
-import { useAuthStore } from '@/lib/stores/authStore';
+import { useAuthHasHydrated, useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
 import { NotificationPanel } from '@/components/shared/NotificationPanel';
+import { LanguageToggle } from '@/components/shared/LanguageToggle';
 
 interface NavItem {
   href: string;
@@ -33,8 +35,8 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { href: '/contractor/dashboard', labelKey: 'dashboard', icon: LayoutDashboard },
   { href: '/contractor/offers/active', labelKey: 'activeOffers', icon: ClipboardList },
-  { href: '/contractor/offers/create', labelKey: 'createOffer', icon: PlusCircle },
   { href: '/contractor/projects', labelKey: 'projects', icon: FolderKanban },
+  { href: '/contractor/earnings', labelKey: 'earnings', icon: DollarSign },
   { href: '/contractor/profile', labelKey: 'profile', icon: UserCircle },
 ];
 
@@ -53,16 +55,16 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
   const [resending, setResending] = useState(false);
   const refreshAccessToken = useAuthStore((s) => s.refreshAccessToken);
   const logout = useAuthStore((s) => s.logout);
+  const hasHydrated = useAuthHasHydrated();
 
   useEffect(() => {
-    if (!token && isAuthenticated) {
+    if (!hasHydrated) return;
+    if (!token) {
       refreshAccessToken().then((success) => {
         if (!success) router.replace('/login');
       });
-    } else if (!token && !isAuthenticated) {
-      router.replace('/login');
     }
-  }, [token, isAuthenticated, router, refreshAccessToken]);
+  }, [hasHydrated, token, router, refreshAccessToken]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -76,8 +78,16 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
     }
   }, [userMenuOpen]);
 
-  if (!token && !isAuthenticated) {
+  if (!hasHydrated) {
     return null;
+  }
+
+  if (!token) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
+      </div>
+    );
   }
 
 
@@ -200,10 +210,10 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
           >
             <div className="flex items-center gap-2 text-amber-800 text-sm">
               <Mail className="h-4 w-4 flex-shrink-0" aria-hidden />
-              <span>נא לאמת את כתובת האימייל שלכם. בדקו את תיבת הדואר ולחצו על קישור האימות.</span>
+              <span>{t('verifyEmailBanner')}</span>
             </div>
             {resendSent ? (
-              <span className="text-emerald-700 text-sm font-medium">נשלח! בדקו את האימייל.</span>
+              <span className="text-emerald-700 text-sm font-medium">{t('resendSent')}</span>
             ) : (
               <button
                 type="button"
@@ -222,10 +232,10 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
                 {resending ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    שולח...
+                    {t('resendSending')}
                   </>
                 ) : (
-                  'שליחת קישור אימות מחדש'
+                  t('resendVerification')
                 )}
               </button>
             )}
@@ -247,6 +257,7 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
             <div className="flex-1" />
 
             <div className="flex items-center gap-3">
+              <LanguageToggle />
               <NotificationPanel />
 
               <div className="relative" ref={userMenuRef}>
@@ -254,6 +265,7 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
                   type="button"
                   onClick={() => setUserMenuOpen((o) => !o)}
                   className="flex items-center gap-2 ps-3 pe-2 py-1.5 rounded-xl hover:bg-gray-100 transition-colors"
+                  aria-label={t('accountMenu')}
                   aria-expanded={userMenuOpen}
                   aria-haspopup="true"
                 >

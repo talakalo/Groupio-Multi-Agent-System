@@ -1,10 +1,12 @@
 """Shared agent tools registry and utilities."""
 
 import logging
+from datetime import UTC, datetime
 from typing import Any
 
 from src.databases.graph_store import get_graph_store
 from src.databases.postgres import get_postgres_client
+from src.integrations.gov.client import get_gov_client
 from src.rag.pipeline import get_rag_pipeline
 from src.services.enrichment import get_enrichment_service
 
@@ -37,6 +39,7 @@ class ToolRegistry:
             "create_support_ticket": self._create_support_ticket,
             "normalize_address": self._normalize_address,
             "verify_contractor_license": self._verify_contractor_license,
+            "verify_contractor_registration": self._verify_contractor_registration,
             "get_municipality_info": self._get_municipality_info,
         }
 
@@ -176,6 +179,63 @@ class ToolRegistry:
             "source": result.source,
             "verified_at": result.verified_at.isoformat(),
             "raw_response": result.raw_response,
+        }
+
+    async def _verify_contractor_registration(
+        self,
+        contractor_id: str,
+        business_name: str,
+        company_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Look up contractor in the ICA companies registry and persist the result.
+
+        Calls data.gov.il via GovDataClient.lookup_company, writes a row to
+        contractor_verification_metadata, and returns a structured result dict.
+        source is always "data_gov_il_companies".
+        Absence of a match is confidence=0 — it is NOT counted as negative evidence.
+        """
+        source = "data_gov_il_companies"
+        gov = get_gov_client()
+        db = get_postgres_client()
+
+        result = gov.lookup_company(name=business_name, company_id=company_id, limit=5)
+
+        verified = False
+        confidence = 0.0
+        raw_response: dict | None = None
+
+        if result.ok and result.value:
+            best = result.value[0]
+            verified = best.is_active
+            confidence = 0.75 if best.is_active else 0.4
+            raw_response = {
+                "company_id": best.company_id,
+                "name": best.name,
+                "status": best.status,
+                "city": best.city,
+                "address": best.address,
+                "cache_hit": result.cache_hit,
+            }
+
+        try:
+            await db.upsert_contractor_verification(
+                contractor_id=contractor_id,
+                source=source,
+                verified=verified,
+                confidence=confidence,
+                raw_response=raw_response or {},
+            )
+        except Exception as exc:
+            logger.warning("Failed to persist verification for contractor %s: %s", contractor_id, exc)
+
+        return {
+            "contractor_id": contractor_id,
+            "source": source,
+            "verified": verified,
+            "confidence": confidence,
+            "verified_at": datetime.now(UTC).isoformat(),
+            "raw_response": raw_response,
+            "found": result.ok and bool(result.value),
         }
 
     async def _get_municipality_info(self, city: str) -> dict[str, Any] | None:

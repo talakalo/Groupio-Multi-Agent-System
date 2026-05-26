@@ -96,6 +96,7 @@ class TestListOffers:
     def test_list_offers_ok(self):
         user = _make_user()
         db = AsyncMock()
+        db.get_building_ids_for_user = AsyncMock(return_value=["b1"])
         db.list_offers = AsyncMock(return_value=([_make_offer()], 1))
 
         from src.api.main import app
@@ -111,6 +112,28 @@ class TestListOffers:
         finally:
             app.dependency_overrides.clear()
 
+    def test_list_offers_resident_scoped_to_building_when_no_building_id_param(self):
+        """Resident membership resolves scope when building_id query param omitted."""
+        user = _make_user()
+        db = AsyncMock()
+        db.get_building_ids_for_user = AsyncMock(return_value=["b1"])
+        db.list_offers = AsyncMock(return_value=([], 0))
+
+        from src.api.main import app
+        from src.api.middleware.auth import get_current_user
+
+        app.dependency_overrides[get_current_user] = lambda: user
+        try:
+            with patch("src.api.routes.offers.get_postgres_client", return_value=db):
+                client = TestClient(app, raise_server_exceptions=False)
+                resp = client.get("/api/v1/offers/")
+            assert resp.status_code == 200
+            db.list_offers.assert_called_once()
+            call_filters = db.list_offers.call_args[1]["filters"]
+            assert call_filters.get("building_id") == "b1"
+        finally:
+            app.dependency_overrides.clear()
+
 
 # ---------------------------------------------------------------------------
 # GET /offers/{offer_id}
@@ -122,6 +145,7 @@ class TestGetOffer:
         user = _make_user()
         db = AsyncMock()
         db.get_offer = AsyncMock(return_value=_make_offer())
+        db.is_user_in_building = AsyncMock(return_value=True)
 
         from src.api.main import app
         from src.api.middleware.auth import get_current_user
@@ -328,6 +352,107 @@ class TestCreateOffer:
         finally:
             app.dependency_overrides.clear()
 
+    def test_create_offer_contractor_ok_when_membership_active(self):
+        now = datetime.now(UTC)
+        user = UserInDB(
+            id="user-1",
+            email="c@example.com",
+            full_name="Co",
+            phone="0501234567",
+            role=UserRole.CONTRACTOR,
+            hashed_password="h",
+            is_active=True,
+            is_verified=True,
+            preferred_language="he",
+            contractor_id="contractor-1",
+            created_at=now,
+            updated_at=now,
+        )
+        db = AsyncMock()
+        db.get_building = AsyncMock(return_value={"id": "b1"})
+        db.get_contractor = AsyncMock(
+            return_value={"id": "contractor-1", "membership_status": "active"},
+        )
+        db.create_offer = AsyncMock(return_value=_make_offer(created_by="user-1"))
+
+        embeddings = AsyncMock()
+        embeddings.embed_text = AsyncMock(return_value=[0.1, 0.2])
+        vs = AsyncMock()
+        vs.upsert = AsyncMock()
+
+        from src.api.main import app
+        from src.api.middleware.auth import get_current_user
+
+        app.dependency_overrides[get_current_user] = lambda: user
+        try:
+            with patch("src.api.routes.offers.get_postgres_client", return_value=db):
+                with patch("src.api.routes.offers.get_embedding_client", return_value=embeddings):
+                    with patch("src.api.routes.offers.get_vector_store", return_value=vs):
+                        client = TestClient(app, raise_server_exceptions=False)
+                        resp = client.post(
+                            "/api/v1/offers/",
+                            json={
+                                "title": "Solar Panels Deal",
+                                "description": "Group buy for solar panels",
+                                "category": "electrical",
+                                "base_price": 5000.0,
+                                "min_participants": 5,
+                                "max_participants": 50,
+                                "building_id": "b1",
+                                "created_by": "user-1",
+                            },
+                        )
+            assert resp.status_code == 200
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_create_offer_contractor_blocked_when_membership_canceled(self):
+        now = datetime.now(UTC)
+        user = UserInDB(
+            id="user-1",
+            email="c@example.com",
+            full_name="Co",
+            phone="0501234567",
+            role=UserRole.CONTRACTOR,
+            hashed_password="h",
+            is_active=True,
+            is_verified=True,
+            preferred_language="he",
+            contractor_id="contractor-1",
+            created_at=now,
+            updated_at=now,
+        )
+        db = AsyncMock()
+        db.get_building = AsyncMock(return_value={"id": "b1"})
+        db.get_contractor = AsyncMock(
+            return_value={"id": "contractor-1", "membership_status": "canceled"},
+        )
+
+        from src.api.main import app
+        from src.api.middleware.auth import get_current_user
+
+        app.dependency_overrides[get_current_user] = lambda: user
+        try:
+            with patch("src.api.routes.offers.get_postgres_client", return_value=db):
+                client = TestClient(app, raise_server_exceptions=False)
+                resp = client.post(
+                    "/api/v1/offers/",
+                    json={
+                        "title": "Solar Panels Deal",
+                        "description": "Group buy for solar panels",
+                        "category": "electrical",
+                        "base_price": 5000.0,
+                        "min_participants": 5,
+                        "max_participants": 50,
+                        "building_id": "b1",
+                        "created_by": "user-1",
+                    },
+                )
+            assert resp.status_code == 403
+            assert "membership" in resp.json()["detail"].lower()
+        finally:
+            app.dependency_overrides.clear()
+
 
 # ---------------------------------------------------------------------------
 # POST /offers/{offer_id}/join
@@ -339,6 +464,7 @@ class TestJoinOffer:
         user = _make_user()
         db = AsyncMock()
         db.get_offer = AsyncMock(return_value=_make_offer(status="pending"))
+        db.is_user_in_building = AsyncMock(return_value=True)
         db.has_user_joined_offer = AsyncMock(return_value=False)
         db.join_offer = AsyncMock()
         db.get_offer_participants = AsyncMock(return_value=[])
@@ -546,6 +672,7 @@ class TestGetParticipants:
         user = _make_user()
         db = AsyncMock()
         db.get_offer = AsyncMock(return_value=_make_offer())
+        db.is_user_in_building = AsyncMock(return_value=True)
         db.get_offer_participants = AsyncMock(
             return_value=[{"user_id": "user-1", "email": "a@b.com", "unit_number": "4A"}]
         )
@@ -738,14 +865,18 @@ class TestMatchContractor:
 
     def test_match_resident_forbidden(self):
         user = _make_user()
+        db = AsyncMock()
+        db.get_offer = AsyncMock(return_value=_make_offer(status="pending"))
+        db.get_contractor = AsyncMock(return_value={"id": "c1", "business_name": "Co"})
 
         from src.api.main import app
         from src.api.middleware.auth import get_current_user
 
         app.dependency_overrides[get_current_user] = lambda: user
         try:
-            client = TestClient(app, raise_server_exceptions=False)
-            resp = client.post("/api/v1/offers/o1/match", json={"contractor_id": "c1", "final_price": 4500.0})
+            with patch("src.api.routes.offers.get_postgres_client", return_value=db):
+                client = TestClient(app, raise_server_exceptions=False)
+                resp = client.post("/api/v1/offers/o1/match", json={"contractor_id": "c1", "final_price": 4500.0})
             assert resp.status_code == 403
         finally:
             app.dependency_overrides.clear()
@@ -848,17 +979,20 @@ class TestResolveUndersubscription:
 
     def test_resolve_resident_forbidden(self):
         user = _make_user()
+        db = AsyncMock()
+        db.get_offer = AsyncMock(return_value=_make_offer())
 
         from src.api.main import app
         from src.api.middleware.auth import get_current_user
 
         app.dependency_overrides[get_current_user] = lambda: user
         try:
-            client = TestClient(app, raise_server_exceptions=False)
-            resp = client.post(
-                "/api/v1/offers/o1/resolve-undersubscription",
-                params={"action": "lower_minimum", "new_minimum": 3},
-            )
+            with patch("src.api.routes.offers.get_postgres_client", return_value=db):
+                client = TestClient(app, raise_server_exceptions=False)
+                resp = client.post(
+                    "/api/v1/offers/o1/resolve-undersubscription",
+                    params={"action": "lower_minimum", "new_minimum": 3},
+                )
             assert resp.status_code == 403
         finally:
             app.dependency_overrides.clear()

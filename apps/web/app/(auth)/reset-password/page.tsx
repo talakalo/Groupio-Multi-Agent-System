@@ -4,36 +4,39 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Building2, Loader2, CheckCircle2, AlertCircle, KeyRound } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Suspense, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { apiClient, ApiError } from "@/lib/api/client";
 
-const schema = z
-  .object({
-    password: z
-      .string()
-      .min(8, "סיסמה חייבת להכיל לפחות 8 תווים")
-      .regex(/[A-Z]/, "סיסמה חייבת לכלול לפחות אות גדולה אחת באנגלית")
-      .regex(/[0-9]/, "סיסמה חייבת לכלול לפחות ספרה אחת"),
-    confirmPassword: z.string(),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "הסיסמאות אינן תואמות",
-    path: ["confirmPassword"],
-  });
-
-type FormData = z.infer<typeof schema>;
-
 function ResetPasswordForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const t = useTranslations("resetPassword");
   const token = searchParams.get("token");
+
+  const schema = z
+    .object({
+      password: z
+        .string()
+        .min(8, t("validationMinLength"))
+        .regex(/[A-Z]/, t("validationUppercase"))
+        .regex(/[0-9]/, t("validationDigit")),
+      confirmPassword: z.string(),
+    })
+    .refine((data) => data.password === data.confirmPassword, {
+      message: t("validationMismatch"),
+      path: ["confirmPassword"],
+    });
+
+  type FormData = z.infer<typeof schema>;
 
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isExpiredError, setIsExpiredError] = useState(false);
 
   const {
     register,
@@ -45,11 +48,13 @@ function ResetPasswordForm() {
 
   const onSubmit = async (data: FormData) => {
     if (!token) {
-      setError("קישור האיפוס אינו תקין. בקשו קישור חדש.");
+      setError(t("errorExpired"));
+      setIsExpiredError(true);
       return;
     }
     setIsLoading(true);
     setError(null);
+    setIsExpiredError(false);
     try {
       await apiClient.confirmPasswordReset(token, data.password);
       setSuccess(true);
@@ -58,11 +63,14 @@ function ResetPasswordForm() {
       const status = err instanceof ApiError ? err.status : null;
       const message = err instanceof Error ? err.message : "";
       if (status === 400 || message.toLowerCase().includes("expired") || message.toLowerCase().includes("invalid")) {
-        setError("הקישור פג תוקף או אינו תקין. בקשו קישור איפוס חדש.");
+        setError(t("errorExpired"));
+        setIsExpiredError(true);
       } else if (status === 429) {
-        setError("יותר מדי ניסיונות. המתינו מספר דקות ונסו שוב.");
+        setError(t("errorTooManyAttempts"));
+        setIsExpiredError(false);
       } else {
-        setError("אירעה שגיאה. נסו שוב מאוחר יותר.");
+        setError(t("errorGeneral"));
+        setIsExpiredError(false);
       }
     } finally {
       setIsLoading(false);
@@ -73,12 +81,10 @@ function ResetPasswordForm() {
     return (
       <div className="card py-8 text-center space-y-4">
         <AlertCircle className="h-12 w-12 text-red-500 mx-auto" aria-hidden="true" />
-        <h1 className="text-xl font-bold text-gray-900">קישור לא תקין</h1>
-        <p className="text-sm text-gray-600">
-          קישור האיפוס חסר או שגוי. ודאו שהעתקתם את הקישור המלא מהאימייל.
-        </p>
+        <h1 className="text-xl font-bold text-gray-900">{t("invalidLinkTitle")}</h1>
+        <p className="text-sm text-gray-600">{t("invalidLinkMessage")}</p>
         <Link href="/forgot-password" className="btn-primary inline-block">
-          בקשת קישור חדש
+          {t("requestNewLink")}
         </Link>
       </div>
     );
@@ -88,12 +94,10 @@ function ResetPasswordForm() {
     return (
       <div className="card py-8 text-center space-y-4">
         <CheckCircle2 className="h-12 w-12 text-emerald-500 mx-auto" aria-hidden="true" />
-        <h1 className="text-xl font-bold text-gray-900">הסיסמה אופסה בהצלחה!</h1>
-        <p className="text-sm text-gray-600">
-          הסיסמה שונתה. מועברים להתחברות...
-        </p>
+        <h1 className="text-xl font-bold text-gray-900">{t("successTitle")}</h1>
+        <p className="text-sm text-gray-600">{t("successMessage")}</p>
         <Link href="/login" className="btn-primary inline-block">
-          התחברות
+          {t("loginButton")}
         </Link>
       </div>
     );
@@ -101,18 +105,16 @@ function ResetPasswordForm() {
 
   return (
     <div className="card">
-      <h1 className="text-xl font-bold text-gray-900 mb-2">איפוס סיסמה</h1>
-      <p className="text-sm text-gray-600 mb-6">
-        הזינו סיסמה חדשה לחשבונכם. הסיסמה חייבת להכיל לפחות 8 תווים, אות גדולה וספרה.
-      </p>
+      <h1 className="text-xl font-bold text-gray-900 mb-2">{t("title")}</h1>
+      <p className="text-sm text-gray-600 mb-6">{t("subtitle")}</p>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
         {error && (
           <div role="alert" className="bg-red-50 text-red-700 rounded-xl px-4 py-3 text-sm space-y-2">
             <p>{error}</p>
-            {(error.includes("פג תוקף") || error.includes("לא תקין")) && (
+            {isExpiredError && (
               <Link href="/forgot-password" className="underline font-medium text-red-700 hover:text-red-800">
-                בקשת קישור חדש
+                {t("invalidLinkRef")}
               </Link>
             )}
           </div>
@@ -123,7 +125,7 @@ function ResetPasswordForm() {
             htmlFor="reset-password"
             className="block text-sm font-medium text-gray-700 mb-1.5"
           >
-            סיסמה חדשה
+            {t("newPasswordLabel")}
           </label>
           <div className="relative">
             <KeyRound className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" aria-hidden="true" />
@@ -131,7 +133,7 @@ function ResetPasswordForm() {
               id="reset-password"
               type="password"
               autoComplete="new-password"
-              placeholder="לפחות 8 תווים"
+              placeholder={t("newPasswordPlaceholder")}
               className="input-field pr-10"
               aria-describedby={errors.password ? "reset-password-error" : undefined}
               aria-invalid={!!errors.password}
@@ -150,7 +152,7 @@ function ResetPasswordForm() {
             htmlFor="reset-confirm-password"
             className="block text-sm font-medium text-gray-700 mb-1.5"
           >
-            אימות סיסמה
+            {t("confirmPasswordLabel")}
           </label>
           <div className="relative">
             <KeyRound className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" aria-hidden="true" />
@@ -158,7 +160,7 @@ function ResetPasswordForm() {
               id="reset-confirm-password"
               type="password"
               autoComplete="new-password"
-              placeholder="הזינו שוב את הסיסמה"
+              placeholder={t("confirmPasswordPlaceholder")}
               className="input-field pr-10"
               aria-describedby={errors.confirmPassword ? "reset-confirm-password-error" : undefined}
               aria-invalid={!!errors.confirmPassword}
@@ -180,10 +182,10 @@ function ResetPasswordForm() {
           {isLoading ? (
             <>
               <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
-              <span>מאפס...</span>
+              <span>{t("resetting")}</span>
             </>
           ) : (
-            "אפס סיסמה"
+            t("submitButton")
           )}
         </button>
       </form>
@@ -192,6 +194,7 @@ function ResetPasswordForm() {
 }
 
 export default function ResetPasswordPage() {
+  const t = useTranslations("resetPassword");
   return (
     <div className="w-full max-w-md space-y-6">
       <div className="text-center">
@@ -205,7 +208,7 @@ export default function ResetPasswordPage() {
         fallback={
           <div className="card py-8 text-center">
             <Loader2 className="h-8 w-8 animate-spin text-primary-500 mx-auto" aria-hidden="true" />
-            <p className="text-sm text-gray-500 mt-2">טוען...</p>
+            <p className="text-sm text-gray-500 mt-2">{t("loading")}</p>
           </div>
         }
       >
@@ -214,7 +217,7 @@ export default function ResetPasswordPage() {
 
       <p className="text-center text-sm text-gray-600">
         <Link href="/login" className="text-primary-600 hover:text-primary-700 font-medium">
-          חזרה להתחברות
+          {t("backToLogin")}
         </Link>
       </p>
     </div>

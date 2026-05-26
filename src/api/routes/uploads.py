@@ -9,7 +9,7 @@ from src.api.middleware.auth import get_current_user
 from src.databases.postgres import get_postgres_client
 from src.databases.redis_client import get_redis_client
 from src.models.user import UserInDB
-from src.services.storage import StorageError, get_storage_service
+from src.services.storage import MAX_FILE_SIZE, StorageError, get_storage_service
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +18,7 @@ router = APIRouter(tags=["uploads"])
 # File uploads are rate-limited separately from the main message endpoint.
 # Uploads are heavier operations (disk I/O, storage API calls) and must be
 # throttled more aggressively to prevent abuse/DoS.
-_UPLOAD_RATE_LIMIT = 10   # requests
+_UPLOAD_RATE_LIMIT = 10  # requests
 _UPLOAD_RATE_WINDOW = 60  # per 60 seconds
 
 
@@ -58,6 +58,9 @@ async def upload_architecture_plan(
     await _check_upload_rate_limit(current_user)
     storage = get_storage_service()
     data = await file.read()
+
+    if len(data) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=413, detail="File too large. Max 20 MB.")
 
     try:
         storage.validate_file(

@@ -13,10 +13,11 @@ import {
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
+import { LanguageToggle } from '@/components/shared/LanguageToggle';
 import { NotificationPanel } from '@/components/shared/NotificationPanel';
-import { useAuthStore } from '@/lib/stores/authStore';
+import { useAuthHasHydrated, useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
 
 interface NavItem {
@@ -36,20 +37,52 @@ export default function BuildingsManagerLayout({ children }: { children: React.R
   const router = useRouter();
   const t = useTranslations('buildingsManagerNav');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
   const token = useAuthStore((s) => s.accessToken);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
+  const refreshAccessToken = useAuthStore((s) => s.refreshAccessToken);
+  const hasHydrated = useAuthHasHydrated();
 
   useEffect(() => {
+    if (!hasHydrated) return;
     if (!token) {
-      router.replace('/login');
+      refreshAccessToken().then((ok) => {
+        if (!ok) router.replace('/login');
+      });
       return;
     }
-    if (user && user.role !== 'buildings_manager' && user.role !== 'admin' && user.role !== 'super_admin') {
-      router.replace('/dashboard');
+    if (user) {
+      if (user.role === 'admin' || user.role === 'super_admin') {
+        // Admin/super_admin landing on BM dashboard → send them to admin area
+        if (pathname === '/buildings-manager/dashboard') {
+          router.replace('/admin/dashboard');
+        }
+        return;
+      }
+      if (user.role !== 'buildings_manager') {
+        router.replace('/dashboard');
+      }
     }
-  }, [token, user, router]);
+  }, [hasHydrated, token, user, router, refreshAccessToken, pathname]);
 
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    }
+    if (userMenuOpen) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [userMenuOpen]);
+
+  if (!hasHydrated) {
+    return null;
+  }
   if (!token) {
     return null;
   }
@@ -64,14 +97,15 @@ export default function BuildingsManagerLayout({ children }: { children: React.R
   };
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+  const accountActive = isActive('/buildings-manager/account');
 
   const sidebar = (
     <nav className="flex flex-col h-full">
       {/* Logo */}
       <div className="flex items-center gap-2 px-6 py-5 border-b border-gray-100">
-        <Building2 className="h-8 w-8 text-emerald-500" />
+        <Building2 className="h-8 w-8 text-primary-500" />
         <div>
-          <span className="text-xl font-bold text-emerald-600">Groupio</span>
+          <span className="text-xl font-bold text-primary-600">Groupio</span>
           <p className="text-xs text-gray-400 leading-none mt-0.5">{t('role')}</p>
         </div>
       </div>
@@ -89,33 +123,47 @@ export default function BuildingsManagerLayout({ children }: { children: React.R
               className={cn(
                 'flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors',
                 active
-                  ? 'bg-emerald-50 text-emerald-700'
+                  ? 'bg-primary-50 text-primary-700'
                   : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
               )}
             >
-              <Icon className={cn('h-5 w-5 flex-shrink-0', active ? 'text-emerald-500' : 'text-gray-400')} />
+              <Icon className={cn('h-5 w-5 flex-shrink-0', active ? 'text-primary-500' : 'text-gray-400')} />
               <span>{t(item.labelKey)}</span>
             </Link>
           );
         })}
       </div>
 
-      {/* User section */}
+      {/* Account — logout via header menu or account page */}
       <div className="border-t border-gray-100 px-4 py-4">
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="flex items-center gap-3 w-full text-start text-sm text-gray-600 hover:text-gray-900 transition-colors"
+        <Link
+          href="/buildings-manager/account"
+          onClick={() => setSidebarOpen(false)}
+          className={cn(
+            'flex items-center gap-3 w-full text-start text-sm transition-colors rounded-xl px-2 py-2 -mx-2',
+            accountActive
+              ? 'bg-primary-50 text-primary-700 hover:bg-primary-50'
+              : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+          )}
+          aria-label={t('myAccount')}
+          aria-current={accountActive ? 'page' : undefined}
         >
-          <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
-            <UserCircle className="h-5 w-5 text-emerald-600" />
+          <div
+            className={cn(
+              'w-8 h-8 rounded-full flex items-center justify-center shrink-0',
+              accountActive ? 'bg-primary-200' : 'bg-primary-100'
+            )}
+          >
+            <UserCircle
+              className={cn('h-5 w-5', accountActive ? 'text-primary-700' : 'text-primary-600')}
+              aria-hidden
+            />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="font-medium text-gray-900 truncate">{user?.fullName ?? t('myAccount')}</p>
-            <p className="text-xs text-gray-400 truncate">{user?.email}</p>
+            <p className="font-medium text-gray-900 truncate">{t('myAccount')}</p>
+            <p className="text-xs text-gray-500 truncate">{t('myAccountHint')}</p>
           </div>
-          <LogOut className="h-4 w-4 text-gray-400" />
-        </button>
+        </Link>
       </div>
     </nav>
   );
@@ -170,17 +218,53 @@ export default function BuildingsManagerLayout({ children }: { children: React.R
             <div className="flex-1" />
 
             <div className="flex items-center gap-3">
+              <LanguageToggle />
               <NotificationPanel />
 
-              <button
-                type="button"
-                className="flex items-center gap-2 ps-3 pe-2 py-1.5 rounded-xl hover:bg-gray-100 transition-colors"
-              >
-                <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
-                  <UserCircle className="h-5 w-5 text-emerald-600" />
-                </div>
-                <ChevronDown className="h-4 w-4 text-gray-400" />
-              </button>
+              <div className="relative" ref={userMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setUserMenuOpen((o) => !o)}
+                  className="flex items-center gap-2 ps-3 pe-2 py-1.5 rounded-xl hover:bg-gray-100 transition-colors"
+                  aria-label={t('accountMenu')}
+                  aria-expanded={userMenuOpen}
+                  aria-haspopup="true"
+                >
+                  <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center">
+                    <UserCircle className="h-5 w-5 text-primary-600" />
+                  </div>
+                  <ChevronDown
+                    className={cn('h-4 w-4 text-gray-400 transition-transform', userMenuOpen && 'rotate-180')}
+                  />
+                </button>
+                {userMenuOpen && (
+                  <div className="absolute end-0 top-full mt-2 w-52 rounded-xl border border-gray-200 bg-white py-1 shadow-lg z-50">
+                    <div className="px-4 py-2 border-b border-gray-100">
+                      <p className="font-medium text-gray-900 truncate">{user?.fullName ?? t('myAccount')}</p>
+                      <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                    </div>
+                    <Link
+                      href="/buildings-manager/account"
+                      onClick={() => setUserMenuOpen(false)}
+                      className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    >
+                      <UserCircle className="h-4 w-4" />
+                      {t('profile')}
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUserMenuOpen(false);
+                        void handleLogout();
+                      }}
+                      className="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      {t('logout')}
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </header>

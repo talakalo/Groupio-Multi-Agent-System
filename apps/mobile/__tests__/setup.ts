@@ -144,6 +144,8 @@ vi.mock('react-native-paper', () => {
       },
       dark: false,
     }),
+    TextInput: wrap('TextInput'),
+    HelperText: wrap('HelperText'),
     Provider: wrap('PaperProvider'),
     DefaultTheme: { colors: {} },
     MD3LightTheme: { colors: {} },
@@ -158,11 +160,35 @@ vi.mock('react-native-vector-icons/MaterialCommunityIcons', () => {
   return { default: Icon };
 });
 
+// Mock react-native-safe-area-context (native module, can't parse in Node)
+vi.mock('react-native-safe-area-context', () => {
+  const { createElement } = require('react');
+  const SafeAreaView = (props: Record<string, unknown>) =>
+    createElement('View', props, props.children);
+  SafeAreaView.displayName = 'SafeAreaView';
+  return {
+    SafeAreaView,
+    SafeAreaProvider: (props: Record<string, unknown>) =>
+      createElement('View', props, props.children),
+    useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+    useSafeAreaFrame: () => ({ x: 0, y: 0, width: 375, height: 812 }),
+  };
+});
+
+// Mock expo-constants so expo-modules-core's NativeModules requirement is bypassed
+vi.mock('expo-constants', () => ({
+  default: {
+    expoConfig: { extra: {} },
+    manifest: {},
+  },
+}));
+
 // Mock React Native modules
 vi.mock('react-native', () => ({
+  NativeModules: {},
   Platform: {
     OS: 'ios',
-    select: vi.fn((obj) => obj.ios),
+    select: vi.fn((obj: Record<string, unknown>) => obj.ios),
   },
   Dimensions: {
     get: vi.fn(() => ({ width: 375, height: 812 })),
@@ -181,6 +207,7 @@ vi.mock('react-native', () => ({
   Image: 'Image',
   TextInput: 'TextInput',
   ActivityIndicator: 'ActivityIndicator',
+  KeyboardAvoidingView: 'KeyboardAvoidingView',
   Alert: {
     alert: vi.fn(),
   },

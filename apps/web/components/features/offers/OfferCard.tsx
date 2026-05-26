@@ -3,13 +3,13 @@
 import type { Offer, PricingTier, ServiceCategory } from '@groupio/types';
 import {
   Users,
-  Tag,
   Clock,
   ChevronLeft,
   BadgeCheck,
   TrendingDown,
 } from 'lucide-react';
 import { useMemo } from 'react';
+import { useTranslations } from 'next-intl';
 
 import { cn } from '@/lib/utils/cn';
 
@@ -50,28 +50,13 @@ const STATUS_STYLES: Record<string, string> = {
   expired: 'bg-gray-200 text-gray-500',
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  active: 'פעיל',
-  pending: 'ממתין',
-  draft: 'טיוטה',
-  completed: 'הושלם',
-  cancelled: 'בוטל',
-  expired: 'פג תוקף',
-};
+const STATUS_KEYS = ['active', 'pending', 'draft', 'completed', 'cancelled', 'expired'] as const;
+type StatusKey = (typeof STATUS_KEYS)[number];
 
-const CATEGORY_LABELS: Record<ServiceCategory, string> = {
-  ac_installation: 'התקנת מזגנים',
-  ac_maintenance: 'תחזוקת מזגנים',
-  kitchen: 'מטבחים',
-  electrical: 'חשמל',
-  plumbing: 'אינסטלציה',
-  heating: 'חימום',
-  renovations: 'שיפוצים',
-  painting: 'צביעה',
-  flooring: 'ריצוף',
-  windows: 'חלונות',
-  security: 'אבטחה',
-};
+const CATEGORY_KEYS: ReadonlyArray<ServiceCategory> = [
+  'ac_installation', 'ac_maintenance', 'kitchen', 'electrical', 'plumbing',
+  'heating', 'renovations', 'painting', 'flooring', 'windows', 'security',
+];
 
 function formatCurrency(amount: number): string {
   return `₪${Math.round(amount).toLocaleString('en-IL')}`;
@@ -111,6 +96,7 @@ export function OfferCard({
   compact = false,
   className,
 }: OfferCardProps) {
+  const t = useTranslations('offers');
   const currentTier = useMemo(() => getCurrentTier(offer), [offer]);
   const nextTier = useMemo(() => getNextTier(offer), [offer]);
   const expiresInDays = useMemo(() => daysUntil(offer.expiresAt), [offer.expiresAt]);
@@ -132,7 +118,9 @@ export function OfferCard({
       <div className="flex items-start justify-between gap-3">
         <div className="flex flex-col gap-1">
           <span className="text-xs font-medium text-gray-500">
-            {CATEGORY_LABELS[offer.category]}
+            {CATEGORY_KEYS.includes(offer.category)
+              ? t(`categories.${offer.category as ServiceCategory}`)
+              : offer.category}
           </span>
           <h3 className="text-base font-bold text-gray-900 line-clamp-1">
             {offer.contractor?.businessName ?? ""}
@@ -145,14 +133,16 @@ export function OfferCard({
             STATUS_STYLES[offer.status] ?? 'bg-gray-100 text-gray-600',
           )}
         >
-          {STATUS_LABELS[offer.status] ?? offer.status}
+          {STATUS_KEYS.includes(offer.status as StatusKey)
+            ? t(offer.status as StatusKey)
+            : offer.status}
         </span>
       </div>
 
       {/* ---- Pricing row ---- */}
       <div className="flex items-end justify-between gap-4">
         <div className="flex flex-col">
-          <span className="text-xs text-gray-500">מחיר נוכחי</span>
+          <span className="text-xs text-gray-500">{t('currentPrice')}</span>
           <span className="text-xl font-bold text-gray-900">
             {formatCurrency(currentPrice)}
           </span>
@@ -177,13 +167,13 @@ export function OfferCard({
       <div className="flex items-center gap-4 text-sm text-gray-600">
         <div className="flex items-center gap-1.5">
           <Users className="h-4 w-4 text-primary-500" />
-          <span>{offer.participants} שכנים הצטרפו</span>
+          <span>{t('participants', { count: offer.participants })}</span>
         </div>
 
         {offer.contractor?.verified && (
           <div className="flex items-center gap-1 text-emerald-600">
             <BadgeCheck className="h-4 w-4" />
-            <span className="text-xs font-medium">מאומת</span>
+            <span className="text-xs font-medium">{t('verifiedContractor')}</span>
           </div>
         )}
       </div>
@@ -193,7 +183,7 @@ export function OfferCard({
         <div data-testid="tier-progress" className="rounded-xl bg-primary-50 px-3.5 py-2.5">
           <div className="flex items-center justify-between text-xs">
             <span className="text-primary-700 font-medium">
-              עוד {neededForNext} שכנים ל-{nextTier.discount}% הנחה
+              {t('nextTier', { needed: neededForNext, discount: nextTier.discount })}
             </span>
             <span className="font-bold text-primary-600">
               {formatCurrency(nextTier.price)}
@@ -223,7 +213,7 @@ export function OfferCard({
       {offer.status === 'active' && expiresInDays > 0 && (
         <div className="flex items-center gap-1.5 text-xs text-gray-400">
           <Clock className="h-3.5 w-3.5" />
-          <span>פג תוקף בעוד {expiresInDays} ימים</span>
+          <span>{t('expiresIn', { days: expiresInDays })}</span>
         </div>
       )}
 
@@ -238,11 +228,11 @@ export function OfferCard({
             )}
           >
             <Users className="h-4 w-4" />
-            הצטרף להצעה
+            {t('joinOffer')}
           </button>
         ) : (
           <div className="flex-1 rounded-xl bg-emerald-50 py-2.5 text-center text-sm font-medium text-emerald-700">
-            הצטרפת
+            {t('joined')}
           </div>
         )}
 
@@ -253,7 +243,7 @@ export function OfferCard({
             'btn-secondary flex items-center justify-center gap-1 text-sm',
           )}
         >
-          פרטים
+          {t('details')}
           <ChevronLeft className="h-4 w-4" />
         </button>
       </div>

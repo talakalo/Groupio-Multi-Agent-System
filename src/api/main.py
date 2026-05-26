@@ -1,6 +1,8 @@
 """FastAPI application for the Groupio Multi-Agent System."""
 
+import errno
 import logging
+import socket
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -9,7 +11,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
-from src.api.middleware.auth import get_current_user
+from src.api.middleware.auth import get_current_user, verify_api_key
+from src.api.middleware.caching import CacheHeaderMiddleware
 from src.api.middleware.logging import RequestLoggingMiddleware
 from src.api.middleware.security import SecurityHeadersMiddleware
 from src.api.routes import api_router
@@ -40,6 +43,22 @@ async def lifespan(app: FastAPI):
         logger.info("Vector DB collections verified")
     except Exception:
         logger.warning("Could not verify vector DB collections")
+
+    # Fail-closed probe for the payment provider. Lazy init means a broken
+    # PAYMENT_PROVIDER only surfaces on the first charge; call the factory
+    # here so misconfigured deploys refuse to serve traffic. In staging /
+    # production the process exits; in development we log and continue so
+    # local dev without a provider still works.
+    try:
+        from src.services.payment import get_payment_provider
+
+        get_payment_provider()
+        logger.info("Payment provider initialised")
+    except Exception as exc:
+        if get_settings().ENVIRONMENT in ("production", "staging"):
+            logger.error("Payment provider unavailable at startup: %s", exc)
+            raise
+        logger.warning("Payment provider unavailable (dev): %s", exc)
 
     yield
 
@@ -74,16 +93,36 @@ def _is_db_connection_error(exc: Exception) -> bool:
     """True if exception is due to DB (e.g. PostgreSQL) not reachable."""
     if isinstance(exc, ConnectionRefusedError):
         return True
-    if isinstance(exc, OSError) and getattr(exc, "errno", None) == 61:
+    if isinstance(exc, socket.gaierror):
         return True
+    if isinstance(exc, OSError):
+        code = getattr(exc, "errno", None)
+        if code in (errno.ECONNREFUSED, errno.EADDRNOTAVAIL):
+            return True
     return False
+
+
+def _is_schema_not_ready(exc: Exception) -> bool:
+    """True when a required table/relation is missing (migrations not applied)."""
+    try:
+        import asyncpg.exceptions
+
+        return isinstance(exc, asyncpg.exceptions.UndefinedTableError)
+    except ImportError:
+        return False
 
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Ensure CORS headers on error responses so browser shows real error, not CORS."""
     logger.exception("Unhandled exception: %s", exc)
-    if _is_db_connection_error(exc):
+    if _is_schema_not_ready(exc):
+        status_code = 503
+        content = {
+            "detail": "Database schema not ready. Apply Alembic migrations.",
+            "code": "DB_SCHEMA_NOT_READY",
+        }
+    elif _is_db_connection_error(exc):
         status_code = 503
         content = {"detail": "Database unavailable. Please try again later."}
     else:
@@ -119,7 +158,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-API-Key", "X-Request-ID"],
-    expose_headers=["Authorization"],
+    expose_headers=[],
 )
 
 # Security headers middleware (HSTS, CSP, X-Frame-Options, etc.)
@@ -127,6 +166,11 @@ app.add_middleware(SecurityHeadersMiddleware, environment=settings.ENVIRONMENT)
 
 # Request logging middleware (with PII redaction)
 app.add_middleware(RequestLoggingMiddleware)
+
+# Cache-Control middleware (PERF-12) — outermost so its explicit values
+# override the conservative ``no-store`` default from SecurityHeadersMiddleware
+# for cacheable GETs (offers, contractors, buildings, etc.).
+app.add_middleware(CacheHeaderMiddleware)
 
 # Include API routes (auth, offers, contractors, buildings, etc.)
 app.include_router(api_router, prefix="/api/v1")
@@ -146,7 +190,11 @@ async def api_root() -> dict[str, str]:
 # WebSocket routes (mounted separately – no prefix collision with REST routes)
 from src.api.routes.websocket import router as ws_router
 
+# Mount at /api/v1 for API-versioned access (e.g. /api/v1/ws/admin).
 app.include_router(ws_router, prefix="/api/v1")
+# Also mount at root so the frontend default WS URL (ws://host/ws/offers) works
+# without requiring NEXT_PUBLIC_WS_URL to be configured.
+app.include_router(ws_router)
 
 
 # -- Request/Response Models --
@@ -295,6 +343,7 @@ async def health_check() -> dict[str, Any]:
     "/api/v1/health/db",
     summary="Database pool stats",
     description="Returns asyncpg connection pool statistics (Task 3.5).",
+    dependencies=[Depends(verify_api_key)],
 )
 async def db_pool_health() -> dict:
     """Return DB pool size/free/used stats for monitoring."""
@@ -318,11 +367,16 @@ async def db_pool_health() -> dict:
 @app.get("/metrics")
 async def prometheus_metrics(
     x_api_key: str | None = Header(None, alias="X-API-Key"),
+    authorization: str | None = Header(None),
 ) -> Response:
-    """Expose Prometheus metrics — requires a valid X-API-Key header."""
+    """Expose Prometheus metrics — accepts X-API-Key or Authorization: Bearer <key>."""
     _settings = get_settings()
     if _settings.API_KEYS:
-        if not x_api_key or x_api_key not in _settings.API_KEYS:
+        bearer = None
+        if authorization and authorization.startswith("Bearer "):
+            bearer = authorization[7:]
+        key = x_api_key or bearer
+        if not key or key not in _settings.API_KEYS:
             raise HTTPException(status_code=403, detail="Invalid or missing API key")
 
     from prometheus_client import CONTENT_TYPE_LATEST, generate_latest

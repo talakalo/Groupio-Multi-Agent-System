@@ -98,6 +98,125 @@ scheduler = TaskScheduler()
 # ------------------------------------------------------------------
 
 
+@scheduler.register("reconcile_stale_payments", interval_seconds=1800)  # Every 30 minutes
+async def reconcile_stale_payments() -> None:
+    """Detect payments stuck in 'processing' or 'pending' and reconcile against Stripe.
+
+    A payment is considered stale if:
+    - status='processing' for > 15 minutes (Stripe should have responded by then)
+    - status='pending' for > 24 hours (user abandoned or webhook was missed)
+
+    For each stale payment that has a provider_transaction_id (Stripe PaymentIntent),
+    we fetch the live intent and align our local status.  Any transition is written
+    to audit_logs so the escrow release path has a reliable trail.
+    """
+    import stripe as stripe_lib
+
+    from src.config.settings import get_settings
+
+    db = get_postgres_client()
+    settings = get_settings()
+
+    if not settings.STRIPE_SECRET_KEY:
+        logger.warning("reconcile_stale_payments: STRIPE_SECRET_KEY not configured, skipping")
+        return
+
+    stripe_lib.api_key = settings.STRIPE_SECRET_KEY
+
+    now = datetime.now(UTC)
+
+    try:
+        stale_rows = await db._pg_fetch_all(
+            """
+            SELECT id, user_id, offer_id, provider_transaction_id, status, amount, currency
+            FROM payments
+            WHERE (
+                (status = 'processing' AND updated_at < NOW() - INTERVAL '15 minutes')
+                OR (status = 'pending' AND updated_at < NOW() - INTERVAL '24 hours')
+            )
+            AND provider = 'stripe'
+            AND provider_transaction_id IS NOT NULL
+            LIMIT 100
+            """,
+        )
+    except Exception as exc:
+        logger.error("reconcile_stale_payments: failed to query stale payments: %s", exc)
+        return
+
+    if not stale_rows:
+        logger.info("reconcile_stale_payments: no stale payments found")
+        return
+
+    logger.info("reconcile_stale_payments: found %d stale payment(s)", len(stale_rows))
+    reconciled = 0
+
+    for row in stale_rows:
+        payment_id = row["id"]
+        intent_id = row["provider_transaction_id"]
+        old_status = row["status"]
+
+        try:
+            intent = await stripe_lib.PaymentIntent.retrieve_async(intent_id)
+        except stripe_lib.error.StripeError as exc:
+            logger.warning(
+                "reconcile_stale_payments: Stripe error for payment %s (intent %s): %s",
+                payment_id,
+                intent_id,
+                exc,
+            )
+            continue
+
+        stripe_status = intent.get("status", "")
+        # Map Stripe intent status → our payment status
+        stripe_to_local: dict[str, str] = {
+            "succeeded": "succeeded",
+            "canceled": "failed",
+            "requires_payment_method": "failed",
+            "payment_failed": "failed",
+        }
+        new_status = stripe_to_local.get(stripe_status)
+        if new_status is None or new_status == old_status:
+            continue  # No actionable change
+
+        try:
+            await db._pg_execute(
+                "UPDATE payments SET status = $1, updated_at = NOW() WHERE id = $2",
+                new_status,
+                payment_id,
+            )
+            await db.create_audit_log(
+                {
+                    "user_id": row["user_id"],
+                    "action": "payment_reconciled",
+                    "resource_type": "payment",
+                    "resource_id": payment_id,
+                    "details": {
+                        "old_status": old_status,
+                        "new_status": new_status,
+                        "stripe_intent_status": stripe_status,
+                        "intent_id": intent_id,
+                        "reconciled_at": now.isoformat(),
+                    },
+                }
+            )
+            logger.info(
+                "reconcile_stale_payments: payment %s %s → %s (Stripe: %s)",
+                payment_id,
+                old_status,
+                new_status,
+                stripe_status,
+            )
+            reconciled += 1
+        except Exception as exc:
+            logger.error(
+                "reconcile_stale_payments: failed to update payment %s: %s",
+                payment_id,
+                exc,
+            )
+
+    logger.info("reconcile_stale_payments: reconciled %d / %d payments", reconciled, len(stale_rows))
+
+
 @scheduler.register("check_expired_offers", interval_seconds=3600)  # Hourly
 async def check_expired_offers():
     """Close offers past their deadline and notify participants."""
@@ -134,38 +253,50 @@ async def check_expired_offers():
             logger.error("Failed to cancel expired offer %s: %s", offer_id, exc)
             continue  # Skip notifications if cancellation itself failed
 
-        # Notify each participant
-        for p in participants:
+        # Notify each participant concurrently (max 10 in flight) — PERF-4.
+        sem = asyncio.Semaphore(10)
+
+        async def _notify(p: dict) -> None:
             p_email = p.get("email") or p.get("user_email", "")
             if not p_email:
-                continue
-            try:
-                await email_svc.send_offer_cancelled(
-                    to_email=p_email,
-                    user_name=p.get("full_name") or p.get("user_name", "דייר"),
-                    offer_title=offer_title,
-                    reason="פג תוקף ההצעה",
-                )
-            except Exception as exc:
-                logger.warning(
-                    "Failed to send expiry notification to %s for offer %s: %s",
-                    p_email,
-                    offer_id,
-                    exc,
-                )
+                return
+            async with sem:
+                try:
+                    await email_svc.send_offer_cancelled(
+                        to_email=p_email,
+                        user_name=p.get("full_name") or p.get("user_name", "דייר"),
+                        offer_title=offer_title,
+                        reason="פג תוקף ההצעה",
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "Failed to send expiry notification to %s for offer %s: %s",
+                        p_email,
+                        offer_id,
+                        exc,
+                    )
+
+        await asyncio.gather(*(_notify(p) for p in participants))
 
 
 @scheduler.register("recalculate_trust_scores", interval_seconds=604800)  # Weekly
 async def recalculate_trust_scores():
-    """Recalculate trust scores for all active contractors."""
+    """Recalculate trust scores for all active contractors in a single batched pass."""
     db = get_postgres_client()
-    contractors, _ = await db.list_contractors(filters={"verification_status": "verified"}, page=1, page_size=1000)
-    for contractor in contractors:
-        try:
-            await db.update_contractor_rating(contractor["id"])
-            logger.info("Recalculated trust score for contractor %s", contractor["id"])
-        except Exception as exc:
-            logger.error("Failed to recalculate for %s: %s", contractor["id"], exc)
+    contractors, _ = await db.list_contractors(
+        filters={"verification_status": "verified", "marketplace_visible_only": False},
+        page=1,
+        page_size=1000,
+    )
+    ids = [c["id"] for c in contractors]
+    if not ids:
+        logger.info("recalculate_trust_scores: no verified contractors to process")
+        return
+    try:
+        updated = await db.batch_update_contractor_ratings(ids)
+        logger.info("recalculate_trust_scores: batch-updated %s of %s contractors", updated, len(ids))
+    except Exception as exc:
+        logger.exception("recalculate_trust_scores: batch update failed: %s", exc)
 
 
 @scheduler.register("cleanup_stale_conversations", interval_seconds=86400)  # Daily
@@ -188,7 +319,9 @@ async def generate_daily_analytics():
 
         # Count active contractors
         contractors, total_contractors = await db.list_contractors(
-            {"verification_status": "verified"}, page=1, page_size=1
+            {"verification_status": "verified", "marketplace_visible_only": False},
+            page=1,
+            page_size=1,
         )
 
         summary = {

@@ -5,12 +5,18 @@ import logging
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
 
-from src.api.middleware.auth import get_current_user, is_admin
+from src.api.middleware.auth import get_current_user, get_current_user_optional, is_admin
+from src.config.settings import Settings, get_settings
 from src.databases.graph_store import get_graph_store
 from src.databases.postgres import get_postgres_client
 from src.databases.redis_client import get_redis_client
 from src.databases.vector_store import get_vector_store
+from src.domain.contractor_membership import (
+    contractor_may_view_contractor_profile,
+    contractor_visible_in_marketplace,
+)
 from src.models.contractor import (
     ContractorCreate,
     ContractorListResponse,
@@ -23,7 +29,7 @@ from src.models.contractor import (
     VerificationStatus,
 )
 from src.models.offer import ServiceCategory
-from src.models.user import UserInDB
+from src.models.user import UserInDB, UserRole
 from src.rag.embeddings import get_embedding_client
 
 logger = logging.getLogger(__name__)
@@ -84,6 +90,28 @@ async def create_contractor(
     except Exception as e:
         logger.warning("Failed to add contractor to graph DB: %s", e)
 
+    try:
+        from src.messaging.envelope import EventEnvelope
+        from src.messaging.outbox_helpers import try_enqueue_crm
+        from src.messaging.topics import RK_CRM_CONTRACTOR_REGISTERED
+
+        env = EventEnvelope(
+            event_name="crm.contractor.registered",
+            entity_type="contractor",
+            entity_id=contractor_id,
+            idempotency_key=f"crm:contractor:registered:{contractor_id}",
+            payload={"contractor_id": contractor_id},
+        )
+        await try_enqueue_crm(
+            db,
+            RK_CRM_CONTRACTOR_REGISTERED,
+            env.event_name,
+            env.to_json_dict(),
+            idempotency_key=env.idempotency_key,
+        )
+    except Exception:
+        logger.exception("CRM outbox enqueue failed after contractor create (non-fatal)")
+
     return contractor
 
 
@@ -108,6 +136,8 @@ async def list_contractors(
         filters["min_trust_score"] = min_trust_score
     if verification_status:
         filters["verification_status"] = verification_status.value
+
+    filters["marketplace_visible_only"] = True
 
     contractors, total = await db.list_contractors(
         filters=filters,
@@ -154,6 +184,7 @@ async def search_contractors(
 
         contractor_ids = [r["id"] for r in results]
         contractors = await db.get_contractors_by_ids(contractor_ids)
+        contractors = [c for c in contractors if contractor_visible_in_marketplace(c)]
         total = len(contractors)
     else:
         # Regular filter search
@@ -168,6 +199,8 @@ async def search_contractors(
             filters["min_rating"] = request.min_rating
         if request.verification_status:
             filters["verification_status"] = request.verification_status.value
+
+        filters["marketplace_visible_only"] = True
 
         contractors, total = await db.list_contractors(
             filters=filters,
@@ -209,13 +242,164 @@ async def get_my_doc_requests(
         return {"items": [], "pending": False}
 
 
+_MEMBERSHIP_KEYS = (
+    "membership_status",
+    "membership_plan",
+    "membership_provider",
+    "provider_customer_id",
+    "provider_subscription_id",
+    "current_period_start",
+    "current_period_end",
+    "next_billing_at",
+    "cancel_at_period_end",
+    "canceled_at",
+    "billing_failure_count",
+    "membership_grace_until",
+    "trial_ends_at",
+    "last_payment_at",
+)
+
+
+class ContractorMembershipCheckoutBody(BaseModel):
+    """Optional redirect URLs (must stay under FRONTEND_URL, or localhost in dev/test)."""
+
+    success_url: str | None = Field(default=None, max_length=2048)
+    cancel_url: str | None = Field(default=None, max_length=2048)
+
+
+class ContractorMembershipCheckoutResponse(BaseModel):
+    """Stripe Checkout URL for contractor membership subscription."""
+
+    url: str
+    session_id: str
+
+
+def _redirect_allowed(settings: Settings, url: str) -> bool:
+    u = url.strip()
+    base = settings.FRONTEND_URL.rstrip("/")
+    if u.startswith(base):
+        return True
+    if settings.ENVIRONMENT in ("development", "test"):
+        return u.startswith("http://localhost") or u.startswith("http://127.0.0.1")
+    return False
+
+
+def _membership_redirect(
+    settings: Settings,
+    explicit: str | None,
+    *,
+    default_path: str,
+) -> str:
+    if explicit and explicit.strip():
+        chosen = explicit.strip()
+        if not _redirect_allowed(settings, chosen):
+            raise HTTPException(
+                status_code=400,
+                detail="success_url/cancel_url must be under FRONTEND_URL (or http://localhost in development)",
+            )
+        return chosen
+    return f"{settings.FRONTEND_URL.rstrip('/')}{default_path}"
+
+
+@router.post(
+    "/me/membership/checkout-session",
+    response_model=ContractorMembershipCheckoutResponse,
+)
+async def create_contractor_membership_checkout_session(
+    body: ContractorMembershipCheckoutBody | None = None,
+    current_user: UserInDB = Depends(get_current_user),
+) -> ContractorMembershipCheckoutResponse:
+    """Start Stripe Checkout for marketplace membership (subscription).
+
+    The Checkout Session includes ``metadata.contractor_id`` (and subscription metadata)
+    so webhooks can bind the subscription to the contractor row.
+    """
+    if current_user.role != UserRole.CONTRACTOR or not current_user.contractor_id:
+        raise HTTPException(status_code=403, detail="Contractor only")
+
+    settings = get_settings()
+    if (settings.PAYMENT_PROVIDER or "").lower() != "stripe":
+        raise HTTPException(
+            status_code=400,
+            detail="Membership checkout requires PAYMENT_PROVIDER=stripe",
+        )
+    price_id = (settings.STRIPE_CONTRACTOR_MEMBERSHIP_PRICE_ID or "").strip()
+    if not price_id:
+        raise HTTPException(
+            status_code=503,
+            detail="STRIPE_CONTRACTOR_MEMBERSHIP_PRICE_ID is not configured",
+        )
+    secret = (settings.STRIPE_SECRET_KEY or "").strip()
+    if not secret:
+        raise HTTPException(status_code=503, detail="STRIPE_SECRET_KEY is not configured")
+
+    payload = body or ContractorMembershipCheckoutBody()
+    success_url = _membership_redirect(
+        settings,
+        payload.success_url,
+        default_path="/contractor/profile?membership=success",
+    )
+    cancel_url = _membership_redirect(
+        settings,
+        payload.cancel_url,
+        default_path="/contractor/profile?membership=canceled",
+    )
+
+    contractor_id = current_user.contractor_id
+    meta = {"contractor_id": contractor_id}
+
+    import stripe  # noqa: PLC0415
+
+    stripe.api_key = secret
+    try:
+        session = await stripe.checkout.Session.create_async(
+            mode="subscription",
+            line_items=[{"price": price_id, "quantity": 1}],
+            success_url=success_url,
+            cancel_url=cancel_url,
+            customer_email=str(current_user.email),
+            client_reference_id=contractor_id,
+            metadata=meta,
+            subscription_data={"metadata": meta},
+        )
+    except stripe.StripeError as exc:  # type: ignore[attr-defined]
+        logger.warning("Stripe checkout session failed: %s", exc)
+        raise HTTPException(status_code=502, detail="Stripe checkout could not be created") from exc
+
+    url = session.get("url") if isinstance(session, dict) else getattr(session, "url", None)
+    sid = session.get("id") if isinstance(session, dict) else getattr(session, "id", None)
+    if not url or not sid:
+        raise HTTPException(status_code=502, detail="Stripe returned an incomplete checkout session")
+
+    return ContractorMembershipCheckoutResponse(url=str(url), session_id=str(sid))
+
+
+@router.get("/me/membership")
+async def get_my_contractor_membership(
+    current_user: UserInDB = Depends(get_current_user),
+) -> dict:
+    """Current contractor marketplace membership state (no payment-provider side effects)."""
+    if current_user.role != UserRole.CONTRACTOR or not current_user.contractor_id:
+        raise HTTPException(status_code=403, detail="Contractor only")
+    db = get_postgres_client()
+    contractor = await db.get_contractor(current_user.contractor_id)
+    if not contractor:
+        raise HTTPException(status_code=404, detail="Contractor not found")
+    return {k: contractor.get(k) for k in _MEMBERSHIP_KEYS}
+
+
 @router.get("/{contractor_id}", response_model=ContractorResponse)
-async def get_contractor(contractor_id: str) -> ContractorResponse:
+async def get_contractor(
+    contractor_id: str,
+    current_user: UserInDB | None = Depends(get_current_user_optional),
+) -> ContractorResponse:
     """Get contractor by ID."""
     db = get_postgres_client()
     contractor = await db.get_contractor(contractor_id)
 
     if not contractor:
+        raise HTTPException(status_code=404, detail="Contractor not found")
+    if not contractor_may_view_contractor_profile(current_user, contractor):
         raise HTTPException(status_code=404, detail="Contractor not found")
 
     return contractor
@@ -372,6 +556,31 @@ async def verify_contractor(
             "verification_status": status,
         },
     )
+
+    try:
+        from src.messaging.envelope import EventEnvelope
+        from src.messaging.outbox_helpers import try_enqueue_crm
+        from src.messaging.topics import RK_CRM_CONTRACTOR_STATUS_CHANGED
+
+        env = EventEnvelope(
+            event_name="crm.contractor.status_changed",
+            entity_type="contractor",
+            entity_id=contractor_id,
+            idempotency_key=f"crm:contractor:status:{contractor_id}:{status.value}",
+            payload={
+                "contractor_id": contractor_id,
+                "verification_status": status.value,
+            },
+        )
+        await try_enqueue_crm(
+            db,
+            RK_CRM_CONTRACTOR_STATUS_CHANGED,
+            env.event_name,
+            env.to_json_dict(),
+            idempotency_key=env.idempotency_key,
+        )
+    except Exception:
+        logger.exception("CRM outbox enqueue failed after contractor verify (non-fatal)")
 
     return updated
 

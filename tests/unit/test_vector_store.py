@@ -51,7 +51,7 @@ async def test_ensure_collections_creates_missing(store):
     client.create_collection = AsyncMock()
 
     await s.ensure_collections()
-    assert client.create_collection.await_count == 4  # 4 collections defined
+    assert client.create_collection.await_count == 5  # 5 collections defined
 
 
 @pytest.mark.asyncio
@@ -63,11 +63,13 @@ async def test_ensure_collections_skips_existing(store):
     coll_mock2 = MagicMock()
     coll_mock2.name = "buildings"
     coll_mock3 = MagicMock()
-    coll_mock3.name = "knowledge_base"
+    coll_mock3.name = "offers"
     coll_mock4 = MagicMock()
-    coll_mock4.name = "conversations"
+    coll_mock4.name = "knowledge_base"
+    coll_mock5 = MagicMock()
+    coll_mock5.name = "conversations"
     existing = MagicMock()
-    existing.collections = [coll_mock, coll_mock2, coll_mock3, coll_mock4]
+    existing.collections = [coll_mock, coll_mock2, coll_mock3, coll_mock4, coll_mock5]
     client.get_collections = AsyncMock(return_value=existing)
     client.create_collection = AsyncMock()
 

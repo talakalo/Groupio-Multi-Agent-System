@@ -2,18 +2,21 @@ import * as React from 'react';
 import { cva, type VariantProps } from 'class-variance-authority';
 
 const inputVariants = cva(
-  'flex w-full rounded-lg border bg-white px-3 py-2 text-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
+  'flex w-full rounded-[10px] border-[1.5px] bg-white px-4 py-2.5 text-[0.9rem] text-[#0f1f1a] shadow-[inset_0_2px_4px_rgba(10,51,41,0.04)] transition-all duration-200 file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-[#9aadaa] focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-[#f0f2ef]',
   {
     variants: {
       variant: {
-        default: 'border-gray-300 focus-visible:ring-sky-500',
-        error: 'border-red-500 focus-visible:ring-red-500',
-        success: 'border-green-500 focus-visible:ring-green-500',
+        default:
+          'border-[rgba(10,51,41,0.14)] hover:border-[rgba(26,154,118,0.3)] focus-visible:border-primary-500 focus-visible:ring-[rgba(26,154,118,0.12)]',
+        error:
+          'border-red-400 bg-red-50/30 focus-visible:border-red-500 focus-visible:ring-[rgba(239,68,68,0.12)]',
+        success:
+          'border-emerald-400 bg-emerald-50/20 focus-visible:border-emerald-500 focus-visible:ring-[rgba(34,197,94,0.12)]',
       },
       inputSize: {
-        default: 'h-10',
-        sm: 'h-8 text-xs',
-        lg: 'h-12 text-base',
+        default: 'h-11',
+        sm: 'h-8 text-sm px-3 rounded-[8px]',
+        lg: 'h-13 text-base',
       },
     },
     defaultVariants: {
@@ -59,14 +62,15 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         {label && (
           <label
             htmlFor={inputId}
-            className="mb-1.5 block text-sm font-medium text-gray-700"
+            className="mb-1.5 block text-sm font-semibold"
+            style={{ color: '#2d4a40' }}
           >
             {label}
           </label>
         )}
         <div className="relative">
           {leftIcon && (
-            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
+            <div className="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3.5" style={{ color: '#9aadaa' }}>
               {leftIcon}
             </div>
           )}
@@ -76,7 +80,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
             className={inputVariants({
               variant: error ? 'error' : variant,
               inputSize,
-              className: `${leftIcon ? 'pl-10' : ''} ${rightIcon ? 'pr-10' : ''} ${className || ''}`,
+              className: `${leftIcon ? 'ps-10' : ''} ${rightIcon ? 'pe-10' : ''} ${className || ''}`,
             })}
             ref={ref}
             aria-invalid={error ? 'true' : 'false'}
@@ -84,18 +88,18 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
             {...props}
           />
           {rightIcon && (
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400">
+            <div className="pointer-events-none absolute inset-y-0 end-0 flex items-center pe-3.5" style={{ color: '#9aadaa' }}>
               {rightIcon}
             </div>
           )}
         </div>
         {error && (
-          <p id={errorId} className="mt-1.5 text-sm text-red-500">
+          <p id={errorId} className="mt-1.5 text-sm font-medium" style={{ color: '#dc2626' }}>
             {error}
           </p>
         )}
         {hint && !error && (
-          <p id={hintId} className="mt-1.5 text-sm text-gray-500">
+          <p id={hintId} className="mt-1.5 text-sm" style={{ color: '#9aadaa' }}>
             {hint}
           </p>
         )}

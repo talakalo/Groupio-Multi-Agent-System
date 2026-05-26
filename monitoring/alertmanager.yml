@@ -1,6 +1,8 @@
 global:
   resolve_timeout: 5m
-  slack_api_url: '${SLACK_WEBHOOK_URL}'
+  # Replace with your real Slack webhook URL in production.
+  # --config.expand-env is not supported in v0.27.0; hardcode or mount a secrets file.
+  slack_api_url: 'https://example.com/alertmanager-noop'
 
 route:
   group_by: ['alertname', 'severity']

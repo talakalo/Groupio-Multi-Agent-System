@@ -131,7 +131,7 @@ export function useJoinOffer() {
 
   return useMutation({
     mutationFn: async ({ offerId, unitCount, inviteToken }: JoinOfferPayload) => {
-      return apiClient.joinOffer(offerId, unitCount, inviteToken);
+      return apiClient.joinOffer(offerId, { unitCount, inviteToken });
     },
     onSuccess: (_data, variables) => {
       // Optimistically update the participant count in the cache

@@ -1,0 +1,31 @@
+# Flow: Contractor — My Offers
+# Verifies a contractor can view their offers list.
+#
+# Run: maestro test .maestro/flows/03-contractor/my-offers.yaml
+
+appId: ${APP_ID}
+tags:
+  - contractor
+  - offers
+---
+
+- runFlow: ../../subflows/launch-fresh.yaml
+- runFlow: ../../subflows/login-contractor.yaml
+
+# Navigate to Offers tab
+- tapOn: "Offers"
+- assertVisible:
+    text: "Offers"
+    timeout: 8000
+
+# Contractor offers view
+- waitForAnimationToEnd
+
+# Either shows offers or empty state
+- assertTrue:
+    visible: "No offers"
+    orVisible: "Active"
+    timeout: 8000
+
+# FAB "New Offer" should be present for contractors
+- assertVisible: "New Offer"

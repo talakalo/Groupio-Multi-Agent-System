@@ -1,0 +1,25 @@
+# Flow: Resident — Orders Tab
+# Verifies the orders tab renders (with or without active orders).
+#
+# Run: maestro test .maestro/flows/02-resident/orders.yaml
+
+appId: ${APP_ID}
+tags:
+  - resident
+  - orders
+---
+
+- runFlow: ../../subflows/launch-fresh.yaml
+- runFlow: ../../subflows/login-resident.yaml
+
+# Navigate to Orders tab
+- tapOn: "Orders"
+- assertVisible:
+    text: "Orders"
+    timeout: 8000
+
+# Either shows orders list or empty state
+- assertTrue:
+    visible: "No orders"
+    orVisible: "Pending"
+    timeout: 8000

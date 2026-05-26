@@ -46,3 +46,16 @@ pytest tests/ -k onboarding -v
 ## Current focus
 
 Phase 2 complete. Phase 3: wire real gov APIs, extend verification flow.
+
+### Release readiness (2026-03-23 follow-up)
+
+- [x] Integration: `test_rbac_release_matrix.py`, `test_stripe_webhook_idempotency_db.py` (skips if no PG/table)
+- [x] Playwright (focused): `notification-panel.spec.ts`, `rbac-routing.spec.ts`, `contractor-membership-checkout.spec.ts`
+- [x] `setupAuthAndMocks` mocks `/auth/me` for role under test; default notification API mocks in `setupBaseMocks`
+- [ ] **Ops still required:** live Stripe test-mode + target DB 031 + `docker compose up` smoke
+
+### Admin offers table (2026-03-18)
+
+- [x] Backend: `get_all_offers_admin` attaches `building_name` via batch lookup on `buildings`.
+- [x] Frontend: `mapApiOffer` maps `base_price` → `price`, `current_participants` → `participants`; `apiV1()` for fetches/exports; status `flagged` / `active` in filters + badges.
+- [x] Doc: `docs/admin-super-admin-crud.md` — super_admin API vs CRUD checklist.

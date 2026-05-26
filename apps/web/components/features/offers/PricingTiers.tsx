@@ -3,6 +3,7 @@
 import type { PricingTier } from '@groupio/types';
 import { Users, Check, TrendingDown, Sparkles } from 'lucide-react';
 import { useMemo } from 'react';
+import { useTranslations } from 'next-intl';
 
 import { cn } from '@/lib/utils/cn';
 
@@ -65,9 +66,11 @@ export function PricingTiers({
   tiers: tiersProp,
   basePrice,
   currentParticipants,
-  unitLabel = 'דירות',
+  unitLabel,
   className,
 }: PricingTiersProps) {
+  const t = useTranslations('offers');
+  const unit = unitLabel ?? t('units');
   // Use provided tiers or generate defaults
   const tiers = useMemo(
     () => tiersProp ?? generateDefaultTiers(basePrice),
@@ -109,10 +112,10 @@ export function PricingTiers({
     <div className={cn('flex flex-col gap-5', className)}>
       {/* ---- Header ---- */}
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-bold text-gray-900">מדרגות מחיר</h3>
+        <h3 className="text-lg font-bold text-gray-900">{t('pricingTiers')}</h3>
         <div className="flex items-center gap-1.5 text-sm text-primary-600 font-medium">
           <Users className="h-4 w-4" />
-          <span>{currentParticipants} {unitLabel}</span>
+          <span>{currentParticipants} {unit}</span>
         </div>
       </div>
 
@@ -163,7 +166,7 @@ export function PricingTiers({
                 <>
                   <div className="absolute -inset-px rounded-2xl border-2 border-primary-400 animate-pulse pointer-events-none" />
                   <div className="absolute -top-3 start-1/2 -translate-x-1/2 rounded-full bg-primary-500 px-3 py-0.5 text-[11px] font-bold text-white shadow-md shadow-primary-200">
-                    שלב נוכחי
+                    {t('currentStage')}
                   </div>
                 </>
               )}
@@ -178,7 +181,7 @@ export function PricingTiers({
               {/* Unit range */}
               <div className="flex items-center gap-1 text-sm text-gray-500">
                 <Users className="h-3.5 w-3.5" />
-                <span>{rangeLabel} {unitLabel}</span>
+                <span>{rangeLabel} {unit}</span>
               </div>
 
               {/* Discount percentage */}
@@ -207,12 +210,12 @@ export function PricingTiers({
                       : 'text-gray-500',
                 )}
               >
-                {formatCurrency(tier.price)} ליחידה
+                {formatCurrency(tier.price)} {t('perUnit')}
               </span>
 
               {/* Savings compared to base */}
               <span className="text-xs text-gray-400">
-                חיסכון {formatCurrency(basePrice - tier.price)} ליחידה
+                {t('savingsPerUnit', { amount: formatCurrency(basePrice - tier.price) })}
               </span>
             </div>
           );
@@ -227,12 +230,12 @@ export function PricingTiers({
               <Users className="h-4 w-4 text-primary-600" />
             </div>
             <p className="text-sm font-bold text-primary-700">
-              עוד {nextTier.min - currentParticipants} שכנים לרמה הבאה!
+              {t('neighborsToNextTier', { count: nextTier.min - currentParticipants })}
             </p>
           </div>
           <div className="flex items-center justify-between text-sm mb-2">
             <span className="font-medium text-gray-700">
-              {nextTier.discount}% הנחה — {formatCurrency(nextTier.price)} ליחידה
+              {t('discount', { percent: nextTier.discount })} — {formatCurrency(nextTier.price)} {t('perUnit')}
             </span>
             <span className="text-xs font-semibold text-primary-600">
               {Math.round(progressToNext)}%
@@ -245,8 +248,8 @@ export function PricingTiers({
             />
           </div>
           <div className="mt-1.5 flex justify-between text-xs text-gray-400">
-            <span>{currentParticipants} {unitLabel}</span>
-            <span>{nextTier.min} {unitLabel}</span>
+            <span>{currentParticipants} {unit}</span>
+            <span>{nextTier.min} {unit}</span>
           </div>
         </div>
       )}
@@ -255,7 +258,7 @@ export function PricingTiers({
       {!nextTier && activeTierIdx >= 0 && (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-center">
           <p className="text-sm font-bold text-emerald-700">
-            הגעתם לרמת ההנחה הגבוהה ביותר! 🎉
+            {t('maxTierReached')}
           </p>
         </div>
       )}
@@ -268,7 +271,7 @@ export function PricingTiers({
           </div>
           <div className="flex flex-col">
             <span className="text-sm font-bold text-emerald-800">
-              חיסכון כולל לקבוצה
+              {t('totalGroupSavings')}
             </span>
             <span className="text-lg font-extrabold text-emerald-700">
               {formatCurrency(totalSavings)}

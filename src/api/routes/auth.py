@@ -1,6 +1,5 @@
 """Authentication API routes."""
 
-import logging
 from datetime import UTC, datetime
 from uuid import uuid4
 
@@ -12,6 +11,7 @@ from src.api.middleware.auth import (
     create_access_token,
     create_refresh_token,
     get_current_user,
+    get_token_jti,
     hash_password,
     verify_password,
     verify_refresh_token,
@@ -20,6 +20,7 @@ from src.config.settings import get_settings
 from src.databases.postgres import get_postgres_client
 from src.databases.redis_client import get_redis_client
 from src.models.user import (
+    SELF_REGISTERABLE_ROLES,
     LoginRequest,
     PasswordChange,
     PasswordReset,
@@ -30,26 +31,32 @@ from src.models.user import (
     UserResponse,
     UserRole,
     UserUpdate,
-    SELF_REGISTERABLE_ROLES,
 )
 from src.services.email import get_email_service
+from src.utils.monitoring import capture_exception_safe, get_logger
+from src.utils.security_logger import security_event
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 router = APIRouter(tags=["auth"])
 
 
 async def check_auth_rate_limit(request: Request) -> None:
-    """Enforce IP-based rate limit on auth endpoints (20 req/min)."""
-    redis = get_redis_client()
-    client_ip = request.client.host if request.client else "unknown"
-    allowed = await redis.check_ip_rate_limit(client_ip, limit=20, window=60)
-    if not allowed:
-        raise HTTPException(
-            status_code=429,
-            detail="Too many authentication attempts. Try again in a minute.",
-            headers={"Retry-After": "60"},
-        )
+    """Enforce IP-based rate limit on auth endpoints (20 req/min). Fails open on Redis errors."""
+    try:
+        redis = get_redis_client()
+        client_ip = request.client.host if request.client else "unknown"
+        allowed = await redis.check_ip_rate_limit(client_ip, limit=20, window=60)
+        if not allowed:
+            raise HTTPException(
+                status_code=429,
+                detail="Too many authentication attempts. Try again in a minute.",
+                headers={"Retry-After": "60"},
+            )
+    except HTTPException:
+        raise
+    except Exception:
+        pass  # fail-open: don't block auth when Redis is unavailable
 
 
 class SignupRequest(BaseModel):
@@ -74,8 +81,7 @@ class SignupRequest(BaseModel):
     def _block_privileged_roles(cls, v: UserRole) -> UserRole:
         if v not in SELF_REGISTERABLE_ROLES:
             raise ValueError(
-                f"Cannot self-register with role '{v}'. "
-                f"Allowed: {', '.join(sorted(SELF_REGISTERABLE_ROLES))}"
+                f"Cannot self-register with role '{v}'. Allowed: {', '.join(sorted(SELF_REGISTERABLE_ROLES))}"
             )
         return v
 
@@ -122,6 +128,63 @@ async def signup(request: SignupRequest, _: None = Depends(check_auth_rate_limit
     }
 
     user = await db.create_user(user_data)
+
+    # Auto-create a minimal contractors row so contractor-only endpoints work
+    # immediately after signup (before the full onboarding wizard completes).
+    if request.role == UserRole.CONTRACTOR:
+        from uuid import uuid4 as _uuid4
+
+        contractor_id = str(_uuid4())
+        contractor_row = {
+            "id": contractor_id,
+            "user_id": user_id,
+            "business_name": request.name,
+            "contact_name": request.name,
+            "email": request.email,
+            "phone": request.phone,
+            "description": "",
+            "categories": [],
+            "regions": [],
+            "years_experience": 0,
+            "employee_count": 1,
+            "website": None,
+            "verification_status": "pending",
+            "trust_score": 0.0,
+            "license_number": None,
+        }
+        try:
+            if db._use_supabase_client():
+                client = await db._get_client()
+                await client.table("contractors").insert(contractor_row).execute()
+            else:
+                await db._pg_execute(
+                    """INSERT INTO contractors
+                       (id, user_id, business_name, contact_name, email,
+                        phone, description, categories, regions,
+                        years_experience, employee_count, website,
+                        verification_status, trust_score, license_number)
+                       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9,
+                               $10, $11, $12, $13, $14, $15)""",
+                    contractor_row["id"],
+                    contractor_row["user_id"],
+                    contractor_row["business_name"],
+                    contractor_row["contact_name"],
+                    contractor_row["email"],
+                    contractor_row["phone"],
+                    contractor_row["description"],
+                    contractor_row["categories"],
+                    contractor_row["regions"],
+                    contractor_row["years_experience"],
+                    contractor_row["employee_count"],
+                    contractor_row["website"],
+                    contractor_row["verification_status"],
+                    contractor_row["trust_score"],
+                    contractor_row["license_number"],
+                )
+            await db.update_user(user_id, {"contractor_id": contractor_id})
+            user = await db.get_user(user_id) or user
+        except Exception as exc:
+            logger.error("Failed to auto-create contractor profile for %s: %s", user_id, exc)
 
     logger.info("User registered via signup: %s", user.email)
 
@@ -227,15 +290,30 @@ async def login(
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
+    lock_ttl = await redis.is_temporarily_locked(user.id)
+    if lock_ttl > 0:
+        raise HTTPException(
+            status_code=423,
+            detail="Account temporarily locked due to too many failed attempts",
+            headers={"Retry-After": str(lock_ttl)},
+        )
+
     # Verify password
     hashed = await db.get_user_password_hash(user.id)
     if not hashed or not verify_password(form_data.password, hashed):
-        # Brute-force lockout: increment failure counter
+        _ip = http_request.client.host if http_request.client else None
         fail_count = await redis.increment_login_failures(user.id)
+        security_event.failed_login(user.email, ip=_ip)
         if fail_count >= 5:
-            await db.update_user(user.id, {"is_active": False})
-            logger.warning("Account locked due to too many failed logins: %s", user.email)
-            raise HTTPException(status_code=423, detail="Account locked due to too many failed attempts")
+            lock_seconds = 900
+            await redis.set_temporary_lockout(user.id, lock_seconds)
+            logger.warning("Temporary lockout after failed logins: %s", user.email)
+            security_event.account_temporarily_locked(user.email, ip=_ip)
+            raise HTTPException(
+                status_code=423,
+                detail="Account temporarily locked due to too many failed attempts",
+                headers={"Retry-After": str(lock_seconds)},
+            )
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     if not user.is_active:
@@ -263,6 +341,7 @@ async def login(
         ex=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
     )
     await redis.clear_login_failures(user.id)
+    await redis.clear_temporary_lockout(user.id)
 
     # Update last login
     await db.update_user(user.id, {"last_login": datetime.now(UTC)})
@@ -274,7 +353,7 @@ async def login(
         value=refresh_token,
         httponly=True,
         secure=settings.ENVIRONMENT != "development",
-        samesite="lax",
+        samesite="strict" if settings.ENVIRONMENT == "production" else "lax",
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
         path="/",
     )
@@ -284,7 +363,7 @@ async def login(
         value=access_token,
         httponly=True,
         secure=settings.ENVIRONMENT != "development",
-        samesite="lax",
+        samesite="strict" if settings.ENVIRONMENT == "production" else "lax",
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         path="/",
     )
@@ -312,18 +391,38 @@ async def login_json(
     if request.email:
         user = await db.get_user_by_email(request.email)
     else:
-        assert request.phone is not None  # validated by LoginRequest
+        if request.phone is None:
+            raise HTTPException(status_code=400, detail="Email or phone required")
         user = await db.get_user_by_phone(request.phone)
     if not user:
+        ident = (request.email or request.phone or "") or ""
+        masked = ident[:3] + "***" if len(ident) > 3 else "***"
+        logger.info("Login 401: user not found for identifier=%s", masked)
         raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    lock_ttl = await redis.is_temporarily_locked(user.id)
+    if lock_ttl > 0:
+        raise HTTPException(
+            status_code=423,
+            detail="Account temporarily locked due to too many failed attempts",
+            headers={"Retry-After": str(lock_ttl)},
+        )
 
     hashed = await db.get_user_password_hash(user.id)
     if not hashed or not verify_password(request.password, hashed):
+        _ip = http_request.client.host if http_request.client else None
         fail_count = await redis.increment_login_failures(user.id)
+        security_event.failed_login(user.email, ip=_ip)
         if fail_count >= 5:
-            await db.update_user(user.id, {"is_active": False})
-            logger.warning("Account locked due to too many failed logins: %s", user.email)
-            raise HTTPException(status_code=423, detail="Account locked due to too many failed attempts")
+            lock_seconds = 900
+            await redis.set_temporary_lockout(user.id, lock_seconds)
+            logger.warning("Temporary lockout after failed logins: %s", user.email)
+            security_event.account_temporarily_locked(user.email, ip=_ip)
+            raise HTTPException(
+                status_code=423,
+                detail="Account temporarily locked due to too many failed attempts",
+                headers={"Retry-After": str(lock_seconds)},
+            )
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     if not user.is_active:
@@ -349,6 +448,7 @@ async def login_json(
         ex=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
     )
     await redis.clear_login_failures(user.id)
+    await redis.clear_temporary_lockout(user.id)
 
     await db.update_user(user.id, {"last_login": datetime.now(UTC)})
 
@@ -357,7 +457,7 @@ async def login_json(
         value=refresh_token,
         httponly=True,
         secure=settings.ENVIRONMENT != "development",
-        samesite="lax",
+        samesite="strict" if settings.ENVIRONMENT == "production" else "lax",
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
         path="/",
     )
@@ -366,7 +466,7 @@ async def login_json(
         value=access_token,
         httponly=True,
         secure=settings.ENVIRONMENT != "development",
-        samesite="lax",
+        samesite="strict" if settings.ENVIRONMENT == "production" else "lax",
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         path="/",
     )
@@ -432,7 +532,7 @@ async def refresh_token(
         value=new_refresh_token,
         httponly=True,
         secure=settings.ENVIRONMENT != "development",
-        samesite="lax",
+        samesite="strict" if settings.ENVIRONMENT == "production" else "lax",
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
         path="/",
     )
@@ -441,7 +541,7 @@ async def refresh_token(
         value=new_access_token,
         httponly=True,
         secure=settings.ENVIRONMENT != "development",
-        samesite="lax",
+        samesite="strict" if settings.ENVIRONMENT == "production" else "lax",
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         path="/",
     )
@@ -457,13 +557,19 @@ async def refresh_token(
 async def logout(
     response: Response,
     current_user: UserInDB = Depends(get_current_user),
+    jti: str | None = Depends(get_token_jti),
 ) -> dict[str, str]:
     """Logout and invalidate tokens.
 
-    Clears refresh_token cookie so middleware no longer treats user as authenticated.
+    Clears refresh_token cookie and adds access-token JTI to Redis denylist
+    so the current bearer token cannot be reused.
     """
     redis = get_redis_client()
     await redis.delete(f"refresh_token:{current_user.id}")
+
+    if jti:
+        settings = get_settings()
+        await redis.add_token_to_denylist(jti, settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60)
 
     response.delete_cookie("refresh_token", path="/")
     response.delete_cookie("access_token", path="/")
@@ -491,13 +597,30 @@ async def update_current_user(
 
     update_data = request.model_dump(exclude_unset=True)
 
+    if "notification_settings" in update_data and update_data["notification_settings"] is not None:
+        incoming = update_data["notification_settings"]
+        if not isinstance(incoming, dict):
+            raise HTTPException(status_code=400, detail="notification_settings must be an object")
+        existing = dict(current_user.notification_settings or {})
+        merged: dict[str, bool] = {**existing}
+        for k, v in incoming.items():
+            key = str(k)
+            if isinstance(v, bool):
+                merged[key] = v
+            elif isinstance(v, (int, float)) and v in (0, 1):
+                merged[key] = bool(v)
+        update_data["notification_settings"] = merged
+
     # Check phone uniqueness if updating
     if "phone" in update_data:
-        existing = await db.get_user_by_phone(update_data["phone"])
-        if existing and existing.id != current_user.id:
+        existing_user = await db.get_user_by_phone(update_data["phone"])
+        if existing_user and existing_user.id != current_user.id:
             raise HTTPException(status_code=400, detail="Phone number already in use")
 
     updated = await db.update_user(current_user.id, update_data)
+    from src.api.middleware.auth import invalidate_cached_user
+
+    await invalidate_cached_user(current_user.id)
     return updated
 
 
@@ -518,9 +641,12 @@ async def change_password(
     new_hashed = hash_password(request.new_password)
     await db.update_user_password(current_user.id, new_hashed)
 
-    # Invalidate all refresh tokens
+    # Invalidate all refresh tokens + auth user cache (forces re-fetch of active status)
     redis = get_redis_client()
     await redis.delete(f"refresh_token:{current_user.id}")
+    from src.api.middleware.auth import invalidate_cached_user
+
+    await invalidate_cached_user(current_user.id)
 
     logger.info("Password changed for user: %s", current_user.email)
 
@@ -553,13 +679,28 @@ async def request_password_reset(
 
     # Send password reset email
     email_service = get_email_service()
-    await email_service.send_password_reset_email(
-        to_email=user.email,
-        user_name=user.full_name or user.email.split("@")[0],
-        reset_token=reset_token,
-    )
+    try:
+        await email_service.send_password_reset_email(
+            to_email=user.email,
+            user_name=user.full_name or user.email.split("@")[0],
+            reset_token=reset_token,
+        )
+    except Exception as exc:
+        await redis.delete(f"password_reset:{reset_token}")
+        logger.error(
+            "password_reset_email_send_failed",
+            user_id=user.id,
+            error_type=type(exc).__name__,
+            error=str(exc)[:500],
+        )
+        capture_exception_safe(exc, flow="password_reset_email")
+        raise HTTPException(
+            status_code=503,
+            detail="Unable to send reset email. Please try again later.",
+        ) from exc
 
-    logger.info("Password reset requested for: %s", user.email)
+    logger.info("password_reset_requested", email=user.email)
+    security_event.password_reset_requested(user.email, ip=http_request.client.host if http_request.client else None)
 
     return {"status": "reset_email_sent"}
 
@@ -571,6 +712,7 @@ async def confirm_password_reset(request: PasswordResetConfirm) -> dict[str, str
 
     user_id = await redis.get(f"password_reset:{request.token}")
     if not user_id:
+        logger.warning("password_reset_confirm_invalid_token")
         raise HTTPException(status_code=400, detail="Invalid or expired reset token")
 
     db = get_postgres_client()
@@ -695,6 +837,9 @@ async def delete_account(
 
     # Revoke refresh token first (prevents any concurrent re-auth)
     await redis.delete(f"refresh_token:{current_user.id}")
+    from src.api.middleware.auth import invalidate_cached_user
+
+    await invalidate_cached_user(current_user.id)
 
     # Delete user — cascade rules in the DB handle linked rows.
     # If the DB client exposes a delete method, use it; otherwise anonymise.

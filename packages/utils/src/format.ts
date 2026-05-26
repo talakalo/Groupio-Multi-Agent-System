@@ -25,7 +25,8 @@ export function formatPrice(amount: number, currency: string = "ILS"): string {
  * @param locale - BCP 47 locale tag, defaults to "he-IL"
  * @returns Formatted date string, e.g. "15 \u05D1\u05E0\u05D5\u05D1\u05F3 2025"
  */
-export function formatDate(date: string | Date, locale: string = "he-IL"): string {
+export function formatDate(date: string | Date | undefined | null, locale: string = "he-IL"): string {
+  if (date == null) return "";
   const d = typeof date === "string" ? new Date(date) : date;
 
   if (isNaN(d.getTime())) {

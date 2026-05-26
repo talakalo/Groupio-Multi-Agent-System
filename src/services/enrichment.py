@@ -10,7 +10,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from src.config.settings import get_settings
-from src.services.datagov_provider import DataGovIlProvider
+from src.integrations.gov.client import GovDataClient
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +26,7 @@ class NormalizedAddress:
     municipality: str | None
     confidence: float
     source: str
+    municipality_code: str | None = None
 
 
 @dataclass
@@ -62,7 +63,8 @@ class EnrichmentService:
 
     def __init__(self) -> None:
         self._settings = get_settings()
-        self._datagov: DataGovIlProvider | None = DataGovIlProvider() if _is_datagov_enabled(self._settings) else None
+        enabled = _is_datagov_enabled(self._settings)
+        self._datagov: GovDataClient | None = GovDataClient(enabled=enabled) if enabled else None
 
     def normalize_address(self, address: str, city: str) -> NormalizedAddress:
         """Normalize an address to canonical form.
@@ -82,6 +84,8 @@ class EnrichmentService:
                 source="stub",
             )
 
+        min_confidence = float(getattr(self._settings, "ENRICHMENT_MIN_CONFIDENCE_ACCEPT", 0.5))
+
         if self._datagov:
             try:
                 parts = address.split()
@@ -94,21 +98,23 @@ class EnrichmentService:
                         break
                 if not street and parts:
                     street = address
-                result = self._datagov.normalize_address(
+                gov_result = self._datagov.normalize_address(
                     city=city,
                     street=street,
                     house_number=house_num,
                     free_text=address,
                 )
-                if result and result.get("confidence", 0) >= 0.5:
+                if gov_result.ok and gov_result.value and gov_result.confidence >= min_confidence:
+                    v = gov_result.value
                     return NormalizedAddress(
-                        address=result.get("address", address),
-                        city=result.get("city", city),
-                        street=result.get("street"),
-                        house_number=result.get("house_number"),
-                        municipality=result.get("municipality"),
-                        confidence=float(result.get("confidence", 0.7)),
-                        source=result.get("source", "data.gov.il"),
+                        address=v.address,
+                        city=v.city,
+                        street=v.street,
+                        house_number=v.house_number,
+                        municipality=v.municipality,
+                        confidence=gov_result.confidence,
+                        source=gov_result.source.value,
+                        municipality_code=v.municipality_code,
                     )
             except Exception as e:
                 logger.warning("data.gov.il normalize_address failed: %s", e)
@@ -134,13 +140,14 @@ class EnrichmentService:
 
         if self._datagov:
             try:
-                result = self._datagov.get_municipality_info(city)
-                if result:
+                gov_result = self._datagov.resolve_municipality(city)
+                if gov_result.ok and gov_result.value:
+                    m = gov_result.value
                     return MunicipalityInfo(
-                        city=result.get("city", city),
-                        municipality_name=result.get("municipality_name", city),
-                        district=result.get("district"),
-                        region=result.get("region"),
+                        city=m.municipality_name_he,
+                        municipality_name=m.municipality_name_he,
+                        district=m.district,
+                        region=m.region,
                     )
             except Exception as e:
                 logger.warning("data.gov.il get_municipality_info failed: %s", e)
@@ -152,10 +159,19 @@ class EnrichmentService:
         if not self._datagov or not (business_name or "").strip():
             return []
         try:
-            return self._datagov.search_registered_entity(
-                name=business_name.strip(),
-                limit=5,
-            )
+            gov_result = self._datagov.lookup_company(name=business_name.strip(), limit=5)
+            if gov_result.value is None:
+                return []
+            return [
+                {
+                    "company_id": c.company_id,
+                    "name": c.name,
+                    "status": c.status,
+                    "city": c.city,
+                    "address": c.address,
+                }
+                for c in gov_result.value
+            ]
         except Exception as e:
             logger.warning("data.gov.il company search failed: %s", e)
             return []
@@ -179,35 +195,32 @@ class EnrichmentService:
                 raw_response={"error": "license_number required"},
             )
 
-        # Phase 3: use data.gov.il company registry to cross-reference business name.
         # NOTE: data.gov.il does not provide official contractor *license* verification.
-        # This performs a best-effort business name + company-ID lookup only.
+        # This performs best-effort business name + company-ID lookup only.
         if self._datagov:
             try:
-                matches: list[dict] = []
-                # Try searching by company ID (license number may be company registration number)
+                gov_result = None
                 if license_number.isdigit():
-                    matches = self._datagov.search_registered_entity(
-                        name=business_name or "",
-                        company_id=license_number,
-                        limit=3,
+                    gov_result = self._datagov.lookup_company(
+                        name=business_name or "", company_id=license_number, limit=3
                     )
-                # Fall back to name search
-                if not matches and business_name:
-                    matches = self._datagov.search_registered_entity(
-                        name=business_name,
-                        limit=3,
-                    )
-                if matches:
-                    best = matches[0]
-                    is_active = best.get("status", "") == "פעילה"
-                    confidence = 0.75 if is_active else 0.4
+                if (not gov_result or not gov_result.value) and business_name:
+                    gov_result = self._datagov.lookup_company(name=business_name, limit=3)
+                if gov_result and gov_result.value:
+                    best = gov_result.value[0]
+                    confidence = 0.75 if best.is_active else 0.4
                     return ContractorVerificationResult(
-                        verified=is_active,
+                        verified=best.is_active,
                         confidence=confidence,
-                        source="data.gov.il (company registry)",
+                        source="data_gov_il_companies",
                         verified_at=datetime.now(UTC),
-                        raw_response=best,
+                        raw_response={
+                            "company_id": best.company_id,
+                            "name": best.name,
+                            "status": best.status,
+                            "city": best.city,
+                            "address": best.address,
+                        },
                     )
             except Exception as e:
                 logger.warning("data.gov.il contractor verification failed: %s", e)

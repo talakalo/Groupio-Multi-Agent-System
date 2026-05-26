@@ -15,10 +15,12 @@ if (typeof window !== "undefined" && process.env.NEXT_PUBLIC_POSTHOG_KEY) {
     const posthog = require("posthog-js").default;
     posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY, {
       api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://app.posthog.com",
-      capture_pageview: false,
+      capture_pageview: true,    // auto-track Next.js page views via URL change detection
+      autocapture: false,         // disable noisy DOM click/input captures; use explicit track()
+      persistence: "localStorage+cookie",
     });
   } catch {
-    // posthog-js not installed
+    // posthog-js not installed or blocked by ad blocker
   }
 }
 
@@ -35,9 +37,6 @@ class AppErrorBoundary extends Component<
   { children: ReactNode },
   ErrorBoundaryState
 > {
-  // Satisfy React 19 Component type (refs is legacy but required by typings)
-  declare refs: Record<string, unknown>;
-
   constructor(props: { children: ReactNode }) {
     super(props);
     this.state = { hasError: false, error: null };
@@ -117,6 +116,28 @@ export function Providers({ children }: { children: React.ReactNode }) {
     return () => apiClient.setOn401Retry(null);
   }, []);
 
+  // PostHog: identify authenticated user so all events are tied to a real user id.
+  // Reset on logout so anonymous sessions don't bleed into each other.
+  const user = useAuthStore((s) => s.user);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const posthog = require("posthog-js").default;
+      if (user) {
+        posthog.identify(user.id, {
+          email: user.email,
+          name: user.fullName,
+          role: user.role,
+        });
+      } else {
+        posthog.reset();
+      }
+    } catch {
+      // posthog not available
+    }
+  }, [user]);
+
   // On first mount, silently refresh the access token from the HTTP-only
   // refresh cookie so returning visitors are immediately authenticated.
   useEffect(() => {
@@ -142,7 +163,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
       })
   );
 
-  const ErrorBoundary = AppErrorBoundary as unknown as React.JSX.ElementType;
+  // React 19 changed Component<> to not extend JSX.ElementType directly.
+  const ErrorBoundary = AppErrorBoundary as React.ComponentType<{ children: React.ReactNode }>;
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>

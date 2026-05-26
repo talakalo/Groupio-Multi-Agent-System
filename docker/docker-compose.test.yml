@@ -1,0 +1,24 @@
+# Removed deprecated `version` key (Docker Compose v2 ignores it and warns).
+# Lightweight test compose — PostgreSQL only.
+# Usage:
+#   docker compose -f docker/docker-compose.test.yml up -d
+#   TEST_DATABASE_URL=postgresql://groupio_test:groupio_test@localhost:5433/groupio_test \
+#     pytest tests/real/ -v
+#   docker compose -f docker/docker-compose.test.yml down -v
+
+services:
+  postgres-test:
+    image: postgres:15-alpine
+    ports:
+      - "5433:5432"  # Use 5433 to avoid clashing with the dev DB on 5432
+    environment:
+      POSTGRES_USER: groupio_test
+      POSTGRES_PASSWORD: groupio_test
+      POSTGRES_DB: groupio_test
+    tmpfs:
+      - /var/lib/postgresql/data  # In-memory for speed; data is ephemeral
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U groupio_test -d groupio_test"]
+      interval: 2s
+      timeout: 5s
+      retries: 10

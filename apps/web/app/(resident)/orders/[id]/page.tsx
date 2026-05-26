@@ -12,14 +12,17 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
+import { useCallback, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { OrderTimeline } from "@/components/features/orders/OrderTimeline";
 import { EscrowBadge } from "@/components/features/payments/EscrowBadge";
 import { Breadcrumb } from "@/components/shared/Breadcrumb";
 import { Badge } from "@/components/ui/Badge";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { apiClient } from "@/lib/api/client";
+import { ApiError, apiClient } from "@/lib/api/client";
+import { useApiData } from "@/lib/hooks/useApiData";
 import { unwrapPageParams, PageParamsProps } from "@/lib/utils/unwrapPageParams";
 
 interface OrderDetail {
@@ -46,22 +49,20 @@ interface OrderDetail {
 
 type BadgeVariant = "warning" | "info" | "success" | "error" | "accent" | "primary";
 
-const STATUS_MAP: Record<
-  string,
-  { label: string; variant: BadgeVariant; icon: React.ElementType }
-> = {
-  pending: { label: "ממתין לתשלום", variant: "warning", icon: Clock },
-  processing: { label: "בעיבוד", variant: "info", icon: Loader2 },
-  succeeded: { label: "שולם", variant: "success", icon: CheckCircle2 },
-  failed: { label: "נכשל", variant: "error", icon: XCircle },
-  refunded: { label: "הוחזר", variant: "accent", icon: Clock },
+const STATUS_VARIANT: Record<string, BadgeVariant> = {
+  pending: "warning",
+  processing: "info",
+  succeeded: "success",
+  failed: "error",
+  refunded: "accent",
 };
 
-const ESCROW_MAP: Record<string, { label: string; color: string }> = {
-  held: { label: "הכסף מוחזק בנאמנות", color: "text-blue-700 bg-blue-50" },
-  released: { label: "הכסף שוחרר לקבלן", color: "text-green-700 bg-green-50" },
-  refunded: { label: "הכסף הוחזר אליך", color: "text-purple-700 bg-purple-50" },
-  pending: { label: "ממתין", color: "text-amber-700 bg-amber-50" },
+const STATUS_ICON: Record<string, React.ElementType> = {
+  pending: Clock,
+  processing: Loader2,
+  succeeded: CheckCircle2,
+  failed: XCircle,
+  refunded: Clock,
 };
 
 function formatCurrency(amount: number, currency = "ILS") {
@@ -84,43 +85,78 @@ function formatDate(dateStr: string) {
 
 export default function OrderDetailPage(props: PageParamsProps) {
   unwrapPageParams(props);
+  const t = useTranslations("orders");
   const { id } = useParams<{ id: string }>();
-  const [order, setOrder] = useState<OrderDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [approving, setApproving] = useState(false);
-  const [approved, setApproved] = useState(false);
+  const queryClient = useQueryClient();
+  const [approveErr, setApproveErr] = useState<string | null>(null);
+  const [invoiceBusy, setInvoiceBusy] = useState(false);
+  const [invoiceErr, setInvoiceErr] = useState<string | null>(null);
 
-  const fetchOrder = useCallback(async () => {
-    if (!id) return;
-    setLoading(true);
+  const {
+    data: order = null,
+    isLoading: loading,
+    error: loadErr,
+    refetch: fetchOrder,
+  } = useApiData<OrderDetail | null>(
+    ["orders", id],
+    async () => {
+      const raw = await apiClient.getPayment(id) as unknown as Record<string, unknown>;
+      return {
+        id: raw.id as string,
+        offerId: (raw.offerId ?? raw.offer_id ?? '') as string,
+        amount: (raw.amount ?? 0) as number,
+        currency: (raw.currency ?? 'ILS') as string,
+        status: (raw.status ?? 'pending') as string,
+        createdAt: (raw.createdAt ?? raw.created_at ?? '') as string,
+        transactionId: raw.transactionId as string | undefined,
+        paymentMethod: raw.paymentMethod as string | undefined,
+        offer: raw.offer as OrderDetail['offer'],
+        escrowStatus: raw.escrowStatus as string | undefined,
+        invoiceId: raw.invoiceId as string | undefined,
+      };
+    },
+    { enabled: !!id },
+  );
+
+  const approveMutation = useMutation({
+    mutationFn: async () => {
+      if (!order) throw new Error("Order not loaded");
+      return apiClient.approveWork(order.id);
+    },
+    onSuccess: () => {
+      setApproveErr(null);
+      queryClient.invalidateQueries({ queryKey: ["orders", id] });
+      queryClient.invalidateQueries({ queryKey: ["orders", "my"] });
+      queryClient.invalidateQueries({ queryKey: ["payments", "my"] });
+    },
+    onError: () => {
+      setApproveErr(t("detail.approveError"));
+    },
+  });
+  const approving = approveMutation.isPending;
+  const approved = approveMutation.isSuccess;
+  const error = approveErr ?? (loadErr ? t("detail.loadError") : null);
+
+  const handleInvoiceDownload = useCallback(async () => {
+    if (!order?.invoiceId) return;
+    setInvoiceErr(null);
+    setInvoiceBusy(true);
     try {
-      const data = await apiClient.getPayment(id);
-      setOrder(data as unknown as OrderDetail);
-    } catch {
-      setError("לא ניתן לטעון את פרטי ההזמנה");
+      const blob = await apiClient.downloadInvoiceHtml(order.invoiceId);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `invoice-${order.invoiceId.slice(0, 8)}.html`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setInvoiceErr(e instanceof ApiError ? e.message : t("detail.invoiceError"));
     } finally {
-      setLoading(false);
+      setInvoiceBusy(false);
     }
-  }, [id]);
-
-  useEffect(() => {
-    fetchOrder();
-  }, [fetchOrder]);
-
-  const handleApproveWork = async () => {
-    if (!order) return;
-    setApproving(true);
-    try {
-      await apiClient.approveWork(order.id);
-      setApproved(true);
-      await fetchOrder();
-    } catch {
-      setError("שגיאה באישור העבודה. נסו שוב.");
-    } finally {
-      setApproving(false);
-    }
-  };
+  }, [order?.invoiceId, t]);
 
   if (loading) {
     return (
@@ -141,7 +177,7 @@ export default function OrderDetailPage(props: PageParamsProps) {
           <AlertCircle className="w-10 h-10 text-red-500 mx-auto mb-3" />
           <p className="text-red-700 font-medium">{error}</p>
           <Link href="/payments" className="text-primary-600 hover:underline mt-3 inline-block">
-            חזרה לתשלומים
+            {t("detail.backToPayments")}
           </Link>
         </div>
       </div>
@@ -150,25 +186,28 @@ export default function OrderDetailPage(props: PageParamsProps) {
 
   if (!order) return null;
 
-  const statusConfig = STATUS_MAP[order.status] || STATUS_MAP.pending;
-  const StatusIcon = statusConfig.icon;
-  const escrowConfig = order.escrowStatus
-    ? ESCROW_MAP[order.escrowStatus] || ESCROW_MAP.pending
+  const statusKey = STATUS_ICON[order.status] ? order.status : "pending";
+  const StatusIcon = STATUS_ICON[statusKey]!;
+  const ESCROW_KEYS = ["held", "released", "refunded", "pending"] as const;
+  type EscrowKey = (typeof ESCROW_KEYS)[number];
+  const escrowLabel = order.escrowStatus
+    ? ESCROW_KEYS.includes(order.escrowStatus as EscrowKey)
+      ? t(`detail.escrow.${order.escrowStatus as EscrowKey}`)
+      : t("detail.escrow.pending")
     : null;
   const canApproveWork =
     order.status === "succeeded" &&
     order.escrowStatus === "held" &&
     !approved;
 
-  const orderTitle = order.offer?.title || "הזמנה";
+  const orderTitle = order.offer?.title ?? t("detail.defaultTitle");
 
   return (
     <main className="max-w-2xl mx-auto space-y-6 p-4 md:p-6" dir="rtl">
-      {/* Breadcrumb */}
       <Breadcrumb
         items={[
-          { label: "ראשי", href: "/dashboard" },
-          { label: "הזמנות", href: "/orders" },
+          { label: t("detail.breadcrumbHome"), href: "/dashboard" },
+          { label: t("detail.breadcrumbOrders"), href: "/orders" },
           { label: orderTitle },
         ]}
       />
@@ -178,8 +217,8 @@ export default function OrderDetailPage(props: PageParamsProps) {
         <div className="flex items-center gap-3">
           <StatusIcon className="w-6 h-6 text-gray-500" />
           <div>
-            <Badge variant={statusConfig.variant} size="md">
-              {statusConfig.label}
+            <Badge variant={STATUS_VARIANT[statusKey] ?? "warning"} size="md">
+              {t(`status.${statusKey}` as Parameters<typeof t>[0])}
             </Badge>
             <p className="text-xs text-gray-500 mt-1">{formatDate(order.createdAt)}</p>
           </div>
@@ -188,39 +227,39 @@ export default function OrderDetailPage(props: PageParamsProps) {
 
       {/* Order Timeline */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h2 className="font-semibold text-gray-900 mb-4">מצב ההזמנה</h2>
+        <h2 className="font-semibold text-gray-900 mb-4">{t("detail.orderStatus")}</h2>
         <OrderTimeline status={order.status} />
       </div>
 
       {/* Order Info Card */}
       <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold text-gray-900">
-            {order.offer?.title || "הזמנה"}
-          </h1>
+          <h1 className="text-xl font-bold text-gray-900">{orderTitle}</h1>
           <span className="text-2xl font-bold text-primary-700">
             {formatCurrency(order.amount, order.currency)}
           </span>
         </div>
 
         {order.offer?.category && (
-          <p className="text-sm text-gray-500">קטגוריה: {order.offer.category}</p>
+          <p className="text-sm text-gray-500">
+            {t("detail.category", { value: order.offer.category })}
+          </p>
         )}
 
         {order.transactionId && (
           <div className="flex items-center gap-2 text-sm text-gray-500">
             <FileText className="w-4 h-4" />
-            <span>מזהה עסקה: {order.transactionId}</span>
+            <span>{t("detail.transactionId", { id: order.transactionId })}</span>
           </div>
         )}
       </div>
 
       {/* Escrow Status */}
-      {escrowConfig && (
+      {order.escrowStatus && escrowLabel && (
         <div className="space-y-2">
           <EscrowBadge variant={order.escrowStatus === "held" ? "block" : "inline"} />
           {order.escrowStatus !== "held" && (
-            <p className="text-sm text-gray-500 px-1">{escrowConfig.label}</p>
+            <p className="text-sm text-gray-500 px-1">{escrowLabel}</p>
           )}
         </div>
       )}
@@ -228,15 +267,12 @@ export default function OrderDetailPage(props: PageParamsProps) {
       {/* Contractor Info */}
       {order.offer?.contractor && (
         <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-3">
-          <h2 className="font-semibold text-gray-900">פרטי הקבלן</h2>
+          <h2 className="font-semibold text-gray-900">{t("detail.contractorDetails")}</h2>
           <p className="font-medium">{order.offer.contractor.businessName}</p>
           {order.offer.contractor.phone && (
             <div className="flex items-center gap-2 text-sm text-gray-600">
               <Phone className="w-4 h-4" />
-              <a
-                href={`tel:${order.offer.contractor.phone}`}
-                className="hover:text-primary-600"
-              >
+              <a href={`tel:${order.offer.contractor.phone}`} className="hover:text-primary-600">
                 {order.offer.contractor.phone}
               </a>
             </div>
@@ -244,10 +280,7 @@ export default function OrderDetailPage(props: PageParamsProps) {
           {order.offer.contractor.email && (
             <div className="flex items-center gap-2 text-sm text-gray-600">
               <Mail className="w-4 h-4" />
-              <a
-                href={`mailto:${order.offer.contractor.email}`}
-                className="hover:text-primary-600"
-              >
+              <a href={`mailto:${order.offer.contractor.email}`} className="hover:text-primary-600">
                 {order.offer.contractor.email}
               </a>
             </div>
@@ -260,19 +293,14 @@ export default function OrderDetailPage(props: PageParamsProps) {
         <div className="bg-green-50 rounded-xl border border-green-200 p-6 space-y-4">
           <h2 className="font-semibold text-green-900 flex items-center gap-2">
             <CheckCircle2 className="w-5 h-5" />
-            אישור השלמת עבודה
+            {t("detail.approveTitle")}
           </h2>
-          <p className="text-sm text-green-800">
-            לאחר שתאשרו שהעבודה הושלמה, הכסף ישוחרר מהנאמנות לקבלן. פעולה זו
-            אינה ניתנת לביטול.
-          </p>
-          {error && (
-            <p className="text-sm text-red-600" role="alert">
-              {error}
-            </p>
+          <p className="text-sm text-green-800">{t("detail.approveDescription")}</p>
+          {approveErr && (
+            <p className="text-sm text-red-600" role="alert">{approveErr}</p>
           )}
           <button
-            onClick={handleApproveWork}
+            onClick={() => approveMutation.mutate()}
             disabled={approving}
             className="btn-primary w-full flex items-center justify-center gap-2"
           >
@@ -281,7 +309,7 @@ export default function OrderDetailPage(props: PageParamsProps) {
             ) : (
               <CheckCircle2 className="w-5 h-5" />
             )}
-            {approving ? "מאשר..." : "אישור השלמת עבודה ושחרור תשלום"}
+            {approving ? t("detail.approving") : t("detail.approveButton")}
           </button>
         </div>
       )}
@@ -290,27 +318,31 @@ export default function OrderDetailPage(props: PageParamsProps) {
       {approved && (
         <div className="bg-green-100 rounded-xl p-4 text-center text-green-800" role="alert">
           <CheckCircle2 className="w-8 h-8 mx-auto mb-2" />
-          <p className="font-semibold">העבודה אושרה! הכסף ישוחרר לקבלן.</p>
+          <p className="font-semibold">{t("detail.approvedBanner")}</p>
         </div>
       )}
 
       {/* Invoice Link */}
       {order.invoiceId && (
-        <div className="text-center">
-          <Link
-            href={`/api/v1/payments/invoices/${order.invoiceId}/pdf`}
-            className="text-primary-600 hover:underline text-sm"
-            target="_blank"
+        <div className="text-center space-y-2">
+          <button
+            type="button"
+            onClick={() => void handleInvoiceDownload()}
+            disabled={invoiceBusy}
+            className="text-primary-600 hover:underline text-sm disabled:opacity-50"
           >
-            הורד חשבונית PDF
-          </Link>
+            {invoiceBusy ? t("detail.invoiceDownloading") : t("detail.invoiceDownload")}
+          </button>
+          {invoiceErr && (
+            <p className="text-sm text-red-600" role="alert">{invoiceErr}</p>
+          )}
         </div>
       )}
 
       {/* Back */}
       <div className="text-center pt-4">
         <Link href="/orders" className="text-gray-500 hover:text-gray-700 text-sm">
-          ← חזרה להזמנות
+          {t("detail.backToOrders")}
         </Link>
       </div>
     </main>

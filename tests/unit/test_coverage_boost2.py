@@ -406,16 +406,16 @@ class TestGetPaymentProvider:
             with pytest.raises(RuntimeError, match="STRIPE_SECRET_KEY"):
                 get_payment_provider()
 
-    def test_mock_logs_warning_in_production(self):
-        from src.services.payment import MockPaymentProvider, get_payment_provider
+    def test_mock_rejected_in_production(self):
+        from src.services.payment import get_payment_provider
 
         with patch("src.config.settings.get_settings") as mock_settings:
             settings = MagicMock()
             settings.PAYMENT_PROVIDER = "mock"
             settings.ENVIRONMENT = "production"
             mock_settings.return_value = settings
-            provider = get_payment_provider()
-        assert isinstance(provider, MockPaymentProvider)
+            with pytest.raises(RuntimeError, match="PAYMENT_PROVIDER=mock is not allowed"):
+                get_payment_provider()
 
 
 # ---------------------------------------------------------------------------
@@ -431,7 +431,7 @@ class TestVettingAgentAnalysis:
             patch("src.agents.base.get_rag_pipeline"),
             patch("src.agents.vetting.get_postgres_client") as mock_db,
             patch("src.agents.vetting.get_graph_store") as mock_graph,
-            patch("src.agents.vetting.get_settings") as mock_settings,
+            patch("src.config.settings.get_settings") as mock_settings,
         ):
             mock_llm.return_value = AsyncMock()
             mock_db.return_value = AsyncMock()

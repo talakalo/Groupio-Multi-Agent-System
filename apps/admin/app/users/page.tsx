@@ -27,7 +27,7 @@ import {
   Lock,
 } from "lucide-react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { apiV1 } from "@/lib/backend-url";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -47,6 +47,41 @@ type RoleFilter = "all" | "resident" | "contractor" | "admin" | "super_admin";
 type StatusFilter = "all" | "active" | "suspended";
 type SortField = "name" | "email" | "role" | "status" | "created_at";
 type SortDir = "asc" | "desc";
+
+function SortTh({
+  field,
+  sortField,
+  sortDir,
+  onSort,
+  children,
+}: {
+  field: SortField;
+  sortField: SortField;
+  sortDir: SortDir;
+  onSort: (f: SortField) => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <th
+      className="table-header cursor-pointer select-none"
+      onClick={() => onSort(field)}
+      onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onSort(field)}
+      tabIndex={0}
+      role="columnheader"
+      aria-sort={sortField === field ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
+    >
+      <div className="flex items-center gap-1">
+        {children}
+        {sortField === field &&
+          (sortDir === "asc" ? (
+            <ChevronUp className="w-3.5 h-3.5" />
+          ) : (
+            <ChevronDown className="w-3.5 h-3.5" />
+          ))}
+      </div>
+    </th>
+  );
+}
 
 const ROLE_LABELS: Record<string, string> = {
   resident: "Resident",
@@ -69,7 +104,7 @@ const ROLE_BADGE_CLASSES: Record<string, string> = {
 const fetchOpts = (): RequestInit => ({ credentials: "include", headers: { "Content-Type": "application/json" } });
 
 async function fetchUsers(): Promise<User[]> {
-  const res = await fetch(`${API_URL}/api/v1/admin/users`, fetchOpts());
+  const res = await fetch(apiV1("/admin/users"), fetchOpts());
   if (!res.ok) throw new Error("Failed to fetch users");
   const data = await res.json();
   const raw = data.users ?? data.items ?? data;
@@ -88,7 +123,7 @@ async function updateUser(
   id: string,
   payload: Partial<Pick<User, "role" | "status">>
 ): Promise<User> {
-  const res = await fetch(`${API_URL}/api/v1/admin/users/${id}`, {
+  const res = await fetch(apiV1(`/admin/users/${id}`), {
     method: "PUT",
     ...fetchOpts(),
     body: JSON.stringify(payload),
@@ -103,7 +138,7 @@ async function createUser(payload: {
   phone: string;
   password: string;
 }): Promise<User> {
-  const res = await fetch(`${API_URL}/api/v1/admin/users`, {
+  const res = await fetch(apiV1("/admin/users"), {
     method: "POST",
     ...fetchOpts(),
     body: JSON.stringify({ ...payload, role: "admin" }),
@@ -266,32 +301,6 @@ export default function UsersPage() {
     [createForm, createMutation]
   );
 
-  // ---- Sort header helper ----
-  function SortTh({
-    field,
-    children,
-  }: {
-    field: SortField;
-    children: React.ReactNode;
-  }) {
-    return (
-      <th
-        className="table-header cursor-pointer select-none"
-        onClick={() => toggleSort(field)}
-      >
-        <div className="flex items-center gap-1">
-          {children}
-          {sortField === field &&
-            (sortDir === "asc" ? (
-              <ChevronUp className="w-3.5 h-3.5" />
-            ) : (
-              <ChevronDown className="w-3.5 h-3.5" />
-            ))}
-        </div>
-      </th>
-    );
-  }
-
   return (
     <div className="space-y-6">
       {/* ---- Page header ---- */}
@@ -422,12 +431,12 @@ export default function UsersPage() {
           <table className="w-full text-left">
             <thead>
               <tr>
-                <SortTh field="name">Name</SortTh>
-                <SortTh field="email">Email</SortTh>
+                <SortTh field="name" sortField={sortField} sortDir={sortDir} onSort={toggleSort}>Name</SortTh>
+                <SortTh field="email" sortField={sortField} sortDir={sortDir} onSort={toggleSort}>Email</SortTh>
                 <th className="table-header">Phone</th>
-                <SortTh field="role">Role</SortTh>
-                <SortTh field="status">Status</SortTh>
-                <SortTh field="created_at">Created</SortTh>
+                <SortTh field="role" sortField={sortField} sortDir={sortDir} onSort={toggleSort}>Role</SortTh>
+                <SortTh field="status" sortField={sortField} sortDir={sortDir} onSort={toggleSort}>Status</SortTh>
+                <SortTh field="created_at" sortField={sortField} sortDir={sortDir} onSort={toggleSort}>Created</SortTh>
                 <th className="table-header">Actions</th>
               </tr>
             </thead>

@@ -17,6 +17,7 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
+  useLocale: () => 'he',
 }));
 
 vi.mock('@/components/shared/NotificationPanel', () => ({
@@ -28,14 +29,19 @@ type UserRole = 'super_admin' | 'admin' | 'buildings_manager' | 'resident' | 'co
 let mockToken: string | null = 'token';
 let mockUser: { role: UserRole } | null = { role: 'buildings_manager' };
 
+const mockRefreshBMToken = vi.fn(() => Promise.resolve(true));
+
 vi.mock('@/lib/stores/authStore', () => ({
   useAuthStore: vi.fn((selector: (s: Record<string, unknown>) => unknown) =>
     selector({
       accessToken: mockToken,
       user: mockUser,
       logout: vi.fn(() => Promise.resolve()),
+      isAuthenticated: !!mockToken,
+      refreshAccessToken: mockRefreshBMToken,
     })
   ),
+  useAuthHasHydrated: vi.fn(() => true),
 }));
 
 // unwrapPageParams is a no-op in tests (no props.params/searchParams)

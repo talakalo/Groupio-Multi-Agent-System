@@ -19,6 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from src.api.middleware.auth import get_current_user
 from src.databases.postgres import get_postgres_client
 from src.models.user import UserInDB, UserResponse
+from src.services.enrichment import get_enrichment_service
 
 logger = logging.getLogger(__name__)
 
@@ -144,17 +145,37 @@ async def complete_onboarding(
                 "total_savings": 0.0,
                 "whatsapp_group_id": None,
             }
-            if info.municipality_code:
-                building_payload["municipality_code"] = info.municipality_code
-            if info.municipality_name:
-                building_payload["municipality_name"] = info.municipality_name
-            if info.address_normalized:
-                building_payload["address_normalized"] = info.address_normalized
-            if info.enrichment_confidence is not None:
-                building_payload["enrichment_confidence"] = info.enrichment_confidence
-            if info.enrichment_source:
-                building_payload["enrichment_source"] = info.enrichment_source
-            if info.municipality_code or info.address_normalized:
+            # Server-side enrichment: if client didn't supply municipality_code,
+            # call EnrichmentService to resolve it from data.gov.il.
+            if not info.municipality_code:
+                try:
+                    enriched = get_enrichment_service().normalize_address(info.building_address, info.city)
+                    if enriched.municipality_code:
+                        building_payload["municipality_code"] = enriched.municipality_code
+                        building_payload["municipality_name"] = enriched.municipality
+                        building_payload["address_normalized"] = enriched.address
+                        building_payload["enrichment_confidence"] = enriched.confidence
+                        building_payload["enrichment_source"] = enriched.source
+                        building_payload["enriched_at"] = datetime.now(UTC)
+                        logger.info(
+                            "Server-side enrichment: building %s got municipality_code=%s confidence=%.2f",
+                            building_id,
+                            enriched.municipality_code,
+                            enriched.confidence,
+                        )
+                except Exception as enrich_exc:
+                    logger.warning("Server-side enrichment failed for building %s: %s", building_id, enrich_exc)
+            else:
+                if info.municipality_code:
+                    building_payload["municipality_code"] = info.municipality_code
+                if info.municipality_name:
+                    building_payload["municipality_name"] = info.municipality_name
+                if info.address_normalized:
+                    building_payload["address_normalized"] = info.address_normalized
+                if info.enrichment_confidence is not None:
+                    building_payload["enrichment_confidence"] = info.enrichment_confidence
+                if info.enrichment_source:
+                    building_payload["enrichment_source"] = info.enrichment_source
                 building_payload["enriched_at"] = datetime.now(UTC)
             try:
                 building = await db.create_building(building_payload)
@@ -196,6 +217,28 @@ async def complete_onboarding(
             raise HTTPException(status_code=500, detail="Failed to update user") from exc
 
         logger.info("Resident onboarding complete for user %s → building %s", user_id, building_id)
+        try:
+            from src.messaging.envelope import EventEnvelope
+            from src.messaging.outbox_helpers import try_enqueue_crm
+            from src.messaging.topics import RK_CRM_BUILDING_CREATED
+
+            env = EventEnvelope(
+                event_name="crm.building.created",
+                entity_type="building",
+                entity_id=building_id,
+                idempotency_key=f"crm:building:created:{building_id}",
+                payload={"building_id": building_id, "user_id": user_id},
+            )
+            await try_enqueue_crm(
+                db,
+                RK_CRM_BUILDING_CREATED,
+                env.event_name,
+                env.to_json_dict(),
+                idempotency_key=env.idempotency_key,
+            )
+        except Exception:
+            logger.exception("CRM outbox enqueue failed after resident onboarding (non-fatal)")
+
         return OnboardingResponse(user=UserResponse.model_validate(updated_user.model_dump()))
 
     # ------------------------------------------------------------------
@@ -246,6 +289,28 @@ async def complete_onboarding(
             raise HTTPException(status_code=500, detail="Failed to update user") from exc
 
         logger.info("Contractor onboarding complete for user %s → contractor %s", user_id, contractor_id)
+        try:
+            from src.messaging.envelope import EventEnvelope
+            from src.messaging.outbox_helpers import try_enqueue_crm
+            from src.messaging.topics import RK_CRM_CONTRACTOR_REGISTERED
+
+            env = EventEnvelope(
+                event_name="crm.contractor.registered",
+                entity_type="contractor",
+                entity_id=contractor_id,
+                idempotency_key=f"crm:contractor:registered:{contractor_id}",
+                payload={"contractor_id": contractor_id, "source": "onboarding"},
+            )
+            await try_enqueue_crm(
+                db,
+                RK_CRM_CONTRACTOR_REGISTERED,
+                env.event_name,
+                env.to_json_dict(),
+                idempotency_key=env.idempotency_key,
+            )
+        except Exception:
+            logger.exception("CRM outbox enqueue failed after contractor onboarding (non-fatal)")
+
         return OnboardingResponse(user=UserResponse.model_validate(updated_user.model_dump()))
 
     # Should never reach here (pydantic validates role)

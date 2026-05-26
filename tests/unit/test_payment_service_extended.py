@@ -1,12 +1,11 @@
 """Extended unit tests for payment services."""
 
-import logging
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 import src.services.payment as pay_module
-from src.services.payment import MockPaymentProvider, get_payment_provider
+from src.services.payment import MockPaymentProvider, PaymentProviderUnavailableError, get_payment_provider
 
 # ---------------------------------------------------------------------------
 # MockPaymentProvider
@@ -95,18 +94,15 @@ def test_get_payment_provider_mock():
     assert isinstance(p, MockPaymentProvider)
 
 
-def test_get_payment_provider_mock_in_production_logs_warning(caplog):
+def test_get_payment_provider_mock_rejected_in_production():
     mock_settings = MagicMock()
     mock_settings.PAYMENT_PROVIDER = "mock"
     mock_settings.ENVIRONMENT = "production"
     mock_settings.STRIPE_SECRET_KEY = None
 
     with patch("src.config.settings.get_settings", return_value=mock_settings):
-        with caplog.at_level(logging.WARNING):
-            p = get_payment_provider()
-
-    assert isinstance(p, MockPaymentProvider)
-    assert "MOCK" in caplog.text or "mock" in caplog.text.lower()
+        with pytest.raises(RuntimeError, match="PAYMENT_PROVIDER=mock is not allowed"):
+            get_payment_provider()
 
 
 def test_get_payment_provider_unknown_raises():
@@ -138,3 +134,21 @@ def test_get_payment_provider_returns_singleton():
         p2 = get_payment_provider()
 
     assert p1 is p2
+
+
+def test_get_payment_provider_bit_not_implemented():
+    mock_settings = MagicMock()
+    mock_settings.PAYMENT_PROVIDER = "bit"
+
+    with patch("src.config.settings.get_settings", return_value=mock_settings):
+        with pytest.raises(PaymentProviderUnavailableError, match="Bit payments are not available"):
+            get_payment_provider()
+
+
+def test_get_payment_provider_paybox_not_implemented():
+    mock_settings = MagicMock()
+    mock_settings.PAYMENT_PROVIDER = "paybox"
+
+    with patch("src.config.settings.get_settings", return_value=mock_settings):
+        with pytest.raises(PaymentProviderUnavailableError, match="PayBox payments are not available"):
+            get_payment_provider()

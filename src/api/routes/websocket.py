@@ -21,6 +21,9 @@ MAX_MESSAGE_SIZE = 65_536  # 64 KB
 MAX_MESSAGES_PER_MINUTE = 60
 ALLOWED_MESSAGE_TYPES = {"ping", "subscribe", "unsubscribe"}
 
+# Redis pub/sub channel names
+OFFERS_CHANNEL = "offers:updates"
+
 
 class ConnectionManager:
     def __init__(self):

@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 
 from src.api.main import app
 from src.api.middleware.auth import get_current_user
-from src.services.storage import StorageError
+from src.services.storage import MAX_FILE_SIZE, StorageError
 
 
 @pytest.fixture
@@ -102,6 +102,21 @@ class TestUploadArchitecture:
 
         assert response.status_code == 400
         assert "not allowed" in response.json()["detail"]
+
+    def test_upload_architecture_rejects_oversized_file(self, client, mock_db, mock_storage):
+        """Uploads larger than MAX_UPLOAD_BYTES are rejected before storage."""
+        oversized = b"x" * (MAX_FILE_SIZE + 1)
+
+        response = client.post(
+            "/api/v1/uploads/architecture",
+            files={"file": ("plan.pdf", oversized, "application/pdf")},
+            headers={"Authorization": "Bearer test-token"},
+        )
+
+        assert response.status_code == 413
+        assert "too large" in response.json()["detail"].lower()
+        mock_storage.validate_file.assert_not_called()
+        mock_storage.upload.assert_not_awaited()
 
 
 class TestUploadContractorDoc:

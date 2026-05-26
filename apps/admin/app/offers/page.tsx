@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 import { useState, useMemo, useCallback, type ReactNode } from "react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { apiV1 } from "@/lib/backend-url";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -47,7 +47,9 @@ interface Offer {
     | "matched"
     | "in_progress"
     | "completed"
-    | "cancelled";
+    | "cancelled"
+    | "flagged"
+    | "active";
   participants: number;
   price?: number;
   flagged: boolean;
@@ -62,7 +64,9 @@ type StatusFilter =
   | "matched"
   | "in_progress"
   | "completed"
-  | "cancelled";
+  | "cancelled"
+  | "flagged"
+  | "active";
 
 type SortField = "title" | "category" | "status" | "participants" | "price" | "created_at";
 type SortDir = "asc" | "desc";
@@ -75,6 +79,8 @@ const STATUS_LABELS: Record<string, string> = {
   in_progress: "In Progress",
   completed: "Completed",
   cancelled: "Cancelled",
+  flagged: "Flagged",
+  active: "Active",
 };
 
 const STATUS_BADGE_CLASSES: Record<string, string> = {
@@ -85,6 +91,8 @@ const STATUS_BADGE_CLASSES: Record<string, string> = {
   in_progress: "bg-info-50 text-info-700",
   completed: "bg-success-50 text-success-700",
   cancelled: "bg-danger-50 text-danger-700",
+  flagged: "bg-warning-50 text-warning-800",
+  active: "bg-primary-50 text-primary-700",
 };
 
 function OffersSortTh({
@@ -153,15 +161,48 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 const fetchOpts = (): RequestInit => ({ credentials: "include", headers: { "Content-Type": "application/json" } });
 
+function mapApiOffer(raw: Record<string, unknown>): Offer {
+  const id = String(raw.id ?? "");
+  const title = String(raw.title ?? "");
+  const category = String(raw.category ?? "");
+  const rawStatus = String(raw.status ?? "draft").toLowerCase();
+  const flagged = rawStatus === "flagged" || Boolean(raw.flagged);
+  const status = rawStatus as Offer["status"];
+  const participants = Number(raw.current_participants ?? raw.participants ?? 0);
+  const bp = raw.base_price ?? raw.price;
+  let price: number | undefined;
+  if (bp !== null && bp !== undefined && bp !== "") {
+    const n = typeof bp === "number" ? bp : Number(bp);
+    price = Number.isFinite(n) ? n : undefined;
+  }
+  const building =
+    (typeof raw.building_name === "string" && raw.building_name) ||
+    (typeof raw.building === "string" ? raw.building : undefined);
+  const created_at = String(raw.created_at ?? new Date(0).toISOString());
+  return {
+    id,
+    title,
+    category,
+    status,
+    participants: Number.isFinite(participants) ? participants : 0,
+    price,
+    building,
+    flagged,
+    created_at,
+  };
+}
+
 async function fetchOffers(): Promise<Offer[]> {
-  const res = await fetch(`${API_URL}/api/v1/admin/offers`, fetchOpts());
+  const res = await fetch(apiV1("/admin/offers"), fetchOpts());
   if (!res.ok) throw new Error("Failed to fetch offers");
   const data = await res.json();
-  return data.offers ?? data.items ?? data;
+  const rawList = data.offers ?? data.items ?? (Array.isArray(data) ? data : []);
+  if (!Array.isArray(rawList)) return [];
+  return rawList.map((r) => mapApiOffer(r as Record<string, unknown>));
 }
 
 async function approveOffer(id: string): Promise<void> {
-  const res = await fetch(`${API_URL}/api/v1/admin/offers/${id}/approve`, {
+  const res = await fetch(apiV1(`/admin/offers/${id}/approve`), {
     method: "POST",
     ...fetchOpts(),
   });
@@ -169,7 +210,7 @@ async function approveOffer(id: string): Promise<void> {
 }
 
 async function cancelOffer(id: string): Promise<void> {
-  const res = await fetch(`${API_URL}/api/v1/admin/offers/${id}/cancel`, {
+  const res = await fetch(apiV1(`/admin/offers/${id}/cancel`), {
     method: "POST",
     ...fetchOpts(),
   });
@@ -177,7 +218,7 @@ async function cancelOffer(id: string): Promise<void> {
 }
 
 async function flagOffer(id: string): Promise<void> {
-  const res = await fetch(`${API_URL}/api/v1/admin/offers/${id}/flag`, {
+  const res = await fetch(apiV1(`/admin/offers/${id}/flag`), {
     method: "POST",
     ...fetchOpts(),
   });
@@ -351,7 +392,7 @@ export default function OffersPage() {
           <button
             onClick={() =>
               downloadCsv(
-                `${API_URL}/api/v1/admin/export/offers`,
+                apiV1("/admin/export/offers"),
                 `groupio_offers_${new Date().toISOString().slice(0, 10)}.csv`
               )
             }
@@ -363,7 +404,7 @@ export default function OffersPage() {
           <button
             onClick={() =>
               downloadCsv(
-                `${API_URL}/api/v1/admin/export/participants`,
+                apiV1("/admin/export/participants"),
                 `groupio_participants_${new Date().toISOString().slice(0, 10)}.csv`
               )
             }
@@ -456,6 +497,8 @@ export default function OffersPage() {
             <option value="in_progress">In Progress</option>
             <option value="completed">Completed</option>
             <option value="cancelled">Cancelled</option>
+            <option value="flagged">Flagged</option>
+            <option value="active">Active</option>
           </select>
 
           {/* Category */}

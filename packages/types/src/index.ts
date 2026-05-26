@@ -2,7 +2,10 @@
 
 export interface Resident {
   id: string;
+  /** UI / legacy camelCase */
   name: string;
+  /** API field (`full_name`); map to `name` when building UI models */
+  full_name?: string;
   email: string;
   phone: string;
   buildingId: string;
@@ -14,10 +17,27 @@ export interface Building {
   address: string;
   city: string;
   region: Region;
+  /** Preferred API / analytics field */
+  total_units?: number;
+  /** Legacy / UI alias; prefer `total_units` when present */
   units: number;
   age: number;
   type: BuildingType;
   coordinates?: { lat: number; lng: number };
+  /** Populated by server-side enrichment from data.gov.il settlements API */
+  municipality_name?: string;
+  municipality_code?: string;
+  enrichment_confidence?: number;
+  enrichment_source?: string;
+  /** Runtime-populated by API join — shape varies by endpoint */
+  residents?: unknown[];
+  inviteCode?: string;
+  /** Aggregate stats returned by the API */
+  activeOffers?: Offer[];
+  totalSavings?: number;
+  committee?: string;
+  buildingAge?: number;
+  name?: string;
 }
 
 export interface Contractor {
@@ -51,6 +71,10 @@ export interface Offer {
   tiers: PricingTier[];
   createdAt: string;
   expiresAt: string;
+  /** Agent-generated explanation; API may expose as snake_case `pricing_rationale` */
+  pricingRationale?: string;
+  /** True when the authenticated caller has already joined this offer. API returns snake_case. */
+  user_is_participant?: boolean;
 }
 
 export interface PricingTier {
@@ -65,8 +89,13 @@ export interface Review {
   id: string;
   contractorId: string;
   residentId: string;
+  /** Maps API `user_id` when building from contractor_reviews */
+  offerId?: string;
   rating: number;
+  /** Preferred UI field */
   text: string;
+  /** API / DB column name for the same value */
+  comment?: string;
   verified: boolean;
   createdAt: string;
 }
@@ -98,6 +127,8 @@ export interface ContractorMatch {
   graphScore: number;
   rating: number;
   description: string;
+  /** True when contractor was found active in the data.gov.il company registry */
+  govRegistered?: boolean;
 }
 
 export interface PricingAnalysis {
@@ -213,7 +244,10 @@ export interface EscalationContext {
 }
 
 export interface SystemStatus {
-  agents: Record<string, { model: string; calls: number; errors: number; avgDurationMs?: number; tokens?: number }>;
+  agents: Record<
+    string,
+    { model: string; calls: number; errors: number; avgDurationMs?: number; tokens?: number }
+  >;
   vectorCollections: Record<
     string,
     { pointsCount: number; status: string }
@@ -315,6 +349,8 @@ export interface Payment {
   paymentMethod?: string;
   createdAt: string;
   updatedAt?: string;
+  /** API snake_case: provider — mock | stripe | … (initiate responses include this) */
+  provider?: string;
 }
 
 export interface Invoice {

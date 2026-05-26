@@ -1,6 +1,6 @@
 """TypedDict definitions for agent state management in LangGraph."""
 
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, NotRequired
 
 from typing_extensions import TypedDict
 
@@ -71,6 +71,9 @@ class AgentState(TypedDict):
 
     # Response
     final_response: dict[str, Any] | None
+
+    # File upload context (set by architecture upload route, absent otherwise)
+    architecture_file_id: NotRequired[str | None]
 
     # Metadata
     start_time: str

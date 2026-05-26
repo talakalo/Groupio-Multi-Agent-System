@@ -1,8 +1,19 @@
 import type { Offer } from "@groupio/types";
 import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
+import React from "react";
+import { NextIntlClientProvider } from "next-intl";
+import messages from "../messages/he.json";
 
 import { OfferCard } from "../components/features/offers/OfferCard";
+
+function renderOfferCard(props: { offer: Offer }) {
+  return render(
+    <NextIntlClientProvider locale="he" messages={messages}>
+      <OfferCard {...props} />
+    </NextIntlClientProvider>
+  );
+}
 
 
 const mockOffer: Offer = {
@@ -36,28 +47,28 @@ const mockOffer: Offer = {
 
 describe("OfferCard", () => {
   it("renders contractor name", () => {
-    render(<OfferCard offer={mockOffer} />);
+    renderOfferCard({ offer: mockOffer });
     expect(screen.getByText("Cool Air Ltd")).toBeDefined();
   });
 
   it("renders current price", () => {
-    render(<OfferCard offer={mockOffer} />);
+    renderOfferCard({ offer: mockOffer });
     expect(screen.getByText(/4,275/)).toBeDefined();
   });
 
   it("renders discount badge", () => {
-    render(<OfferCard offer={mockOffer} />);
+    renderOfferCard({ offer: mockOffer });
     expect(screen.getByText(/5%/)).toBeDefined();
   });
 
   it("renders participant count", () => {
-    render(<OfferCard offer={mockOffer} />);
+    renderOfferCard({ offer: mockOffer });
     // Look for the Hebrew text "5 שכנים הצטרפו" (5 neighbors joined)
     expect(screen.getByText(/שכנים הצטרפו/)).toBeDefined();
   });
 
   it("renders join button", () => {
-    render(<OfferCard offer={mockOffer} />);
+    renderOfferCard({ offer: mockOffer });
     // Use getAllByRole since there are multiple buttons (join and details)
     const buttons = screen.getAllByRole("button");
     expect(buttons.length).toBeGreaterThan(0);
@@ -66,7 +77,7 @@ describe("OfferCard", () => {
   });
 
   it("shows next tier info when available", () => {
-    render(<OfferCard offer={mockOffer} />);
+    renderOfferCard({ offer: mockOffer });
     // Next tier is 6-10 at 10% discount, need 1 more neighbor
     expect(screen.getByText(/10%/)).toBeDefined();
   });

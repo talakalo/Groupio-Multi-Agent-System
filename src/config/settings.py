@@ -3,6 +3,7 @@
 import logging
 import secrets
 from functools import lru_cache
+from urllib.parse import quote
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings
@@ -42,6 +43,12 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/groupio"
     # Set to "1" or "true" to force local PostgreSQL (useful when Supabase has connection issues)
     USE_LOCAL_POSTGRES: str = ""
+    # Docker Compose Postgres components — when USE_LOCAL_POSTGRES is set AND all four are
+    # provided, DATABASE_URL is overridden with the assembled URL (special chars URL-encoded).
+    DOCKER_POSTGRES_HOST: str = ""
+    DOCKER_POSTGRES_USER: str = ""
+    DOCKER_POSTGRES_PASSWORD: str = ""
+    DOCKER_POSTGRES_DB: str = ""
 
     # Redis
     # In production, set REDIS_URL to include credentials, e.g.:
@@ -130,6 +137,8 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     SMTP_FROM_EMAIL: str = "noreply@groupio.co.il"
     SMTP_FROM_NAME: str = "Groupio"
+    # Resend API (preferred over SMTP when set)
+    RESEND_API_KEY: str = ""
     # When True, login rejects unverified users with 403. Enabled by default for production safety.
     # Set ENFORCE_EMAIL_VERIFICATION=false in .env to disable during local development.
     ENFORCE_EMAIL_VERIFICATION: bool = True
@@ -157,6 +166,8 @@ class Settings(BaseSettings):
     # Stripe webhook signing secret (from Stripe Dashboard → Webhooks → Signing secret)
     # Used by POST /payments/webhook/stripe to verify authentic Stripe events.
     STRIPE_WEBHOOK_SECRET: str = ""
+    # Stripe Price ID for the contractor membership subscription
+    STRIPE_CONTRACTOR_MEMBERSHIP_PRICE_ID: str = ""
 
     # Shared HMAC webhook signing secret — must be set in non-dev environments
     # to prevent fraudulent webhook forgery. Generate with:
@@ -183,6 +194,26 @@ class Settings(BaseSettings):
     # "sandbox" or "production"
     PAYBOX_ENVIRONMENT: str = "sandbox"
 
+    # Feature flags — async workers and integrations
+    ENABLE_RABBITMQ: bool = False
+    ENABLE_OUTBOX: bool = False
+    ENABLE_NOTIFICATION_QUEUE: bool = False
+    ENABLE_CRM_SYNC: bool = False
+    ENABLE_GDS_SIMILARITY: bool = False
+    ENABLE_PAYMENT_EVENTS: bool = False
+
+    # RabbitMQ config
+    RABBITMQ_URL: str = ""
+    RABBITMQ_EXCHANGE_EVENTS: str = "groupio.events"
+    OUTBOX_POLL_INTERVAL_MS: int = 500
+
+    # EspoCRM integration
+    ESPOCRM_BASE_URL: str = ""
+    ESPOCRM_API_KEY: str = ""
+
+    # Vector DB provider: "qdrant" (default) or "pinecone"
+    VECTOR_DB_PROVIDER: str = "qdrant"
+
     # Environment
     ENVIRONMENT: str = "development"
 
@@ -195,6 +226,21 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def _validate_production_config(self) -> "Settings":
         """Prevent insecure defaults in production/staging."""
+        # Override DATABASE_URL with Docker Compose components when USE_LOCAL_POSTGRES is set.
+        force_local = (self.USE_LOCAL_POSTGRES or "").lower() in ("1", "true", "yes")
+        if force_local and all(
+            [
+                self.DOCKER_POSTGRES_HOST,
+                self.DOCKER_POSTGRES_USER,
+                self.DOCKER_POSTGRES_PASSWORD,
+                self.DOCKER_POSTGRES_DB,
+            ]
+        ):
+            pw = quote(self.DOCKER_POSTGRES_PASSWORD, safe="")
+            self.DATABASE_URL = (
+                f"postgresql://{self.DOCKER_POSTGRES_USER}:{pw}"
+                f"@{self.DOCKER_POSTGRES_HOST}:5432/{self.DOCKER_POSTGRES_DB}"
+            )
         is_prod = self.ENVIRONMENT in ("production", "staging")
 
         # --- JWT secret ---
@@ -229,6 +275,40 @@ class Settings(BaseSettings):
                 "Unverified users can log in. Enable it to protect the platform.",
                 self.ENVIRONMENT,
             )
+
+        # --- Staging/production payment provider rules ---
+        if is_prod:
+            if self.PAYMENT_PROVIDER == "mock":
+                raise ValueError(
+                    f"PAYMENT_PROVIDER=mock is not allowed in {self.ENVIRONMENT}. "
+                    "Use 'stripe' (or 'bit'/'paybox' once onboarded)."
+                )
+            if self.PAYMENT_PROVIDER in ("bit", "paybox"):
+                raise ValueError(
+                    f"PAYMENT_PROVIDER={self.PAYMENT_PROVIDER} is not launch-ready. "
+                    "Complete merchant onboarding before deploying to staging/production. "
+                    "See docs/PAYMENT_PROVIDER_ONBOARDING.md."
+                )
+            if self.PAYMENT_PROVIDER == "stripe":
+                if not self.STRIPE_WEBHOOK_SECRET:
+                    raise ValueError(
+                        f"STRIPE_WEBHOOK_SECRET must be set when PAYMENT_PROVIDER=stripe in {self.ENVIRONMENT}. "
+                        "Obtain it from the Stripe Dashboard → Webhooks → Signing secret."
+                    )
+            if (
+                self.ENFORCE_EMAIL_VERIFICATION
+                and not self.RESEND_API_KEY
+                and not (self.SMTP_HOST and self.SMTP_USER and self.SMTP_PASSWORD)
+            ):
+                raise ValueError(
+                    f"ENFORCE_EMAIL_VERIFICATION is enabled in {self.ENVIRONMENT} but no email transport "
+                    "is configured. Set RESEND_API_KEY or SMTP_HOST + SMTP_USER + SMTP_PASSWORD."
+                )
+            if (self.ENABLE_DATAGOV_IL or "").lower() in ("0", "false", "no", ""):
+                raise ValueError(
+                    f"ENABLE_DATAGOV_IL must be enabled in {self.ENVIRONMENT}. "
+                    "Disabling it silently degrades address/municipality features with stub responses."
+                )
 
         # --- Required secrets in production ---
         if is_prod:

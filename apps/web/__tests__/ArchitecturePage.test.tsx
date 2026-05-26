@@ -5,6 +5,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // Mock next-intl
 vi.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
+  useLocale: () => 'he',
+}));
+
+// unwrapPageParams uses React.use() which needs Suspense in tests — stub it out
+vi.mock('@/lib/utils/unwrapPageParams', () => ({
+  unwrapPageParams: vi.fn(),
 }));
 
 // Mock the apiClient

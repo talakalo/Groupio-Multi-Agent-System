@@ -1,0 +1,50 @@
+# Flow: Resident — join a building by invite code (M1)
+# Verifies the new /join-building screen accepts a code, posts it to
+# /buildings/join, and lands on the home tab on success.
+#
+# Run: maestro test .maestro/flows/04-resident-extras/join-building.yaml
+
+appId: ${APP_ID}
+tags:
+  - resident
+  - join-building
+  - smoke
+---
+
+# 1. Login as a resident with NO building yet — relies on the test fixture
+#    user TEST_RESIDENT_EMAIL_NO_BUILDING. If that fixture is unavailable
+#    the flow assumes the regular fixture is unbounded and skips the banner
+#    assertion gracefully.
+- runFlow: ../../subflows/launch-fresh.yaml
+- runFlow: ../../subflows/login-resident.yaml
+
+# 2. The home banner should prompt to join. Tap into the join screen.
+- assertVisible:
+    id: "home-join-building-banner"
+    timeout: 10000
+- tapOn:
+    id: "home-join-building-cta"
+
+# 3. The dedicated screen should prompt for the code.
+- assertVisible:
+    id: "join-building-code"
+    timeout: 5000
+
+# 4. Enter the test invite code from the env fixture and submit.
+- tapOn:
+    id: "join-building-code"
+- inputText: ${TEST_BUILDING_INVITE_CODE}
+- tapOn:
+    id: "join-building-submit"
+
+# 5. The success state should expose a "go to my building" CTA.
+- assertVisible:
+    id: "join-building-go-home"
+    timeout: 10000
+- tapOn:
+    id: "join-building-go-home"
+
+# 6. Back on the home tab, the banner is gone.
+- assertNotVisible:
+    id: "home-join-building-banner"
+    timeout: 5000

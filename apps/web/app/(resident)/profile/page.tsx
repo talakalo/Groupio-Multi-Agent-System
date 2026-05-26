@@ -20,8 +20,9 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
+import { apiClient, ApiError } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
 
@@ -36,7 +37,9 @@ interface ResidentProfile extends Resident {
   fullName?: string;
   language: 'he' | 'en';
   preferredLanguage?: string;
-  notifications: NotificationPreferences;
+  buildingName?: string;
+  apartmentNumber?: string;
+  notification_settings?: Record<string, boolean>;
 }
 
 interface NotificationPreferences {
@@ -49,6 +52,28 @@ interface NotificationPreferences {
   pushEnabled: boolean;
   emailEnabled: boolean;
   whatsappEnabled: boolean;
+}
+
+const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
+  newOffers: true,
+  offerUpdates: true,
+  neighborJoined: true,
+  tierReached: true,
+  contractorMessages: true,
+  weeklyDigest: false,
+  pushEnabled: true,
+  emailEnabled: true,
+  whatsappEnabled: false,
+};
+
+function mergeNotificationPreferences(raw: unknown): NotificationPreferences {
+  const base = { ...DEFAULT_NOTIFICATION_PREFERENCES };
+  if (!raw || typeof raw !== 'object') return base;
+  for (const key of Object.keys(base) as (keyof NotificationPreferences)[]) {
+    const v = (raw as Record<string, unknown>)[key];
+    if (typeof v === 'boolean') base[key] = v;
+  }
+  return base;
 }
 
 // ---------------------------------------------------------------------------
@@ -127,7 +152,6 @@ export default function ResidentProfilePage() {
   const [passwordStatus, setPasswordStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
 
   const accessToken = useAuthStore((s) => s.accessToken);
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
   const handleAvatarUpload = () => {
     const input = document.createElement('input');
@@ -138,24 +162,10 @@ export default function ResidentProfilePage() {
       if (!file) return;
 
       setIsUploadingAvatar(true);
-      const formData = new FormData();
-      formData.append('file', file);
-
       try {
-        const headers: Record<string, string> = {};
-        if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
-
-        const res = await fetch(`${apiBase}/api/v1/uploads/avatar`, {
-          method: 'POST',
-          headers,
-          body: formData,
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          setFormData((prev) => ({ ...prev, avatar: data.avatar_url, avatarUrl: data.avatar_url }));
-          queryClient.invalidateQueries({ queryKey: ['resident', 'profile'] });
-        }
+        const data = await apiClient.uploadAvatar(file, file.name || 'avatar');
+        setFormData((prev) => ({ ...prev, avatar: data.avatar_url, avatarUrl: data.avatar_url }));
+        queryClient.invalidateQueries({ queryKey: ['resident', 'profile'] });
       } catch (error) {
         console.error('Avatar upload failed:', error);
       } finally {
@@ -169,26 +179,10 @@ export default function ResidentProfilePage() {
     if (!passwordForm.newPassword || passwordForm.newPassword !== passwordForm.confirm) return;
     setPasswordStatus('loading');
     try {
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
-
-      const res = await fetch(`${apiBase}/api/v1/auth/password-reset`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          current_password: passwordForm.current,
-          new_password: passwordForm.newPassword,
-        }),
-      });
-
-      if (res.ok) {
-        setPasswordStatus('success');
-        setPasswordForm({ current: '', newPassword: '', confirm: '' });
-        setTimeout(() => setPasswordStatus('idle'), 3000);
-      } else {
-        setPasswordStatus('error');
-        setTimeout(() => setPasswordStatus('idle'), 3000);
-      }
+      await apiClient.changePassword(passwordForm.current, passwordForm.newPassword);
+      setPasswordStatus('success');
+      setPasswordForm({ current: '', newPassword: '', confirm: '' });
+      setTimeout(() => setPasswordStatus('idle'), 3000);
     } catch {
       setPasswordStatus('error');
       setTimeout(() => setPasswordStatus('idle'), 3000);
@@ -201,44 +195,69 @@ export default function ResidentProfilePage() {
 
   const handleDeleteAccount = async () => {
     if (deleteInput !== 'DELETE') {
-      setDeleteError('יש להקליד DELETE לאישור');
+      setDeleteError(t('deleteValidationError'));
       return;
     }
     setDeleteError('');
     try {
-      const headers: Record<string, string> = {};
-      if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
-
-      await fetch(`${apiBase}/api/v1/auth/me`, {
-        method: 'DELETE',
-        headers,
-      });
-
+      await apiClient.deleteAccount();
       await logoutAction();
       router.push('/login');
     } catch (error) {
       console.error('Failed to delete account:', error);
-      setDeleteError('שגיאה במחיקת החשבון. נסו שוב.');
+      setDeleteError(t('deleteErrorMessage'));
     }
   };
 
   const profileQuery = useQuery<ResidentProfile>({
     queryKey: ['resident', 'profile'],
     queryFn: async () => {
-      const headers: Record<string, string> = {};
-      if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
-      const res = await fetch(`${apiBase}/api/v1/auth/me`, { headers });
-      if (!res.ok) throw new Error('Failed to fetch profile');
-      const data = await res.json();
-      return {
-        ...data,
-        fullName: data.full_name ?? data.fullName ?? '',
-        phone: data.phone ?? '',
-        preferredLanguage: data.preferred_language ?? data.preferredLanguage ?? 'he',
-        avatarUrl: data.avatar_url ?? data.avatarUrl ?? '',
-        buildingName: data.building_name ?? data.buildingName ?? '',
-        apartmentNumber: data.apartment_number ?? data.apartmentNumber ?? '',
-      } as ResidentProfile;
+      const data = (await apiClient.getMe()) as Record<string, unknown>;
+      const fullName =
+        (typeof data.full_name === 'string' && data.full_name) ||
+        (typeof data.fullName === 'string' && data.fullName) ||
+        '';
+      const preferredLanguage =
+        (typeof data.preferred_language === 'string' && data.preferred_language) ||
+        (typeof data.preferredLanguage === 'string' && data.preferredLanguage) ||
+        'he';
+      const language: 'he' | 'en' = preferredLanguage === 'en' ? 'en' : 'he';
+      const notification_settings =
+        data.notification_settings && typeof data.notification_settings === 'object'
+          ? (data.notification_settings as Record<string, boolean>)
+          : undefined;
+
+      const profile: ResidentProfile = {
+        id: typeof data.id === 'string' ? data.id : '',
+        name: fullName,
+        email: typeof data.email === 'string' ? data.email : '',
+        phone: typeof data.phone === 'string' ? data.phone : '',
+        buildingId:
+          (typeof data.building_id === 'string' && data.building_id) ||
+          (typeof data.buildingId === 'string' && data.buildingId) ||
+          '',
+        createdAt:
+          (typeof data.created_at === 'string' && data.created_at) ||
+          (typeof data.createdAt === 'string' && data.createdAt) ||
+          new Date().toISOString(),
+        fullName,
+        language,
+        preferredLanguage,
+        avatarUrl:
+          (typeof data.avatar_url === 'string' && data.avatar_url) ||
+          (typeof data.avatarUrl === 'string' && data.avatarUrl) ||
+          '',
+        buildingName:
+          (typeof data.building_name === 'string' && data.building_name) ||
+          (typeof data.buildingName === 'string' && data.buildingName) ||
+          '',
+        apartmentNumber:
+          (typeof data.apartment_number === 'string' && data.apartment_number) ||
+          (typeof data.apartmentNumber === 'string' && data.apartmentNumber) ||
+          '',
+        notification_settings,
+      };
+      return profile;
     },
     enabled: !!accessToken,
   });
@@ -251,39 +270,32 @@ export default function ResidentProfilePage() {
     ...formData,
   };
 
-  const [notifications, setNotifications] = useState<NotificationPreferences>({
-    newOffers: true,
-    offerUpdates: true,
-    neighborJoined: true,
-    tierReached: true,
-    contractorMessages: true,
-    weeklyDigest: false,
-    pushEnabled: true,
-    emailEnabled: true,
-    whatsappEnabled: false,
-    ...profileQuery.data?.notifications,
-  });
+  const [notifications, setNotifications] = useState<NotificationPreferences>(DEFAULT_NOTIFICATION_PREFERENCES);
+  const [notificationsDirty, setNotificationsDirty] = useState(false);
+
+  useEffect(() => {
+    if (!profileQuery.data?.id || notificationsDirty) return;
+    setNotifications(mergeNotificationPreferences(profileQuery.data.notification_settings));
+  }, [profileQuery.data?.id, profileQuery.data?.notification_settings, notificationsDirty]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
       const userId = profileQuery.data?.id;
       if (!userId) throw new Error('No user ID');
-      const res = await fetch(`${apiBase}/api/v1/auth/me`, {
-        method: 'PUT',
-        headers,
-        body: JSON.stringify({
-          full_name: formData.fullName ?? formData.name,
-          phone: formData.phone,
-          preferred_language: formData.preferredLanguage ?? formData.language,
-          avatar_url: formData.avatarUrl ?? formData.avatar,
-        }),
-      });
-      if (!res.ok) throw new Error('Failed to save profile');
-      return res.json();
+      const payload: Record<string, unknown> = {};
+      const fullName = formData.fullName ?? formData.name;
+      if (fullName !== undefined && fullName !== '') payload.full_name = fullName;
+      if (formData.phone !== undefined && formData.phone !== '') payload.phone = formData.phone;
+      const plang = formData.preferredLanguage ?? formData.language;
+      if (plang !== undefined && plang !== '') payload.preferred_language = plang;
+      const avatarUrl = formData.avatarUrl ?? formData.avatar;
+      if (avatarUrl !== undefined && avatarUrl !== '') payload.avatar_url = avatarUrl;
+      if (notificationsDirty) payload.notification_settings = notifications;
+      if (Object.keys(payload).length === 0) throw new Error('Nothing to save');
+      return apiClient.updateCurrentUser(payload);
     },
     onSuccess: async (data: { preferred_language?: string }) => {
+      setNotificationsDirty(false);
       queryClient.invalidateQueries({ queryKey: ['resident', 'profile'] });
       const lang = data?.preferred_language;
       if (lang) {
@@ -449,6 +461,11 @@ export default function ResidentProfilePage() {
       {/* Notifications tab */}
       {activeTab === 'notifications' && (
         <div className="card">
+          {notificationsDirty && (
+            <p className="mb-3 text-xs font-medium text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2" role="status">
+              {t('notificationsUnsaved')}
+            </p>
+          )}
           <h3 className="text-sm font-bold text-gray-900 mb-1">{t('offerNotifications')}</h3>
           <p className="text-xs text-gray-500 mb-3">{t('offerNotificationsDescription')}</p>
           <div className="divide-y divide-gray-50">
@@ -456,31 +473,46 @@ export default function ResidentProfilePage() {
               label={t('newOffers')}
               description={t('newOffersDescription')}
               checked={notifications.newOffers}
-              onChange={(v) => setNotifications((prev) => ({ ...prev, newOffers: v }))}
+              onChange={(v) => {
+                setNotifications((prev) => ({ ...prev, newOffers: v }));
+                setNotificationsDirty(true);
+              }}
             />
             <NotificationToggle
               label={t('offerUpdates')}
               description={t('offerUpdatesDescription')}
               checked={notifications.offerUpdates}
-              onChange={(v) => setNotifications((prev) => ({ ...prev, offerUpdates: v }))}
+              onChange={(v) => {
+                setNotifications((prev) => ({ ...prev, offerUpdates: v }));
+                setNotificationsDirty(true);
+              }}
             />
             <NotificationToggle
               label={t('neighborJoined')}
               description={t('neighborJoinedDescription')}
               checked={notifications.neighborJoined}
-              onChange={(v) => setNotifications((prev) => ({ ...prev, neighborJoined: v }))}
+              onChange={(v) => {
+                setNotifications((prev) => ({ ...prev, neighborJoined: v }));
+                setNotificationsDirty(true);
+              }}
             />
             <NotificationToggle
               label={t('tierReached')}
               description={t('tierReachedDescription')}
               checked={notifications.tierReached}
-              onChange={(v) => setNotifications((prev) => ({ ...prev, tierReached: v }))}
+              onChange={(v) => {
+                setNotifications((prev) => ({ ...prev, tierReached: v }));
+                setNotificationsDirty(true);
+              }}
             />
             <NotificationToggle
               label={t('contractorMessages')}
               description={t('contractorMessagesDescription')}
               checked={notifications.contractorMessages}
-              onChange={(v) => setNotifications((prev) => ({ ...prev, contractorMessages: v }))}
+              onChange={(v) => {
+                setNotifications((prev) => ({ ...prev, contractorMessages: v }));
+                setNotificationsDirty(true);
+              }}
             />
           </div>
 
@@ -492,19 +524,28 @@ export default function ResidentProfilePage() {
                 label={t('pushNotifications')}
                 description={t('pushNotificationsDescription')}
                 checked={notifications.pushEnabled}
-                onChange={(v) => setNotifications((prev) => ({ ...prev, pushEnabled: v }))}
+                onChange={(v) => {
+                  setNotifications((prev) => ({ ...prev, pushEnabled: v }));
+                  setNotificationsDirty(true);
+                }}
               />
               <NotificationToggle
                 label={t('emailNotifications')}
                 description={t('emailNotificationsDescription')}
                 checked={notifications.emailEnabled}
-                onChange={(v) => setNotifications((prev) => ({ ...prev, emailEnabled: v }))}
+                onChange={(v) => {
+                  setNotifications((prev) => ({ ...prev, emailEnabled: v }));
+                  setNotificationsDirty(true);
+                }}
               />
               <NotificationToggle
                 label={t('whatsappNotifications')}
                 description={t('whatsappNotificationsDescription')}
                 checked={notifications.whatsappEnabled}
-                onChange={(v) => setNotifications((prev) => ({ ...prev, whatsappEnabled: v }))}
+                onChange={(v) => {
+                  setNotifications((prev) => ({ ...prev, whatsappEnabled: v }));
+                  setNotificationsDirty(true);
+                }}
               />
             </div>
           </div>
@@ -514,7 +555,10 @@ export default function ResidentProfilePage() {
               label={t('weeklyDigest')}
               description={t('weeklyDigestDescription')}
               checked={notifications.weeklyDigest}
-              onChange={(v) => setNotifications((prev) => ({ ...prev, weeklyDigest: v }))}
+              onChange={(v) => {
+                setNotifications((prev) => ({ ...prev, weeklyDigest: v }));
+                setNotificationsDirty(true);
+              }}
             />
           </div>
         </div>
@@ -585,15 +629,17 @@ export default function ResidentProfilePage() {
                   t('updatePassword')
                 )}
               </button>
-              {passwordStatus === 'success' && (
-                <span className="text-sm text-green-600 flex items-center gap-1">
-                  <Check className="h-4 w-4" />
-                  {t('passwordUpdated')}
-                </span>
-              )}
-              {passwordStatus === 'error' && (
-                <span className="text-sm text-red-600">{t('passwordUpdateFailed')}</span>
-              )}
+              <span aria-live="polite" aria-atomic="true" className="text-sm">
+                {passwordStatus === 'success' && (
+                  <span className="text-green-600 flex items-center gap-1">
+                    <Check className="h-4 w-4" aria-hidden="true" />
+                    {t('passwordUpdated')}
+                  </span>
+                )}
+                {passwordStatus === 'error' && (
+                  <span className="text-red-600">{t('passwordUpdateFailed')}</span>
+                )}
+              </span>
             </div>
           </div>
 
@@ -613,15 +659,15 @@ export default function ResidentProfilePage() {
               </div>
             ) : (
               <div className="space-y-3 p-4 rounded-xl border border-red-200 bg-red-50">
-                <p className="text-sm font-semibold text-red-700">⚠️ פעולה זו אינה הפיכה</p>
-                <p className="text-xs text-red-600">הקלידו <strong>DELETE</strong> כדי לאשר מחיקת החשבון:</p>
+                <p className="text-sm font-semibold text-red-700">{t('deleteIrreversible')}</p>
+                <p className="text-xs text-red-600">{t('deleteConfirmInstruction')}</p>
                 <input
                   type="text"
                   value={deleteInput}
                   onChange={e => { setDeleteInput(e.target.value); setDeleteError(''); }}
                   placeholder="DELETE"
                   className="input-field text-sm"
-                  aria-label="אישור מחיקת חשבון"
+                  aria-label={t('deleteConfirmAriaLabel')}
                   autoComplete="off"
                 />
                 {deleteError && <p className="text-xs text-red-600" role="alert">{deleteError}</p>}
@@ -633,14 +679,14 @@ export default function ResidentProfilePage() {
                     className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
                   >
                     <Trash2 className="h-4 w-4" />
-                    מחק את החשבון שלי
+                    {t('deleteButton')}
                   </button>
                   <button
                     type="button"
                     onClick={() => { setDeletePhase('idle'); setDeleteInput(''); setDeleteError(''); }}
                     className="px-4 py-2 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors text-sm font-medium"
                   >
-                    ביטול
+                    {t('cancel')}
                   </button>
                 </div>
               </div>
@@ -658,11 +704,19 @@ export default function ResidentProfilePage() {
       )}
 
       {/* Save button (fixed at bottom) */}
-      <div className="sticky bottom-4">
+      <div className="sticky bottom-4 space-y-2">
+        {saveMutation.isError && (
+          <p className="text-center text-sm text-red-600" role="alert">
+            {t('saveFailed')}
+          </p>
+        )}
         <button
           type="button"
           onClick={() => saveMutation.mutate()}
-          disabled={saveMutation.isPending}
+          disabled={
+            saveMutation.isPending ||
+            (!notificationsDirty && Object.keys(formData).length === 0)
+          }
           className="btn-primary w-full flex items-center justify-center gap-2 shadow-lg"
         >
           {saveMutation.isPending ? (

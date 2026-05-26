@@ -8,14 +8,15 @@ from typing import Any
 
 import httpx
 from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Query, Request
-
-# E.164 phone number format (e.g. "972501234567" — digits only, 7-15 digits)
-_E164_PATTERN = re.compile(r"^\d{7,15}$")
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 from src.config.settings import get_settings
 from src.databases.postgres import get_postgres_client
 from src.orchestration.graph import get_orchestrator
 from src.orchestration.state import create_initial_state
+
+# E.164 phone number format (e.g. "972501234567" — digits only, 7-15 digits)
+_E164_PATTERN = re.compile(r"^\d{7,15}$")
 
 logger = logging.getLogger(__name__)
 
@@ -157,9 +158,10 @@ async def contractor_update_webhook(
 ) -> dict[str, str]:
     """Handle contractor profile update notifications — requires X-API-Key."""
     settings = get_settings()
-    if settings.API_KEYS:
-        if not x_api_key or x_api_key not in settings.API_KEYS:
-            raise HTTPException(status_code=403, detail="Invalid or missing API key")
+    if not settings.API_KEYS:
+        raise HTTPException(status_code=503, detail="Webhook endpoint not configured")
+    if not x_api_key or not any(hmac.compare_digest(x_api_key, k) for k in settings.API_KEYS):
+        raise HTTPException(status_code=403, detail="Invalid or missing API key")
     contractor_id = payload.get("contractor_id")
     update_type = payload.get("type")
 
@@ -183,6 +185,30 @@ async def contractor_update_webhook(
                 }
             ]
             await vetting_agent.run(state)
+
+        if update_type == "document_uploaded":
+            try:
+                from src.messaging.envelope import EventEnvelope
+                from src.messaging.outbox_helpers import try_enqueue_crm
+                from src.messaging.topics import RK_CRM_CONTRACTOR_DOCUMENTS_SUBMITTED
+
+                db = get_postgres_client()
+                env = EventEnvelope(
+                    event_name="crm.contractor.documents_submitted",
+                    entity_type="contractor",
+                    entity_id=str(contractor_id),
+                    idempotency_key=f"crm:contractor:docs:{contractor_id}:{update_type}",
+                    payload={"contractor_id": str(contractor_id), "update_type": update_type},
+                )
+                await try_enqueue_crm(
+                    db,
+                    RK_CRM_CONTRACTOR_DOCUMENTS_SUBMITTED,
+                    env.event_name,
+                    env.to_json_dict(),
+                    idempotency_key=env.idempotency_key,
+                )
+            except Exception:
+                logger.exception("CRM outbox enqueue failed for contractor document webhook (non-fatal)")
 
     return {"status": "processed"}
 
@@ -210,6 +236,31 @@ def _parse_whatsapp_payload(payload: dict) -> dict[str, str] | None:
         return None
 
 
+def _whatsapp_transient(exc: BaseException) -> bool:
+    if isinstance(exc, httpx.RequestError):
+        return True
+    if isinstance(exc, httpx.HTTPStatusError):
+        return exc.response.status_code >= 500
+    return False
+
+
+@retry(
+    retry=retry_if_exception(_whatsapp_transient),
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=0.5, min=0.5, max=6),
+    reraise=True,
+)
+async def _post_whatsapp_message(url: str, token: str, payload: dict) -> httpx.Response:
+    async with httpx.AsyncClient(timeout=12.0) as client:
+        response = await client.post(
+            url,
+            headers={"Authorization": f"Bearer {token}"},
+            json=payload,
+        )
+        response.raise_for_status()
+        return response
+
+
 async def _send_whatsapp_reply(phone: str, text: str) -> None:
     """Send a WhatsApp reply via the Meta WhatsApp Business Cloud API.
 
@@ -235,19 +286,22 @@ async def _send_whatsapp_reply(phone: str, text: str) -> None:
         "text": {"body": text},
     }
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.post(
-                url,
-                headers={"Authorization": f"Bearer {settings.WHATSAPP_API_TOKEN}"},
-                json=payload,
-            )
-            response.raise_for_status()
-            logger.info("WhatsApp message sent to %s (status %d)", phone, response.status_code)
+        response = await _post_whatsapp_message(url, settings.WHATSAPP_API_TOKEN, payload)
+        logger.info(
+            "whatsapp_outbound_ok phone_prefix=%s status_code=%s",
+            phone[:4],
+            response.status_code,
+        )
     except httpx.HTTPStatusError as exc:
         logger.error(
-            "WhatsApp API error: status=%d body=%s",
+            "whatsapp_outbound_failed kind=http_error status=%s body=%s phone_prefix=%s",
             exc.response.status_code,
-            exc.response.text[:200],
+            exc.response.text[:500],
+            phone[:4],
         )
     except httpx.RequestError as exc:
-        logger.error("WhatsApp network error: %s", exc)
+        logger.error(
+            "whatsapp_outbound_failed kind=network_error err=%s phone_prefix=%s",
+            exc,
+            phone[:4],
+        )

@@ -6,6 +6,7 @@
 
 import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { useLocale, useTranslations } from "next-intl";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import {
@@ -15,26 +16,30 @@ import {
   HardHat,
   BarChart3,
   Bell,
+  Building2,
   Settings,
   ChevronLeft,
   LogOut,
   Shield,
   Users,
   Tag,
+  CreditCard,
 } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { useAdminUser } from "@/lib/hooks";
 
-const NAV_ITEMS = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Agents", href: "/agents", icon: Bot },
-  { label: "Escalations", href: "/escalations", icon: AlertTriangle },
-  { label: "Contractors", href: "/contractors", icon: HardHat },
-  { label: "Analytics", href: "/analytics", icon: BarChart3 },
-  { label: "Users", href: "/users", icon: Users },
-  { label: "Offers", href: "/offers", icon: Tag },
-  { label: "Settings", href: "/settings", icon: Settings },
+const NAV_DEF = [
+  { href: "/dashboard", icon: LayoutDashboard, key: "dashboard" },
+  { href: "/agents", icon: Bot, key: "agents" },
+  { href: "/escalations", icon: AlertTriangle, key: "escalations" },
+  { href: "/contractors", icon: HardHat, key: "contractors" },
+  { href: "/buildings", icon: Building2, key: "buildings" },
+  { href: "/analytics", icon: BarChart3, key: "analytics" },
+  { href: "/users", icon: Users, key: "users" },
+  { href: "/offers", icon: Tag, key: "offers" },
+  { href: "/payments", icon: CreditCard, key: "payments" },
+  { href: "/settings", icon: Settings, key: "settings" },
 ] as const;
 
 function makeQueryClient() {
@@ -42,7 +47,6 @@ function makeQueryClient() {
     defaultOptions: {
       queries: {
         staleTime: 30_000,
-        refetchInterval: 60_000,
         retry: 2,
       },
     },
@@ -76,6 +80,8 @@ function Sidebar({
   onToggle: () => void;
 }) {
   const pathname = usePathname();
+  const tNav = useTranslations("nav");
+  const tShell = useTranslations("shell");
 
   return (
     <aside
@@ -92,8 +98,10 @@ function Sidebar({
               <Shield className="w-4.5 h-4.5 text-white" />
             </div>
             <div>
-              <h1 className="text-base font-bold text-surface-900 leading-none">Groupio</h1>
-              <span className="text-[10px] font-medium text-surface-400 uppercase tracking-widest">Admin</span>
+              <h1 className="text-base font-bold text-surface-900 leading-none">{tShell("productTitle")}</h1>
+              <span className="text-[10px] font-medium text-surface-400 uppercase tracking-widest">
+                {tShell("productSubtitle")}
+              </span>
             </div>
           </div>
         )}
@@ -107,14 +115,15 @@ function Sidebar({
       </div>
 
       <nav className="flex-1 overflow-y-auto scrollbar-thin px-3 py-4 space-y-1">
-        {NAV_ITEMS.map((item) => {
+        {NAV_DEF.map((item) => {
           const isActive = pathname.startsWith(item.href);
           const Icon = item.icon;
+          const label = tNav(item.key);
           return (
             <a
               key={item.href}
               href={item.href}
-              title={collapsed ? item.label : undefined}
+              title={collapsed ? label : undefined}
               className={clsx(
                 "sidebar-link",
                 isActive && "sidebar-link-active",
@@ -122,7 +131,7 @@ function Sidebar({
               )}
             >
               <Icon className="w-5 h-5 flex-shrink-0" />
-              {!collapsed && <span>{item.label}</span>}
+              {!collapsed && <span>{label}</span>}
             </a>
           );
         })}
@@ -132,7 +141,7 @@ function Sidebar({
         <button
           onClick={onToggle}
           className="sidebar-link w-full justify-center"
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-label={collapsed ? tShell("expandSidebar") : tShell("collapseSidebar")}
         >
           <ChevronLeft
             className={clsx("w-5 h-5 transition-transform duration-200", collapsed && "rotate-180")}
@@ -145,6 +154,8 @@ function Sidebar({
 
 function Header({ sidebarCollapsed }: { sidebarCollapsed: boolean }) {
   const router = useRouter();
+  const locale = useLocale();
+  const tShell = useTranslations("shell");
   const { data: user } = useAdminUser();
   const displayName = user?.full_name?.trim() || "Admin User";
   const initials = displayName.split(/\s+/).map((s: string) => s[0]).join("").toUpperCase().slice(0, 2) || "AU";
@@ -176,14 +187,42 @@ function Header({ sidebarCollapsed }: { sidebarCollapsed: boolean }) {
       )}
     >
       <div className="flex items-center gap-3">
-        <h2 className="text-lg font-semibold text-surface-800">Admin Dashboard</h2>
-        <span className="badge badge-normal">v0.1.0</span>
+        <h2 className="text-lg font-semibold text-surface-800">{tShell("dashboardTitle")}</h2>
+        <span className="badge badge-normal">{tShell("versionBadge")}</span>
+        <div className="flex items-center gap-1 rounded-lg border border-surface-200 px-1 py-0.5 text-xs">
+          <button
+            type="button"
+            className={clsx(
+              "px-2 py-0.5 rounded",
+              locale === "en" ? "bg-surface-200 font-semibold" : "text-surface-500 hover:bg-surface-50"
+            )}
+            onClick={() => {
+              document.cookie = "NEXT_LOCALE=en; path=/; max-age=31536000; SameSite=Lax";
+              router.refresh();
+            }}
+          >
+            {tShell("localeEn")}
+          </button>
+          <button
+            type="button"
+            className={clsx(
+              "px-2 py-0.5 rounded",
+              locale === "he" ? "bg-surface-200 font-semibold" : "text-surface-500 hover:bg-surface-50"
+            )}
+            onClick={() => {
+              document.cookie = "NEXT_LOCALE=he; path=/; max-age=31536000; SameSite=Lax";
+              router.refresh();
+            }}
+          >
+            {tShell("localeHe")}
+          </button>
+        </div>
       </div>
 
       <div className="flex items-center gap-4">
         <button
           className="relative p-2 rounded-lg text-surface-500 hover:bg-surface-100 transition-colors"
-          aria-label="Notifications"
+          aria-label={tShell("notificationsAria")}
         >
           <Bell className="w-5 h-5" />
           <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-danger-500" />
@@ -192,7 +231,7 @@ function Header({ sidebarCollapsed }: { sidebarCollapsed: boolean }) {
         <a
           href="/settings"
           className="p-2 rounded-lg text-surface-500 hover:bg-surface-100 transition-colors"
-          aria-label="Settings"
+          aria-label={tShell("settingsAria")}
         >
           <Settings className="w-5 h-5" />
         </a>
@@ -211,7 +250,7 @@ function Header({ sidebarCollapsed }: { sidebarCollapsed: boolean }) {
             type="button"
             onClick={handleLogout}
             className="p-1.5 rounded-lg text-surface-400 hover:text-danger-600 hover:bg-danger-50 transition-colors"
-            aria-label="Sign out"
+            aria-label={tShell("signOutAria")}
           >
             <LogOut className="w-4 h-4" />
           </button>
@@ -219,6 +258,25 @@ function Header({ sidebarCollapsed }: { sidebarCollapsed: boolean }) {
       </div>
     </header>
   );
+}
+
+// PostHog analytics — optional, requires NEXT_PUBLIC_POSTHOG_KEY env var
+if (typeof window !== "undefined" && process.env.NEXT_PUBLIC_POSTHOG_KEY) {
+  try {
+    const w = window as Window & { __groupioPosthogInit?: boolean };
+    if (!w.__groupioPosthogInit) {
+      w.__groupioPosthogInit = true;
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const posthog = require("posthog-js").default;
+      posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY, {
+        api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://app.posthog.com",
+        capture_pageview: true,
+        autocapture: false,
+      });
+    }
+  } catch {
+    // posthog-js not available
+  }
 }
 
 export function AdminShell({ children }: { children: ReactNode }) {

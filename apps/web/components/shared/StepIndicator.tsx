@@ -1,5 +1,8 @@
+"use client";
+
 import clsx from "clsx";
 import { Check } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 interface Step {
   label: string;
@@ -14,6 +17,7 @@ interface StepIndicatorProps {
 }
 
 export function StepIndicator({ steps, currentStep, variant = "circles", className }: StepIndicatorProps) {
+  const t = useTranslations("common");
   if (variant === "bar") {
     const pct = steps.length > 0 ? ((currentStep + 1) / steps.length) * 100 : 0;
     return (
@@ -25,7 +29,7 @@ export function StepIndicator({ steps, currentStep, variant = "circles", classNa
           />
         </div>
         <p className="text-xs text-gray-500 mt-2 text-center">
-          שלב {currentStep + 1} מתוך {steps.length}
+          {t("stepOf", { current: currentStep + 1, total: steps.length })}
         </p>
       </nav>
     );

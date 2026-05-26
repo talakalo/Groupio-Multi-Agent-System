@@ -3,19 +3,22 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Building2, Loader2, Mail, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { apiClient, ApiError } from "@/lib/api/client";
 
-const schema = z.object({
-  email: z.string().email("נא להזין כתובת אימייל תקינה"),
-});
-
-type FormData = z.infer<typeof schema>;
-
 export default function ForgotPasswordPage() {
+  const t = useTranslations("forgotPassword");
+
+  const schema = z.object({
+    email: z.string().email(t("emailValidation")),
+  });
+
+  type FormData = z.infer<typeof schema>;
+
   const [isLoading, setIsLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +40,7 @@ export default function ForgotPasswordPage() {
     } catch (err) {
       const status = err instanceof ApiError ? err.status : null;
       if (status === 429) {
-        setError("שלחתם יותר מדי בקשות. המתינו מספר דקות ונסו שוב.");
+        setError(t("tooManyRequests"));
       } else {
         // Always show success to avoid email enumeration — but log for dev
         console.error("Password reset request error:", err);
@@ -58,22 +61,16 @@ export default function ForgotPasswordPage() {
       </div>
 
       <div className="card">
-        <h1 className="text-xl font-bold text-gray-900 mb-2">שכחתי סיסמה</h1>
-        <p className="text-sm text-gray-600 mb-6">
-          הזינו את כתובת האימייל שלכם ונשלח אליכם קישור לאיפוס הסיסמה.
-        </p>
+        <h1 className="text-xl font-bold text-gray-900 mb-2">{t("title")}</h1>
+        <p className="text-sm text-gray-600 mb-6">{t("subtitle")}</p>
 
         {sent ? (
           <div className="py-4 text-center space-y-4">
             <CheckCircle2 className="h-12 w-12 text-emerald-500 mx-auto" aria-hidden="true" />
-            <p className="text-emerald-700 font-medium">
-              אם כתובת האימייל קיימת במערכת, ישלח אליה קישור לאיפוס הסיסמה תוך מספר דקות.
-            </p>
-            <p className="text-sm text-gray-500">
-              בדקו גם את תיקיית הספאם. הקישור בתוקף לשעה אחת.
-            </p>
+            <p className="text-emerald-700 font-medium">{t("successMessage")}</p>
+            <p className="text-sm text-gray-500">{t("successSpamNote")}</p>
             <Link href="/login" className="btn-primary mt-2 inline-block">
-              חזרה להתחברות
+              {t("backToLoginButton")}
             </Link>
           </div>
         ) : (
@@ -88,7 +85,7 @@ export default function ForgotPasswordPage() {
                 htmlFor="forgot-email"
                 className="block text-sm font-medium text-gray-700 mb-1.5"
               >
-                כתובת אימייל
+                {t("emailLabel")}
               </label>
               <div className="relative">
                 <Mail className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" aria-hidden="true" />
@@ -117,10 +114,10 @@ export default function ForgotPasswordPage() {
               {isLoading ? (
                 <>
                   <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
-                  <span>שולח...</span>
+                  <span>{t("sending")}</span>
                 </>
               ) : (
-                "שלח קישור לאיפוס סיסמה"
+                t("sendButton")
               )}
             </button>
           </form>
@@ -129,7 +126,7 @@ export default function ForgotPasswordPage() {
 
       <p className="text-center text-sm text-gray-600">
         <Link href="/login" className="text-primary-600 hover:text-primary-700 font-medium">
-          חזרה להתחברות
+          {t("backToLogin")}
         </Link>
       </p>
     </div>

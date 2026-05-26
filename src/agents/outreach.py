@@ -274,16 +274,15 @@ class OutreachAgent(BaseAgent):
         if "momentum" in user_message.lower() or "offer" in user_message.lower():
             return "offer_momentum"
 
-        # Check for seasonal relevance
+        user_profile = state.get("user_profile", {})
+        if user_profile.get("past_interactions_count", 0) == 0:
+            return "new_building_onboarding"
+
+        # Seasonal relevance (after onboarding — new users stay on onboarding flow)
         month = datetime.now().month
         seasonal = CAMPAIGNS["seasonal_campaign"]["campaigns"]
         for name, config in seasonal.items():
             if month in config.get("active_months", []):
                 return "seasonal_campaign"
-
-        # Default based on user context
-        user_profile = state.get("user_profile", {})
-        if user_profile.get("past_interactions_count", 0) == 0:
-            return "new_building_onboarding"
 
         return "offer_momentum"

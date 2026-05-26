@@ -2,6 +2,7 @@
 
 import logging
 from datetime import UTC, datetime
+from typing import Any
 from uuid import uuid4
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
@@ -14,6 +15,7 @@ from src.models.escalation import (
     EscalationFilterRequest,
     EscalationListResponse,
     EscalationPriority,
+    EscalationReason,
     EscalationReplyRequest,
     EscalationResponse,
     EscalationSource,
@@ -21,11 +23,20 @@ from src.models.escalation import (
     EscalationStatus,
     EscalationUpdate,
 )
-from src.models.user import UserInDB
+from src.models.user import UserInDB, UserRole
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["escalations"])
+
+
+def _escalation_status_str(status: Any) -> str:
+    """Normalize DB/driver escalation status for comparisons (str vs enum)."""
+    if status is None:
+        return ""
+    if isinstance(status, EscalationStatus):
+        return status.value
+    return str(status).strip().lower()
 
 
 class ResolveEscalationBody(BaseModel):
@@ -34,11 +45,83 @@ class ResolveEscalationBody(BaseModel):
     resolution_notes: str | None = Field(None, max_length=2000)
 
 
+class AssignEscalationBody(BaseModel):
+    """Admin UI sends ``assigned_to`` in JSON; keep field name aligned with DB column."""
+
+    assigned_to: str = Field(..., min_length=1)
+
+
+class ContractorRequestReviewBody(BaseModel):
+    """Contractor asks ops to review a completed offer (e.g. dispute / quality)."""
+
+    offer_id: str = Field(..., min_length=1, max_length=64)
+    message: str | None = Field(None, max_length=2000)
+
+
+@router.post("/contractor/request-review", response_model=EscalationResponse)
+async def contractor_request_review(
+    body: ContractorRequestReviewBody,
+    current_user: UserInDB = Depends(get_current_user),
+) -> EscalationResponse:
+    """Create a support escalation for a completed offer owned by the logged-in contractor."""
+    if current_user.role != UserRole.CONTRACTOR or not current_user.contractor_id:
+        raise HTTPException(status_code=403, detail="Contractor access required")
+
+    db = get_postgres_client()
+    offer = await db.get_offer(body.offer_id)
+    if not offer:
+        raise HTTPException(status_code=404, detail="Offer not found")
+    if str(offer.get("contractor_id") or "") != str(current_user.contractor_id):
+        raise HTTPException(status_code=403, detail="This offer is not associated with your contractor profile")
+
+    status_val = str(offer.get("status") or "").lower()
+    if status_val != "completed":
+        raise HTTPException(
+            status_code=400,
+            detail="Review requests are only available for completed offers",
+        )
+
+    summary = (body.message or "").strip()
+    if len(summary) < 10:
+        summary = (
+            f"Contractor requests manual review for completed offer {body.offer_id}. "
+            f"(contractor_id={current_user.contractor_id})"
+        )
+    summary = summary[:1000]
+
+    escalation_id = str(uuid4())
+    escalation_data: dict[str, Any] = {
+        "id": escalation_id,
+        "user_id": current_user.id,
+        "conversation_id": f"contractor_offer:{body.offer_id}",
+        "source_agent": EscalationSource.SUPPORT.value,
+        "reason": EscalationReason.MANUAL_REVIEW.value,
+        "priority": EscalationPriority.MEDIUM.value,
+        "summary": summary,
+        "status": EscalationStatus.OPEN.value,
+        "context": {
+            "kind": "contractor_review_request",
+            "offer_id": body.offer_id,
+            "contractor_id": str(current_user.contractor_id),
+        },
+    }
+
+    row = await db.create_escalation(escalation_data)
+    logger.info(
+        "contractor_request_review escalation_id=%s offer_id=%s user_id=%s",
+        escalation_id,
+        body.offer_id,
+        current_user.id,
+    )
+    return EscalationResponse.model_validate(row)
+
+
 @router.post("/", response_model=EscalationResponse)
 async def create_escalation(
     request: EscalationCreate,
+    current_user: UserInDB = Depends(get_current_user),
 ) -> EscalationResponse:
-    """Create a new escalation (typically called by agents)."""
+    """Create a new escalation (typically called by agents or admin users)."""
     db = get_postgres_client()
 
     escalation_id = str(uuid4())
@@ -54,6 +137,28 @@ async def create_escalation(
         request.source_agent,
         request.priority,
     )
+
+    try:
+        from src.messaging.envelope import EventEnvelope
+        from src.messaging.outbox_helpers import try_enqueue_crm
+        from src.messaging.topics import RK_CRM_ESCALATION_CREATED
+
+        env = EventEnvelope(
+            event_name="crm.escalation.created",
+            entity_type="escalation",
+            entity_id=escalation_id,
+            idempotency_key=f"crm:escalation:{escalation_id}",
+            payload={"escalation_id": escalation_id},
+        )
+        await try_enqueue_crm(
+            db,
+            RK_CRM_ESCALATION_CREATED,
+            env.event_name,
+            env.to_json_dict(),
+            idempotency_key=env.idempotency_key,
+        )
+    except Exception:
+        logger.exception("CRM outbox enqueue failed after escalation create (non-fatal)")
 
     return escalation
 
@@ -223,7 +328,10 @@ async def update_escalation(
     update_data = request.model_dump(exclude_unset=True)
 
     # Track resolution time
-    if request.status == EscalationStatus.RESOLVED and escalation.get("status") != EscalationStatus.RESOLVED:
+    if (
+        request.status == EscalationStatus.RESOLVED
+        and _escalation_status_str(escalation.get("status")) != EscalationStatus.RESOLVED.value
+    ):
         update_data["resolved_at"] = datetime.now(UTC)
 
     updated = await db.update_escalation(escalation_id, update_data)
@@ -236,7 +344,7 @@ async def update_escalation(
 @router.post("/{escalation_id}/assign")
 async def assign_escalation(
     escalation_id: str,
-    admin_id: str,
+    body: AssignEscalationBody,
     current_user: UserInDB = Depends(get_current_user),
 ) -> EscalationResponse:
     """Assign escalation to an admin."""
@@ -244,6 +352,7 @@ async def assign_escalation(
         raise HTTPException(status_code=403, detail="Admin access required")
 
     db = get_postgres_client()
+    admin_id = body.assigned_to
 
     escalation = await db.get_escalation(escalation_id)
     if not escalation:
@@ -325,7 +434,7 @@ async def resolve_escalation(
     if not escalation:
         raise HTTPException(status_code=404, detail="Escalation not found")
 
-    if escalation.get("status") == EscalationStatus.RESOLVED:
+    if _escalation_status_str(escalation.get("status")) == EscalationStatus.RESOLVED.value:
         raise HTTPException(status_code=400, detail="Escalation already resolved")
 
     notes = body.resolution_notes if body else None
@@ -359,7 +468,7 @@ async def reopen_escalation(
     if not escalation:
         raise HTTPException(status_code=404, detail="Escalation not found")
 
-    if escalation.get("status") != EscalationStatus.RESOLVED:
+    if _escalation_status_str(escalation.get("status")) != EscalationStatus.RESOLVED.value:
         raise HTTPException(status_code=400, detail="Can only reopen resolved escalations")
 
     # Add message about reopening

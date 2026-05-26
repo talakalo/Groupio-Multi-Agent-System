@@ -1,0 +1,68 @@
+name: Gov Data Contract Tests
+
+on:
+  schedule:
+    # Run nightly at 02:00 UTC (04:00 Israel time)
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+    inputs:
+      run_live:
+        description: "Run against live data.gov.il API (slow, uses real HTTP)"
+        required: false
+        default: "false"
+
+jobs:
+  contract-tests:
+    name: CKAN Schema Contract Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          pip install -e ".[dev]" --quiet
+
+      - name: Run contract tests (fixture-backed)
+        run: |
+          python -m pytest tests/contracts/ -v --tb=short
+
+      - name: Open schema drift issue on failure
+        if: failure()
+        uses: actions/github-script@v7
+        env:
+          RUN_ID: ${{ github.run_id }}
+          SERVER_URL: ${{ github.server_url }}
+          REPO: ${{ github.repository }}
+          DATE: ${{ github.event.schedule }}
+        with:
+          script: |
+            const runUrl = `${process.env.SERVER_URL}/${process.env.REPO}/actions/runs/${process.env.RUN_ID}`;
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '[Schema Drift] Gov CKAN contract test failed',
+              body: [
+                '## Gov Data Schema Drift Detected',
+                '',
+                'The nightly CKAN contract tests failed, which means one of:',
+                '1. A fixture file is out of date with the live API',
+                '2. The client code depends on a column name that was renamed',
+                '3. The data.gov.il CKAN resource structure changed',
+                '',
+                '**Action required:**',
+                '- Run `python -m pytest tests/contracts/ -v` locally to see which test failed',
+                '- Compare `tests/fixtures/gov/` with the live API response',
+                '- Update the fixture AND the client code if a field name changed',
+                '',
+                `Workflow run: ${runUrl}`,
+              ].join('\n'),
+              labels: ['bug', 'schema-drift'],
+            });

@@ -103,8 +103,8 @@ class TestGetMyPayments:
     """Tests for GET /api/v1/payments/my."""
 
     def test_get_my_payments(self, client, mock_db, mock_payment_record):
-        """Current user can list their own payments."""
-        mock_db.list_payments_for_user = AsyncMock(return_value=[mock_payment_record])
+        """Current user can list their own payments (paginated — PERF-9)."""
+        mock_db.list_payments_for_user_paginated = AsyncMock(return_value=([mock_payment_record], 1))
 
         response = client.get(
             "/api/v1/payments/my",
@@ -113,10 +113,12 @@ class TestGetMyPayments:
 
         assert response.status_code == 200
         data = response.json()
-        assert isinstance(data, list)
-        assert len(data) == 1
-        assert data[0]["id"] == "pay-001"
-        assert data[0]["status"] == "succeeded"
+        assert isinstance(data, dict)
+        assert data["total"] == 1
+        assert data["page"] == 1
+        assert len(data["payments"]) == 1
+        assert data["payments"][0]["id"] == "pay-001"
+        assert data["payments"][0]["status"] == "succeeded"
 
 
 # ---------------------------------------------------------------------------
@@ -127,7 +129,8 @@ class TestGetMyPayments:
 class TestInitiatePayment:
     """Tests for POST /api/v1/payments/initiate."""
 
-    def test_initiate_payment_success(self, client, mock_db, mock_offer):
+    @patch("src.messaging.outbox_helpers.try_enqueue_invoice_created_event", new_callable=AsyncMock)
+    def test_initiate_payment_success(self, mock_enqueue_invoice, client, mock_db, mock_offer):
         """Successful payment initiation creates invoice, payment, and calls provider."""
         mock_db.get_offer = AsyncMock(return_value=mock_offer)
         mock_db.is_user_in_building = AsyncMock(return_value=True)
@@ -160,6 +163,41 @@ class TestInitiatePayment:
         assert data["transaction_id"] == "txn_123"
         mock_db.create_invoice.assert_awaited_once()
         mock_db.create_payment.assert_awaited_once()
+        mock_enqueue_invoice.assert_awaited_once()
+        kw = mock_enqueue_invoice.await_args.kwargs
+        assert kw["offer_id"] == "offer-100"
+        assert kw["user_id"] == "user-123"
+        assert "conn" in kw
+        assert "invoice_id" in kw
+
+    @patch("src.messaging.outbox_helpers.try_enqueue_invoice_created_event", new_callable=AsyncMock)
+    def test_initiate_payment_reuses_invoice_does_not_enqueue_created(
+        self, mock_enqueue_invoice, client, mock_db, mock_offer, mock_invoice
+    ):
+        """When an invoice already exists, invoices.created outbox hook must not run."""
+        inv = {**mock_invoice, "subtotal": 84.75, "tax_amount": 15.25, "amount": 100.0, "payment_type": "direct"}
+        mock_db.get_offer = AsyncMock(return_value=mock_offer)
+        mock_db.is_user_in_building = AsyncMock(return_value=True)
+        mock_db.get_invoice_for_offer = AsyncMock(return_value=inv)
+        mock_db.create_invoice = AsyncMock()
+        mock_db.create_payment = AsyncMock()
+
+        with patch("src.api.routes.payments.get_payment_provider") as mock_pp:
+            provider = AsyncMock()
+            provider.create_charge = AsyncMock(
+                return_value={"transaction_id": "txn_999", "status": "processing", "amount": 100}
+            )
+            mock_pp.return_value = provider
+
+            response = client.post(
+                "/api/v1/payments/initiate",
+                json={"offer_id": "offer-100", "payment_method_id": None},
+                headers={"Authorization": "Bearer test-token"},
+            )
+
+        assert response.status_code == 200
+        mock_db.create_invoice.assert_not_called()
+        mock_enqueue_invoice.assert_not_called()
 
     def test_initiate_payment_offer_not_found(self, client, mock_db):
         """Initiating payment for a non-existent offer returns 404."""
@@ -175,9 +213,9 @@ class TestInitiatePayment:
         assert response.status_code == 404
 
     def test_initiate_payment_not_participant(self, client, mock_db, mock_offer):
-        """User not in the building of the offer gets 403."""
+        """User who hasn't joined the offer gets 403."""
         mock_db.get_offer = AsyncMock(return_value=mock_offer)
-        mock_db.is_user_in_building = AsyncMock(return_value=False)
+        mock_db.has_user_joined_offer = AsyncMock(return_value=False)
 
         with patch("src.api.routes.payments.get_payment_provider"):
             response = client.post(
@@ -264,8 +302,7 @@ class TestPaymentWebhook:
     def test_webhook_payment_succeeded(self, unauth_client, mock_db, mock_payment_record):
         """Webhook with payment.succeeded updates payment status."""
         mock_db.get_payment_by_transaction = AsyncMock(return_value=mock_payment_record)
-        mock_db.update_payment = AsyncMock()
-        mock_db.update_invoice = AsyncMock()
+        mock_db.update_payment_and_invoice_for_webhook = AsyncMock()
 
         response = unauth_client.post(
             "/api/v1/payments/webhook",
@@ -280,7 +317,12 @@ class TestPaymentWebhook:
         data = response.json()
         assert data["status"] == "processed"
         assert data["new_status"] == "succeeded"
-        mock_db.update_payment.assert_awaited_once()
+        mock_db.update_payment_and_invoice_for_webhook.assert_awaited_once_with(
+            "pay-001",
+            "inv-001",
+            "succeeded",
+            "paid",
+        )
 
     def test_webhook_missing_fields(self, unauth_client, mock_db):
         """Webhook without transaction_id or event_type returns 400."""

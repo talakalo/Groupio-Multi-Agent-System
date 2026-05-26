@@ -2,6 +2,7 @@
 
 import logging
 from typing import Any
+from uuid import uuid4
 
 from src.agents.base import AgentConfig, BaseAgent
 from src.config.prompts.support import SUPPORT_SYSTEM_PROMPT
@@ -131,6 +132,15 @@ class SupportAgent(BaseAgent):
         await self._memory.add_message(
             user_id,
             {"role": "assistant", "content": response},
+        )
+
+        # Asynchronously index the resolved exchange so future complaint queries
+        # can retrieve similar resolved cases from the conversations collection.
+        await self._index_resolved_exchange(
+            user_message=user_message,
+            assistant_response=response,
+            user_id=user_id,
+            intent=intent,
         )
 
         state["actions_taken"] = [
@@ -293,3 +303,41 @@ class SupportAgent(BaseAgent):
 
         content = response.get("content", [])
         return content[0].get("text", "") if content else ""
+
+    async def _index_resolved_exchange(
+        self,
+        user_message: str,
+        assistant_response: str,
+        user_id: str,
+        intent: str,
+    ) -> None:
+        """Index a resolved Q&A pair into the conversations Qdrant collection.
+
+        This populates the collection that the 'complaint' RAG strategy queries
+        so future interactions can retrieve relevant past resolutions.
+        """
+        if not self.rag:
+            return
+        try:
+            from src.databases.vector_store import get_vector_store
+            from src.rag.embeddings import get_embedding_client
+
+            text = f"Q: {user_message}\nA: {assistant_response}"
+            embedding = await get_embedding_client().embed_text(text)
+            point_id = str(uuid4())
+            vs = get_vector_store()
+            await vs.upsert(
+                collection="conversations",
+                ids=[point_id],
+                vectors=[embedding],
+                payloads=[
+                    {
+                        "text": text,
+                        "user_id": user_id,
+                        "intent": intent,
+                        "outcome": "resolved",
+                    }
+                ],
+            )
+        except Exception as exc:
+            logger.warning("Failed to index resolved conversation exchange: %s", exc)

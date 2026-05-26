@@ -4,9 +4,16 @@ const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 
 const isDev = process.env.NODE_ENV !== "production";
 
-// In development, allow the local backend (localhost:8000) so fetch/WebSocket
-// calls are not blocked by CSP. In production, only the deployed API is allowed.
-const devApiOrigins = isDev
+// Derive allowed API origins from NEXT_PUBLIC_API_URL at runtime, so that
+// docker-compose (which sets this to http://localhost:8000) works without
+// needing NODE_ENV=development inside the container.
+const configuredApiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
+const configuredWsUrl = configuredApiUrl
+  .replace(/^https:/, "wss:")
+  .replace(/^http:/, "ws:");
+const extraOrigins = configuredApiUrl
+  ? ` ${configuredApiUrl} ${configuredWsUrl}`
+  : isDev
   ? " http://localhost:8000 ws://localhost:8000"
   : "";
 
@@ -22,7 +29,7 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: https://*.supabase.co",
       "font-src 'self'",
-      `connect-src 'self' https://api.groupio.co.il wss://api.groupio.co.il${devApiOrigins}`,
+      `connect-src 'self' https://api.groupio.co.il wss://api.groupio.co.il${extraOrigins}`,
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",
@@ -52,6 +59,7 @@ const securityHeaders = [
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: "standalone",
   transpilePackages: ["@groupio/types", "@groupio/api-client", "@groupio/utils"],
 
   webpack: (config) => {

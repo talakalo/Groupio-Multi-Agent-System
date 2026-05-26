@@ -22,13 +22,11 @@ import json
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from fastapi.testclient import TestClient
 
 from src.api.main import app
 from src.api.middleware.auth import get_admin_user, get_current_user
 from src.models.user import UserInDB, UserRole
-
 
 # ---------------------------------------------------------------------------
 # Shared helpers
@@ -65,19 +63,7 @@ def _make_admin(uid: str = "admin-1") -> UserInDB:
 
 def _whatsapp_payload(phone: str = "972501234567", text: str = "שלום") -> bytes:
     """Build a minimal WhatsApp webhook payload matching Meta's format."""
-    body = {
-        "entry": [
-            {
-                "changes": [
-                    {
-                        "value": {
-                            "messages": [{"from": phone, "text": {"body": text}}]
-                        }
-                    }
-                ]
-            }
-        ]
-    }
+    body = {"entry": [{"changes": [{"value": {"messages": [{"from": phone, "text": {"body": text}}]}}]}]}
     return json.dumps(body).encode()
 
 
@@ -241,9 +227,7 @@ class TestRefundRejectFlow:
                 patch("src.services.payment.get_payment_provider", return_value=provider),
             ):
                 client = TestClient(app)
-                approve_resp = client.post(
-                    "/api/v1/admin/agents/pending-decisions/decision-1/approve"
-                )
+                approve_resp = client.post("/api/v1/admin/agents/pending-decisions/decision-1/approve")
 
             assert approve_resp.status_code == 409
             provider.refund.assert_not_awaited()
@@ -438,9 +422,7 @@ class TestWhatsAppVerificationGate:
         mock_settings.ENFORCE_EMAIL_VERIFICATION = True
 
         mock_orchestrator = MagicMock()
-        mock_orchestrator.run = AsyncMock(
-            return_value={"response": {"message": "שלום, איך אפשר לעזור?"}}
-        )
+        mock_orchestrator.run = AsyncMock(return_value={"response": {"message": "שלום, איך אפשר לעזור?"}})
 
         with (
             patch("src.api.routes.webhooks.get_postgres_client", return_value=mock_db),
@@ -466,9 +448,7 @@ class TestWhatsAppVerificationGate:
         mock_settings.ENFORCE_EMAIL_VERIFICATION = True
 
         mock_orchestrator = MagicMock()
-        mock_orchestrator.run = AsyncMock(
-            return_value={"response": {"message": "ברוכים הבאים"}}
-        )
+        mock_orchestrator.run = AsyncMock(return_value={"response": {"message": "ברוכים הבאים"}})
 
         with (
             patch("src.api.routes.webhooks.get_postgres_client", return_value=mock_db),

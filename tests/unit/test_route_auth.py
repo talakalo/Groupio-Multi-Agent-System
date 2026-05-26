@@ -282,8 +282,10 @@ class TestLoginJson:
 
         redis = AsyncMock()
         redis.check_ip_rate_limit = AsyncMock(return_value=True)
+        redis.is_temporarily_locked = AsyncMock(return_value=0)
         redis.set = AsyncMock()
         redis.clear_login_failures = AsyncMock()
+        redis.clear_temporary_lockout = AsyncMock()
 
         from src.api.main import app
 
@@ -344,6 +346,7 @@ class TestLoginJson:
 
         redis = AsyncMock()
         redis.check_ip_rate_limit = AsyncMock(return_value=True)
+        redis.is_temporarily_locked = AsyncMock(return_value=0)
         redis.increment_login_failures = AsyncMock(return_value=1)
 
         from src.api.main import app
@@ -371,7 +374,9 @@ class TestLoginJson:
 
         redis = AsyncMock()
         redis.check_ip_rate_limit = AsyncMock(return_value=True)
+        redis.is_temporarily_locked = AsyncMock(return_value=0)
         redis.increment_login_failures = AsyncMock(return_value=5)
+        redis.set_temporary_lockout = AsyncMock()
 
         from src.api.main import app
 
@@ -397,6 +402,7 @@ class TestLoginJson:
 
         redis = AsyncMock()
         redis.check_ip_rate_limit = AsyncMock(return_value=True)
+        redis.is_temporarily_locked = AsyncMock(return_value=0)
 
         from src.api.main import app
 
@@ -423,6 +429,7 @@ class TestLoginJson:
 
         redis = AsyncMock()
         redis.check_ip_rate_limit = AsyncMock(return_value=True)
+        redis.is_temporarily_locked = AsyncMock(return_value=0)
 
         mock_settings = AsyncMock()
         mock_settings.ENFORCE_EMAIL_VERIFICATION = True
@@ -457,8 +464,10 @@ class TestLoginJson:
 
         redis = AsyncMock()
         redis.check_ip_rate_limit = AsyncMock(return_value=True)
+        redis.is_temporarily_locked = AsyncMock(return_value=0)
         redis.set = AsyncMock()
         redis.clear_login_failures = AsyncMock()
+        redis.clear_temporary_lockout = AsyncMock()
 
         from src.api.main import app
 
@@ -769,6 +778,36 @@ class TestPasswordReset:
             assert resp.status_code == 200
             assert resp.json()["status"] == "reset_email_sent"
             email_svc.send_password_reset_email.assert_called_once()
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_reset_email_send_failure_returns_503_and_cleans_redis(self):
+        user = _make_user()
+        db = AsyncMock()
+        db.get_user_by_email = AsyncMock(return_value=user)
+
+        redis = AsyncMock()
+        redis.check_ip_rate_limit = AsyncMock(return_value=True)
+        redis.set = AsyncMock()
+        redis.delete = AsyncMock()
+
+        email_svc = AsyncMock()
+        email_svc.send_password_reset_email = AsyncMock(side_effect=RuntimeError("SMTP down"))
+
+        from src.api.main import app
+
+        app.dependency_overrides.clear()
+        try:
+            with patch("src.api.routes.auth.get_postgres_client", return_value=db):
+                with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+                    with patch("src.api.routes.auth.get_email_service", return_value=email_svc):
+                        client = TestClient(app, raise_server_exceptions=False)
+                        resp = client.post(
+                            "/api/v1/auth/password/reset",
+                            json={"email": "user@example.com"},
+                        )
+            assert resp.status_code == 503
+            redis.delete.assert_called()
         finally:
             app.dependency_overrides.clear()
 
@@ -1092,8 +1131,10 @@ class TestLoginForm:
 
         redis = AsyncMock()
         redis.check_ip_rate_limit = AsyncMock(return_value=True)
+        redis.is_temporarily_locked = AsyncMock(return_value=0)
         redis.set = AsyncMock()
         redis.clear_login_failures = AsyncMock()
+        redis.clear_temporary_lockout = AsyncMock()
 
         from src.api.main import app
 
@@ -1154,6 +1195,7 @@ class TestLoginForm:
 
         redis = AsyncMock()
         redis.check_ip_rate_limit = AsyncMock(return_value=True)
+        redis.is_temporarily_locked = AsyncMock(return_value=0)
         redis.increment_login_failures = AsyncMock(return_value=1)
 
         from src.api.main import app
@@ -1181,7 +1223,9 @@ class TestLoginForm:
 
         redis = AsyncMock()
         redis.check_ip_rate_limit = AsyncMock(return_value=True)
+        redis.is_temporarily_locked = AsyncMock(return_value=0)
         redis.increment_login_failures = AsyncMock(return_value=5)
+        redis.set_temporary_lockout = AsyncMock()
 
         from src.api.main import app
 
@@ -1207,6 +1251,7 @@ class TestLoginForm:
 
         redis = AsyncMock()
         redis.check_ip_rate_limit = AsyncMock(return_value=True)
+        redis.is_temporarily_locked = AsyncMock(return_value=0)
 
         from src.api.main import app
 

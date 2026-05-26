@@ -119,7 +119,9 @@ class TestRecordInviteEndpoint:
             patch("src.api.routes.graph_features.get_redis_client") as mock_redis,
         ):
             mock_db = AsyncMock()
-            mock_db.get_user_by_phone = AsyncMock(return_value={"id": "r2"})
+            invitee = MagicMock()
+            invitee.id = "r2"
+            mock_db.get_user_by_phone = AsyncMock(return_value=invitee)
             graph = AsyncMock()
             graph.record_invite_event = AsyncMock(return_value={"inviter_id": "user-1"})
             redis = AsyncMock()

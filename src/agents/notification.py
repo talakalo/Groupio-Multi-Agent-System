@@ -1,15 +1,14 @@
 """Notification Agent – central hub for crafting and dispatching notifications."""
 
 import json
-import logging
 from typing import Any
 
 from src.agents.base import AgentConfig, BaseAgent
 from src.config.prompts.notification import NOTIFICATION_SYSTEM_PROMPT
 from src.models.agent_state import AgentState
-from src.utils.monitoring import track_agent_execution
+from src.utils.monitoring import capture_exception_safe, get_logger, track_agent_execution
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Supported channels
 CHANNELS = ("email", "whatsapp", "push", "in_app")
@@ -145,14 +144,36 @@ class NotificationAgent(BaseAgent):
         return "offer_update"
 
     def _resolve_channels(self, state: AgentState) -> list[str]:
-        """Determine which channels to use for this notification."""
-        # Explicit channels override
+        """Determine which channels to use, respecting user notification_settings."""
+        # Explicit caller override always wins
         explicit = state.get("notification_channels")  # type: ignore[arg-type]
         if explicit and isinstance(explicit, list):
             return [ch for ch in explicit if ch in CHANNELS]
 
-        # Default: in-app always, plus email
-        return ["in_app", "email"]
+        # Read user preferences from profile (saved as notification_settings JSONB)
+        prefs: dict = {}
+        user_profile = state.get("user_profile") or {}
+        raw_settings = user_profile.get("notification_settings")
+        if isinstance(raw_settings, dict):
+            prefs = raw_settings
+
+        # in_app is always on — residents can't opt out of in-app alerts
+        channels = ["in_app"]
+
+        # Map frontend preference keys to channel names
+        # Both camelCase (resident) and snake_case (contractor) variants supported
+        email_on = prefs.get("emailEnabled", prefs.get("email_offers", True))
+        push_on = prefs.get("pushEnabled", False)  # opt-in; only send push if user has explicitly enabled it
+        whatsapp_on = prefs.get("whatsappEnabled", prefs.get("whatsapp_offers", False))
+
+        if email_on:
+            channels.append("email")
+        if push_on:
+            channels.append("push")
+        if whatsapp_on:
+            channels.append("whatsapp")
+
+        return channels
 
     async def _craft_message(
         self,
@@ -279,7 +300,13 @@ class NotificationAgent(BaseAgent):
                     wa = get_whatsapp_bot()
                     await wa.send_text_message(to=phone, text=message.get("body", ""))
                 except Exception as exc:
-                    logger.warning("WhatsApp dispatch failed for user %s: %s", user_name, exc)
+                    logger.warning(
+                        "notification_whatsapp_dispatch_failed",
+                        channel="whatsapp",
+                        error_type=type(exc).__name__,
+                        error=str(exc)[:500],
+                    )
+                    capture_exception_safe(exc, flow="notification_whatsapp", channel="whatsapp")
 
         elif channel == "push":
             logger.info(
@@ -302,7 +329,13 @@ class NotificationAgent(BaseAgent):
                         data=message.get("data", {}),
                     )
                 except Exception as exc:
-                    logger.warning("Push notification failed for user %s: %s", user_name, exc)
+                    logger.warning(
+                        "notification_push_dispatch_failed",
+                        channel="push",
+                        error_type=type(exc).__name__,
+                        error=str(exc)[:500],
+                    )
+                    capture_exception_safe(exc, flow="notification_push", channel="push")
             else:
                 logger.debug("NOTIFICATION [push] no push_token for user %s, skipping", user_name)
         elif channel == "in_app":

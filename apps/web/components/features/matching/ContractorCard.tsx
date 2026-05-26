@@ -9,7 +9,9 @@ import {
   Tag,
   Phone,
   ChevronLeft,
+  Building2,
 } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 
 import { cn } from '@/lib/utils/cn';
 
@@ -40,19 +42,10 @@ interface ContractorCardProps {
 // Helpers
 // ---------------------------------------------------------------------------
 
-const CATEGORY_LABELS: Record<ServiceCategory, string> = {
-  ac_installation: 'התקנת מזגנים',
-  ac_maintenance: 'תחזוקת מזגנים',
-  kitchen: 'מטבחים',
-  electrical: 'חשמל',
-  plumbing: 'אינסטלציה',
-  heating: 'חימום',
-  renovations: 'שיפוצים',
-  painting: 'צביעה',
-  flooring: 'ריצוף',
-  windows: 'חלונות',
-  security: 'אבטחה',
-};
+const CATEGORY_KEYS: ReadonlyArray<ServiceCategory> = [
+  'ac_installation', 'ac_maintenance', 'kitchen', 'electrical', 'plumbing',
+  'heating', 'renovations', 'painting', 'flooring', 'windows', 'security',
+];
 
 function formatCurrency(amount: number): string {
   return `₪${Math.round(amount).toLocaleString('en-IL')}`;
@@ -62,12 +55,6 @@ function getTrustColor(score: number): string {
   if (score >= 80) return 'text-emerald-600 bg-emerald-50 border-emerald-200';
   if (score >= 60) return 'text-amber-600 bg-amber-50 border-amber-200';
   return 'text-red-600 bg-red-50 border-red-200';
-}
-
-function getTrustLabel(score: number): string {
-  if (score >= 80) return 'מהימנות גבוהה';
-  if (score >= 60) return 'מהימנות בינונית';
-  return 'מהימנות נמוכה';
 }
 
 // ---------------------------------------------------------------------------
@@ -84,7 +71,10 @@ export function ContractorCard({
   onViewProfile,
   className,
 }: ContractorCardProps) {
+  const t = useTranslations('contractors');
+  const tOffers = useTranslations('offers');
   const trustScore = Math.round(match.overallScore * 100);
+  const trustLabel = trustScore >= 80 ? t('trustHigh') : trustScore >= 60 ? t('trustMedium') : t('trustLow');
 
   return (
     <div
@@ -139,7 +129,7 @@ export function ContractorCard({
             <span className="text-lg font-extrabold">{trustScore}</span>
           </div>
           <span className="text-[10px] font-medium whitespace-nowrap">
-            {getTrustLabel(trustScore)}
+            {trustLabel}
           </span>
         </div>
       </div>
@@ -160,7 +150,7 @@ export function ContractorCard({
               className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600"
             >
               <Tag className="h-3 w-3" />
-              {CATEGORY_LABELS[cat]}
+              {CATEGORY_KEYS.includes(cat) ? tOffers(`categories.${cat as ServiceCategory}`) : cat}
             </span>
           ))}
         </div>
@@ -174,7 +164,7 @@ export function ContractorCard({
             <span className="font-bold text-primary-600">
               {formatCurrency(priceEstimate)}
             </span>
-            <span className="text-xs text-gray-400">הערכת מחיר</span>
+            <span className="text-xs text-gray-400">{t('priceEstimate')}</span>
           </div>
         )}
 
@@ -182,7 +172,7 @@ export function ContractorCard({
         {yearsInBusiness != null && (
           <div className="flex items-center gap-1 text-gray-500">
             <Clock className="h-3.5 w-3.5" />
-            <span className="text-xs">{yearsInBusiness} שנות ניסיון</span>
+            <span className="text-xs">{t('experience', { years: yearsInBusiness })}</span>
           </div>
         )}
 
@@ -200,15 +190,26 @@ export function ContractorCard({
               available ? 'text-emerald-600' : 'text-gray-400',
             )}
           >
-            {available ? 'זמין' : 'לא זמין'}
+            {available ? t('available') : t('unavailable')}
           </span>
         </div>
 
         {/* Verified badge */}
         <div className="flex items-center gap-1 text-emerald-600">
           <BadgeCheck className="h-4 w-4" />
-          <span className="text-xs font-medium">מאומת</span>
+          <span className="text-xs font-medium">{t('verified')}</span>
         </div>
+
+        {/* Gov registration badge — only shown when confirmed in ICA registry */}
+        {match.govRegistered && (
+          <div
+            className="flex items-center gap-1 text-blue-600"
+            title={t('govRegistered')}
+          >
+            <Building2 className="h-4 w-4" />
+            <span className="text-xs font-medium">✔ {t('govRegistered')}</span>
+          </div>
+        )}
       </div>
 
       {/* ---- Actions ---- */}
@@ -219,14 +220,14 @@ export function ContractorCard({
           className="btn-primary flex-1 flex items-center justify-center gap-2 text-sm"
         >
           <Phone className="h-4 w-4" />
-          בקש הצעת מחיר
+          {t('requestQuote')}
         </button>
         <button
           type="button"
           onClick={() => onViewProfile?.(match.contractorId)}
           className="btn-secondary flex items-center justify-center gap-1 text-sm"
         >
-          פרופיל
+          {t('profile')}
           <ChevronLeft className="h-4 w-4" />
         </button>
       </div>

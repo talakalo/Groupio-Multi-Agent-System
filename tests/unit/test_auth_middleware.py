@@ -12,6 +12,7 @@ from src.api.middleware.auth import (
     get_admin_user,
     get_current_active_user,
     get_current_user,
+    get_current_user_optional,
     hash_password,
     is_admin,
     require_roles,
@@ -47,7 +48,8 @@ def _make_user(role: UserRole = UserRole.RESIDENT) -> UserInDB:
 @pytest.fixture
 def mock_settings():
     s = MagicMock()
-    s.JWT_SECRET_KEY = "test-secret-key"
+    # >= 32 bytes for HS256 to avoid PyJWT InsecureKeyLengthWarning in tests
+    s.JWT_SECRET_KEY = "test-jwt-secret-key-32-bytes-min!!"
     s.JWT_ALGORITHM = "HS256"
     s.ACCESS_TOKEN_EXPIRE_MINUTES = 30
     s.REFRESH_TOKEN_EXPIRE_DAYS = 7
@@ -326,6 +328,46 @@ async def test_get_admin_user_resident_denied():
 
 
 # ---------------------------------------------------------------------------
+# require_admin_only
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_require_admin_only_allows_admin():
+    from src.api.middleware.auth import require_admin_only
+
+    user = _make_user(UserRole.ADMIN)
+    result = await require_admin_only(current_user=user)
+    assert result is user
+
+
+@pytest.mark.asyncio
+async def test_require_admin_only_rejects_buildings_manager():
+    from fastapi import HTTPException
+
+    from src.api.middleware.auth import require_admin_only
+
+    user = _make_user(UserRole.BUILDINGS_MANAGER)
+    with pytest.raises(HTTPException) as exc:
+        await require_admin_only(current_user=user)
+    assert exc.value.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# is_platform_admin
+# ---------------------------------------------------------------------------
+
+
+def test_is_platform_admin():
+    from src.api.middleware.auth import is_platform_admin
+
+    assert is_platform_admin(_make_user(UserRole.ADMIN)) is True
+    assert is_platform_admin(_make_user(UserRole.SUPER_ADMIN)) is True
+    assert is_platform_admin(_make_user(UserRole.BUILDINGS_MANAGER)) is False
+    assert is_platform_admin(_make_user(UserRole.RESIDENT)) is False
+
+
+# ---------------------------------------------------------------------------
 # verify_api_key
 # ---------------------------------------------------------------------------
 
@@ -414,6 +456,22 @@ def test_is_admin_resident():
 
 def test_is_admin_contractor():
     assert is_admin(_make_user(UserRole.CONTRACTOR)) is False
+
+
+# ---------------------------------------------------------------------------
+# get_current_user_optional
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_get_current_user_optional_no_token():
+    assert await get_current_user_optional(None) is None
+
+
+@pytest.mark.asyncio
+async def test_get_current_user_optional_invalid_token(mock_settings):
+    with patch("src.api.middleware.auth.get_settings", return_value=mock_settings):
+        assert await get_current_user_optional("not-a-valid-jwt") is None
 
 
 # ---------------------------------------------------------------------------

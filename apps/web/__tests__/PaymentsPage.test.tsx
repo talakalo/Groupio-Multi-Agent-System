@@ -1,6 +1,12 @@
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+// unwrapPageParams uses React.use() — stub in tests
+vi.mock("@/lib/utils/unwrapPageParams", () => ({
+  unwrapPageParams: vi.fn(),
+}));
 
 // Mock next-intl — return stable t() so useCallback deps don't change every render
 const paymentsKeys: Record<string, string> = {
@@ -49,7 +55,13 @@ vi.mock("@/lib/stores/authStore", () => {
   return { useAuthStore: fn };
 });
 
+import { apiClient } from "../lib/api/client";
 import PaymentsPage from "../app/(resident)/payments/page";
+
+function renderWithProviders(ui: React.ReactElement) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>);
+}
 
 const MOCK_PAYMENTS = [
   {
@@ -92,8 +104,9 @@ function mockFetchSuccess(data: unknown) {
 }
 
 function mockFetchFailure() {
+  // Use TypeError so the api client's _isRetryable() returns false (no retry delays)
   (global.fetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
-    new Error("Network error")
+    new TypeError("Network error")
   );
 }
 
@@ -106,7 +119,9 @@ function mockFetchNeverResolve() {
 describe("PaymentsPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Set a token so the apiClient sends auth headers
+    // Clear apiClient singleton state so a never-resolving fetch in one test
+    // doesn't poison _inflightGets for subsequent tests on the same endpoint.
+    apiClient.__resetInternalsForTests();
     if (typeof window !== "undefined") {
       window.localStorage.setItem("auth_token", "test-token");
     }
@@ -116,14 +131,14 @@ describe("PaymentsPage", () => {
 
   it("shows loading state initially", () => {
     mockFetchNeverResolve();
-    render(<PaymentsPage />);
+    renderWithProviders(<PaymentsPage />);
     // During loading, header and skeleton placeholders are shown
     expect(screen.getByText("התשלומים שלי")).toBeInTheDocument();
   });
 
   it("shows error state when API fails", async () => {
     mockFetchFailure();
-    render(<PaymentsPage />);
+    renderWithProviders(<PaymentsPage />);
 
     await waitFor(() => {
       expect(screen.getByText(/לא ניתן לטעון/)).toBeDefined();
@@ -132,7 +147,7 @@ describe("PaymentsPage", () => {
 
   it("shows retry button on error", async () => {
     mockFetchFailure();
-    render(<PaymentsPage />);
+    renderWithProviders(<PaymentsPage />);
 
     await waitFor(() => {
       // "נסה שוב" appears in both the error message and button; check that a clickable element exists
@@ -145,7 +160,7 @@ describe("PaymentsPage", () => {
 
   it("renders page header and escrow explainer", async () => {
     mockFetchSuccess(MOCK_PAYMENTS);
-    render(<PaymentsPage />);
+    renderWithProviders(<PaymentsPage />);
 
     // Header is always rendered (not dependent on data)
     expect(screen.getByText(/התשלומים שלי/)).toBeDefined();
@@ -154,7 +169,7 @@ describe("PaymentsPage", () => {
 
   it("renders stat cards", async () => {
     mockFetchSuccess(MOCK_PAYMENTS);
-    render(<PaymentsPage />);
+    renderWithProviders(<PaymentsPage />);
 
     await waitFor(() => {
       expect(screen.getByText(/סה״כ שולם/)).toBeDefined();
@@ -165,7 +180,7 @@ describe("PaymentsPage", () => {
 
   it("renders all payments in list", async () => {
     mockFetchSuccess(MOCK_PAYMENTS);
-    render(<PaymentsPage />);
+    renderWithProviders(<PaymentsPage />);
 
     await waitFor(() => {
       expect(screen.getByText(/offer-10/)).toBeDefined();
@@ -176,7 +191,7 @@ describe("PaymentsPage", () => {
 
   it("renders payment status badges in Hebrew", async () => {
     mockFetchSuccess(MOCK_PAYMENTS);
-    render(<PaymentsPage />);
+    renderWithProviders(<PaymentsPage />);
 
     await waitFor(() => {
       // Check that status badges render (using getAllByText since some might match partially)
@@ -190,7 +205,7 @@ describe("PaymentsPage", () => {
 
   it("renders filter tabs", async () => {
     mockFetchSuccess(MOCK_PAYMENTS);
-    render(<PaymentsPage />);
+    renderWithProviders(<PaymentsPage />);
 
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "הכל" })).toBeDefined();
@@ -202,7 +217,7 @@ describe("PaymentsPage", () => {
 
   it("filters to show only pending payments", async () => {
     mockFetchSuccess(MOCK_PAYMENTS);
-    render(<PaymentsPage />);
+    renderWithProviders(<PaymentsPage />);
 
     await waitFor(() => {
       expect(screen.getByText(/offer-10/)).toBeDefined();
@@ -219,7 +234,7 @@ describe("PaymentsPage", () => {
 
   it("filters to show only succeeded payments", async () => {
     mockFetchSuccess(MOCK_PAYMENTS);
-    render(<PaymentsPage />);
+    renderWithProviders(<PaymentsPage />);
 
     await waitFor(() => {
       expect(screen.getByText(/offer-10/)).toBeDefined();
@@ -237,7 +252,7 @@ describe("PaymentsPage", () => {
 
   it("shows empty state when no payments exist", async () => {
     mockFetchSuccess([]);
-    render(<PaymentsPage />);
+    renderWithProviders(<PaymentsPage />);
 
     await waitFor(() => {
       expect(screen.getByText(/עדיין אין תשלומים/)).toBeDefined();
@@ -246,7 +261,7 @@ describe("PaymentsPage", () => {
 
   it("shows category empty state when filter yields no results", async () => {
     mockFetchSuccess([MOCK_PAYMENTS[0]]);
-    render(<PaymentsPage />);
+    renderWithProviders(<PaymentsPage />);
 
     await waitFor(() => {
       expect(screen.getByText(/offer-10/)).toBeDefined();
@@ -270,7 +285,7 @@ describe("PaymentsPage", () => {
         text: async () => JSON.stringify(MOCK_PAYMENTS),
       })
     );
-    render(<PaymentsPage />);
+    renderWithProviders(<PaymentsPage />);
 
     await waitFor(() => {
       expect(screen.getByText(/offer-10/)).toBeDefined();

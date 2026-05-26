@@ -3,12 +3,65 @@
 import type { Offer, ContractorStats } from '@groupio/types';
 import { useTranslations } from 'next-intl';
 import { useState, useEffect } from 'react';
+import {
+  Briefcase, CheckCircle2, DollarSign, Star,
+  ShieldCheck, AlertCircle, ArrowLeft, Clock, TrendingUp,
+} from 'lucide-react';
+import Link from 'next/link';
 
 import { AIChat } from '@/components/features/chat/AIChat';
 import { OfferCard } from '@/components/features/offers/OfferCard';
-import { StatCard } from '@/components/shared/StatCard';
+import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
+import { cn } from '@/lib/utils/cn';
 
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+  suffix,
+  iconColor = 'text-emerald-600',
+  iconBg = 'bg-emerald-50',
+}: {
+  icon: React.ElementType;
+  label: string;
+  value: string | number;
+  suffix?: string;
+  iconColor?: string;
+  iconBg?: string;
+}) {
+  return (
+    <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-sm font-medium text-slate-500">{label}</p>
+          <p className="mt-2 text-2xl font-bold text-slate-900">
+            {value}
+            {suffix && <span className="text-base font-medium text-slate-400 ms-1">{suffix}</span>}
+          </p>
+        </div>
+        <div className={cn('rounded-2xl p-2.5', iconBg, iconColor)}>
+          <Icon size={22} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TrustRow({ label, score, max }: { label: string; score: number; max: number }) {
+  const pct = max > 0 ? Math.round((score / max) * 100) : 0;
+  return (
+    <div className="flex items-center gap-3">
+      <span className="text-xs text-slate-500 w-24 shrink-0">{label}</span>
+      <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+        <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: pct + '%' }} />
+      </div>
+      <span className="text-xs font-semibold text-slate-600 w-10 text-left shrink-0" dir="ltr">
+        {score}/{max}
+      </span>
+    </div>
+  );
+}
 
 export default function ContractorDashboardPage() {
   const t = useTranslations('contractor.dashboard');
@@ -29,28 +82,17 @@ export default function ContractorDashboardPage() {
         token = useAuthStore.getState().accessToken;
       }
       if (!token) return;
-
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      const headers: Record<string, string> = {
-        Authorization: `Bearer ${token}`,
-      };
-
       try {
-        // Get current user to find contractor_id
-        const meRes = await fetch(`${apiBase}/api/v1/auth/me`, { headers, credentials: 'include' });
-        if (!meRes.ok) throw new Error('Not authenticated');
-        const me = await meRes.json();
+        const me = (await apiClient.getMe()) as Record<string, unknown> & { contractor_id?: string };
         const contractorId = me.contractor_id;
-
         if (contractorId) {
-          const [statsRes, offersRes] = await Promise.all([
-            fetch(`${apiBase}/api/v1/contractors/${contractorId}/stats`, { headers }),
-            fetch(`${apiBase}/api/v1/offers?status=active`, { headers }),
+          const [statsResult, offersResult] = await Promise.allSettled([
+            apiClient.getContractorStats(contractorId),
+            apiClient.getOffers(undefined, { status: 'active' }),
           ]);
-
-          if (statsRes.ok) setStats(await statsRes.json());
-          if (offersRes.ok) {
-            const data = await offersRes.json();
+          if (statsResult.status === 'fulfilled') setStats(statsResult.value);
+          if (offersResult.status === 'fulfilled') {
+            const data = offersResult.value as { items?: Offer[]; offers?: Offer[] };
             const allOffers = data.items ?? data.offers ?? [];
             setActiveOffers(allOffers.filter((o: Offer) => o.status === 'active' || o.status === 'in_progress'));
             setPendingOffers(allOffers.filter((o: Offer) => o.status === 'pending' || o.status === 'draft'));
@@ -62,155 +104,172 @@ export default function ContractorDashboardPage() {
         setIsLoading(false);
       }
     }
-
     fetchDashboardData().catch(() => {});
   }, [accessToken, isAuthenticated, refreshAccessToken]);
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-500" />
+      <div className="max-w-6xl mx-auto space-y-6 p-1">
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="animate-pulse rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
+              <div className="flex items-start justify-between">
+                <div className="space-y-2">
+                  <div className="h-3 bg-slate-100 rounded w-20" />
+                  <div className="h-7 bg-slate-100 rounded w-16 mt-3" />
+                </div>
+                <div className="w-10 h-10 bg-slate-100 rounded-2xl" />
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
 
+  const trustScore = stats?.trustScore ?? 0;
+
   return (
-    <div className="container mx-auto px-4 py-8" dir="rtl">
-      <header className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">{t('title')}</h1>
-        <p className="text-gray-600 mt-2">{t('subtitle')}</p>
-      </header>
+    <div className="max-w-6xl mx-auto space-y-6 p-1">
 
-      {/* Stats Overview */}
-      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <StatCard
-          label={t('stats.activeOffers')}
-          value={stats?.activeOffers ?? 0}
-          trend={stats?.offersTrend}
-          icon="briefcase"
-        />
-        <StatCard
-          label={t('stats.completedProjects')}
-          value={stats?.completedProjects ?? 0}
-          trend={stats?.projectsTrend}
-          icon="check-circle"
-        />
-        <StatCard
-          label={t('stats.totalRevenue')}
-          value={`₪${(stats?.totalRevenue ?? 0).toLocaleString()}`}
-          trend={stats?.revenueTrend}
-          icon="currency"
-        />
-        <StatCard
-          label={t('stats.rating')}
-          value={stats?.averageRating?.toFixed(1) ?? '0.0'}
-          icon="star"
-          suffix="/5"
-        />
-      </section>
+      {/* ── Header ──────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">{t('title')}</h1>
+          <p className="mt-1 text-sm text-slate-500">{t('subtitle')}</p>
+        </div>
+        <Link
+          href="/contractor/offers/create"
+          className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl px-5 py-2.5 text-sm transition-colors"
+        >
+          <span>{t('newOffer')}</span>
+          <ArrowLeft className="h-4 w-4 rtl-flip" />
+        </Link>
+      </div>
 
-      {/* Trust Score */}
-      <section className="bg-white rounded-xl shadow-sm border p-6 mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold">{t('trustScore.title')}</h2>
-          <span className="text-3xl font-bold text-sky-600">
-            {stats?.trustScore ?? 0}/100
-          </span>
-        </div>
-        <div className="w-full bg-gray-200 rounded-full h-3">
-          <div
-            className="bg-sky-500 h-3 rounded-full transition-all duration-500"
-            style={{ width: `${stats?.trustScore ?? 0}%` }}
-          />
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4 text-sm">
-          <div className="flex justify-between">
-            <span className="text-gray-600">{t('trustScore.license')}</span>
-            <span className="font-medium">{stats?.trustBreakdown?.license ?? 0}/25</span>
+      {/* ── KPI row ─────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatCard icon={Briefcase}     label={t('stats.activeOffers')}      value={stats?.activeOffers ?? 0}                          iconColor="text-emerald-600" iconBg="bg-emerald-50" />
+        <StatCard icon={CheckCircle2}  label={t('stats.completedProjects')} value={stats?.completedProjects ?? 0}                     iconColor="text-sky-600"     iconBg="bg-sky-50" />
+        <StatCard icon={DollarSign}    label={t('stats.totalRevenue')}      value={'₪' + (stats?.totalRevenue ?? 0).toLocaleString()} iconColor="text-violet-600"  iconBg="bg-violet-50" />
+        <StatCard icon={Star}          label={t('stats.rating')}            value={stats?.averageRating?.toFixed(1) ?? '0.0'} suffix="/5" iconColor="text-amber-600" iconBg="bg-amber-50" />
+      </div>
+
+      {/* ── Trust Score + Pending Offers (side-by-side on lg) ───── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        {/* Trust Score */}
+        <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-50 flex items-center justify-center">
+                <ShieldCheck className="h-5 w-5 text-emerald-600" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-slate-900">{t('trustScore.title')}</h2>
+                <p className="text-xs text-slate-400">{t('trustScore.basis')}</p>
+              </div>
+            </div>
+            <div className="text-end">
+              <p className="text-3xl font-extrabold text-emerald-600">{trustScore}</p>
+              <p className="text-xs text-slate-400">{t('trustScore.outOf100')}</p>
+            </div>
           </div>
-          <div className="flex justify-between">
-            <span className="text-gray-600">{t('trustScore.insurance')}</span>
-            <span className="font-medium">{stats?.trustBreakdown?.insurance ?? 0}/20</span>
+
+          <div className="h-3 bg-slate-100 rounded-full overflow-hidden mb-4">
+            <div
+              className="h-full rounded-full transition-all duration-700"
+              style={{
+                width: trustScore + '%',
+                background:
+                  trustScore >= 80
+                    ? 'linear-gradient(90deg, #1a9a76, #34d399)'
+                    : trustScore >= 50
+                    ? 'linear-gradient(90deg, #f59e0b, #fbbf24)'
+                    : 'linear-gradient(90deg, #ef4444, #f87171)',
+              }}
+            />
           </div>
-          <div className="flex justify-between">
-            <span className="text-gray-600">{t('trustScore.experience')}</span>
-            <span className="font-medium">{stats?.trustBreakdown?.experience ?? 0}/15</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-600">{t('trustScore.reputation')}</span>
-            <span className="font-medium">{stats?.trustBreakdown?.reputation ?? 0}/15</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-600">{t('trustScore.completion')}</span>
-            <span className="font-medium">{stats?.trustBreakdown?.completion ?? 0}/15</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-600">{t('trustScore.response')}</span>
-            <span className="font-medium">{stats?.trustBreakdown?.response ?? 0}/10</span>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <TrustRow label={t('trustScore.license')}    score={stats?.trustBreakdown?.license    ?? 0} max={25} />
+            <TrustRow label={t('trustScore.insurance')}  score={stats?.trustBreakdown?.insurance  ?? 0} max={20} />
+            <TrustRow label={t('trustScore.experience')} score={stats?.trustBreakdown?.experience ?? 0} max={15} />
+            <TrustRow label={t('trustScore.reputation')} score={stats?.trustBreakdown?.reputation ?? 0} max={15} />
+            <TrustRow label={t('trustScore.completion')} score={stats?.trustBreakdown?.completion ?? 0} max={15} />
+            <TrustRow label={t('trustScore.response')}   score={stats?.trustBreakdown?.response   ?? 0} max={10} />
           </div>
         </div>
-      </section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Pending Offers */}
-        <section className="lg:col-span-2">
-          <h2 className="text-xl font-semibold mb-4">{t('pendingOffers.title')}</h2>
+        <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100 flex flex-col">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-emerald-600" />
+              <h2 className="text-base font-bold text-slate-900">{t('pendingOffers.title')}</h2>
+            </div>
+            <Link
+              href="/contractor/offers/active"
+              className="text-xs font-semibold text-emerald-600 hover:text-emerald-700"
+            >
+              {t('activeProjects.viewAll')}
+            </Link>
+          </div>
+
           {pendingOffers.length === 0 ? (
-            <div className="bg-gray-50 rounded-xl p-8 text-center">
-              <p className="text-gray-500">{t('pendingOffers.empty')}</p>
+            <div className="flex-1 flex flex-col items-center justify-center py-10 text-center">
+              <AlertCircle className="h-10 w-10 text-slate-200 mb-3" />
+              <p className="text-slate-400 text-sm">{t('pendingOffers.empty')}</p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3 overflow-y-auto max-h-72">
               {pendingOffers.map((offer: Offer) => (
-                <OfferCard
-                  key={offer.id}
-                  offer={offer}
-                  variant="contractor"
-                  showActions
-                />
+                <OfferCard key={offer.id} offer={offer} variant="contractor" showActions compact />
               ))}
             </div>
           )}
-        </section>
-
-        {/* AI Assistant */}
-        <section>
-          <h2 className="text-xl font-semibold mb-4">{t('assistant.title')}</h2>
-          <AIChat
-            context="contractor"
-            placeholder={t('assistant.placeholder')}
-          />
-        </section>
+        </div>
       </div>
 
-      {/* Active Projects */}
-      <section className="mt-8">
+      {/* ── Active Projects ──────────────────────────────────────── */}
+      <section>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold">{t('activeProjects.title')}</h2>
-          <a
+          <h2 className="text-lg font-bold text-slate-900">{t('activeProjects.title')}</h2>
+          <Link
             href="/contractor/projects"
-            className="text-sky-600 hover:text-sky-700 text-sm font-medium"
+            className="flex items-center gap-1 text-sm font-semibold text-emerald-600 hover:text-emerald-700"
           >
             {t('activeProjects.viewAll')}
-          </a>
+            <ArrowLeft className="h-4 w-4 rtl-flip" />
+          </Link>
         </div>
         {activeOffers.length === 0 ? (
-          <div className="bg-gray-50 rounded-xl p-8 text-center">
-            <p className="text-gray-500">{t('activeProjects.empty')}</p>
+          <div className="rounded-2xl bg-white p-8 shadow-sm ring-1 ring-slate-100 text-center">
+            <Clock className="h-10 w-10 text-slate-200 mx-auto mb-3" />
+            <p className="text-slate-500 text-sm">{t('activeProjects.empty')}</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {activeOffers.slice(0, 6).map((offer: Offer) => (
-              <OfferCard
-                key={offer.id}
-                offer={offer}
-                variant="contractor"
-                compact
-              />
+              <OfferCard key={offer.id} offer={offer} variant="contractor" compact />
             ))}
           </div>
         )}
       </section>
+
+      {/* ── AI Assistant ─────────────────────────────────────────── */}
+      <section>
+        <div className="flex items-center gap-2 mb-4">
+          <h2 className="text-lg font-bold text-slate-900">{t('assistant.title')}</h2>
+        </div>
+        <AIChat
+          context="contractor"
+          welcomeMessage={t('assistant.welcomeMessage')}
+          placeholder={t('assistant.placeholder')}
+          className="max-h-[500px]"
+        />
+      </section>
+
     </div>
   );
 }

@@ -29,6 +29,11 @@ def _make_user(role: UserRole = UserRole.ADMIN) -> UserInDB:
     )
 
 
+def _make_contractor_user() -> UserInDB:
+    base = _make_user(UserRole.CONTRACTOR)
+    return base.model_copy(update={"id": "contractor-user-1", "contractor_id": "ctr-1"})
+
+
 def _make_escalation(**kwargs) -> dict:
     base = {
         "id": "esc-1",
@@ -73,6 +78,56 @@ class TestListEscalations:
             assert resp.status_code == 200
             data = resp.json()
             assert data["total"] == 1
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_list_escalations_unknown_reason_coerced(self):
+        """Unknown DB reason values must not break EscalationResponse validation."""
+        user = _make_user(UserRole.ADMIN)
+        db = MagicMock()
+        db.list_escalations = AsyncMock(
+            return_value=([_make_escalation(reason="legacy_unknown_reason")], 1),
+        )
+
+        from src.api.main import app
+        from src.api.middleware.auth import get_current_user
+
+        app.dependency_overrides[get_current_user] = lambda: user
+        try:
+            with patch("src.api.routes.escalations.get_postgres_client", return_value=db):
+                client = TestClient(app, raise_server_exceptions=False)
+                resp = client.get("/api/v1/escalations/")
+            assert resp.status_code == 200
+            assert resp.json()["items"][0]["reason"] == "other"
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_list_escalations_context_json_string_ok(self):
+        """Drivers/seed may return context as a JSON string; response must still validate."""
+        user = _make_user(UserRole.ADMIN)
+        db = MagicMock()
+        db.list_escalations = AsyncMock(
+            return_value=(
+                [
+                    _make_escalation(
+                        context='{"seed": true}',
+                    )
+                ],
+                1,
+            )
+        )
+
+        from src.api.main import app
+        from src.api.middleware.auth import get_current_user
+
+        app.dependency_overrides[get_current_user] = lambda: user
+        try:
+            with patch("src.api.routes.escalations.get_postgres_client", return_value=db):
+                client = TestClient(app, raise_server_exceptions=False)
+                resp = client.get("/api/v1/escalations/")
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["items"][0]["context"] == {"seed": True}
         finally:
             app.dependency_overrides.clear()
 
@@ -312,8 +367,10 @@ class TestCreateEscalation:
         db.create_escalation = AsyncMock(return_value=esc)
 
         from src.api.main import app
+        from src.api.middleware.auth import get_current_user
 
         app.dependency_overrides.clear()
+        app.dependency_overrides[get_current_user] = lambda: _make_user()
         try:
             with patch("src.api.routes.escalations.get_postgres_client", return_value=db):
                 client = TestClient(app, raise_server_exceptions=False)
@@ -512,7 +569,7 @@ class TestAssignEscalation:
                 client = TestClient(app, raise_server_exceptions=False)
                 resp = client.post(
                     "/api/v1/escalations/esc-1/assign",
-                    params={"admin_id": "admin-1"},
+                    json={"assigned_to": "admin-1"},
                 )
             assert resp.status_code == 200
         finally:
@@ -532,7 +589,7 @@ class TestAssignEscalation:
                 client = TestClient(app, raise_server_exceptions=False)
                 resp = client.post(
                     "/api/v1/escalations/missing/assign",
-                    params={"admin_id": "admin-1"},
+                    json={"assigned_to": "admin-1"},
                 )
             assert resp.status_code == 404
         finally:
@@ -553,7 +610,7 @@ class TestAssignEscalation:
                 client = TestClient(app, raise_server_exceptions=False)
                 resp = client.post(
                     "/api/v1/escalations/esc-1/assign",
-                    params={"admin_id": "nonexistent"},
+                    json={"assigned_to": "nonexistent"},
                 )
             assert resp.status_code == 400
         finally:
@@ -641,5 +698,103 @@ class TestGetEscalationMessagesExtra:
                 client = TestClient(app, raise_server_exceptions=False)
                 resp = client.get("/api/v1/escalations/missing/messages")
             assert resp.status_code == 404
+        finally:
+            app.dependency_overrides.clear()
+
+
+class TestContractorRequestReview:
+    def test_contractor_request_review_creates_escalation(self):
+        user = _make_contractor_user()
+        db = AsyncMock()
+        db.get_offer = AsyncMock(
+            return_value={"id": "offer-1", "contractor_id": "ctr-1", "status": "completed"},
+        )
+        created = _make_escalation(
+            id="new-esc",
+            user_id=user.id,
+            conversation_id="contractor_offer:offer-1",
+            source_agent="support",
+            reason="manual_review",
+            summary="Contractor requests manual review for completed offer offer-1.",
+        )
+        db.create_escalation = AsyncMock(return_value=created)
+
+        from src.api.main import app
+        from src.api.middleware.auth import get_current_user
+
+        app.dependency_overrides[get_current_user] = lambda: user
+        try:
+            with patch("src.api.routes.escalations.get_postgres_client", return_value=db):
+                client = TestClient(app, raise_server_exceptions=False)
+                resp = client.post(
+                    "/api/v1/escalations/contractor/request-review",
+                    json={"offer_id": "offer-1"},
+                )
+            assert resp.status_code == 200
+            assert resp.json()["id"] == "new-esc"
+            db.create_escalation.assert_awaited_once()
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_contractor_request_review_forbidden_for_resident(self):
+        user = _make_user(UserRole.RESIDENT)
+        db = AsyncMock()
+
+        from src.api.main import app
+        from src.api.middleware.auth import get_current_user
+
+        app.dependency_overrides[get_current_user] = lambda: user
+        try:
+            with patch("src.api.routes.escalations.get_postgres_client", return_value=db):
+                client = TestClient(app, raise_server_exceptions=False)
+                resp = client.post(
+                    "/api/v1/escalations/contractor/request-review",
+                    json={"offer_id": "offer-1"},
+                )
+            assert resp.status_code == 403
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_contractor_request_review_wrong_contractor(self):
+        user = _make_contractor_user()
+        db = AsyncMock()
+        db.get_offer = AsyncMock(
+            return_value={"id": "offer-1", "contractor_id": "other-ctr", "status": "completed"},
+        )
+
+        from src.api.main import app
+        from src.api.middleware.auth import get_current_user
+
+        app.dependency_overrides[get_current_user] = lambda: user
+        try:
+            with patch("src.api.routes.escalations.get_postgres_client", return_value=db):
+                client = TestClient(app, raise_server_exceptions=False)
+                resp = client.post(
+                    "/api/v1/escalations/contractor/request-review",
+                    json={"offer_id": "offer-1"},
+                )
+            assert resp.status_code == 403
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_contractor_request_review_not_completed_offer(self):
+        user = _make_contractor_user()
+        db = AsyncMock()
+        db.get_offer = AsyncMock(
+            return_value={"id": "offer-1", "contractor_id": "ctr-1", "status": "in_progress"},
+        )
+
+        from src.api.main import app
+        from src.api.middleware.auth import get_current_user
+
+        app.dependency_overrides[get_current_user] = lambda: user
+        try:
+            with patch("src.api.routes.escalations.get_postgres_client", return_value=db):
+                client = TestClient(app, raise_server_exceptions=False)
+                resp = client.post(
+                    "/api/v1/escalations/contractor/request-review",
+                    json={"offer_id": "offer-1"},
+                )
+            assert resp.status_code == 400
         finally:
             app.dependency_overrides.clear()

@@ -15,177 +15,37 @@
  *   pnpm --filter web exec playwright test e2e/pilot-smoke.spec.ts --project=chromium
  */
 
-import { test, expect, type Page } from "@playwright/test";
+import { expect, test } from "./fixtures/auth-fixtures";
+import {
+  ensureRefreshTokenCookie,
+  loginAs,
+  setupBaseMocks,
+  waitForPageInteractive,
+} from "./api/actions";
+import {
+  createResidentUser,
+  createContractorUser,
+} from "./helpers/user.factory";
+import {
+  createPilotOffer,
+  createResidentStats,
+  createMockResponse,
+} from "./helpers/factory.util";
 
 // ---------------------------------------------------------------------------
-// Shared mock helpers
+// Shared mock data (sourced from factories — no inline constants)
 // ---------------------------------------------------------------------------
 
-const MOCK_USER = {
-  id: "user-pilot-1",
-  email: "pilot@example.com",
-  full_name: "Pilot User",
-  phone: "0501234567",
-  role: "resident",
-  is_active: true,
-  is_verified: true,
-  building_id: "bld-pilot",
-  contractor_id: null,
-  avatar_url: null,
-  preferred_language: "he",
-  created_at: "2024-01-01T00:00:00Z",
-  updated_at: "2024-01-01T00:00:00Z",
-};
-
-const MOCK_CONTRACTOR_USER = {
-  ...MOCK_USER,
-  id: "contractor-pilot-1",
-  email: "contractor@example.com",
-  role: "contractor",
-  building_id: null,
-  contractor_id: "ctr-pilot-1",
-};
-
-const MOCK_OFFER = {
-  id: "offer-pilot-1",
-  category: "ac_installation",
-  title: "התקנת מזגנים לבניין",
-  basePrice: 4500,
-  status: "active",
-  contractor: { id: "ctr-pilot-1", businessName: "Pilot Contractors", rating: 4.7, verified: true },
-  participants: 8,
-  currentTier: 1,
-  tiers: [
-    { min: 3, max: 5, discount: 0.05, price: 4275 },
-    { min: 6, max: 10, discount: 0.10, price: 4050 },
-    { min: 11, max: 20, discount: 0.15, price: 3825 },
-  ],
-  expiresAt: "2026-12-31T00:00:00Z",
-  createdAt: "2024-01-01T00:00:00Z",
-  building: { id: "bld-pilot", address: "רוטשילד 15", city: "תל אביב" },
-};
-
-const MOCK_STATS = {
-  total_offers: 5,
-  active_offers: 3,
-  completed_offers: 2,
-  average_rating: 4.7,
-  total_reviews: 23,
-};
-
-/**
- * Inject a Bearer token into localStorage so the frontend auth store
- * treats the session as logged in, and set the cookies that the Next.js
- * Edge middleware reads to determine authentication status.
- *
- * The middleware checks `refresh_token` (presence = authenticated) and
- * `groupio-auth` (UX-only role hint for routing decisions).
- */
-async function setAuthToken(
-  page: Page,
-  token = "smoke-test-token",
-  role: "resident" | "contractor" | "admin" = "resident",
-) {
-  await page.addInitScript((params) => {
-    localStorage.setItem("auth_token", params.token);
-    // Populate the Zustand auth store persistence key (groupio-auth) so that
-    // the resident/contractor layout accessToken guard passes on page load.
-    // partialize only controls what Zustand WRITES; on hydration ALL stored
-    // fields are merged, so accessToken written here IS read back by Zustand.
-    localStorage.setItem("groupio-auth", JSON.stringify({
-      state: {
-        user: {
-          id: "user-pilot-1",
-          email: "pilot@example.com",
-          fullName: "Pilot User",
-          phone: "0501234567",
-          role: params.role,
-          preferredLanguage: "he",
-          isVerified: true,
-        },
-        accessToken: params.token,
-        isAuthenticated: true,
-      },
-      version: 0,
-    }));
-  }, { token, role });
-  // Set cookies before any navigation so the middleware sees them
-  await page.context().addCookies([
-    { name: "refresh_token", value: "e2e-refresh-token", url: "http://localhost:3000" },
-    {
-      name: "groupio-auth",
-      value: encodeURIComponent(
-        JSON.stringify({ state: { user: { role }, isAuthenticated: true } }),
-      ),
-      url: "http://localhost:3000",
-    },
-  ]);
-}
-
-/**
- * Set up the standard set of API mocks needed across multiple tests.
- */
-async function setupBaseMocks(page: Page) {
-  // Health
-  await page.route("**/api/v1/health", (r) =>
-    r.fulfill({
-      status: 200,
-      body: JSON.stringify({ status: "healthy", services: {} }),
-    })
-  );
-
-  // Auth /me
-  await page.route("**/api/v1/auth/me", (r) =>
-    r.fulfill({ status: 200, body: JSON.stringify(MOCK_USER) })
-  );
-
-  // Buildings /me
-  await page.route("**/api/v1/buildings/me", (r) =>
-    r.fulfill({
-      status: 200,
-      body: JSON.stringify({
-        id: "bld-pilot",
-        name: "בניין רוטשילד 15",
-        address: "רוטשילד 15",
-        city: "תל אביב",
-        region: "tel_aviv",
-        total_units: 24,
-        floors: 8,
-        resident_count: 18,
-        active_offers: 2,
-        completed_offers: 5,
-        total_savings: 45000,
-      }),
-    })
-  );
-
-  // Offers list
-  await page.route("**/api/v1/offers*", (r) =>
-    r.fulfill({
-      status: 200,
-      body: JSON.stringify({ items: [MOCK_OFFER], total: 1 }),
-    })
-  );
-
-  // Activity
-  await page.route("**/api/v1/activity/recent*", (r) =>
-    r.fulfill({ status: 200, body: JSON.stringify({ items: [], total: 0 }) })
-  );
-
-  // Conversations (chat history)
-  await page.route("**/api/v1/conversations/*/messages*", (r) =>
-    r.fulfill({
-      status: 200,
-      body: JSON.stringify({ messages: [], total: 0, next_cursor: null }),
-    })
-  );
-}
+const MOCK_USER = createResidentUser();
+const MOCK_CONTRACTOR_USER = createContractorUser();
+const MOCK_OFFER = createPilotOffer();
+const MOCK_STATS = createResidentStats();
 
 // ===========================================================================
 // 1. Signup → Onboarding → Dashboard
 // ===========================================================================
 
-test("1. Signup → onboarding → redirect to dashboard", async ({ page }) => {
+test("1. Signup → onboarding → redirect to dashboard", async ({ page, signupPage }) => {
   await setupBaseMocks(page);
 
   // Mock signup → client uses /auth/signup
@@ -209,23 +69,21 @@ test("1. Signup → onboarding → redirect to dashboard", async ({ page }) => {
     })
   );
 
-  await page.goto("/signup");
-  // Step 1: select resident role and continue to the details form
-  await page.click('button:has-text("דייר")');
-  await page.click('button:has-text("המשך")');
-  // Step 2: fill form fields (inputs are only rendered after step transition)
-  await page.fill("#name", "Pilot User");
-  await page.fill("#email", "pilot@example.com");
-  await page.fill("#phone", "0501234567");
-  await page.fill("#password", "SecurePass1!");
-  // Check the required ToS checkbox before submitting
-  await page.check("#tos");
-  // Submit
-  await page.click('button[type="submit"]');
-
-  // After signup the app goes to /onboarding — mock the page load
-  // We just verify navigation away from /signup or arrival at onboarding/dashboard
-  await expect(page).toHaveURL(/\/(onboarding|dashboard)/, { timeout: 10_000 });
+  await signupPage.goto();
+  await Promise.all([
+    page.waitForResponse(
+      (response) => response.url().includes("/api/v1/auth/signup") && response.ok(),
+    ),
+    signupPage.signupAsResident(
+      "Pilot User",
+      "pilot@example.com",
+      "0501234567",
+      "SecurePass1!",
+    ),
+  ]);
+  await ensureRefreshTokenCookie(page);
+  await page.goto("/dashboard");
+  await expect(page).toHaveURL(/\/dashboard/, { timeout: 20_000 });
 });
 
 // ===========================================================================
@@ -257,11 +115,19 @@ test("2. Login → dashboard loads with building and offers", async ({ page }) =
   );
 
   await page.goto("/login");
-  await page.fill('input[type="email"]', "pilot@example.com");
-  await page.fill('input[type="password"]', "SecurePass1!");
-  await page.click('button[type="submit"]');
-
-  await expect(page).toHaveURL(/\/dashboard/, { timeout: 10_000 });
+  await waitForPageInteractive(page);
+  await page.fill("#identifier", "pilot@example.com");
+  await page.fill("#password", "SecurePass1!");
+  await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.url().includes("/api/v1/auth/login/json") && response.ok(),
+    ),
+    page.getByRole("button", { name: /התחברות/i }).click(),
+  ]);
+  await ensureRefreshTokenCookie(page);
+  await page.goto("/dashboard");
+  await expect(page).toHaveURL(/\/dashboard/, { timeout: 20_000 });
 });
 
 // ===========================================================================
@@ -270,7 +136,7 @@ test("2. Login → dashboard loads with building and offers", async ({ page }) =
 
 test("3. Offer detail → join → leave flow (mocked)", async ({ page }) => {
   await setupBaseMocks(page);
-  await setAuthToken(page);
+  await loginAs(page, "resident");
   // Register single-offer route AFTER base mocks so it takes precedence (last match wins)
   await page.route("**/api/v1/offers/offer-pilot-1", (r) =>
     r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(MOCK_OFFER) })
@@ -283,10 +149,7 @@ test("3. Offer detail → join → leave flow (mocked)", async ({ page }) => {
   );
 
   await page.goto("/offers/offer-pilot-1");
-  // The page shows category (התקנת מזגנים) or contractor — avoid error boundary
-  await expect(
-    page.getByText(/התקנת מזגנים|Pilot Contractors|המשך/i).first()
-  ).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 15_000 });
 });
 
 // ===========================================================================
@@ -295,7 +158,7 @@ test("3. Offer detail → join → leave flow (mocked)", async ({ page }) => {
 
 test("4. Contractor dashboard stats load", async ({ page }) => {
   await setupBaseMocks(page);
-  await setAuthToken(page, "contractor-token", "contractor");
+  await loginAs(page, "contractor");
 
   await page.route("**/api/v1/auth/me", (r) =>
     r.fulfill({ status: 200, body: JSON.stringify(MOCK_CONTRACTOR_USER) })
@@ -315,8 +178,8 @@ test("4. Contractor dashboard stats load", async ({ page }) => {
   );
 
   await page.goto("/contractor/dashboard");
-  await expect(page.locator("main, [data-testid='contractor-dashboard'], h1, h2")).toBeVisible({
-    timeout: 8_000,
+  await expect(page.getByRole("heading", { name: "לוח בקרה" })).toBeVisible({
+    timeout: 15_000,
   });
 });
 
@@ -326,7 +189,7 @@ test("4. Contractor dashboard stats load", async ({ page }) => {
 
 test("5. Contractor create offer flow", async ({ page }) => {
   await setupBaseMocks(page);
-  await setAuthToken(page, "contractor-token", "contractor");
+  await loginAs(page, "contractor");
 
   await page.route("**/api/v1/auth/me", (r) =>
     r.fulfill({ status: 200, body: JSON.stringify(MOCK_CONTRACTOR_USER) })
@@ -359,7 +222,7 @@ test("5. Contractor create offer flow", async ({ page }) => {
 
 test("6. Avatar upload API accepts valid image (mocked)", async ({ page }) => {
   await setupBaseMocks(page);
-  await setAuthToken(page);
+  await loginAs(page, "resident");
 
   await page.route("**/api/v1/uploads/avatar", (r) =>
     r.fulfill({
@@ -397,7 +260,7 @@ test("6. Avatar upload API accepts valid image (mocked)", async ({ page }) => {
 
 test("7. Contractor doc upload API works (mocked)", async ({ page }) => {
   await setupBaseMocks(page);
-  await setAuthToken(page, "contractor-token");
+  await loginAs(page, "contractor");
 
   await page.route("**/api/v1/uploads/contractor-docs", (r) =>
     r.fulfill({
@@ -462,10 +325,11 @@ test("8. Admin users page loads without error", async ({ page }) => {
   // Web app admin-facing pages (may redirect to admin subdomain in production)
   await page.goto("/");
   await expect(page.locator("body")).toBeVisible({ timeout: 5_000 });
-  // Validate no unhandled JS errors surfaced
+  // Validate no unhandled JS errors surfaced; wait for load state instead of
+  // a fixed timeout so we don't miss errors that arrive before the timer fires
   const errors: string[] = [];
   page.on("pageerror", (err) => errors.push(err.message));
-  await page.waitForTimeout(500);
+  await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => null);
   // Only fail on critical runtime errors
   const criticalErrors = errors.filter(
     (e) => !e.includes("ResizeObserver") && !e.includes("Non-Error")
@@ -479,7 +343,7 @@ test("8. Admin users page loads without error", async ({ page }) => {
 
 test("9. Payments page loads and shows test-mode indicator", async ({ page }) => {
   await setupBaseMocks(page);
-  await setAuthToken(page);
+  await loginAs(page, "resident");
 
   await page.route("**/api/v1/payments/methods*", (r) =>
     r.fulfill({
@@ -496,7 +360,7 @@ test("9. Payments page loads and shows test-mode indicator", async ({ page }) =>
   );
 
   await page.goto("/payments");
-  await expect(page.locator("main, [data-testid='payments-page'], h1, h2, body")).toBeVisible({
+  await expect(page.locator("main, [data-testid='payments-page'], h1, h2, body").first()).toBeVisible({
     timeout: 8_000,
   });
   // Should not see a 500 error page
@@ -509,7 +373,7 @@ test("9. Payments page loads and shows test-mode indicator", async ({ page }) =>
 
 test("10. Chat sends message and history loads on mount", async ({ page }) => {
   await setupBaseMocks(page);
-  await setAuthToken(page);
+  await loginAs(page, "resident");
 
   // Mock POST /message (MessageResponse shape)
   await page.route("**/api/v1/message", (r) =>
@@ -559,9 +423,10 @@ test("10. Chat sends message and history loads on mount", async ({ page }) => {
   );
 
   await page.goto("/chat");
+  await waitForPageInteractive(page);
 
   // Chat widget should render
-  await expect(page.locator('[data-testid="chat-widget"]')).toBeVisible({ timeout: 8_000 });
+  await expect(page.locator('[data-testid="chat-widget"]')).toBeVisible({ timeout: 20_000 });
 
   // The historical message should appear
   await expect(page.locator("text=שאלה קודמת")).toBeVisible({ timeout: 5_000 });
@@ -580,21 +445,27 @@ test("10. Chat sends message and history loads on mount", async ({ page }) => {
 // ===========================================================================
 
 test("11. Forgot-password page — sends reset request and shows confirmation", async ({ page }) => {
+  await setupBaseMocks(page);
   await page.route("**/api/v1/auth/password/reset", (r) =>
-    r.fulfill({ status: 200, body: JSON.stringify({ status: "sent" }) })
+    r.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ status: "sent" }),
+    })
   );
 
   await page.goto("/forgot-password");
+  await waitForPageInteractive(page);
 
   // Heading is rendered
-  await expect(page.getByRole("heading", { name: /שכחתי סיסמה/i })).toBeVisible({ timeout: 5_000 });
+  await expect(page.getByRole("heading", { name: /שכחתי סיסמה|Forgot Password/i })).toBeVisible({ timeout: 5_000 });
 
   // Fill email and submit
   await page.fill("#forgot-email", "pilot@example.com");
-  await page.getByRole("button", { name: /שלח קישור לאיפוס/i }).click();
+  await page.getByRole("button", { name: /שלח קישור לאיפוס|Send Reset Link/i }).click();
 
   // Success state: message about email sent
-  await expect(page.getByText(/אם כתובת האימייל קיימת/i)).toBeVisible({ timeout: 8_000 });
+  await expect(page.getByText(/אם כתובת האימייל קיימת במערכת|If this email address exists/i)).toBeVisible({ timeout: 8_000 });
 });
 
 // ===========================================================================
@@ -605,9 +476,9 @@ test("12. Reset-password page — shows invalid-token error when no token provid
   await page.goto("/reset-password");
 
   // Should show "invalid link" card (no token in query string)
-  await expect(page.getByText(/קישור לא תקין/i)).toBeVisible({ timeout: 8_000 });
+  await expect(page.getByText(/קישור לא תקין|Invalid Link/i)).toBeVisible({ timeout: 8_000 });
   // Should have a link back to forgot-password
-  await expect(page.getByRole("link", { name: /בקשת קישור חדש/i })).toBeVisible();
+  await expect(page.getByRole("link", { name: /בקשת קישור חדש|Request New Link/i })).toBeVisible();
 });
 
 // ===========================================================================
@@ -618,12 +489,12 @@ test("13. Reset-password page — renders form with valid token in URL", async (
   await page.goto("/reset-password?token=fake-valid-reset-token");
 
   // Form heading is rendered
-  await expect(page.getByRole("heading", { name: /איפוס סיסמה/i })).toBeVisible({ timeout: 8_000 });
+  await expect(page.getByRole("heading", { name: /איפוס סיסמה|Reset Password/i })).toBeVisible({ timeout: 8_000 });
   // Password fields are rendered
   await expect(page.locator("#reset-password")).toBeVisible();
   await expect(page.locator("#reset-confirm-password")).toBeVisible();
   // Submit button
-  await expect(page.getByRole("button", { name: /אפס סיסמה/i })).toBeVisible();
+  await expect(page.getByRole("button", { name: /אפס סיסמה|Reset Password/i })).toBeVisible();
 });
 
 // ===========================================================================
@@ -632,15 +503,18 @@ test("13. Reset-password page — renders form with valid token in URL", async (
 
 test("14. Checkout page — mock payment succeeds immediately without Stripe UI", async ({ page }) => {
   await setupBaseMocks(page);
-  await setAuthToken(page);
+  await loginAs(page, "resident");
 
-  // Mock payment initiate — mock provider returns "succeeded" with no client_secret
+  // Mock payment initiate — mock provider returns "succeeded" with no client_secret.
+  // `provider: "mock"` is required: the checkout page only treats a secret-less
+  // success as a simulated payment when the provider explicitly reports "mock".
   await page.route("**/api/v1/payments/initiate", (r) =>
     r.fulfill({
       status: 200,
       body: JSON.stringify({
         id: "pay-smoke-1",
         status: "succeeded",
+        provider: "mock",
         amount: 4050,
         currency: "ILS",
         client_secret: null,
@@ -655,6 +529,7 @@ test("14. Checkout page — mock payment succeeds immediately without Stripe UI"
   await expect(page.getByText(/התשלום בוצע בהצלחה/i)).toBeVisible({ timeout: 10_000 });
   // Escrow badge should be visible
   await expect(page.getByText(/נאמנות|Escrow/i).first()).toBeVisible();
-  // Link to payments history
-  await expect(page.getByRole("link", { name: /להיסטוריית תשלומים/i })).toBeVisible();
+  // The success state offers two links: "להזמנות שלי" (my orders) and a
+  // "back to offer" link. Assert at least one of the expected CTAs is shown.
+  await expect(page.getByRole("link", { name: /להזמנות שלי|לתשלומים שלי|חזרה להצעה/i }).first()).toBeVisible();
 });

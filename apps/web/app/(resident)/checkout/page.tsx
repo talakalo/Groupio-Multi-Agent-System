@@ -19,6 +19,7 @@ import { Loader2, CheckCircle2, AlertCircle, ShieldCheck, ArrowRight, Share2, Cr
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Suspense, useCallback, useEffect, useState } from "react";
 
 import { apiClient, ApiError } from "@/lib/api/client";
@@ -39,15 +40,20 @@ interface PaymentResult {
 
 // ---- Stripe Elements (dynamically imported; only loaded when client_secret present) ----
 
+function StripeFormLoader() {
+  const tLoading = useTranslations("checkout");
+  return (
+    <div className="flex items-center justify-center py-8">
+      <Loader2 className="h-6 w-6 animate-spin text-indigo-600" aria-hidden="true" />
+      <span className="mr-3 text-gray-500 text-sm">{tLoading("loadingStripeForm")}</span>
+    </div>
+  );
+}
+
 const StripeCheckoutForm = dynamic(
   () => import("@/components/payments/StripeCheckoutForm"),
   {
-    loading: () => (
-      <div className="flex items-center justify-center py-8">
-        <Loader2 className="h-6 w-6 animate-spin text-indigo-600" aria-hidden="true" />
-        <span className="mr-3 text-gray-500 text-sm">טוען טופס תשלום מאובטח...</span>
-      </div>
-    ),
+    loading: StripeFormLoader,
     ssr: false,
   }
 );
@@ -55,12 +61,11 @@ const StripeCheckoutForm = dynamic(
 // ---- Sub-components ----
 
 function EscrowBadge() {
+  const t = useTranslations("checkout");
   return (
     <div className="flex items-center gap-2 text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
       <ShieldCheck className="h-4 w-4 text-indigo-500 flex-shrink-0" aria-hidden="true" />
-      <span>
-        התשלום מוגן בנאמנות (Escrow) — הכסף ישוחרר לקבלן רק לאחר אישורך על השלמת העבודה.
-      </span>
+      <span>{t("escrowProtection")}</span>
     </div>
   );
 }
@@ -74,7 +79,7 @@ function fmt(amount: number, currency = "ILS") {
 }
 
 /**
- * Order summary showing subtotal, מע"מ (18%), and total.
+ * Order summary showing subtotal, VAT, and total.
  * Displayed before the Stripe card form.
  */
 function OrderSummary({
@@ -90,24 +95,25 @@ function OrderSummary({
   total: number;
   currency: string;
 }) {
+  const t = useTranslations("checkout");
   const vatPct = Math.round(taxRate * 100);
   return (
     <div className="rounded-xl border border-gray-200 bg-gray-50 overflow-hidden">
       <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-200 bg-white">
         <Receipt className="h-4 w-4 text-indigo-500" aria-hidden="true" />
-        <span className="text-sm font-semibold text-gray-900">סיכום הזמנה</span>
+        <span className="text-sm font-semibold text-gray-900">{t("orderSummary")}</span>
       </div>
       <dl className="px-4 py-3 space-y-2 text-sm">
         <div className="flex justify-between text-gray-600">
-          <dt>מחיר לפני מע&quot;מ</dt>
+          <dt>{t("subtotal")}</dt>
           <dd dir="ltr">{fmt(subtotal, currency)}</dd>
         </div>
         <div className="flex justify-between text-gray-600">
-          <dt>מע&quot;מ {vatPct}%</dt>
+          <dt>{t("vat", { percent: vatPct })}</dt>
           <dd dir="ltr">{fmt(taxAmount, currency)}</dd>
         </div>
         <div className="flex justify-between font-bold text-gray-900 border-t border-gray-200 pt-2 text-base">
-          <dt>סה&quot;כ לתשלום</dt>
+          <dt>{t("total")}</dt>
           <dd dir="ltr">{fmt(total, currency)}</dd>
         </div>
       </dl>
@@ -117,11 +123,12 @@ function OrderSummary({
 
 /** Badge showing that payment is by credit card via Stripe. */
 function CreditCardBadge() {
+  const t = useTranslations("checkout");
   return (
     <div className="flex items-center gap-3 rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3">
       <CreditCard className="h-5 w-5 text-indigo-600 flex-shrink-0" aria-hidden="true" />
       <div>
-        <p className="text-sm font-semibold text-indigo-800">תשלום בכרטיס אשראי</p>
+        <p className="text-sm font-semibold text-indigo-800">{t("creditCardTitle")}</p>
         <p className="text-xs text-indigo-600">Visa · Mastercard · American Express · Diners</p>
       </div>
       <div className="ms-auto flex gap-1.5 text-gray-400" aria-hidden="true">
@@ -137,12 +144,13 @@ function CreditCardBadge() {
 }
 
 function ShareButton({ offerId }: { offerId?: string }) {
+  const t = useTranslations("checkout");
   const [copied, setCopied] = useState(false);
   if (!offerId) return null;
 
   const handleShare = async () => {
     const url = `${window.location.origin}/offers/${offerId}`;
-    const shareData = { title: "Groupio — הצטרפו להצעה הקבוצתית!", url };
+    const shareData = { title: t("shareOfferTitle"), url };
     try {
       if (navigator.share && navigator.canShare?.(shareData)) {
         await navigator.share(shareData);
@@ -163,7 +171,7 @@ function ShareButton({ offerId }: { offerId?: string }) {
       className="btn-secondary flex items-center gap-2 justify-center"
     >
       <Share2 className="h-4 w-4" aria-hidden="true" />
-      {copied ? "הקישור הועתק!" : "שתפו עם השכנים"}
+      {copied ? t("shareCopied") : t("shareWithNeighbors")}
     </button>
   );
 }
@@ -183,6 +191,7 @@ function SuccessState({
   currency: string;
   offerId?: string;
 }) {
+  const t = useTranslations("checkout");
   const vatPct = Math.round((taxRate ?? 0.18) * 100);
   const sub = subtotal ?? Math.round(amount / 1.18 * 100) / 100;
   const tax = taxAmount ?? Math.round(sub * 0.18 * 100) / 100;
@@ -191,34 +200,34 @@ function SuccessState({
     <div className="space-y-4 py-6">
       <div className="text-center">
         <CheckCircle2 className="h-14 w-14 text-emerald-500 mx-auto mb-3" aria-hidden="true" />
-        <h2 className="text-xl font-bold text-gray-900">התשלום בוצע בהצלחה!</h2>
-        <p className="text-sm text-gray-500 mt-1">תקבלו אישור במייל בקרוב.</p>
+        <h2 className="text-xl font-bold text-gray-900">{t("successTitle")}</h2>
+        <p className="text-sm text-gray-500 mt-1">{t("successEmailNote")}</p>
       </div>
       {/* VAT receipt */}
       <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm space-y-1.5">
         <div className="flex justify-between text-gray-600">
-          <span>מחיר לפני מע&quot;מ</span>
+          <span>{t("subtotal")}</span>
           <span dir="ltr">{fmt(sub, currency)}</span>
         </div>
         <div className="flex justify-between text-gray-600">
-          <span>מע&quot;מ {vatPct}%</span>
+          <span>{t("vat", { percent: vatPct })}</span>
           <span dir="ltr">{fmt(tax, currency)}</span>
         </div>
         <div className="flex justify-between font-bold text-gray-900 border-t border-emerald-200 pt-1.5">
-          <span>שולם</span>
+          <span>{t("paid")}</span>
           <span dir="ltr">{fmt(amount, currency)}</span>
         </div>
       </div>
       <EscrowBadge />
-      <p className="text-sm text-gray-500 text-center">💡 עוד שכנים = הנחה גדולה יותר לכולם!</p>
+      <p className="text-sm text-gray-500 text-center">{t("moreNeighborsTip")}</p>
       <div className="flex flex-col sm:flex-row gap-3 justify-center pt-1">
         <Link href="/orders" className="btn-primary">
-          להזמנות שלי
+          {t("myOrders")}
         </Link>
         <ShareButton offerId={offerId} />
         {offerId && (
           <Link href={`/offers/${offerId}`} className="btn-secondary">
-            חזרה להצעה
+            {t("backToOffer")}
           </Link>
         )}
       </div>
@@ -227,19 +236,20 @@ function SuccessState({
 }
 
 function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
+  const t = useTranslations("checkout");
   return (
     <div className="text-center space-y-4 py-8">
       <AlertCircle className="h-12 w-12 text-red-400 mx-auto" aria-hidden="true" />
-      <h2 className="text-lg font-semibold text-gray-900">שגיאה בעיבוד התשלום</h2>
+      <h2 className="text-lg font-semibold text-gray-900">{t("errorTitle")}</h2>
       <p className="text-sm text-gray-600 max-w-sm mx-auto">{message}</p>
       <div className="flex flex-col sm:flex-row gap-3 justify-center">
         {onRetry && (
           <button onClick={onRetry} className="btn-primary">
-            נסה שוב
+            {t("errorRetry")}
           </button>
         )}
         <Link href="/payments" className="btn-secondary">
-          לתשלומים שלי
+          {t("errorMyPayments")}
         </Link>
       </div>
     </div>
@@ -251,6 +261,7 @@ function ErrorState({ message, onRetry }: { message: string; onRetry?: () => voi
 function CheckoutContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const t = useTranslations("checkout");
   const offerId = searchParams.get("offerId");
 
   const [phase, setPhase] = useState<"loading" | "stripe" | "success" | "error">("loading");
@@ -259,7 +270,7 @@ function CheckoutContent() {
 
   const initiatePayment = useCallback(async () => {
     if (!offerId) {
-      setErrorMessage("מזהה הצעה חסר. חזרו לדף ההצעה ונסו שוב.");
+      setErrorMessage(t("missingOfferId"));
       setPhase("error");
       return;
     }
@@ -281,20 +292,20 @@ function CheckoutContent() {
       }
     } catch (err) {
       const status = err instanceof ApiError ? err.status : null;
-      const msg = err instanceof Error ? err.message : "שגיאה לא ידועה";
+      const msg = err instanceof Error ? err.message : t("unknownError");
       if (status === 400 && msg.toLowerCase().includes("already")) {
-        setErrorMessage("כבר ביצעת תשלום עבור הצעה זו. ניתן לצפות בה בהיסטוריית התשלומים.");
+        setErrorMessage(t("alreadyPaid"));
       } else if (status === 404) {
-        setErrorMessage("ההצעה לא נמצאה. ייתכן שהיא הסתיימה.");
+        setErrorMessage(t("offerNotFound"));
       } else if (status === 401) {
         router.push("/login");
         return;
       } else {
-        setErrorMessage(msg || "לא ניתן לעבד את התשלום. נסו שוב.");
+        setErrorMessage(msg || t("cannotProcess"));
       }
       setPhase("error");
     }
-  }, [offerId, router]);
+  }, [offerId, router, t]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -304,7 +315,7 @@ function CheckoutContent() {
   if (!offerId) {
     return (
       <ErrorState
-        message="לא צוין מזהה הצעה. חזרו לדף ההצעות ובחרו הצעה."
+        message={t("missingOfferId")}
       />
     );
   }
@@ -313,7 +324,7 @@ function CheckoutContent() {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-4">
         <Loader2 className="h-10 w-10 animate-spin text-indigo-600" aria-hidden="true" />
-        <p className="text-gray-600 text-sm">מכין תשלום מאובטח...</p>
+        <p className="text-gray-600 text-sm">{t("loadingPayment")}</p>
       </div>
     );
   }
@@ -321,7 +332,7 @@ function CheckoutContent() {
   if (phase === "error") {
     return (
       <ErrorState
-        message={errorMessage || "אירעה שגיאה בלתי צפויה."}
+        message={errorMessage || t("unexpectedError")}
         onRetry={initiatePayment}
       />
     );
@@ -344,7 +355,7 @@ function CheckoutContent() {
     return (
       <div className="space-y-4">
         <div className="text-center pb-2">
-          <h2 className="text-lg font-semibold text-gray-900">השלמת תשלום</h2>
+          <h2 className="text-lg font-semibold text-gray-900">{t("completePayment")}</h2>
         </div>
         {/* VAT order summary */}
         <OrderSummary
@@ -375,13 +386,14 @@ function CheckoutContent() {
 // ---- Page ----
 
 export default function CheckoutPage() {
+  const t = useTranslations("checkout");
   return (
-    <div className="max-w-lg mx-auto px-4 py-8" dir="rtl">
+    <div className="max-w-lg mx-auto px-4 py-8">
       {/* Breadcrumb */}
-      <nav className="flex items-center gap-1 text-sm text-gray-500 mb-6" aria-label="ניווט">
-        <Link href="/offers" className="hover:text-gray-700">הצעות</Link>
+      <nav className="flex items-center gap-1 text-sm text-gray-500 mb-6" aria-label={t("breadcrumbNav")}>
+        <Link href="/offers" className="hover:text-gray-700">{t("breadcrumbOffers")}</Link>
         <ArrowRight className="h-3.5 w-3.5 rtl-flip" aria-hidden="true" />
-        <span className="text-gray-900 font-medium" aria-current="page">תשלום</span>
+        <span className="text-gray-900 font-medium" aria-current="page">{t("breadcrumbPayment")}</span>
       </nav>
 
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
@@ -399,7 +411,7 @@ export default function CheckoutPage() {
       {/* Security footer */}
       <div className="mt-4 text-center text-xs text-gray-400 flex items-center justify-center gap-1">
         <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
-        <span>מאובטח עם Stripe — פרטי כרטיס לא נשמרים בשרתי Groupio</span>
+        <span>{t("securityFooter")}</span>
       </div>
     </div>
   );

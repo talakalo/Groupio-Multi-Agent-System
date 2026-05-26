@@ -19,6 +19,10 @@ COLLECTIONS = {
         "vector_size": 1536,
         "distance": models.Distance.COSINE,
     },
+    "offers": {
+        "vector_size": 1536,
+        "distance": models.Distance.COSINE,
+    },
     "knowledge_base": {
         "vector_size": 1536,
         "distance": models.Distance.COSINE,
@@ -241,12 +245,22 @@ class VectorStore:
         return models.Filter(must=conditions)
 
 
-_vector_store: VectorStore | None = None
+_vector_store: "VectorStore | Any | None" = None
 
 
-def get_vector_store() -> VectorStore:
-    """Get or create the singleton VectorStore instance."""
+def get_vector_store() -> "VectorStore | Any":
+    """Get or create the singleton vector store instance.
+
+    Returns a PineconeVectorStore when VECTOR_DB_PROVIDER=pinecone,
+    otherwise returns the default Qdrant-backed VectorStore.
+    """
     global _vector_store
     if _vector_store is None:
-        _vector_store = VectorStore()
+        settings = get_settings()
+        if settings.VECTOR_DB_PROVIDER == "pinecone":
+            from src.databases.pinecone_store import PineconeVectorStore
+
+            _vector_store = PineconeVectorStore()
+        else:
+            _vector_store = VectorStore()
     return _vector_store

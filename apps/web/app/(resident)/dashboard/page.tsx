@@ -1,6 +1,6 @@
 'use client';
 
-import type { Offer, ServiceCategory } from '@groupio/types';
+import type { Building, Offer } from '@groupio/types';
 import { formatPrice } from '@groupio/utils';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -11,16 +11,20 @@ import {
   Clock,
   Wrench,
   MessageSquare,
-  Search,
   Building2,
   AlertCircle,
   Star,
   ChevronLeft,
+  CalendarClock,
+  FileText,
+  PhoneCall,
+  MessageCircle,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 
 import { EmptyState } from '@/components/shared/EmptyState';
+import { apiClient, ApiError } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
 
@@ -43,52 +47,31 @@ interface RecentActivity {
 }
 
 // ---------------------------------------------------------------------------
-// Stat Card
+// KPI Stat Card — matches reference image style
 // ---------------------------------------------------------------------------
 
 function StatCard({
   icon: Icon,
   label,
   value,
-  trend,
-  trendLabel,
-  color,
+  iconColor = 'text-emerald-600',
+  iconBg = 'bg-emerald-50',
 }: {
   icon: React.ElementType;
   label: string;
   value: string;
-  trend?: number;
-  trendLabel?: string;
-  color: 'primary' | 'accent' | 'emerald' | 'amber';
+  iconColor?: string;
+  iconBg?: string;
 }) {
-  const colorMap = {
-    primary: { bg: 'bg-primary-100', text: 'text-primary-600', icon: 'text-primary-500' },
-    accent: { bg: 'bg-accent-100', text: 'text-accent-600', icon: 'text-accent-500' },
-    emerald: { bg: 'bg-emerald-100', text: 'text-emerald-600', icon: 'text-emerald-500' },
-    amber: { bg: 'bg-amber-100', text: 'text-amber-600', icon: 'text-amber-500' },
-  };
-  const colors = colorMap[color];
-
   return (
-    <div className="card">
+    <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-sm text-gray-500 mb-1">{label}</p>
-          <p className="text-2xl font-bold text-gray-900">{value}</p>
-          {trend !== undefined && (
-            <p
-              className={cn(
-                'text-xs mt-1 font-medium',
-                trend >= 0 ? 'text-emerald-600' : 'text-red-500'
-              )}
-            >
-              {trend >= 0 ? '+' : ''}
-              {trend}% {trendLabel}
-            </p>
-          )}
+          <p className="text-sm font-medium text-slate-500">{label}</p>
+          <p className="mt-2 text-2xl font-bold text-slate-900">{value}</p>
         </div>
-        <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center', colors.bg)}>
-          <Icon className={cn('h-6 w-6', colors.icon)} />
+        <div className={cn('rounded-2xl p-2.5', iconBg, iconColor)}>
+          <Icon size={22} />
         </div>
       </div>
     </div>
@@ -96,96 +79,147 @@ function StatCard({
 }
 
 // ---------------------------------------------------------------------------
-// Offer Card (compact)
+// Recent Communications row
 // ---------------------------------------------------------------------------
 
-function OfferCardCompact({ offer }: { offer: Offer }) {
-  const t = useTranslations('offers');
+function CommunicationRow({
+  icon: Icon,
+  title,
+  subtitle,
+  time,
+  iconColor = 'text-emerald-600',
+  iconBg = 'bg-emerald-50',
+}: {
+  icon: React.ElementType;
+  title: string;
+  subtitle: string;
+  time: string;
+  iconColor?: string;
+  iconBg?: string;
+}) {
+  return (
+    <div className="flex items-center justify-between rounded-2xl p-3 transition hover:bg-slate-50">
+      <div className="flex items-center gap-4">
+        <div className={cn('rounded-full p-3', iconBg, iconColor)}>
+          <Icon size={18} />
+        </div>
+        <div>
+          <p className="font-semibold text-slate-900">{title}</p>
+          <p className="text-sm text-slate-500">{subtitle}</p>
+        </div>
+      </div>
+      <span className="shrink-0 text-sm text-slate-400">{time}</span>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Upcoming event row
+// ---------------------------------------------------------------------------
+
+function UpcomingRow({
+  title,
+  subtitle,
+  action,
+  actionHref,
+  highlighted = false,
+}: {
+  title: string;
+  subtitle: string;
+  action?: string;
+  actionHref?: string;
+  highlighted?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        'rounded-xl p-4',
+        highlighted ? 'border-r-4 border-emerald-500 bg-emerald-50' : 'bg-slate-50'
+      )}
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="font-semibold text-slate-900">{title}</p>
+          <p className="mt-0.5 text-sm text-slate-500">{subtitle}</p>
+        </div>
+        {action && actionHref && (
+          <Link
+            href={actionHref}
+            className="shrink-0 text-sm font-semibold text-emerald-600 hover:text-emerald-700"
+          >
+            {action}
+          </Link>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Popular Offer card
+// ---------------------------------------------------------------------------
+
+function PopularOfferCard({ offer }: { offer: Offer }) {
   const tCat = useTranslations('categories');
+  const t = useTranslations('offers');
 
   const currentTier = offer.tiers[offer.currentTier] ?? offer.tiers[0];
   const discountPercent = currentTier ? Math.round(currentTier.discount * 100) : 0;
-
   const daysLeft = Math.max(
     0,
     Math.ceil((new Date(offer.expiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
   );
 
   return (
-    <Link href={`/offers/${offer.id}`} className="card group hover:border-primary-200 block">
-      <div className="flex items-start justify-between mb-3">
-        <div>
-          <span className="badge-primary text-xs">{tCat(offer.category)}</span>
-          <div className="flex items-center gap-2 mt-2">
-            <span className="text-lg font-bold text-gray-900">{formatPrice(currentTier?.price ?? offer.basePrice)}</span>
-            {discountPercent > 0 && (
-              <span className="text-sm text-emerald-600 font-medium">
-                {t('discount', { percent: discountPercent })}
-              </span>
-            )}
-          </div>
-        </div>
-        <ChevronLeft className="h-5 w-5 text-gray-300 group-hover:text-primary-500 transition-colors rtl-flip" />
+    <Link
+      href={`/offers/${offer.id}`}
+      className="group rounded-2xl border border-slate-100 bg-slate-50 p-4 block hover:border-emerald-200 hover:shadow-sm transition-all"
+    >
+      <div className="flex items-start justify-between mb-1">
+        <p className="font-bold text-slate-900 group-hover:text-emerald-700 transition-colors">
+          {tCat(offer.category)}
+        </p>
+        <ChevronLeft className="h-4 w-4 text-slate-300 group-hover:text-emerald-500 transition-colors rtl-flip" />
       </div>
+      <p className="text-sm text-slate-500 mb-3">{t('groupOffer')}</p>
 
-      <div className="flex items-center gap-4 text-sm text-gray-500">
-        <span className="flex items-center gap-1">
-          <Users className="h-3.5 w-3.5" />
-          {t('participants', { count: offer.participants })}
-        </span>
-        <span className="flex items-center gap-1">
-          <Clock className="h-3.5 w-3.5" />
-          {t('expiresIn', { days: daysLeft })}
-        </span>
-      </div>
-
-      {/* Progress bar for tier advancement */}
+      {/* Tier progress bar */}
       {offer.tiers.length > 1 && offer.currentTier < offer.tiers.length - 1 && (
-        <div className="mt-3">
-          <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+        <div className="mb-3">
+          <div className="h-1.5 bg-white rounded-full overflow-hidden ring-1 ring-slate-100">
             <div
-              className="h-full bg-primary-500 rounded-full transition-all"
+              className="h-full bg-emerald-500 rounded-full transition-all"
               style={{
                 width: `${Math.min(100, (offer.participants / (offer.tiers[offer.currentTier + 1]?.min ?? offer.participants)) * 100)}%`,
               }}
             />
           </div>
-          <p className="text-xs text-gray-400 mt-1">
-            {t('nextTier', {
-              needed: Math.max(0, (offer.tiers[offer.currentTier + 1]?.min ?? 0) - offer.participants),
-              discount: Math.round((offer.tiers[offer.currentTier + 1]?.discount ?? 0) * 100),
-            })}
-          </p>
+          <div className="flex justify-between mt-1">
+            <span className="text-xs text-slate-400 flex items-center gap-1">
+              <Users size={10} />
+              {offer.participants}
+            </span>
+            <span className="text-xs text-slate-400 flex items-center gap-1">
+              <Clock size={10} />
+              {daysLeft}d
+            </span>
+          </div>
         </div>
       )}
-    </Link>
-  );
-}
 
-// ---------------------------------------------------------------------------
-// Quick Action
-// ---------------------------------------------------------------------------
-
-function QuickAction({
-  icon: Icon,
-  label,
-  href,
-  color,
-}: {
-  icon: React.ElementType;
-  label: string;
-  href: string;
-  color: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className="flex flex-col items-center gap-2 p-4 rounded-xl border border-gray-100 hover:border-primary-200 hover:shadow-sm transition-all"
-    >
-      <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center', color)}>
-        <Icon className="h-6 w-6 text-white" />
+      <div className="flex items-end justify-between">
+        <div>
+          <p className="text-xs text-slate-400">{t('from')}</p>
+          <p className="text-xl font-bold text-emerald-700">
+            {formatPrice(currentTier?.price ?? offer.basePrice)}
+          </p>
+        </div>
+        {discountPercent > 0 && (
+          <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+            {t('upToDiscount', { percent: discountPercent })}
+          </span>
+        )}
       </div>
-      <span className="text-sm font-medium text-gray-700 text-center">{label}</span>
     </Link>
   );
 }
@@ -196,51 +230,61 @@ function QuickAction({
 
 export default function ResidentDashboardPage() {
   const t = useTranslations('dashboard');
-  const tCommon = useTranslations('common');
 
   const accessToken = useAuthStore((s) => s.accessToken);
   const userName = useAuthStore((s) => s.user?.fullName) ?? '';
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-  const headers: Record<string, string> = {};
-  if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
 
-  // Fetch dashboard stats from building endpoint
   const statsQuery = useQuery<DashboardStats>({
     queryKey: ['resident', 'dashboard', 'stats'],
     queryFn: async () => {
-      const res = await fetch(`${apiBase}/api/v1/buildings/me`, { headers });
-      if (!res.ok) {
-        return { activeOffers: 0, neighborsJoined: 0, totalSavings: 0, buildingName: '-' };
+      try {
+        const base = await apiClient.getMyBuilding();
+        const data = base as Building & { total_savings?: number };
+        return {
+          activeOffers: Array.isArray(data.activeOffers) ? data.activeOffers.length : 0,
+          neighborsJoined: Array.isArray(data.residents) ? data.residents.length : 0,
+          totalSavings: data.totalSavings ?? data.total_savings ?? 0,
+          buildingName: data.name ?? data.address ?? '-',
+        };
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 404) {
+          return { activeOffers: 0, neighborsJoined: 0, totalSavings: 0, buildingName: '-' };
+        }
+        throw err;
       }
-      const data = await res.json();
-      return {
-        activeOffers: data.activeOffers?.length ?? 0,
-        neighborsJoined: data.residents?.length ?? 0,
-        totalSavings: data.totalSavings ?? data.total_savings ?? 0,
-        buildingName: data.name ?? data.address ?? '-',
-      };
     },
     enabled: !!accessToken,
   });
 
-  // Fetch active offers
   const offersQuery = useQuery<{ items: Offer[] }>({
     queryKey: ['resident', 'offers', 'active'],
     queryFn: async () => {
-      const res = await fetch(`${apiBase}/api/v1/offers?status=active&page_size=4`, { headers });
-      if (!res.ok) throw new Error('Failed to fetch offers');
-      return res.json();
+      try {
+        const building = await apiClient.getMyBuilding();
+        return await apiClient.getOffers(building.id, { status: 'active', page_size: 3 });
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 404) {
+          return { items: [], total: 0, page: 1, page_size: 3, has_more: false };
+        }
+        throw err;
+      }
     },
     enabled: !!accessToken,
   });
 
-  // Recent activity from the backend
   const activityQuery = useQuery<{ activities: RecentActivity[] }>({
     queryKey: ['resident', 'dashboard', 'activity'],
     queryFn: async () => {
-      const res = await fetch(`${apiBase}/api/v1/activity/recent`, { headers });
-      if (!res.ok) return { activities: [] };
-      return res.json();
+      try {
+        const data = (await apiClient.getRecentActivity()) as unknown as {
+          activities?: RecentActivity[];
+          items?: RecentActivity[];
+        };
+        return { activities: data.activities ?? data.items ?? [] };
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 404) return { activities: [] };
+        throw err;
+      }
     },
     enabled: !!accessToken,
   });
@@ -249,193 +293,239 @@ export default function ResidentDashboardPage() {
   const offers = offersQuery.data?.items ?? [];
   const activities = activityQuery.data?.activities ?? [];
 
+  const activityIconMap: Record<RecentActivity['type'], React.ElementType> = {
+    offer_joined: Users,
+    offer_created: Tag,
+    contractor_matched: Wrench,
+    tier_reached: Star,
+  };
+
+  // Derive "upcoming" from the nearest-expiry active offers
+  const upcomingOffers = [...offers]
+    .sort((a, b) => new Date(a.expiresAt).getTime() - new Date(b.expiresAt).getTime())
+    .slice(0, 3);
+
   return (
-    <div className="max-w-6xl mx-auto space-y-8">
-      {/* Welcome header */}
+    <div className="max-w-6xl mx-auto space-y-6">
+
+      {/* Header */}
       <div>
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
-          {t('welcome', { name: userName || (stats?.buildingName !== '-' ? stats?.buildingName : null) || t('guestName') })}
+        <h1 className="text-2xl font-bold text-slate-900">
+          {t('welcome', {
+            name: userName || (stats?.buildingName !== '-' ? stats?.buildingName : null) || t('guestName'),
+          })}
         </h1>
-        <p className="text-gray-500 mt-1">{t('dashboardSubtitle')}</p>
+        <p className="mt-1 text-sm text-slate-500">{t('dashboardSubtitle')}</p>
       </div>
 
-      {/* New resident: no building yet */}
+      {/* No building yet */}
       {stats?.buildingName === '-' && (
         <EmptyState
           icon={Building2}
-          title="ברוכים הבאים ל-Groupio!"
-          description="עדיין לא הצטרפתם לבניין. הצטרפו לבניין שלכם כדי לגשת להצעות קבוצתיות."
-          action={{ label: 'הצטרפו לבניין', href: '/building/join' }}
+          title={t('noBuilding.title')}
+          description={t('noBuilding.description')}
+          action={{ label: t('noBuilding.action'), href: '/building/join' }}
         />
       )}
 
-      {/* Stats grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* KPI row */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard
-          icon={Tag}
-          label={t('activeOffers')}
+          icon={MessageCircle}
+          label={t('messages')}
+          value={String(activities.length || 0)}
+          iconColor="text-emerald-600"
+          iconBg="bg-emerald-50"
+        />
+        <StatCard
+          icon={PhoneCall}
+          label={t('contractorInquiries')}
+          value={String(
+            activities.filter((a) => a.type === 'contractor_matched').length || 0
+          )}
+          iconColor="text-sky-600"
+          iconBg="bg-sky-50"
+        />
+        <StatCard
+          icon={CalendarClock}
+          label={t('upcomingInstallations')}
           value={String(stats?.activeOffers ?? 0)}
-          color="primary"
+          iconColor="text-violet-600"
+          iconBg="bg-violet-50"
         />
         <StatCard
-          icon={Users}
-          label={t('neighborsJoined')}
-          value={String(stats?.neighborsJoined ?? 0)}
-          color="accent"
-        />
-        <StatCard
-          icon={TrendingDown}
-          label={t('totalSavings')}
-          value={formatPrice(stats?.totalSavings ?? 0)}
-          color="emerald"
-        />
-        <StatCard
-          icon={Building2}
-          label={t('yourBuilding')}
-          value={stats?.buildingName ?? '-'}
-          color="amber"
+          icon={FileText}
+          label={t('documentsOffers')}
+          value={String(offers.length || 0)}
+          iconColor="text-amber-600"
+          iconBg="bg-amber-50"
         />
       </div>
 
-      {/* Quick actions */}
-      <div>
-        <h2 className="section-title">{t('quickActions')}</h2>
-        <div className="grid grid-cols-3 sm:grid-cols-3 gap-4">
-          <QuickAction
-            icon={Search}
-            label={t('findContractor')}
-            href="/contractors"
-            color="bg-primary-500"
-          />
-          <QuickAction
-            icon={Tag}
-            label={t('viewOffers')}
-            href="/offers"
-            color="bg-accent-500"
-          />
-          <QuickAction
-            icon={MessageSquare}
-            label={t('askQuestion')}
-            href="/chat"
-            color="bg-emerald-500"
-          />
-        </div>
-      </div>
+      {/* Communications + Upcoming */}
+      <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
 
-      {/* Active offers + Recent activity side by side */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Active offers - takes 2 cols */}
-        <div className="lg:col-span-2">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold text-gray-900">{t('activeOffers')}</h2>
-            <Link
-              href="/offers"
-              className="text-sm text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1"
-            >
+        {/* Recent Communications */}
+        <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
+          <div className="mb-5 flex items-center justify-between">
+            <h2 className="text-lg font-bold text-slate-900">{t('recentCommunications')}</h2>
+            <Link href="/chat" className="text-sm font-medium text-emerald-600 hover:text-emerald-700">
               {t('viewAll')}
-              <ArrowLeft className="h-3.5 w-3.5 rtl-flip" />
             </Link>
           </div>
 
-          {offersQuery.isLoading ? (
-            <div className="space-y-4">
+          {activityQuery.isLoading ? (
+            <div className="space-y-3">
               {[1, 2, 3].map((i) => (
-                <div key={i} className="card animate-pulse">
-                  <div className="h-4 bg-gray-200 rounded w-24 mb-3" />
-                  <div className="h-6 bg-gray-200 rounded w-32 mb-2" />
-                  <div className="h-3 bg-gray-200 rounded w-48" />
+                <div key={i} className="animate-pulse flex gap-4 p-3">
+                  <div className="w-11 h-11 bg-slate-100 rounded-full shrink-0" />
+                  <div className="flex-1 space-y-2 pt-1">
+                    <div className="h-3 bg-slate-100 rounded w-32" />
+                    <div className="h-2.5 bg-slate-100 rounded w-48" />
+                  </div>
                 </div>
               ))}
             </div>
-          ) : offersQuery.isError ? (
-            <div role="alert" className="card border-red-200 bg-red-50 text-center py-8">
-              <AlertCircle className="h-10 w-10 text-red-300 mx-auto mb-2" />
-              <p className="text-red-700 text-sm font-medium mb-2">{t('errorLoadingOffers')}</p>
-              <button
-                type="button"
-                onClick={() => offersQuery.refetch()}
-                className="text-xs text-red-600 underline hover:text-red-800"
-              >
+          ) : activityQuery.isError ? (
+            <div role="alert" className="flex flex-col items-center py-8 text-center">
+              <AlertCircle className="h-8 w-8 text-red-300 mb-2" />
+              <p className="text-sm text-red-600 mb-2">{t('errorLoadingActivity')}</p>
+              <button type="button" onClick={() => activityQuery.refetch()} className="text-xs text-red-500 underline">
                 {t('retry')}
               </button>
             </div>
-          ) : offers.length > 0 ? (
-            <div className="space-y-4">
-              {offers.map((offer: Offer) => (
-                <OfferCardCompact key={offer.id} offer={offer} />
-              ))}
+          ) : activities.length > 0 ? (
+            <div className="space-y-1">
+              {activities.slice(0, 5).map((activity) => {
+                const Icon = activityIconMap[activity.type] ?? Tag;
+                const relativeTime = new Date(activity.timestamp).toLocaleDateString('he-IL');
+                return (
+                  <CommunicationRow
+                    key={activity.id}
+                    icon={Icon}
+                    title={activity.type === 'contractor_matched' ? 'קבלן' : activity.type === 'offer_joined' ? 'קבוצת הבניין' : 'עדכון'}
+                    subtitle={activity.message}
+                    time={relativeTime}
+                    iconColor={
+                      activity.type === 'contractor_matched'
+                        ? 'text-sky-600'
+                        : activity.type === 'tier_reached'
+                        ? 'text-amber-600'
+                        : 'text-emerald-600'
+                    }
+                    iconBg={
+                      activity.type === 'contractor_matched'
+                        ? 'bg-sky-50'
+                        : activity.type === 'tier_reached'
+                        ? 'bg-amber-50'
+                        : 'bg-emerald-50'
+                    }
+                  />
+                );
+              })}
             </div>
           ) : (
-            <div className="card text-center py-12">
-              <Tag className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-              <p className="text-gray-500 font-medium">{t('noActiveOffers')}</p>
-              <Link href="/offers" className="btn-primary mt-4 inline-flex items-center gap-2">
-                <span>{t('browseOffers')}</span>
-                <ArrowLeft className="h-4 w-4 rtl-flip" />
+            <div className="flex flex-col items-center py-8 text-center">
+              <MessageSquare className="h-10 w-10 text-slate-200 mb-3" />
+              <p className="text-sm text-slate-400">{t('noRecentActivity')}</p>
+              <Link href="/chat" className="mt-3 text-sm font-medium text-emerald-600 hover:text-emerald-700">
+                {t('startChat')}
               </Link>
             </div>
           )}
         </div>
 
-        {/* Recent activity - takes 1 col */}
-        <div>
-          <h2 className="text-lg font-bold text-gray-900 mb-4">{t('recentActivity')}</h2>
-          <div className="card p-0 divide-y divide-gray-50">
-            {activityQuery.isLoading ? (
-              <div className="p-4 space-y-4">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="animate-pulse flex gap-3">
-                    <div className="w-8 h-8 bg-gray-200 rounded-full flex-shrink-0" />
-                    <div className="flex-1">
-                      <div className="h-3 bg-gray-200 rounded w-full mb-2" />
-                      <div className="h-2 bg-gray-200 rounded w-20" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : activityQuery.isError ? (
-              <div role="alert" className="p-6 text-center">
-                <p className="text-sm text-red-600 mb-2">{t('errorLoadingActivity')}</p>
-                <button
-                  type="button"
-                  onClick={() => activityQuery.refetch()}
-                  className="text-xs text-red-500 underline"
-                >
-                  {t('retry')}
-                </button>
-              </div>
-            ) : activities.length > 0 ? (
-              activities.map((activity) => {
-                const iconMap = {
-                  offer_joined: Users,
-                  offer_created: Tag,
-                  contractor_matched: Wrench,
-                  tier_reached: Star,
-                };
-                const ActivityIcon = iconMap[activity.type] ?? Tag;
+        {/* Upcoming */}
+        <aside className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
+          <h2 className="mb-5 text-lg font-bold text-slate-900">{t('upcoming')}</h2>
 
-                return (
-                  <div key={activity.id} className="flex items-start gap-3 p-4">
-                    <div className="w-8 h-8 rounded-full bg-primary-50 flex items-center justify-center flex-shrink-0">
-                      <ActivityIcon className="h-4 w-4 text-primary-500" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-gray-700">{activity.message}</p>
-                      <p className="text-xs text-gray-400 mt-1">
-                        {new Date(activity.timestamp).toLocaleDateString('he-IL')}
-                      </p>
-                    </div>
-                  </div>
+          {offersQuery.isLoading ? (
+            <div className="space-y-3">
+              {[1, 2].map((i) => (
+                <div key={i} className="animate-pulse rounded-xl bg-slate-50 p-4">
+                  <div className="h-3 bg-slate-200 rounded w-40 mb-2" />
+                  <div className="h-2.5 bg-slate-200 rounded w-24" />
+                </div>
+              ))}
+            </div>
+          ) : upcomingOffers.length > 0 ? (
+            <div className="space-y-3">
+              {upcomingOffers.map((offer, idx) => {
+                const tCat = (cat: string) => cat;
+                const daysLeft = Math.max(
+                  0,
+                  Math.ceil((new Date(offer.expiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
                 );
-              })
-            ) : (
-              <div className="p-6 text-center">
-                <p className="text-sm text-gray-400">{t('noRecentActivity')}</p>
-              </div>
-            )}
-          </div>
-        </div>
+                return (
+                  <UpcomingRow
+                    key={offer.id}
+                    title={offer.category}
+                    subtitle={daysLeft === 0 ? 'היום' : `עוד ${daysLeft} ימים`}
+                    action={t('view')}
+                    actionHref={`/offers/${offer.id}`}
+                    highlighted={idx === 0}
+                  />
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center py-8 text-center">
+              <CalendarClock className="h-10 w-10 text-slate-200 mb-3" />
+              <p className="text-sm text-slate-400">{t('noUpcoming')}</p>
+              <Link href="/offers" className="mt-3 text-sm font-medium text-emerald-600 hover:text-emerald-700">
+                {t('browseOffers')}
+              </Link>
+            </div>
+          )}
+        </aside>
       </div>
+
+      {/* Popular Offers */}
+      <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
+        <div className="mb-5 flex items-center justify-between">
+          <h2 className="text-lg font-bold text-slate-900">{t('popularOffers')}</h2>
+          <Link href="/offers" className="flex items-center gap-1 text-sm font-medium text-emerald-600 hover:text-emerald-700">
+            {t('viewAll')}
+            <ArrowLeft className="h-4 w-4 rtl-flip" />
+          </Link>
+        </div>
+
+        {offersQuery.isLoading ? (
+          <div className="grid gap-4 md:grid-cols-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="animate-pulse rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                <div className="h-4 bg-slate-200 rounded w-32 mb-2" />
+                <div className="h-3 bg-slate-200 rounded w-24 mb-4" />
+                <div className="h-6 bg-slate-200 rounded w-20" />
+              </div>
+            ))}
+          </div>
+        ) : offersQuery.isError ? (
+          <div role="alert" className="flex flex-col items-center py-8 text-center">
+            <AlertCircle className="h-8 w-8 text-red-300 mb-2" />
+            <p className="text-sm text-red-600 mb-2">{t('errorLoadingOffers')}</p>
+            <button type="button" onClick={() => offersQuery.refetch()} className="text-xs text-red-500 underline">
+              {t('retry')}
+            </button>
+          </div>
+        ) : offers.length > 0 ? (
+          <div className="grid gap-4 md:grid-cols-3">
+            {offers.map((offer) => (
+              <PopularOfferCard key={offer.id} offer={offer} />
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center py-10 text-center">
+            <Tag className="h-10 w-10 text-slate-200 mb-3" />
+            <p className="text-slate-500 font-medium">{t('noActiveOffers')}</p>
+            <Link href="/offers" className="mt-4 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors">
+              {t('browseOffers')}
+              <ArrowLeft className="h-4 w-4 rtl-flip" />
+            </Link>
+          </div>
+        )}
+      </div>
+
     </div>
   );
 }

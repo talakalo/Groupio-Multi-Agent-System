@@ -3,6 +3,24 @@
     "version": ">= 5.0.0"
   },
   "build": {
+    "e2e": {
+      "extends": "development",
+      "distribution": "internal",
+      "ios": {
+        "simulator": true,
+        "resourceClass": "m-medium"
+      },
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "http://localhost:8000",
+        "EXPO_PUBLIC_E2E": "true",
+        "EXPO_PUBLIC_SUPABASE_URL": "http://localhost:54321",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "e2e-anon-key"
+      }
+    },
     "development": {
       "developmentClient": true,
       "distribution": "internal",

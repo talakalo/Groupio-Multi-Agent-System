@@ -15,6 +15,7 @@ import {
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 import { cn } from '@/lib/utils/cn';
 
@@ -32,37 +33,30 @@ interface ResidentLayoutProps {
   notificationCount?: number;
 }
 
-interface NavItem {
-  label: string;
-  href: string;
-  icon: React.ElementType;
-}
-
-// ---------------------------------------------------------------------------
-// Navigation links
-// ---------------------------------------------------------------------------
-
-const NAV_ITEMS: NavItem[] = [
-  { label: 'לוח בקרה', href: '/dashboard', icon: LayoutDashboard },
-  { label: 'הצעות', href: '/offers', icon: Tag },
-  { label: 'ההזמנות שלי', href: '/orders', icon: Package },
-  { label: 'קבלנים', href: '/contractors', icon: HardHat },
-  { label: 'הבניין שלי', href: '/building', icon: Building2 },
-  { label: 'פרופיל', href: '/profile', icon: UserCircle },
-];
-
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
 export function ResidentLayout({
   children,
-  userName = 'דייר',
+  userName,
   avatarUrl,
   notificationCount = 0,
 }: ResidentLayoutProps) {
+  const t = useTranslations('residentNav');
+  const tc = useTranslations('common');
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const displayName = userName ?? t('resident');
+
+  const NAV_ITEMS = [
+    { label: t('dashboard'), href: '/dashboard', icon: LayoutDashboard },
+    { label: t('offers'), href: '/offers', icon: Tag },
+    { label: t('orders'), href: '/orders', icon: Package },
+    { label: t('contractors'), href: '/contractors', icon: HardHat },
+    { label: t('building'), href: '/building', icon: Building2 },
+    { label: t('profile'), href: '/profile', icon: UserCircle },
+  ];
 
   return (
     <div className="flex min-h-screen">
@@ -86,13 +80,13 @@ export function ResidentLayout({
         {/* Logo area */}
         <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
           <Link href="/dashboard" className="text-xl font-bold text-primary-600">
-            גרופיו
+            {tc('appName')}
           </Link>
           <button
             type="button"
             onClick={() => setSidebarOpen(false)}
             className="lg:hidden rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-            aria-label="סגור תפריט"
+            aria-label={tc('closeMenu')}
           >
             <X className="h-5 w-5" />
           </button>
@@ -103,19 +97,19 @@ export function ResidentLayout({
           {avatarUrl ? (
             <img
               src={avatarUrl}
-              alt={userName}
+              alt={displayName}
               className="h-10 w-10 rounded-full object-cover"
             />
           ) : (
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-100 text-primary-700 font-bold">
-              {userName.charAt(0)}
+              {displayName.charAt(0)}
             </div>
           )}
           <div className="flex flex-col min-w-0">
             <span className="text-sm font-semibold text-gray-900 truncate">
-              {userName}
+              {displayName}
             </span>
-            <span className="text-xs text-gray-500">דייר</span>
+            <span className="text-xs text-gray-500">{t('resident')}</span>
           </div>
         </div>
 
@@ -167,7 +161,7 @@ export function ResidentLayout({
             type="button"
             onClick={() => setSidebarOpen(true)}
             className="lg:hidden rounded-lg p-2 text-gray-500 hover:bg-gray-100"
-            aria-label="פתח תפריט"
+            aria-label={tc('openMenu')}
           >
             <Menu className="h-5 w-5" />
           </button>
@@ -178,7 +172,7 @@ export function ResidentLayout({
           <button
             type="button"
             className="relative rounded-xl p-2 text-gray-500 hover:bg-gray-100 transition-colors"
-            aria-label="התראות"
+            aria-label={tc('notifications')}
           >
             <Bell className="h-5 w-5" />
             {notificationCount > 0 && (

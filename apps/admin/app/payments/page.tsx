@@ -109,7 +109,7 @@ const ESCROW_STATUS_CONFIG: Record<
   released: { label: "Released", color: "bg-green-100 text-green-800", icon: CheckCircle2 },
   partially_released: { label: "Partial Release", color: "bg-cyan-100 text-cyan-800", icon: ArrowUpFromLine },
   disputed: { label: "Disputed", color: "bg-red-100 text-red-800", icon: AlertTriangle },
-  refunded: { label: "Refunded", color: "bg-purple-100 text-purple-800", icon: RefreshCw },
+  refunded: { label: "Refunded", color: "bg-surface-100 text-surface-700", icon: RefreshCw },
 };
 
 const PAYOUT_STATUS_CONFIG: Record<
@@ -173,7 +173,7 @@ function SummaryCard({
 
 function EscrowFlowDiagram() {
   return (
-    <div className="bg-gradient-to-r from-indigo-50 via-blue-50 to-green-50 rounded-xl border border-indigo-100 p-6">
+    <div className="bg-gradient-to-r from-primary-50 via-blue-50 to-green-50 rounded-xl border border-primary-100 p-6">
       <h3 className="text-sm font-semibold text-surface-700 mb-4">
         Payment Flow: Residents → Escrow → Contractor
       </h3>
@@ -200,8 +200,8 @@ function EscrowFlowDiagram() {
         <ArrowUpFromLine className="w-5 h-5 text-surface-300 rotate-90 flex-shrink-0" />
         {/* Step 3 */}
         <div className="flex-1 text-center">
-          <div className="flex items-center justify-center w-12 h-12 rounded-full bg-indigo-100 mx-auto mb-2">
-            <CheckCircle2 className="w-6 h-6 text-indigo-600" />
+          <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary-100 mx-auto mb-2">
+            <CheckCircle2 className="w-6 h-6 text-primary-600" />
           </div>
           <p className="text-xs font-medium text-surface-700">
             Work Verified
@@ -670,7 +670,7 @@ export default function AdminPaymentsPage() {
           value={formatCurrency(summary.totalInEscrow)}
           subtitle="Held by Groupio"
           icon={Shield}
-          color="bg-indigo-100 text-indigo-600"
+          color="bg-primary-100 text-primary-600"
         />
         <SummaryCard
           title="Released"
@@ -684,7 +684,7 @@ export default function AdminPaymentsPage() {
           value={formatCurrency(summary.totalPlatformFees)}
           subtitle="Groupio revenue"
           icon={TrendingUp}
-          color="bg-purple-100 text-purple-600"
+          color="bg-success-100 text-success-600"
         />
         <SummaryCard
           title="Refunded"

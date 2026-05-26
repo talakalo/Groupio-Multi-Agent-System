@@ -1,9 +1,11 @@
 """Contractor Pydantic models."""
 
+import json
 from datetime import UTC, datetime
 from enum import StrEnum
+from typing import Annotated, Any
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, BeforeValidator, ConfigDict, EmailStr, Field, model_validator
 
 from src.models.offer import ServiceCategory
 
@@ -28,6 +30,60 @@ class VerificationStatus(StrEnum):
     VERIFIED = "verified"
     SUSPENDED = "suspended"
     REJECTED = "rejected"
+
+
+class MembershipStatus(StrEnum):
+    """Marketplace membership billing state (contractor subscription)."""
+
+    ACTIVE = "active"
+    TRIALING = "trialing"
+    PAST_DUE = "past_due"
+    CANCELED = "canceled"
+    INACTIVE = "inactive"
+
+
+def _coerce_null_membership(v: Any) -> Any:
+    """DB rows often have NULL membership_status; treat like active for API responses."""
+    if v is None:
+        return MembershipStatus.ACTIVE
+    return v
+
+
+MembershipStatusDB = Annotated[MembershipStatus, BeforeValidator(_coerce_null_membership)]
+
+
+def _coerce_pg_str_list(v: Any) -> list[Any]:
+    """PostgREST/async drivers may return JSON array columns as str."""
+    if v is None:
+        return []
+    if isinstance(v, list):
+        return v
+    if isinstance(v, str):
+        s = v.strip()
+        if not s:
+            return []
+        try:
+            parsed = json.loads(s)
+        except json.JSONDecodeError:
+            return []
+        return parsed if isinstance(parsed, list) else []
+    return []
+
+
+def _coerce_verification_status(v: Any) -> Any:
+    """Map legacy DB values into ``VerificationStatus``."""
+    if v is None:
+        return VerificationStatus.PENDING.value
+    s = str(v).strip().lower()
+    if s == "approved":
+        return VerificationStatus.VERIFIED.value
+    allowed = {x.value for x in VerificationStatus}
+    if s in allowed:
+        return s
+    return VerificationStatus.PENDING.value
+
+
+VerificationStatusDB = Annotated[VerificationStatus, BeforeValidator(_coerce_verification_status)]
 
 
 class ContractorBase(BaseModel):
@@ -83,8 +139,39 @@ class ContractorInDB(ContractorBase):
 
     model_config = ConfigDict(from_attributes=True)
 
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_json_array_columns(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        out = dict(data)
+        for key in ("categories", "regions", "certifications"):
+            if key in out:
+                out[key] = _coerce_pg_str_list(out.get(key))
+        tsb = out.get("trust_score_breakdown")
+        if isinstance(tsb, str):
+            s = tsb.strip()
+            if not s:
+                out["trust_score_breakdown"] = None
+            else:
+                try:
+                    parsed = json.loads(s)
+                    out["trust_score_breakdown"] = parsed if isinstance(parsed, dict) else None
+                except json.JSONDecodeError:
+                    out["trust_score_breakdown"] = None
+        return out
+
+    # Lenient read model — rows may predate stricter registration/API rules.
+    business_name: str = Field(..., min_length=1, max_length=200)
+    contact_name: str = Field(..., min_length=1, max_length=100)
+    email: str = Field(..., min_length=3, max_length=320)
+    phone: str = Field(..., min_length=1, max_length=40)
+    description: str = Field(..., min_length=1, max_length=4000)
+    categories: list[ServiceCategory] = Field(..., min_length=1)
+    regions: list[Region] = Field(..., min_length=1)
+
     id: str
-    verification_status: VerificationStatus = VerificationStatus.PENDING
+    verification_status: VerificationStatusDB = VerificationStatus.PENDING
     trust_score: float = 0
     trust_score_breakdown: TrustScoreBreakdown | None = None
     license_number: str | None = None
@@ -97,8 +184,41 @@ class ContractorInDB(ContractorBase):
     completed_projects: int = 0
     response_rate: float = 0
     average_response_time_hours: float = 0
+    membership_status: MembershipStatusDB = MembershipStatus.ACTIVE
+    membership_plan: str | None = None
+    membership_provider: str | None = None
+    provider_customer_id: str | None = None
+    provider_subscription_id: str | None = None
+    current_period_start: datetime | None = None
+    current_period_end: datetime | None = None
+    next_billing_at: datetime | None = None
+    cancel_at_period_end: bool = False
+    canceled_at: datetime | None = None
+    billing_failure_count: int = 0
+    membership_grace_until: datetime | None = None
+    trial_ends_at: datetime | None = None
+    last_payment_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
+
+
+class ContractorMembershipAdminUpdate(BaseModel):
+    """Admin-only update payload for contractor marketplace membership (no payment provider calls)."""
+
+    membership_status: MembershipStatus | None = None
+    membership_plan: str | None = Field(None, max_length=64)
+    membership_provider: str | None = Field(None, max_length=32)
+    provider_customer_id: str | None = Field(None, max_length=255)
+    provider_subscription_id: str | None = Field(None, max_length=255)
+    current_period_start: datetime | None = None
+    current_period_end: datetime | None = None
+    next_billing_at: datetime | None = None
+    cancel_at_period_end: bool | None = None
+    canceled_at: datetime | None = None
+    billing_failure_count: int | None = Field(None, ge=0)
+    membership_grace_until: datetime | None = None
+    trial_ends_at: datetime | None = None
+    last_payment_at: datetime | None = None
 
 
 class ContractorResponse(ContractorInDB):

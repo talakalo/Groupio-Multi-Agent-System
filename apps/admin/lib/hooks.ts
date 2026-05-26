@@ -371,6 +371,11 @@ export interface AdminAnalyticsDashboard {
   openTicketsChange?: number;
   resolvedToday?: number;
   totalContractors?: number;
+  categoryBreakdown?: Record<string, number>;
+  regionalData?: Record<string, number>;
+  dailyOffers?: { date: string; count: number }[];
+  dailyRevenue?: { date: string; amount: number }[];
+  agentPerformance?: { name: string; [key: string]: unknown }[];
 }
 
 export function useAdminAnalyticsDashboard() {

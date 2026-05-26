@@ -3,11 +3,37 @@
 import type { Contractor, ServiceCategory, Region } from '@groupio/types';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
+import { Analytics } from '@/lib/analytics';
+import { ApiError, apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
+
+function normalizeMembershipStatusKey(raw: unknown): string {
+  const s = String(raw ?? 'inactive')
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '_');
+  const allowed = [
+    'active',
+    'trialing',
+    'renewal',
+    'past_due',
+    'grace',
+    'canceled',
+    'expired',
+    'inactive',
+  ] as const;
+  return (allowed as readonly string[]).includes(s) ? s : 'unknown';
+}
+
+function formatIsoDate(value: unknown): string | null {
+  if (value == null || value === '') return null;
+  const d = new Date(String(value));
+  return Number.isNaN(d.getTime()) ? null : d.toLocaleDateString();
+}
 
 const profileSchema = z.object({
   businessName: z.string().min(2, 'Business name is required'),
@@ -25,6 +51,47 @@ const profileSchema = z.object({
 });
 
 type ProfileForm = z.infer<typeof profileSchema>;
+
+type ContractorNotifPrefs = {
+  email_offers: boolean;
+  sms_offers: boolean;
+  whatsapp_offers: boolean;
+};
+
+const DEFAULT_CONTRACTOR_NOTIF_PREFS: ContractorNotifPrefs = {
+  email_offers: true,
+  sms_offers: true,
+  whatsapp_offers: true,
+};
+
+function mergeContractorNotifPrefs(raw: unknown): ContractorNotifPrefs {
+  const d = DEFAULT_CONTRACTOR_NOTIF_PREFS;
+  if (!raw || typeof raw !== 'object') return { ...d };
+  const r = raw as Record<string, unknown>;
+  return {
+    email_offers: typeof r.email_offers === 'boolean' ? r.email_offers : d.email_offers,
+    sms_offers: typeof r.sms_offers === 'boolean' ? r.sms_offers : d.sms_offers,
+    whatsapp_offers: typeof r.whatsapp_offers === 'boolean' ? r.whatsapp_offers : d.whatsapp_offers,
+  };
+}
+
+function contractorToForm(c: Contractor): ProfileForm {
+  const raw = c as Contractor & Record<string, unknown>;
+  return {
+    businessName: c.businessName ?? (raw.business_name as string) ?? '',
+    contactName: (raw.contactName ?? raw.contact_name ?? c.businessName ?? '') as string,
+    email: (c.email ?? '') as string,
+    phone: (c.phone ?? '') as string,
+    description: (c.description ?? '') as string,
+    categories: (c.categories as string[]) ?? [],
+    regions: (c.regions as string[]) ?? [],
+    yearsExperience: ((raw.yearsExperience ?? raw.years_experience ?? c.yearsInBusiness ?? 0) as number),
+    employeeCount: ((raw.employeeCount ?? raw.employee_count ?? 1) as number),
+    licenseNumber: (c.licenseNumber ?? (raw.license_number as string) ?? undefined),
+    insuranceExpiry: (c.insuranceExpiry ?? (raw.insurance_expiry as string) ?? undefined),
+    website: ((raw.website ?? '') as string),
+  };
+}
 
 export default function ContractorProfilePage() {
   const t = useTranslations('contractor.profile');
@@ -46,6 +113,86 @@ export default function ContractorProfilePage() {
   const [contractorId, setContractorId] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState<string | null>(null);
   const [docRequest, setDocRequest] = useState<{ message: string; requested_at: string } | null>(null);
+  const [membership, setMembership] = useState<Record<string, unknown> | null>(null);
+  const [membershipFetching, setMembershipFetching] = useState(false);
+  const [membershipLoadError, setMembershipLoadError] = useState(false);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [membershipQueryBanner, setMembershipQueryBanner] = useState<'success' | 'canceled' | null>(null);
+
+  const [notifPrefs, setNotifPrefs] = useState<ContractorNotifPrefs>(DEFAULT_CONTRACTOR_NOTIF_PREFS);
+  const notifDirtyRef = useRef(false);
+  const [notifSaving, setNotifSaving] = useState(false);
+  const [notifError, setNotifError] = useState<string | null>(null);
+  const [notifSavedAt, setNotifSavedAt] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const q = new URLSearchParams(window.location.search).get('membership');
+    if (q === 'success' || q === 'canceled') {
+      setMembershipQueryBanner(q);
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!contractorId || !accessToken) return;
+    let cancelled = false;
+    (async () => {
+      setMembershipFetching(true);
+      setMembershipLoadError(false);
+      try {
+        const m = await apiClient.getMyContractorMembership();
+        if (!cancelled) setMembership(m);
+      } catch {
+        if (!cancelled) {
+          setMembership(null);
+          setMembershipLoadError(true);
+        }
+      } finally {
+        if (!cancelled) setMembershipFetching(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [contractorId, accessToken]);
+
+  async function startMembershipCheckout() {
+    setCheckoutError(null);
+    setCheckoutLoading(true);
+    Analytics.membershipSubscribeClicked({ contractor_id: contractorId ?? undefined });
+    try {
+      const { url } = await apiClient.createContractorMembershipCheckoutSession();
+      window.location.href = url;
+    } catch (e) {
+      const msg =
+        e instanceof ApiError ? e.message : t('settings.membershipCheckoutError');
+      setCheckoutError(msg);
+    } finally {
+      setCheckoutLoading(false);
+    }
+  }
+
+  async function saveNotificationPreferences() {
+    setNotifError(null);
+    setNotifSavedAt(false);
+    setNotifSaving(true);
+    try {
+      await apiClient.updateCurrentUser({
+        notification_settings: notifPrefs,
+      });
+      notifDirtyRef.current = false;
+      setNotifSavedAt(true);
+      setTimeout(() => setNotifSavedAt(false), 4000);
+    } catch (e) {
+      const msg =
+        e instanceof ApiError ? e.message : t('settings.notificationsSaveError');
+      setNotifError(msg);
+    } finally {
+      setNotifSaving(false);
+    }
+  }
 
   async function handleDocumentUpload(docType: 'license' | 'insurance' | 'certifications') {
     const input = document.createElement('input');
@@ -56,28 +203,11 @@ export default function ContractorProfilePage() {
       if (!file) return;
 
       setIsUploading(docType);
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      const token = accessToken;
-      const formData = new FormData();
-      formData.append('file', file);
-
       try {
-        const headers: Record<string, string> = {};
-        if (token) headers['Authorization'] = `Bearer ${token}`;
-
-        const res = await fetch(`${apiBase}/api/v1/uploads/contractor-docs`, {
-          method: 'POST',
-          headers,
-          body: formData,
-        });
-
-        if (res.ok) {
-          alert(t('documents.uploadSuccess'));
-          // Refresh profile to show updated documents
-          window.location.reload();
-        } else {
-          alert(t('documents.uploadError'));
-        }
+        await apiClient.uploadContractorDoc(file, file.name || 'doc');
+        alert(t('documents.uploadSuccess'));
+        // Refresh profile to show updated documents
+        window.location.reload();
       } catch (error) {
         console.error('Upload failed:', error);
         alert(t('documents.uploadError'));
@@ -90,32 +220,35 @@ export default function ContractorProfilePage() {
 
   useEffect(() => {
     async function fetchProfile() {
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      const token = accessToken;
-      const headers: Record<string, string> = {};
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-
       try {
-        const meRes = await fetch(`${apiBase}/api/v1/auth/me`, { headers });
-        if (!meRes.ok) throw new Error('Not authenticated');
-        const me = await meRes.json();
+        const me = (await apiClient.getMe()) as Record<string, unknown> & {
+          contractor_id?: string;
+          notification_settings?: unknown;
+        };
         const cid = me.contractor_id;
-        setContractorId(cid);
+        setContractorId(cid ?? null);
+
+        if (!notifDirtyRef.current) {
+          setNotifPrefs(mergeContractorNotifPrefs(me.notification_settings));
+        }
 
         if (cid) {
-          const [contractorRes, docReqRes] = await Promise.all([
-            fetch(`${apiBase}/api/v1/contractors/${cid}`, { headers, credentials: 'include' }),
-            fetch(`${apiBase}/api/v1/contractors/me/doc-requests`, { headers, credentials: 'include' }),
+          const [contractorResult, docReqResult] = await Promise.allSettled([
+            apiClient.getContractor(cid),
+            apiClient.getMyContractorDocRequests(),
           ]);
-          if (contractorRes.ok) {
-            const data = await contractorRes.json();
-            setContractor(data);
-            reset(data);
+          if (contractorResult.status === 'fulfilled') {
+            const contractor = contractorResult.value;
+            setContractor(contractor);
+            reset(contractorToForm(contractor));
           }
-          if (docReqRes.ok) {
-            const dr = await docReqRes.json();
+          if (docReqResult.status === 'fulfilled') {
+            const dr = docReqResult.value;
             if (dr.pending && dr.items?.[0]) {
-              setDocRequest({ message: dr.items[0].message ?? '', requested_at: dr.items[0].requested_at ?? '' });
+              setDocRequest({
+                message: dr.items[0].message ?? '',
+                requested_at: dr.items[0].requested_at ?? '',
+              });
             }
           }
         }
@@ -132,27 +265,15 @@ export default function ContractorProfilePage() {
   async function onSubmit(data: ProfileForm) {
     if (!contractorId) return;
     setIsSaving(true);
-    const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-    // Access token lives only in Zustand memory — never in localStorage.
-    const token = useAuthStore.getState().accessToken;
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
 
     try {
-      const res = await fetch(`${apiBase}/api/v1/contractors/${contractorId}`, {
-        method: 'PUT',
-        headers,
-        body: JSON.stringify(data),
-      });
-
-      if (res.ok) {
-        const updated = await res.json();
-        setContractor(updated);
-        reset(updated);
-        alert(t('saveSuccess'));
-      } else {
-        alert(t('saveError'));
-      }
+      const updated = await apiClient.updateContractor(
+        contractorId,
+        data as Record<string, unknown>,
+      );
+      setContractor(updated);
+      reset(contractorToForm(updated as Contractor));
+      alert(t('saveSuccess'));
     } catch (error) {
       console.error('Failed to save profile:', error);
       alert(t('saveError'));
@@ -181,6 +302,29 @@ export default function ContractorProfilePage() {
     'sharon',
     'shfela',
   ];
+
+  function labelForMembershipStatus(raw: unknown): string {
+    switch (normalizeMembershipStatusKey(raw)) {
+      case 'active':
+        return t('settings.membershipStates.active');
+      case 'trialing':
+        return t('settings.membershipStates.trialing');
+      case 'renewal':
+        return t('settings.membershipStates.renewal');
+      case 'past_due':
+        return t('settings.membershipStates.past_due');
+      case 'grace':
+        return t('settings.membershipStates.grace');
+      case 'canceled':
+        return t('settings.membershipStates.canceled');
+      case 'expired':
+        return t('settings.membershipStates.expired');
+      case 'inactive':
+        return t('settings.membershipStates.inactive');
+      default:
+        return t('settings.membershipStates.unknown');
+    }
+  }
 
   if (isLoading) {
     return (
@@ -223,14 +367,15 @@ export default function ContractorProfilePage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b mb-6">
+      <div className="mb-6 flex flex-wrap gap-1 border-b">
         {(['info', 'documents', 'settings'] as const).map((tab) => (
           <button
             key={tab}
+            type="button"
             onClick={() => setActiveTab(tab)}
-            className={`px-6 py-3 font-medium transition-colors ${
+            className={`whitespace-nowrap px-4 py-3 text-sm font-medium transition-colors sm:px-6 sm:text-base ${
               activeTab === tab
-                ? 'text-sky-600 border-b-2 border-sky-600'
+                ? 'border-b-2 border-sky-600 text-sky-600'
                 : 'text-gray-500 hover:text-gray-700'
             }`}
           >
@@ -366,16 +511,21 @@ export default function ContractorProfilePage() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 {t('fields.categories')} *
               </label>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {categories.map((cat) => (
-                  <label key={cat} className="flex items-center gap-2">
+                  <label
+                    key={cat}
+                    className="flex min-w-0 items-start gap-2 rounded-lg p-1 hover:bg-gray-50"
+                  >
                     <input
                       type="checkbox"
                       value={cat}
                       {...register('categories')}
-                      className="rounded border-gray-300 text-sky-500 focus:ring-sky-500"
+                      className="mt-0.5 shrink-0 rounded border-gray-300 text-sky-500 focus:ring-sky-500"
                     />
-                    <span className="text-sm text-gray-700">{t(`categories.${cat}`)}</span>
+                    <span className="min-w-0 flex-1 break-words text-sm leading-snug text-gray-700">
+                      {t(`categories.${cat}`)}
+                    </span>
                   </label>
                 ))}
               </div>
@@ -388,16 +538,21 @@ export default function ContractorProfilePage() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 {t('fields.regions')} *
               </label>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {regions.map((reg) => (
-                  <label key={reg} className="flex items-center gap-2">
+                  <label
+                    key={reg}
+                    className="flex min-w-0 items-start gap-2 rounded-lg p-1 hover:bg-gray-50"
+                  >
                     <input
                       type="checkbox"
                       value={reg}
                       {...register('regions')}
-                      className="rounded border-gray-300 text-sky-500 focus:ring-sky-500"
+                      className="mt-0.5 shrink-0 rounded border-gray-300 text-sky-500 focus:ring-sky-500"
                     />
-                    <span className="text-sm text-gray-700">{t(`regions.${reg}`)}</span>
+                    <span className="min-w-0 flex-1 break-words text-sm leading-snug text-gray-700">
+                      {t(`regions.${reg}`)}
+                    </span>
                   </label>
                 ))}
               </div>
@@ -492,14 +647,103 @@ export default function ContractorProfilePage() {
           <h2 className="text-xl font-semibold mb-4">{t('sections.settings')}</h2>
 
           <div className="space-y-6">
+            {membershipQueryBanner === 'success' && (
+              <div
+                className="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-900"
+                role="status"
+              >
+                {t('settings.membershipSuccessBanner')}
+              </div>
+            )}
+            {membershipQueryBanner === 'canceled' && (
+              <div
+                className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"
+                role="status"
+              >
+                {t('settings.membershipCanceledBanner')}
+              </div>
+            )}
+
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+              <h3 className="font-medium text-gray-900">{t('settings.membershipTitle')}</h3>
+              <p className="mt-1 text-sm text-gray-600">{t('settings.membershipDescription')}</p>
+
+              {membershipFetching && (
+                <p className="mt-3 text-sm text-gray-500">{t('settings.membershipStatusLoading')}</p>
+              )}
+              {membershipLoadError && (
+                <p className="mt-3 text-sm text-red-600">{t('settings.membershipLoadError')}</p>
+              )}
+
+              {!membershipFetching && membership && !membershipLoadError && (
+                <dl className="mt-4 space-y-2 text-sm">
+                  <div className="flex flex-wrap justify-between gap-2 border-b border-slate-200 pb-2">
+                    <dt className="text-gray-600">{t('settings.membershipStatusLabel')}</dt>
+                    <dd className="font-medium text-gray-900">
+                      {labelForMembershipStatus(membership.membership_status)}
+                    </dd>
+                  </div>
+                  {formatIsoDate(membership.current_period_end) && (
+                    <div className="flex flex-wrap justify-between gap-2">
+                      <dt className="text-gray-600">{t('settings.membershipPeriodEnd')}</dt>
+                      <dd className="font-medium text-gray-900" dir="ltr">
+                        {formatIsoDate(membership.current_period_end)}
+                      </dd>
+                    </div>
+                  )}
+                  {formatIsoDate(membership.next_billing_at) && (
+                    <div className="flex flex-wrap justify-between gap-2">
+                      <dt className="text-gray-600">{t('settings.membershipNextBilling')}</dt>
+                      <dd className="font-medium text-gray-900" dir="ltr">
+                        {formatIsoDate(membership.next_billing_at)}
+                      </dd>
+                    </div>
+                  )}
+                </dl>
+              )}
+
+              {checkoutError && (
+                <p className="mt-3 text-sm text-red-600" role="alert">
+                  {checkoutError}
+                </p>
+              )}
+
+              <button
+                type="button"
+                data-testid="contractor-membership-subscribe"
+                onClick={() => void startMembershipCheckout()}
+                disabled={checkoutLoading || !contractorId}
+                className="mt-4 inline-flex items-center justify-center rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {checkoutLoading
+                  ? t('settings.membershipCheckoutLoading')
+                  : t('settings.membershipSubscribe')}
+              </button>
+            </div>
+
             {/* Notification Preferences */}
             <div>
               <h3 className="font-medium mb-3">{t('settings.notifications')}</h3>
+              <p className="text-sm text-gray-500 mb-3">{t('settings.notificationsHint')}</p>
+              {notifError && (
+                <p className="mb-2 text-sm text-red-600" role="alert">
+                  {notifError}
+                </p>
+              )}
+              {notifSavedAt && (
+                <p className="mb-2 text-sm text-green-700" role="status">
+                  {t('settings.notificationsSaved')}
+                </p>
+              )}
               <div className="space-y-2">
                 <label className="flex items-center gap-3">
                   <input
                     type="checkbox"
-                    defaultChecked
+                    checked={notifPrefs.email_offers}
+                    onChange={(e) => {
+                      notifDirtyRef.current = true;
+                      setNotifPrefs((p) => ({ ...p, email_offers: e.target.checked }));
+                    }}
                     className="rounded border-gray-300 text-sky-500 focus:ring-sky-500"
                   />
                   <span className="text-gray-700">{t('settings.emailOffers')}</span>
@@ -507,7 +751,11 @@ export default function ContractorProfilePage() {
                 <label className="flex items-center gap-3">
                   <input
                     type="checkbox"
-                    defaultChecked
+                    checked={notifPrefs.sms_offers}
+                    onChange={(e) => {
+                      notifDirtyRef.current = true;
+                      setNotifPrefs((p) => ({ ...p, sms_offers: e.target.checked }));
+                    }}
                     className="rounded border-gray-300 text-sky-500 focus:ring-sky-500"
                   />
                   <span className="text-gray-700">{t('settings.smsOffers')}</span>
@@ -515,12 +763,24 @@ export default function ContractorProfilePage() {
                 <label className="flex items-center gap-3">
                   <input
                     type="checkbox"
-                    defaultChecked
+                    checked={notifPrefs.whatsapp_offers}
+                    onChange={(e) => {
+                      notifDirtyRef.current = true;
+                      setNotifPrefs((p) => ({ ...p, whatsapp_offers: e.target.checked }));
+                    }}
                     className="rounded border-gray-300 text-sky-500 focus:ring-sky-500"
                   />
                   <span className="text-gray-700">{t('settings.whatsappOffers')}</span>
                 </label>
               </div>
+              <button
+                type="button"
+                onClick={() => void saveNotificationPreferences()}
+                disabled={notifSaving}
+                className="mt-4 inline-flex items-center justify-center rounded-lg border border-sky-600 bg-white px-4 py-2 text-sm font-medium text-sky-700 hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {notifSaving ? t('settings.notificationsSaving') : t('settings.notificationsSave')}
+              </button>
             </div>
 
             {/* Availability */}

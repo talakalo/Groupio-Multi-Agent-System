@@ -7,8 +7,18 @@ from neo4j import AsyncDriver, AsyncGraphDatabase
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from src.config.settings import get_settings
+from src.databases.cache import cached
 
 logger = logging.getLogger(__name__)
+
+# TTLs for read-heavy Neo4j queries. These are all append-only aggregations
+# (completed projects, reviews, suspicious-pattern rollups) that change on
+# the order of hours — not minutes — so a medium-length TTL yields high
+# hit-rates without meaningful staleness risk. If a mutation needs to be
+# reflected immediately, callers can bust the cache via cache_delete().
+_GRAPH_MATCH_TTL = 600  # 10 min — matching hot path; trades freshness for latency
+_GRAPH_REPUTATION_TTL = 3600  # 1h — reputation accumulates slowly
+_GRAPH_HISTORY_TTL = 1800  # 30 min — completed-project history is append-only
 
 
 class GraphStore:
@@ -38,6 +48,13 @@ class GraphStore:
             records = [dict(record) for record in await result.data()]
             return records
 
+    @cached(
+        prefix="graph:match_cntr",
+        ttl=_GRAPH_MATCH_TTL,
+        key_fn=lambda self, building_type, region, category=None, min_success_rate=0.85, min_projects=3, limit=10: (
+            f"{building_type}:{region}:{category or ''}:{min_success_rate}:{min_projects}:{limit}"
+        ),
+    )
     async def find_matching_contractors(
         self,
         building_type: str,
@@ -47,7 +64,13 @@ class GraphStore:
         min_projects: int = 3,
         limit: int = 10,
     ) -> list[dict[str, Any]]:
-        """Find contractors with proven track records in similar buildings."""
+        """Find contractors with proven track records in similar buildings.
+
+        Cached for 10 minutes keyed by the full filter tuple. This is the
+        matching-agent hot path — every user contractor request executes
+        a graph traversal, so even a 10-minute TTL produces a high hit
+        rate on popular (region, building_type, category) combinations.
+        """
         query = """
         MATCH (c:Contractor)-[comp:COMPLETED]->(b:Building)
         WHERE b.type = $building_type
@@ -87,8 +110,19 @@ class GraphStore:
         """
         return await self.execute(query, {"offer_id": offer_id})
 
+    @cached(
+        prefix="graph:rep",
+        ttl=_GRAPH_REPUTATION_TTL,
+        key_fn=lambda self, contractor_id: contractor_id,
+    )
     async def get_contractor_reputation(self, contractor_id: str) -> dict[str, Any]:
-        """Calculate contractor reputation from graph patterns."""
+        """Calculate contractor reputation from graph patterns.
+
+        Cached for 1h keyed by contractor_id. Reputation is an aggregate
+        over slowly-changing signals (completed projects, reviews), so
+        hour-level staleness is acceptable and the cache hit rate is high
+        because the same contractors are re-surfaced across sessions.
+        """
         query = """
         MATCH (c:Contractor {id: $contractor_id})
         OPTIONAL MATCH (c)-[comp:COMPLETED]->(b:Building)
@@ -112,8 +146,18 @@ class GraphStore:
         results = await self.execute(query, {"contractor_id": contractor_id})
         return results[0]["reputation"] if results else {}
 
+    @cached(
+        prefix="graph:suspicious",
+        ttl=_GRAPH_REPUTATION_TTL,
+        key_fn=lambda self, contractor_id: contractor_id,
+    )
     async def detect_suspicious_patterns(self, contractor_id: str) -> list[dict[str, Any]]:
-        """Detect suspicious patterns for fraud detection."""
+        """Detect suspicious patterns for fraud detection.
+
+        Cached for 1h — fraud signals (failed projects, 1-star reviews,
+        cancelled offers) accumulate slowly and are safe to serve
+        slightly stale for vetting decisions.
+        """
         query = """
         MATCH (c:Contractor {id: $contractor_id})
         OPTIONAL MATCH (c)-[comp:COMPLETED]->(b:Building)
@@ -139,8 +183,18 @@ class GraphStore:
         results = await self.execute(query, {"contractor_id": contractor_id})
         return results[0]["patterns"] if results else {}
 
+    @cached(
+        prefix="graph:history",
+        ttl=_GRAPH_HISTORY_TTL,
+        key_fn=lambda self, contractor_id, limit=10: f"{contractor_id}:{limit}",
+    )
     async def get_contractor_building_history(self, contractor_id: str, limit: int = 10) -> list[dict[str, Any]]:
-        """Get a contractor's past project history with buildings."""
+        """Get a contractor's past project history with buildings.
+
+        Cached for 30 min keyed by (contractor_id, limit). Project history
+        is append-only; a completed project added within the TTL window
+        will only delay its appearance until the next refresh.
+        """
         query = """
         MATCH (c:Contractor {id: $contractor_id})-[comp:COMPLETED]->(b:Building)
         RETURN b {.*,
@@ -332,8 +386,56 @@ class GraphStore:
         region: str | None = None,
         batch_size: int = 500,
     ) -> int:
-        """Compute and materialise SIMILAR_TO edges between buildings. Returns edge count written."""
+        """Compute and materialise SIMILAR_TO edges between buildings. Returns edge count written.
+
+        PERF-11: when ``ENABLE_GDS_SIMILARITY`` is on, keeps only the top-K
+        highest-scoring neighbours per building (configurable via
+        ``GDS_SIMILARITY_TOP_K`` / ``GDS_SIMILARITY_MIN_SCORE``). This turns
+        the worst-case O(n^2) edge set into O(n * k), which keeps Neo4j
+        storage/edge count linear with building count. The default (flag off)
+        preserves the original exhaustive computation for safety.
+        """
+        from src.config.settings import get_settings
+
+        settings = get_settings()
         region_filter = "AND a.region = $region AND b.region = $region" if region else ""
+        params: dict[str, Any] = {}
+        if region:
+            params["region"] = region
+
+        if settings.ENABLE_GDS_SIMILARITY:
+            params["min_score"] = float(settings.GDS_SIMILARITY_MIN_SCORE)
+            params["top_k"] = int(settings.GDS_SIMILARITY_TOP_K)
+            query = f"""
+            MATCH (a:Building), (b:Building)
+            WHERE a.id < b.id
+              AND a.region = b.region
+              AND a.building_type = b.building_type
+              AND abs(coalesce(a.units, 0) - coalesce(b.units, 0)) <=
+                  coalesce(a.units, 1) * 0.3
+              {region_filter}
+            WITH a, b,
+                 0.4 + CASE WHEN a.building_type = b.building_type THEN 0.3 ELSE 0.0 END as structural_score
+            OPTIONAL MATCH (ra:Resident)-[:LIVES_IN]->(a)
+            OPTIONAL MATCH (rb:Resident)-[:LIVES_IN]->(b)
+            OPTIONAL MATCH (ra)-[:JOINED]->(shared:Offer)<-[:JOINED]-(rb)
+            WITH a, b, structural_score,
+                 COUNT(DISTINCT shared) as shared_offers
+            WITH a, b,
+                 structural_score + (toFloat(shared_offers) * 0.1) as raw_score
+            WHERE raw_score >= $min_score
+            WITH a, collect({{peer: b, score: raw_score}}) AS peers
+            UNWIND [p IN peers[0..$top_k] | p] AS pick
+            WITH a, pick.peer AS b, pick.score AS raw_score
+            MERGE (a)-[s:SIMILAR_TO]->(b)
+            SET s.similarity_score = raw_score,
+                s.computed_at = datetime(),
+                s.basis = ['region', 'building_type', 'unit_count', 'shared_offers']
+            RETURN COUNT(s) as edges_written
+            """
+            results = await self.execute(query, params)
+            return int(results[0]["edges_written"]) if results else 0
+
         query = f"""
         MATCH (a:Building), (b:Building)
         WHERE a.id < b.id
@@ -358,9 +460,6 @@ class GraphStore:
             s.basis = ['region', 'building_type', 'unit_count', 'shared_offers']
         RETURN COUNT(s) as edges_written
         """
-        params: dict[str, Any] = {}
-        if region:
-            params["region"] = region
         results = await self.execute(query, params)
         return int(results[0]["edges_written"]) if results else 0
 

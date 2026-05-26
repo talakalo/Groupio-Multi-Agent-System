@@ -1,59 +1,62 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
-/**
- * Admin panel route protection middleware.
- *
- * All admin routes require an authenticated session. The presence of the
- * HTTP-only `refresh_token` cookie (set by the backend at login) is used
- * as the authentication signal — it cannot be forged by client-side scripts.
- *
- * Unauthenticated requests are redirected to /login, preserving the
- * originally-requested path in the `from` query parameter so the user
- * can be sent back after a successful login.
- */
+// Paths served by the admin console that do NOT require authentication.
+// Everything else under the app is gated behind a valid session cookie and
+// an admin / super_admin / buildings_manager role hint.
+const PUBLIC_PATHS = new Set<string>(["/login"]);
 
-/** Paths that must remain accessible without authentication. */
-const PUBLIC_PATHS = ["/login"];
+const ALLOWED_ADMIN_ROLES = new Set<string>([
+  "admin",
+  "super_admin",
+  "buildings_manager",
+]);
 
-export function middleware(request: NextRequest): NextResponse {
-  const { pathname } = request.nextUrl;
-
-  // Allow public paths through without auth check
-  if (PUBLIC_PATHS.some((path) => pathname.startsWith(path))) {
-    return addSecurityHeaders(NextResponse.next());
-  }
-
-  // Allow Next.js internal paths and static assets
-  if (
-    pathname.startsWith("/_next/") ||
-    pathname.startsWith("/favicon") ||
-    pathname.startsWith("/api/")
-  ) {
-    return NextResponse.next();
-  }
-
-  // Check for the HTTP-only refresh token set by the backend at login.
-  const refreshToken = request.cookies.get("refresh_token");
-  if (!refreshToken?.value) {
-    const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("from", pathname);
-    return NextResponse.redirect(loginUrl);
-  }
-
-  // Require admin_role_verified cookie set by login page after role check.
-  // Reduces exposure: non-admin users who never complete admin login won't have it.
-  // Backend API remains source of truth for authorization.
-  const adminRoleVerified = request.cookies.get("admin_role_verified");
-  if (!adminRoleVerified?.value) {
-    const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("from", pathname);
-    return NextResponse.redirect(loginUrl);
-  }
-
-  return addSecurityHeaders(NextResponse.next());
+function isPublicPath(pathname: string): boolean {
+  if (PUBLIC_PATHS.has(pathname)) return true;
+  return pathname.startsWith("/login/");
 }
 
-function addSecurityHeaders(response: NextResponse): NextResponse {
+function readRoleHint(request: NextRequest): string | null {
+  // The Zustand `groupio-auth` cookie is client-writable — use it only for
+  // UX routing hints. Real authorisation lives in the backend, which checks
+  // the JWT access token on every request.
+  const cookie = request.cookies.get("groupio-auth");
+  if (!cookie) return null;
+  try {
+    const parsed = JSON.parse(decodeURIComponent(cookie.value));
+    return parsed?.state?.user?.role ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export default function middleware(request: NextRequest): NextResponse {
+  const { pathname } = request.nextUrl;
+
+  if (!isPublicPath(pathname)) {
+    const hasRefreshCookie = !!request.cookies.get("refresh_token");
+    if (!hasRefreshCookie) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      url.searchParams.set("redirect", pathname);
+      return NextResponse.redirect(url);
+    }
+
+    const role = readRoleHint(request);
+    if (role && !ALLOWED_ADMIN_ROLES.has(role)) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      url.searchParams.set("redirect", pathname);
+      return NextResponse.redirect(url);
+    }
+  }
+
+  const locale =
+    request.cookies.get("NEXT_LOCALE")?.value === "en" ? "en" : "he";
+
+  const response = NextResponse.next();
+  response.headers.set("x-locale", locale);
   response.headers.set("X-Frame-Options", "DENY");
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
@@ -61,6 +64,5 @@ function addSecurityHeaders(response: NextResponse): NextResponse {
 }
 
 export const config = {
-  // Match all routes except Next.js internals and static files
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!api|_next|.*\\..*).*)"],
 };

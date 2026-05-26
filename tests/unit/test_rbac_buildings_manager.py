@@ -248,10 +248,10 @@ class TestEscalationsRBAC:
 
 
 class TestAdminEndpointsRBAC:
-    """buildings_manager must pass the get_admin_user dependency."""
+    """Admin API uses get_admin_user (admin, super_admin, buildings_manager)."""
 
     def test_buildings_manager_can_access_admin_status(self, client):
-        """GET /api/v1/admin/status should return 200 for buildings_manager."""
+        """GET /api/v1/admin/status succeeds for buildings_manager."""
         _override_auth(_make_user(UserRole.BUILDINGS_MANAGER))
 
         with (
@@ -261,15 +261,16 @@ class TestAdminEndpointsRBAC:
             orchestrator = MagicMock()
             orchestrator.agents = {}
             mock_orch.return_value = orchestrator
-            mock_vs.return_value.health_check = AsyncMock(return_value=True)
+            vs = AsyncMock()
+            vs.get_collection_info = AsyncMock(return_value={"count": 0})
+            mock_vs.return_value = vs
 
             response = client.get(
                 "/api/v1/admin/status",
                 headers={"Authorization": "Bearer test-token"},
             )
 
-        # 200 or 500 (if downstream mock is incomplete) – either way NOT 403
-        assert response.status_code != 403
+        assert response.status_code == 200
 
     def test_resident_cannot_access_admin_status(self, client):
         """GET /api/v1/admin/status should return 403 for resident."""

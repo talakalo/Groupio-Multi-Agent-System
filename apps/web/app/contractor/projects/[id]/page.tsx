@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 
+import { ApiError, apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
 
 // API returns snake_case: title, building_id, current_participants, pricing_tiers, deadline, created_at
@@ -60,6 +61,9 @@ export default function ContractorProjectDetailPage() {
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState<'publish' | 'cancel' | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [showCancelModal, setShowCancelModal] = useState(false);
 
   const fetchProject = useCallback(async () => {
     if (!id) {
@@ -84,26 +88,15 @@ export default function ContractorProjectDetailPage() {
 
     setIsLoading(true);
     setError(null);
-    const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-    const headers: Record<string, string> = {
-      Authorization: `Bearer ${token}`,
-    };
-
     try {
-      const res = await fetch(`${apiBase}/api/v1/offers/${id}`, { headers });
-      if (!res.ok) {
-        if (res.status === 404) {
-          setError('Project not found');
-        } else {
-          setError('Failed to load project');
-        }
-        setProject(null);
-        return;
+      const data = await apiClient.getOffer(id);
+      setProject(data as unknown as ProjectDetail);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) {
+        setError('Project not found');
+      } else {
+        setError('Failed to load project');
       }
-      const data = await res.json();
-      setProject(data);
-    } catch {
-      setError('Failed to load project');
       setProject(null);
     } finally {
       setIsLoading(false);
@@ -114,12 +107,40 @@ export default function ContractorProjectDetailPage() {
     fetchProject();
   }, [fetchProject]);
 
+  async function handlePublish() {
+    if (!id) return;
+    setActionLoading('publish');
+    setActionError(null);
+    try {
+      const updated = await apiClient.publishOffer(id);
+      setProject(updated as unknown as ProjectDetail);
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : t('publishFailed'));
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleCancelConfirmed() {
+    if (!id) return;
+    setShowCancelModal(false);
+    setActionLoading('cancel');
+    setActionError(null);
+    try {
+      await apiClient.cancelOffer(id);
+      router.push('/contractor/projects');
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : t('cancelFailed'));
+      setActionLoading(null);
+    }
+  }
+
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
       draft: 'bg-gray-100 text-gray-800',
       pending: 'bg-amber-100 text-amber-800',
       matching: 'bg-blue-100 text-blue-800',
-      matched: 'bg-indigo-100 text-indigo-800',
+      matched: 'bg-primary-50 text-primary-600',
       in_progress: 'bg-blue-100 text-blue-800',
       completed: 'bg-green-100 text-green-800',
       cancelled: 'bg-red-100 text-red-800',
@@ -147,7 +168,7 @@ export default function ContractorProjectDetailPage() {
             href="/contractor/projects"
             className="text-sky-600 hover:text-sky-700 font-medium"
           >
-            חזרה לפרויקטים
+            {t('backToProjects')}
           </Link>
         </div>
       </div>
@@ -218,6 +239,43 @@ export default function ContractorProjectDetailPage() {
               <p className="text-sm text-gray-500">
                 {displayParticipants} {t('participants')}
               </p>
+              {/* Draft-only actions */}
+              {project.status === 'draft' && (
+                <div className="mt-3 flex gap-2 justify-end">
+                  <button
+                    type="button"
+                    onClick={() => void handlePublish()}
+                    disabled={actionLoading !== null}
+                    className="px-3 py-1.5 bg-sky-600 text-white text-sm font-medium rounded-lg hover:bg-sky-700 disabled:opacity-50"
+                  >
+                    {actionLoading === 'publish' ? '...' : t('publish')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowCancelModal(true)}
+                    disabled={actionLoading !== null}
+                    className="px-3 py-1.5 bg-white border border-red-300 text-red-600 text-sm font-medium rounded-lg hover:bg-red-50 disabled:opacity-50"
+                  >
+                    {actionLoading === 'cancel' ? '...' : t('cancel')}
+                  </button>
+                </div>
+              )}
+              {/* Pending-only cancel */}
+              {project.status === 'pending' && (
+                <div className="mt-3 flex gap-2 justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setShowCancelModal(true)}
+                    disabled={actionLoading !== null}
+                    className="px-3 py-1.5 bg-white border border-red-300 text-red-600 text-sm font-medium rounded-lg hover:bg-red-50 disabled:opacity-50"
+                  >
+                    {actionLoading === 'cancel' ? '...' : t('cancelOffer')}
+                  </button>
+                </div>
+              )}
+              {actionError && (
+                <p className="mt-2 text-red-600 text-xs">{actionError}</p>
+              )}
             </div>
           </div>
         </div>
@@ -225,7 +283,7 @@ export default function ContractorProjectDetailPage() {
         {/* Description */}
         {project.description && (
           <div className="p-6 border-b border-gray-100">
-            <h2 className="text-sm font-semibold text-gray-700 mb-2">תיאור</h2>
+            <h2 className="text-sm font-semibold text-gray-700 mb-2">{t('description')}</h2>
             <p className="text-gray-600 text-sm">{project.description}</p>
           </div>
         )}
@@ -247,7 +305,7 @@ export default function ContractorProjectDetailPage() {
           {expiresAt && (
             <div>
               <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                תאריך יעד
+                {t('targetDate')}
               </h2>
               <p className="text-gray-900">
                 {new Date(expiresAt).toLocaleDateString('he-IL', {
@@ -275,7 +333,7 @@ export default function ContractorProjectDetailPage() {
 
           <div>
             <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
-              קטגוריה
+              {t('category')}
             </h2>
             <p className="text-gray-900">{tCat(project.category)}</p>
           </div>
@@ -288,7 +346,7 @@ export default function ContractorProjectDetailPage() {
           {currentTier && (currentTier.discount > 0 || currentTier.price > 0) && (
             <div>
               <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                דרגת הנחה נוכחית
+                {t('currentTier')}
               </h2>
               <p className="text-gray-900">
                 {Math.round((currentTier.discount ?? 0) * 100)}% — ₪{(currentTier.price ?? 0).toLocaleString('he-IL')}
@@ -300,7 +358,7 @@ export default function ContractorProjectDetailPage() {
         {/* Tiers */}
         {tiers.length > 0 && (
           <div className="p-6 border-t border-gray-100 bg-gray-50">
-            <h2 className="text-sm font-semibold text-gray-700 mb-3">דרגות מחיר</h2>
+            <h2 className="text-sm font-semibold text-gray-700 mb-3">{t('pricingTiers')}</h2>
             <div className="flex flex-wrap gap-2">
               {tiers.map((tier, idx) => (
                 <div
@@ -309,7 +367,7 @@ export default function ContractorProjectDetailPage() {
                     idx === currentTierIdx ? 'bg-sky-100 text-sky-800' : 'bg-white border border-gray-200 text-gray-700'
                   }`}
                 >
-                  {(tier.min ?? 0)}–{tier.max ?? '∞'} משתתפים: {Math.round((tier.discount ?? 0) * 100)}% → ₪
+                  {(tier.min ?? 0)}–{tier.max ?? '∞'} {t('participants')}: {Math.round((tier.discount ?? 0) * 100)}% → ₪
                   {(tier.price ?? 0).toLocaleString('he-IL')}
                 </div>
               ))}
@@ -317,6 +375,39 @@ export default function ContractorProjectDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Cancel confirmation modal */}
+      {showCancelModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="cancel-modal-title"
+        >
+          <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full" dir="rtl">
+            <h2 id="cancel-modal-title" className="text-lg font-bold text-gray-900 mb-2">
+              {t('cancelConfirmTitle')}
+            </h2>
+            <p className="text-gray-600 text-sm mb-6">{t('cancelConfirm')}</p>
+            <div className="flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => setShowCancelModal(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+              >
+                {t('cancelModalBack')}
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleCancelConfirmed()}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700"
+              >
+                {t('cancelModalConfirm')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

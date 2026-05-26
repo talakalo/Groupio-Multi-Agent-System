@@ -5,12 +5,11 @@ import logging
 from typing import Any
 
 import redis.asyncio as redis
+from tenacity import retry, stop_after_attempt, wait_exponential
+
 from src.config.settings import get_settings
 
 logger = logging.getLogger(__name__)
-
-
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 
 def _normalize_redis_url(url: str) -> str:
@@ -76,7 +75,7 @@ class RedisClient:
 
     async def close(self) -> None:
         """Close the Redis connection."""
-        await self._redis.close()
+        await self._redis.aclose()  # type: ignore[attr-defined]
 
     # -- Conversation Memory --
 
@@ -139,9 +138,13 @@ class RedisClient:
         Returns True if the request is allowed, False if rate limited.
         Uses the same atomic Lua script as check_rate_limit.
         """
-        key = f"auth_ip:{ip}"
-        count = await self._redis.eval(_RATE_LIMIT_SCRIPT, 1, key, limit, window)
-        return int(count) <= limit
+        # Fails open (allows) on Redis errors to avoid blocking users when Redis is down.
+        try:
+            key = f"auth_ip:{ip}"
+            count = await self._redis.eval(_RATE_LIMIT_SCRIPT, 1, key, limit, window)
+            return int(count) <= limit
+        except Exception:
+            return True
 
     async def increment_login_failures(self, user_id: str, window: int = 900) -> int:
         """Increment failed login counter for a user. Returns new count."""
@@ -243,9 +246,7 @@ class RedisClient:
             -1 — token mismatch (race condition or replay attempt)
         """
         key = f"refresh_token:{user_id}"
-        result = await self._redis.eval(
-            _REFRESH_TOKEN_SWAP_SCRIPT, 1, key, old_token, new_token, ttl
-        )
+        result = await self._redis.eval(_REFRESH_TOKEN_SWAP_SCRIPT, 1, key, old_token, new_token, ttl)
         return int(result)
 
     # -- Temporary account lockout (brute-force protection) --

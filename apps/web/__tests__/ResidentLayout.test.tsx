@@ -25,9 +25,18 @@ vi.mock('@/components/shared/NotificationPanel', () => ({
 let mockAccessToken: string | null = 'test-token';
 const mockLogout = vi.fn(() => Promise.resolve());
 
+// refreshAccessToken returns true only when there is a token (simulates a live session)
+const mockRefreshAccessToken = vi.fn(() => Promise.resolve(!!mockAccessToken));
+
 vi.mock('@/lib/stores/authStore', () => ({
   useAuthStore: vi.fn((selector: (s: Record<string, unknown>) => unknown) =>
-    selector({ accessToken: mockAccessToken, logout: mockLogout, isAuthenticated: !!mockAccessToken, user: { role: 'resident', isVerified: true } })
+    selector({
+      accessToken: mockAccessToken,
+      logout: mockLogout,
+      isAuthenticated: !!mockAccessToken,
+      user: mockAccessToken ? { role: 'resident', isVerified: true } : null,
+      refreshAccessToken: mockRefreshAccessToken,
+    })
   ),
   useAuthHasHydrated: vi.fn(() => true),
 }));
@@ -70,11 +79,13 @@ describe('ResidentLayout — logout navigation', () => {
   it('calls router.push("/login") after clicking the logout button', async () => {
     render(<ResidentLayout><div>page</div></ResidentLayout>);
 
-    // The layout renders two sidebars (mobile + desktop), so the logout button
-    // appears twice. Click the first occurrence.
-    const logoutBtns = screen.getAllByRole('button', { name: /myAccount/i });
-    expect(logoutBtns.length).toBeGreaterThanOrEqual(1);
-    fireEvent.click(logoutBtns[0]);
+    // Open the account menu first (header button with aria-label="accountMenu")
+    const accountMenuBtn = screen.getByRole('button', { name: /accountMenu/i });
+    fireEvent.click(accountMenuBtn);
+
+    // Then click the logout button in the dropdown
+    const logoutBtn = await waitFor(() => screen.getByRole('button', { name: /logout/i }));
+    fireEvent.click(logoutBtn);
 
     await waitFor(() => {
       expect(mockLogout).toHaveBeenCalled();

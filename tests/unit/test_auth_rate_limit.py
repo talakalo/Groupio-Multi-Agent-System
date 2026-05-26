@@ -33,6 +33,19 @@ async def test_check_ip_rate_limit_blocks_over_limit():
 
 
 @pytest.mark.asyncio
+async def test_check_ip_rate_limit_allows_when_redis_down():
+    """When Redis is unreachable, rate limiting must not block auth (fail open)."""
+    from src.databases.redis_client import RedisClient
+
+    client = RedisClient.__new__(RedisClient)
+    client._redis = AsyncMock()
+    client._redis.eval = AsyncMock(side_effect=ConnectionError("Redis is down"))
+
+    result = await client.check_ip_rate_limit("1.2.3.4", limit=20, window=60)
+    assert result is True
+
+
+@pytest.mark.asyncio
 async def test_check_auth_rate_limit_raises_429():
     """check_auth_rate_limit dependency must raise HTTP 429 when IP is rate limited."""
     from src.api.routes.auth import check_auth_rate_limit

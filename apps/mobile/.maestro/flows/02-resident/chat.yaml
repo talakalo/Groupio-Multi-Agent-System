@@ -1,0 +1,37 @@
+# Flow: Resident — AI Chat
+# Tests opening the AI chat tab and sending a message.
+#
+# Run: maestro test .maestro/flows/02-resident/chat.yaml
+
+appId: ${APP_ID}
+tags:
+  - resident
+  - chat
+---
+
+- runFlow: ../../subflows/launch-fresh.yaml
+- runFlow: ../../subflows/login-resident.yaml
+
+# Navigate to Chat tab
+- tapOn: "Chat"
+- assertVisible:
+    text: "AI Chat"
+    timeout: 8000
+
+# Quick suggestions should be visible
+- assertVisible: "Quick suggestions:"
+
+# Type and send a message
+- tapOn:
+    id: "chat-input"
+- inputText: "How much does AC installation cost?"
+- tapOn: "Send"
+
+# Wait for the AI response
+- waitForAnimationToEnd
+- assertVisible:
+    text: "AI Chat"
+    timeout: 20000
+
+# "Talk to a human" button should be present
+- assertVisible: "Talk to a human"

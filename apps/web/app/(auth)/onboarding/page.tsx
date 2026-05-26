@@ -16,11 +16,10 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import { useState, useCallback } from 'react';
 
 import { apiClient } from '@/lib/api/client';
-import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
 import { LanguageToggle } from '@/components/shared/LanguageToggle';
 
@@ -82,10 +81,10 @@ const REGIONS: { value: Region; labelHe: string; labelEn: string }[] = [
   { value: 'shfela', labelHe: 'שפלה', labelEn: 'Shfela' },
 ];
 
-const BUILDING_TYPES: { value: BuildingType; labelHe: string }[] = [
-  { value: 'new_residential', labelHe: 'מגורים חדש' },
-  { value: 'old_residential', labelHe: 'מגורים ישן' },
-  { value: 'commercial', labelHe: 'מסחרי' },
+const BUILDING_TYPES: { value: BuildingType; labelHe: string; labelEn: string }[] = [
+  { value: 'new_residential', labelHe: 'מגורים חדש', labelEn: 'New Residential' },
+  { value: 'old_residential', labelHe: 'מגורים ישן', labelEn: 'Old Residential' },
+  { value: 'commercial', labelHe: 'מסחרי', labelEn: 'Commercial' },
 ];
 
 const STEPS: OnboardingStep[] = ['role', 'info', 'preferences'];
@@ -98,7 +97,7 @@ export default function OnboardingPage() {
   const router = useRouter();
   const t = useTranslations('onboarding');
   const tCommon = useTranslations('common');
-  const accessToken = useAuthStore((s) => s.accessToken);
+  const locale = useLocale();
 
   const [currentStep, setCurrentStep] = useState<OnboardingStep>('role');
   const [role, setRole] = useState<UserRole | null>(null);
@@ -134,17 +133,11 @@ export default function OnboardingPage() {
 
   const normalizeMutation = useMutation({
     mutationFn: async () => {
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      const res = await fetch(`${apiBase}/api/v1/enrichment/normalize-address`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          address: residentInfo.buildingAddress.trim(),
-          city: residentInfo.city.trim(),
-        }),
-      });
-      if (!res.ok) throw new Error('Normalization failed');
-      return res.json();
+      // Routed through apiClient so the 401-refresh + retry policy applies.
+      return apiClient.normalizeAddress(
+        residentInfo.buildingAddress.trim(),
+        residentInfo.city.trim(),
+      );
     },
     onSuccess: (data: { address: string; city: string; municipality: string | null; confidence: number; source: string }) => {
       if (data.confidence >= 0.5) {
@@ -210,17 +203,7 @@ export default function OnboardingPage() {
         categories: selectedCategories,
         ...(role === 'resident' ? { building: buildingPayload } : { business: contractorInfo }),
       };
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      const token = accessToken;
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-      const response = await fetch(`${apiBase}/api/v1/onboarding`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(payload),
-      });
-      if (!response.ok) throw new Error('Onboarding failed');
-      return response.json();
+      return apiClient.submitOnboarding(payload);
     },
     onSuccess: () => {
       router.push(role === 'resident' ? '/dashboard' : '/contractor/dashboard');
@@ -478,7 +461,7 @@ export default function OnboardingPage() {
         >
           {REGIONS.map((r) => (
             <option key={r.value} value={r.value}>
-              {r.labelHe}
+              {locale === 'he' ? r.labelHe : r.labelEn}
             </option>
           ))}
         </select>
@@ -501,7 +484,7 @@ export default function OnboardingPage() {
                   : 'border-gray-200 text-gray-600 hover:border-gray-300'
               )}
             >
-              {bt.labelHe}
+              {locale === 'he' ? bt.labelHe : bt.labelEn}
             </button>
           ))}
         </div>
@@ -611,7 +594,7 @@ export default function OnboardingPage() {
                   : 'border-gray-200 text-gray-600 hover:border-gray-300'
               )}
             >
-              {r.labelHe}
+              {locale === 'he' ? r.labelHe : r.labelEn}
             </button>
           ))}
         </div>
@@ -656,7 +639,7 @@ export default function OnboardingPage() {
                   isSelected ? 'text-primary-700' : 'text-gray-700'
                 )}
               >
-                {cat.labelHe}
+                {locale === 'he' ? cat.labelHe : cat.labelEn}
               </span>
             </button>
           );

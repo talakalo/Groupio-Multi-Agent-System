@@ -234,11 +234,13 @@ class BaseAgent(ABC):
             logger.warning("LLM circuit breaker is open, failing fast for agent %s", self.config.name)
             raise ConnectionError("LLM service circuit breaker is open")
 
-        # Check cache first
+        # Skip cache for agents that make personalized decisions (matching, pricing, vetting)
         system_prompt = system or self.config.system_prompt
-        cached = await _llm_cache.get(self.config.model, system_prompt, messages)
-        if cached is not None:
-            return cached
+        use_cache = self.config.name.lower() not in _REVIEW_AGENTS
+        if use_cache:
+            cached = await _llm_cache.get(self.config.model, system_prompt, messages)
+            if cached is not None:
+                return cached
 
         try:
             response = await self.llm_client.create_message(
@@ -252,8 +254,9 @@ class BaseAgent(ABC):
 
             _llm_circuit_breaker.record_success()
 
-            # Cache the response
-            await _llm_cache.set(self.config.model, system_prompt, messages, response)
+            # Cache the response (only for non-personalized agents)
+            if use_cache:
+                await _llm_cache.set(self.config.model, system_prompt, messages, response)
 
             # Track token usage
             usage = response.get("usage", {})
@@ -312,8 +315,12 @@ class BaseAgent(ABC):
             except Exception as exc:
                 logger.warning("agent_audit_log write failed: %s", exc)
 
-        asyncio.create_task(_write())
-        asyncio.create_task(self._persist_metrics())
+        try:
+            asyncio.get_running_loop()
+            asyncio.ensure_future(_write())
+            asyncio.ensure_future(self._persist_metrics())
+        except RuntimeError:
+            pass  # No running loop (sync/test context) — audit dropped intentionally
 
     @retry(
         stop=stop_after_attempt(3),

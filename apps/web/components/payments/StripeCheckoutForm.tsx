@@ -13,6 +13,7 @@
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
 import { loadStripe, type Stripe } from "@stripe/stripe-js";
 import { Loader2, AlertCircle } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useMemo, useState } from "react";
 
 interface StripeFormProps {
@@ -33,6 +34,8 @@ function getStripePromise(): Promise<Stripe | null> {
 // ---- Inner form (needs to be inside <Elements> to use useStripe / useElements) ----
 
 function InnerForm({ onSuccess, onError }: { onSuccess: () => void; onError: (msg: string) => void }) {
+  const t = useTranslations('checkout.stripe');
+  const tCheckout = useTranslations('checkout');
   const stripe = useStripe();
   const elements = useElements();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -53,9 +56,9 @@ function InnerForm({ onSuccess, onError }: { onSuccess: () => void; onError: (ms
     if (error) {
       setIsSubmitting(false);
       if (error.type === "card_error" || error.type === "validation_error") {
-        setFieldError(error.message || "שגיאה בפרטי הכרטיס. בדקו ונסו שוב.");
+        setFieldError(error.message || t('cardError'));
       } else {
-        onError(error.message || "התשלום נכשל. נסו שוב או השתמשו בכרטיס אחר.");
+        onError(error.message || t('paymentFailed'));
       }
     } else {
       onSuccess();
@@ -86,15 +89,15 @@ function InnerForm({ onSuccess, onError }: { onSuccess: () => void; onError: (ms
         {isSubmitting ? (
           <>
             <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
-            <span>מעבד תשלום...</span>
+            <span>{t('processing')}</span>
           </>
         ) : (
-          "אשר תשלום"
+          t('confirm')
         )}
       </button>
 
       <p className="text-xs text-gray-400 text-center">
-        פרטי הכרטיס מוצפנים ומועברים ישירות ל-Stripe. Groupio לא שומרת מספרי כרטיסים.
+        {tCheckout('securityFooter')}
       </p>
     </form>
   );
@@ -103,6 +106,7 @@ function InnerForm({ onSuccess, onError }: { onSuccess: () => void; onError: (ms
 // ---- Exported wrapper (handles Stripe not configured) ----
 
 export default function StripeCheckoutForm({ clientSecret, onSuccess, onError }: StripeFormProps) {
+  const tStripe = useTranslations('checkout.stripe');
   const stripeKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
   // useMemo ensures single initialization (module-level singleton in getStripePromise)
   const stripePromise = useMemo(() => getStripePromise(), []);
@@ -110,11 +114,8 @@ export default function StripeCheckoutForm({ clientSecret, onSuccess, onError }:
   if (!stripeKey) {
     return (
       <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800 space-y-1">
-        <p className="font-medium">תשלום Stripe לא מוגדר</p>
-        <p>
-          המפתח <code className="bg-amber-100 px-1 rounded">NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY</code> לא הוגדר.
-          פנו למנהל המערכת להגדרת Stripe.
-        </p>
+        <p className="font-medium">{tStripe('notConfiguredTitle')}</p>
+        <p>{tStripe('notConfiguredDesc')}</p>
       </div>
     );
   }
@@ -127,7 +128,7 @@ export default function StripeCheckoutForm({ clientSecret, onSuccess, onError }:
         appearance: {
           theme: "stripe",
           variables: {
-            colorPrimary: "#4f46e5", // indigo-600
+            colorPrimary: "#1a9a76",
             fontFamily: "inherit",
             borderRadius: "8px",
           },

@@ -22,9 +22,11 @@ import {
   Phone,
 } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
+import { useState } from "react";
 
 import { apiClient, ApiError } from "@/lib/api/client";
+import { useApiData } from "@/lib/hooks/useApiData";
 import { cn } from "@/lib/utils/cn";
 
 // ---- Types ----
@@ -45,19 +47,37 @@ interface Order {
 
 type OrderTab = "active" | "completed" | "all";
 
-// ---- Status config ----
+type StatusKey = "pending" | "processing" | "succeeded" | "released" | "failed" | "refunded";
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ElementType; tab: OrderTab }> = {
-  pending: { label: "ממתין לתשלום", color: "bg-amber-100 text-amber-800", icon: Clock, tab: "active" },
-  processing: { label: "בעיבוד", color: "bg-blue-100 text-blue-800", icon: RefreshCw, tab: "active" },
-  succeeded: { label: "שולם — בנאמנות", color: "bg-indigo-100 text-indigo-800", icon: Shield, tab: "active" },
-  released: { label: "הושלם", color: "bg-green-100 text-green-800", icon: CheckCircle2, tab: "completed" },
-  failed: { label: "נכשל", color: "bg-red-100 text-red-800", icon: XCircle, tab: "all" },
-  refunded: { label: "הוחזר", color: "bg-purple-100 text-purple-800", icon: RefreshCw, tab: "completed" },
+const STATUS_ICON: Record<StatusKey, React.ElementType> = {
+  pending: Clock,
+  processing: RefreshCw,
+  succeeded: Shield,
+  released: CheckCircle2,
+  failed: XCircle,
+  refunded: RefreshCw,
 };
 
-function getOrderTab(status: string): OrderTab {
-  return STATUS_CONFIG[status]?.tab ?? "all";
+const STATUS_COLOR: Record<StatusKey, string> = {
+  pending: "bg-amber-100 text-amber-800",
+  processing: "bg-blue-100 text-blue-800",
+  succeeded: "bg-primary-50 text-primary-600",
+  released: "bg-green-100 text-green-800",
+  failed: "bg-red-100 text-red-800",
+  refunded: "bg-surface-100 text-surface-600",
+};
+
+const STATUS_TAB: Record<StatusKey, OrderTab> = {
+  pending: "active",
+  processing: "active",
+  succeeded: "active",
+  released: "completed",
+  failed: "all",
+  refunded: "completed",
+};
+
+function getStatusKey(status: string): StatusKey {
+  return (STATUS_ICON[status as StatusKey] ? status : "pending") as StatusKey;
 }
 
 function formatCurrency(amount: number, currency = "ILS") {
@@ -76,7 +96,7 @@ function TimelineStep({ label, done, active }: { label: string; done: boolean; a
       <div
         className={cn(
           "w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0",
-          done ? "bg-green-500" : active ? "bg-indigo-500" : "bg-gray-200"
+          done ? "bg-green-500" : active ? "bg-primary-500" : "bg-gray-200"
         )}
         aria-hidden="true"
       >
@@ -89,12 +109,14 @@ function TimelineStep({ label, done, active }: { label: string; done: boolean; a
 }
 
 function OrderTimeline({ status }: { status: string }) {
+  const t = useTranslations("orders");
+
   const steps = [
-    { key: "joined", label: "הצטרפות להצעה" },
-    { key: "paid", label: "תשלום נשמר בנאמנות" },
-    { key: "scheduled", label: "עבודה תוזמנה" },
-    { key: "done", label: "עבודה הושלמה" },
-    { key: "released", label: "תשלום שוחרר לקבלן" },
+    { key: "joined", label: t("timeline.joined") },
+    { key: "paid", label: t("timeline.paid") },
+    { key: "scheduled", label: t("timeline.scheduled") },
+    { key: "done", label: t("timeline.done") },
+    { key: "released", label: t("timeline.released") },
   ];
 
   const doneUpTo: Record<string, number> = {
@@ -130,8 +152,9 @@ function OrderTimeline({ status }: { status: string }) {
 // ---- Order card ----
 
 function OrderCard({ order }: { order: Order }) {
-  const config = STATUS_CONFIG[order.status] ?? STATUS_CONFIG.pending;
-  const StatusIcon = config.icon;
+  const t = useTranslations("orders");
+  const statusKey = getStatusKey(order.status);
+  const StatusIcon = STATUS_ICON[statusKey];
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -143,12 +166,12 @@ function OrderCard({ order }: { order: Order }) {
         aria-expanded={expanded}
       >
         <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center flex-shrink-0">
-            <Package className="w-5 h-5 text-indigo-600" aria-hidden="true" />
+          <div className="w-10 h-10 rounded-lg bg-primary-50 flex items-center justify-center flex-shrink-0">
+            <Package className="w-5 h-5 text-primary-600" aria-hidden="true" />
           </div>
           <div className="text-right">
             <p className="font-semibold text-gray-900 text-sm">
-              {order.offerTitle || `הצעה #${order.offerId.slice(0, 8)}`}
+              {order.offerTitle || t("offerFallback", { id: order.offerId.slice(0, 8) })}
             </p>
             {order.contractorName && (
               <p className="text-xs text-gray-500">{order.contractorName}</p>
@@ -157,9 +180,9 @@ function OrderCard({ order }: { order: Order }) {
           </div>
         </div>
         <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-          <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium", config.color)}>
+          <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium", STATUS_COLOR[statusKey])}>
             <StatusIcon className="w-3 h-3" aria-hidden="true" />
-            {config.label}
+            {t(`status.${statusKey}`)}
           </span>
           <span className="text-sm font-bold text-gray-900" dir="ltr">
             {formatCurrency(order.amount, order.currency)}
@@ -173,39 +196,38 @@ function OrderCard({ order }: { order: Order }) {
 
       {expanded && (
         <div className="px-4 pb-4 border-t border-gray-100">
-          {/* Timeline */}
           <OrderTimeline status={order.status} />
 
-          {/* Escrow explanation for active escrow */}
           {order.status === "succeeded" && (
-            <div className="mt-4 bg-indigo-50 rounded-xl p-3 text-xs text-indigo-700 flex items-start gap-2">
+            <div className="mt-4 bg-primary-50 rounded-xl p-3 text-xs text-primary-600 flex items-start gap-2">
               <Shield className="w-4 h-4 flex-shrink-0 mt-0.5" aria-hidden="true" />
               <span>
-                התשלום שלך מוגן בנאמנות. הכסף ישוחרר לקבלן לאחר השלמת העבודה ואישור מנהל המערכת.
-                אם יש בעיה, <a href="mailto:support@groupio.co.il" className="underline">פנו לתמיכה</a>.
+                {t("escrowActive")}{" "}
+                <a href="mailto:support@groupio.co.il" className="underline">
+                  {t("escrowSupport")}
+                </a>
+                .
               </span>
             </div>
           )}
 
-          {/* Contact contractor */}
           {order.contractorPhone && (
             <a
               href={`tel:${order.contractorPhone}`}
-              className="mt-3 flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+              className="mt-3 flex items-center gap-2 text-sm text-primary-600 hover:text-primary-600 font-medium"
             >
               <Phone className="w-4 h-4" aria-hidden="true" />
               {order.contractorPhone}
             </a>
           )}
 
-          {/* Actions */}
           <div className="flex flex-wrap gap-2 mt-4">
             {order.status === "succeeded" && (
               <a
                 href="mailto:support@groupio.co.il?subject=בעיה בהזמנה"
                 className="btn-secondary text-xs py-1.5 px-3"
               >
-                דיווח על בעיה
+                {t("reportProblem")}
               </a>
             )}
             {(order.status === "released" || order.status === "refunded") && order.contractorId && (
@@ -216,7 +238,7 @@ function OrderCard({ order }: { order: Order }) {
               />
             )}
             <Link href="/payments" className="btn-secondary text-xs py-1.5 px-3">
-              חשבוניות
+              {t("invoices")}
             </Link>
           </div>
         </div>
@@ -236,6 +258,7 @@ function ReviewButton({
   contractorId: string;
   contractorName?: string;
 }) {
+  const t = useTranslations("orders");
   const [open, setOpen] = useState(false);
   const [rating, setRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
@@ -246,14 +269,14 @@ function ReviewButton({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (rating === 0) { setError("נא לבחור דירוג"); return; }
+    if (rating === 0) { setError(t("reviewSelectRating")); return; }
     setSubmitting(true);
     setError(null);
     try {
       await apiClient.addContractorReview(contractorId, { offer_id: offerId, rating, comment: comment || undefined });
       setSubmitted(true);
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "שגיאה בשליחת הביקורת";
+      const msg = err instanceof ApiError ? err.message : t("reviewError");
       setError(msg);
     } finally {
       setSubmitting(false);
@@ -264,7 +287,7 @@ function ReviewButton({
     return (
       <span className="flex items-center gap-1 text-xs text-green-700 font-medium">
         <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
-        ביקורת נשלחה!
+        {t("reviewSent")}
       </span>
     );
   }
@@ -273,7 +296,7 @@ function ReviewButton({
     return (
       <button type="button" onClick={() => setOpen(true)} className="btn-primary text-xs py-1.5 px-3 flex items-center gap-1">
         <Star className="w-3.5 h-3.5" aria-hidden="true" />
-        כתוב ביקורת
+        {t("writeReview")}
       </button>
     );
   }
@@ -281,12 +304,11 @@ function ReviewButton({
   return (
     <div className="w-full mt-3 bg-amber-50 border border-amber-200 rounded-xl p-4">
       <h3 className="text-sm font-semibold text-gray-900 mb-3">
-        דירוג {contractorName ?? "הקבלן"}
+        {t("reviewTitle", { name: contractorName ?? "" })}
       </h3>
       <form onSubmit={handleSubmit} className="space-y-3" noValidate>
         {error && <p role="alert" className="text-xs text-red-600">{error}</p>}
-        {/* Star rating */}
-        <div className="flex gap-1" role="group" aria-label="דירוג">
+        <div className="flex gap-1" role="group" aria-label={t("ratingAriaLabel")}>
           {[1, 2, 3, 4, 5].map((n) => (
             <button
               key={n}
@@ -294,7 +316,7 @@ function ReviewButton({
               onClick={() => setRating(n)}
               onMouseEnter={() => setHoverRating(n)}
               onMouseLeave={() => setHoverRating(0)}
-              aria-label={`${n} כוכבים`}
+              aria-label={t("starAriaLabel", { n })}
               aria-pressed={rating === n}
             >
               <Star
@@ -310,19 +332,19 @@ function ReviewButton({
         <textarea
           value={comment}
           onChange={(e) => setComment(e.target.value)}
-          placeholder="ספרו על החוויה שלכם (אופציונלי)..."
+          placeholder={t("reviewPlaceholder")}
           className="input-field text-sm resize-none"
           rows={3}
           maxLength={500}
-          aria-label="תוכן הביקורת"
+          aria-label={t("reviewTitle", { name: contractorName ?? "" })}
         />
         <div className="flex gap-2">
           <button type="submit" disabled={submitting} className="btn-primary text-sm flex items-center gap-1">
             {submitting ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : null}
-            שלח ביקורת
+            {t("reviewSubmit")}
           </button>
           <button type="button" onClick={() => setOpen(false)} className="btn-secondary text-sm">
-            ביטול
+            {t("reviewCancel")}
           </button>
         </div>
       </form>
@@ -333,37 +355,46 @@ function ReviewButton({
 // ---- Main page ----
 
 export default function OrdersPage() {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const t = useTranslations("orders");
   const [tab, setTab] = useState<OrderTab>("active");
 
-  const fetchOrders = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const payments = await apiClient.getMyPayments() as unknown as Order[];
-      setOrders(Array.isArray(payments) ? payments : []);
-    } catch {
-      setError("לא ניתן לטעון את ההזמנות. נסו שוב.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { fetchOrders(); }, [fetchOrders]);
+  const {
+    data: orders = [],
+    isLoading: loading,
+    error,
+    refetch,
+  } = useApiData<Order[]>(
+    ["orders", "my", { page: 1, limit: 50 }],
+    async () => {
+      const raw = await apiClient.getMyPayments({ page: 1, limit: 50 });
+      const list = (Array.isArray(raw) ? raw : (raw?.payments ?? [])) as unknown as Record<string, unknown>[];
+      return list.map((p) => ({
+        id: p.id as string,
+        offerId: (p.offerId ?? p.offer_id ?? '') as string,
+        offerTitle: p.offerTitle as string | undefined,
+        contractorId: p.contractorId as string | undefined,
+        contractorName: p.contractorName as string | undefined,
+        contractorPhone: p.contractorPhone as string | undefined,
+        amount: (p.amount ?? 0) as number,
+        currency: (p.currency ?? 'ILS') as string,
+        status: (p.status ?? 'pending') as string,
+        createdAt: (p.createdAt ?? p.created_at ?? '') as string,
+        transactionId: p.transactionId as string | undefined,
+      }));
+    },
+  );
+  const fetchOrders = () => { void refetch(); };
 
   const tabs: { key: OrderTab; label: string }[] = [
-    { key: "active", label: "פעילות" },
-    { key: "completed", label: "הושלמו" },
-    { key: "all", label: "הכל" },
+    { key: "active", label: t("tabActive") },
+    { key: "completed", label: t("tabCompleted") },
+    { key: "all", label: t("tabAll") },
   ];
 
   const displayed = orders.filter((o) => {
     if (tab === "all") return true;
-    if (tab === "active") return ["pending", "processing", "succeeded"].includes(o.status);
-    if (tab === "completed") return ["released", "refunded", "failed"].includes(o.status);
-    return true;
+    const sk = getStatusKey(o.status);
+    return STATUS_TAB[sk] === tab;
   });
 
   return (
@@ -371,44 +402,44 @@ export default function OrdersPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">ההזמנות שלי</h1>
-          <p className="text-sm text-gray-500 mt-1">מעקב אחר הזמנות, תשלומים ועבודות</p>
+          <h1 className="text-2xl font-bold text-gray-900">{t("title")}</h1>
+          <p className="text-sm text-gray-500 mt-1">{t("subtitle")}</p>
         </div>
         <button
           onClick={fetchOrders}
           className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-          aria-label="רענן הזמנות"
+          aria-label={t("refreshAriaLabel")}
         >
           <RefreshCw className="w-4 h-4" aria-hidden="true" />
-          רענן
+          {t("refresh")}
         </button>
       </div>
 
       {/* Escrow explainer */}
-      <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-xl border border-indigo-100 p-4 flex items-start gap-3">
-        <Shield className="w-5 h-5 text-indigo-600 flex-shrink-0 mt-0.5" aria-hidden="true" />
-        <p className="text-sm text-indigo-700">
-          <span className="font-semibold">התשלומים שלך מוגנים בנאמנות.</span>{" "}
-          Groupio מחזיקה את הכסף עד להשלמת העבודה. הכסף משוחרר לקבלן רק לאחר אישור מנהל המערכת.
+      <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-xl border border-primary-100 p-4 flex items-start gap-3">
+        <Shield className="w-5 h-5 text-primary-600 flex-shrink-0 mt-0.5" aria-hidden="true" />
+        <p className="text-sm text-primary-600">
+          <span className="font-semibold">{t("escrowBadge")}</span>{" "}
+          {t("escrowExplainer")}
         </p>
       </div>
 
       {/* Tabs */}
       <div className="flex gap-2" role="tablist">
-        {tabs.map((t) => (
+        {tabs.map((tab_item) => (
           <button
-            key={t.key}
+            key={tab_item.key}
             role="tab"
-            aria-selected={tab === t.key}
-            onClick={() => setTab(t.key)}
+            aria-selected={tab === tab_item.key}
+            onClick={() => setTab(tab_item.key)}
             className={cn(
               "px-4 py-2 text-sm font-medium rounded-lg transition-colors",
-              tab === t.key
-                ? "bg-indigo-600 text-white"
+              tab === tab_item.key
+                ? "bg-primary-600 text-white"
                 : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
             )}
           >
-            {t.label}
+            {tab_item.label}
           </button>
         ))}
       </div>
@@ -416,26 +447,26 @@ export default function OrdersPage() {
       {/* Order list */}
       {loading ? (
         <div className="flex items-center justify-center py-16">
-          <Loader2 className="w-6 h-6 animate-spin text-indigo-600" aria-hidden="true" />
-          <span className="mr-3 text-gray-500">טוען הזמנות...</span>
+          <Loader2 className="w-6 h-6 animate-spin text-primary-600" aria-hidden="true" />
+          <span className="mr-3 text-gray-500">{t("loading")}</span>
         </div>
       ) : error ? (
         <div className="flex flex-col items-center py-12 text-center">
           <AlertCircle className="w-10 h-10 text-red-400 mb-3" aria-hidden="true" />
-          <p className="text-gray-600">{error}</p>
-          <button onClick={fetchOrders} className="mt-3 text-indigo-600 text-sm font-medium hover:underline">
-            נסה שוב
+          <p className="text-gray-600">{t("loadError")}</p>
+          <button onClick={fetchOrders} className="mt-3 text-primary-600 text-sm font-medium hover:underline">
+            {t("retry")}
           </button>
         </div>
       ) : displayed.length === 0 ? (
         <div className="flex flex-col items-center py-16 text-center">
           <Package className="w-10 h-10 text-gray-300 mb-3" aria-hidden="true" />
           <p className="text-gray-500 font-medium">
-            {tab === "active" ? "אין הזמנות פעילות" : tab === "completed" ? "אין הזמנות שהושלמו" : "אין הזמנות עדיין"}
+            {tab === "active" ? t("emptyActive") : tab === "completed" ? t("emptyCompleted") : t("emptyAll")}
           </p>
-          <p className="text-sm text-gray-400 mt-1">הזמנות יופיעו לאחר הצטרפות להצעה ותשלום</p>
+          <p className="text-sm text-gray-400 mt-1">{t("emptyHint")}</p>
           <Link href="/offers" className="btn-primary mt-4 text-sm">
-            גלה הצעות
+            {t("discoverOffers")}
           </Link>
         </div>
       ) : (
