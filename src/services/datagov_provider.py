@@ -203,11 +203,13 @@ class DataGovIlProvider:
             comp_name = _normalize_hebrew(rec.get("שם חברה", ""))
             if not company_id and not _fuzzy_match(name, comp_name):
                 continue
-            results.append({
-                "company_id": str(rec.get("מספר חברה", "")),
-                "name": comp_name,
-                "status": _normalize_hebrew(rec.get("סטטוס חברה", "")),
-                "city": _normalize_hebrew(rec.get("שם עיר", "")),
-                "address": f"{_normalize_hebrew(rec.get('שם רחוב', ''))} {rec.get('מספר בית', '')}".strip(),
-            })
+            results.append(
+                {
+                    "company_id": str(rec.get("מספר חברה", "")),
+                    "name": comp_name,
+                    "status": _normalize_hebrew(rec.get("סטטוס חברה", "")),
+                    "city": _normalize_hebrew(rec.get("שם עיר", "")),
+                    "address": f"{_normalize_hebrew(rec.get('שם רחוב', ''))} {rec.get('מספר בית', '')}".strip(),
+                }
+            )
         return results

@@ -228,8 +228,14 @@ class Settings(BaseSettings):
         """Prevent insecure defaults in production/staging."""
         # Override DATABASE_URL with Docker Compose components when USE_LOCAL_POSTGRES is set.
         force_local = (self.USE_LOCAL_POSTGRES or "").lower() in ("1", "true", "yes")
-        if force_local and all([self.DOCKER_POSTGRES_HOST, self.DOCKER_POSTGRES_USER,
-                                self.DOCKER_POSTGRES_PASSWORD, self.DOCKER_POSTGRES_DB]):
+        if force_local and all(
+            [
+                self.DOCKER_POSTGRES_HOST,
+                self.DOCKER_POSTGRES_USER,
+                self.DOCKER_POSTGRES_PASSWORD,
+                self.DOCKER_POSTGRES_DB,
+            ]
+        ):
             pw = quote(self.DOCKER_POSTGRES_PASSWORD, safe="")
             self.DATABASE_URL = (
                 f"postgresql://{self.DOCKER_POSTGRES_USER}:{pw}"

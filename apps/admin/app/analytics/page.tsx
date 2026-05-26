@@ -85,7 +85,12 @@ export default function AnalyticsPage() {
       regionalData: backendAnalytics.regionalData ?? {},
       dailyOffers: backendAnalytics.dailyOffers ?? [],
       dailyRevenue: backendAnalytics.dailyRevenue ?? [],
-      agentPerformance: backendAnalytics.agentPerformance ?? [],
+      agentPerformance: (backendAnalytics.agentPerformance ?? []).map((ap) => ({
+        agent: String(ap.agent ?? ap.name ?? ''),
+        accuracy: typeof ap.accuracy === 'number' ? ap.accuracy : 0,
+        responseTime: typeof ap.responseTime === 'number' ? ap.responseTime : 0,
+        throughput: typeof ap.throughput === 'number' ? ap.throughput : 0,
+      })),
     };
   }, [backendAnalytics]);
 

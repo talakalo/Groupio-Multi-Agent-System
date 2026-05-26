@@ -246,9 +246,7 @@ class RedisClient:
             -1 — token mismatch (race condition or replay attempt)
         """
         key = f"refresh_token:{user_id}"
-        result = await self._redis.eval(
-            _REFRESH_TOKEN_SWAP_SCRIPT, 1, key, old_token, new_token, ttl
-        )
+        result = await self._redis.eval(_REFRESH_TOKEN_SWAP_SCRIPT, 1, key, old_token, new_token, ttl)
         return int(result)
 
     # -- Temporary account lockout (brute-force protection) --

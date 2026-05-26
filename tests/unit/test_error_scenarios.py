@@ -174,7 +174,7 @@ class TestSchemaNotReady:
 
         from src.api.main import _is_schema_not_ready
 
-        exc = asyncpg.exceptions.UndefinedTableError("relation \"users\" does not exist")
+        exc = asyncpg.exceptions.UndefinedTableError('relation "users" does not exist')
         assert _is_schema_not_ready(exc) is True
 
     def test_login_returns_503_when_users_table_missing(self):
@@ -185,7 +185,7 @@ class TestSchemaNotReady:
 
         db = MagicMock()
         db.get_user_by_email = AsyncMock(
-            side_effect=asyncpg.exceptions.UndefinedTableError("relation \"users\" does not exist")
+            side_effect=asyncpg.exceptions.UndefinedTableError('relation "users" does not exist')
         )
 
         with patch("src.api.routes.auth.get_postgres_client", return_value=db):

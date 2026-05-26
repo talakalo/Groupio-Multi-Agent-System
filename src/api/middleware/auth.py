@@ -219,6 +219,7 @@ async def get_current_user(
     if payload.jti:
         try:
             from src.databases.redis_client import get_redis_client
+
             redis = get_redis_client()
             if await redis.is_token_denylisted(payload.jti):
                 raise HTTPException(

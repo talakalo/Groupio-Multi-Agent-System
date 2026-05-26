@@ -192,8 +192,7 @@ class TestGetAgentMode:
             patch("src.databases.postgres.get_postgres_client", return_value=db),
         ):
             results = {
-                name: await get_agent_mode(name)
-                for name in ["matching", "pricing", "vetting", "outreach", "payment"]
+                name: await get_agent_mode(name) for name in ["matching", "pricing", "vetting", "outreach", "payment"]
             }
 
         # Cache was only populated from one DB call per key
@@ -300,7 +299,9 @@ class TestPricingAgentModeDBFirst:
             patch("src.agents.pricing.get_agent_mode", new=AsyncMock(return_value="gated")),
             patch.object(agent, "_retrieve_context", new_callable=AsyncMock, return_value=[]),
             patch.object(
-                agent, "_get_market_data", new_callable=AsyncMock,
+                agent,
+                "_get_market_data",
+                new_callable=AsyncMock,
                 return_value={"avg_price": 0, "avg_participants": 1},
             ),
             patch.object(agent, "_generate_pricing_response", new_callable=AsyncMock, return_value="ok"),
@@ -323,7 +324,9 @@ class TestPricingAgentModeDBFirst:
             patch("src.agents.pricing.get_agent_mode", new=AsyncMock(return_value="auto")),
             patch.object(agent, "_retrieve_context", new_callable=AsyncMock, return_value=[]),
             patch.object(
-                agent, "_get_market_data", new_callable=AsyncMock,
+                agent,
+                "_get_market_data",
+                new_callable=AsyncMock,
                 return_value={"avg_price": 0, "avg_participants": 1},
             ),
             patch.object(agent, "_generate_pricing_response", new_callable=AsyncMock, return_value="ok"),

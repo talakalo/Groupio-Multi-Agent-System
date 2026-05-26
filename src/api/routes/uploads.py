@@ -18,7 +18,7 @@ router = APIRouter(tags=["uploads"])
 # File uploads are rate-limited separately from the main message endpoint.
 # Uploads are heavier operations (disk I/O, storage API calls) and must be
 # throttled more aggressively to prevent abuse/DoS.
-_UPLOAD_RATE_LIMIT = 10   # requests
+_UPLOAD_RATE_LIMIT = 10  # requests
 _UPLOAD_RATE_WINDOW = 60  # per 60 seconds
 
 

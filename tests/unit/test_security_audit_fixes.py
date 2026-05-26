@@ -703,9 +703,7 @@ class TestLow04E164PhoneValidation:
     """Phone numbers not matching E.164 digits-only format are silently ignored."""
 
     def _post_webhook(self, phone: str, secret: str = "test-secret"):
-        payload = {
-            "entry": [{"changes": [{"value": {"messages": [{"from": phone, "text": {"body": "Hello"}}]}}]}]
-        }
+        payload = {"entry": [{"changes": [{"value": {"messages": [{"from": phone, "text": {"body": "Hello"}}]}}]}]}
         payload_bytes = json.dumps(payload).encode()
         sig = _whatsapp_sig(secret, payload_bytes)
 

@@ -95,9 +95,7 @@ def _build_admin_db(
     """Return a fully-configured mock DB for admin route tests."""
     db = AsyncMock()
     db.get_pending_decision = AsyncMock(return_value=entry)
-    db.update_pending_decision = AsyncMock(
-        return_value=update_decision_result or {**entry, "status": entry["status"]}
-    )
+    db.update_pending_decision = AsyncMock(return_value=update_decision_result or {**entry, "status": entry["status"]})
     db.get_payment = AsyncMock(return_value=payment or _payment_record())
     db.update_payment = AsyncMock(return_value={**(payment or _payment_record()), "status": "refunded"})
     db.update_invoice = AsyncMock(return_value={})
@@ -428,9 +426,7 @@ class TestRejectDecision:
 
         with patch("src.api.routes.admin.get_postgres_client", return_value=db):
             client = TestClient(app)
-            resp = client.post(
-                "/api/v1/admin/agents/pending-decisions/decision-1/reject?note=denied"
-            )
+            resp = client.post("/api/v1/admin/agents/pending-decisions/decision-1/reject?note=denied")
 
         assert resp.status_code == 200
         db.create_audit_log.assert_awaited_once()

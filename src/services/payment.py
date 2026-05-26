@@ -297,9 +297,7 @@ class BitPaymentProvider(PaymentProvider):
         self._api_key = api_key
         self._merchant_id = merchant_id
         self._base_url = (
-            "https://sandbox.bitpay.co.il/api"
-            if environment == "sandbox"
-            else "https://api.bitpay.co.il/api"
+            "https://sandbox.bitpay.co.il/api" if environment == "sandbox" else "https://api.bitpay.co.il/api"
         )
         logger.info("BitPaymentProvider initialized (environment=%s)", environment)
 
@@ -332,15 +330,13 @@ class BitPaymentProvider(PaymentProvider):
         Implement after completing onboarding.
         """
         raise NotImplementedError(
-            "BitPaymentProvider.refund is not yet implemented. "
-            "See docs/PAYMENT_PROVIDER_ONBOARDING.md."
+            "BitPaymentProvider.refund is not yet implemented. See docs/PAYMENT_PROVIDER_ONBOARDING.md."
         )
 
     async def get_status(self, transaction_id: str) -> dict[str, Any]:
         """Retrieve the current status of a bit payment request."""
         raise NotImplementedError(
-            "BitPaymentProvider.get_status is not yet implemented. "
-            "See docs/PAYMENT_PROVIDER_ONBOARDING.md."
+            "BitPaymentProvider.get_status is not yet implemented. See docs/PAYMENT_PROVIDER_ONBOARDING.md."
         )
 
     async def create_customer(self, user_id: str, email: str) -> str:
@@ -430,15 +426,13 @@ class PayBoxPaymentProvider(PaymentProvider):
     async def refund(self, transaction_id: str, amount: float | None = None) -> dict[str, Any]:
         """Issue a PayBox refund."""
         raise NotImplementedError(
-            "PayBoxPaymentProvider.refund is not yet implemented. "
-            "See docs/PAYMENT_PROVIDER_ONBOARDING.md."
+            "PayBoxPaymentProvider.refund is not yet implemented. See docs/PAYMENT_PROVIDER_ONBOARDING.md."
         )
 
     async def get_status(self, transaction_id: str) -> dict[str, Any]:
         """Retrieve the current status of a PayBox transaction."""
         raise NotImplementedError(
-            "PayBoxPaymentProvider.get_status is not yet implemented. "
-            "See docs/PAYMENT_PROVIDER_ONBOARDING.md."
+            "PayBoxPaymentProvider.get_status is not yet implemented. See docs/PAYMENT_PROVIDER_ONBOARDING.md."
         )
 
     async def create_customer(self, user_id: str, email: str) -> str:
@@ -511,8 +505,7 @@ def get_payment_provider() -> PaymentProvider:
 
         else:
             raise RuntimeError(
-                f"Unknown PAYMENT_PROVIDER={provider_name!r}. "
-                "Supported values: 'mock', 'stripe', 'bit', 'paybox'."
+                f"Unknown PAYMENT_PROVIDER={provider_name!r}. Supported values: 'mock', 'stripe', 'bit', 'paybox'."
             )
 
     return _payment_provider
