@@ -1,6 +1,7 @@
 'use client';
 
 import { Building2, Copy, Check, Users, Tag, UserPlus } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { useState, useCallback } from 'react';
 
 import { cn } from '@/lib/utils/cn';
@@ -22,6 +23,7 @@ export function BuildingSummaryCard({
   activeOffersCount,
   className,
 }: BuildingSummaryCardProps) {
+  const t = useTranslations('building');
   const [copied, setCopied] = useState(false);
 
   const copyCode = useCallback(async () => {
@@ -52,19 +54,19 @@ export function BuildingSummaryCard({
         <span className="flex items-center gap-1.5 text-gray-600">
           <Users className="h-4 w-4 text-gray-400" />
           <span className="font-semibold text-gray-900">{memberCount}</span>
-          דיירים
+          {t('residents')}
         </span>
         <span className="flex items-center gap-1.5 text-gray-600">
           <Tag className="h-4 w-4 text-gray-400" />
           <span className="font-semibold text-gray-900">{activeOffersCount}</span>
-          הצעות פעילות
+          {t('activeOffers')}
         </span>
       </div>
 
       {/* Invite code */}
       <div className="bg-gray-50 rounded-xl p-3 flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xs text-gray-500 mb-0.5">קוד הזמנה</p>
+          <p className="text-xs text-gray-500 mb-0.5">{t('inviteCode')}</p>
           <p className="font-mono text-sm font-bold text-gray-900 tracking-wider">{inviteCode}</p>
         </div>
         <button
@@ -78,7 +80,7 @@ export function BuildingSummaryCard({
           )}
         >
           {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-          {copied ? 'הועתק!' : 'העתק'}
+          {copied ? t('copied') : t('copyCode')}
         </button>
       </div>
 
@@ -89,7 +91,7 @@ export function BuildingSummaryCard({
         className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-500 hover:bg-primary-600 text-white text-sm font-medium rounded-xl transition-colors"
       >
         <UserPlus className="h-4 w-4" />
-        הזמינו שכנים
+        {t('inviteNeighbors')}
       </button>
     </div>
   );

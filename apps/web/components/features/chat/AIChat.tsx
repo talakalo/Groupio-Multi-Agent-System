@@ -3,17 +3,11 @@
 import type { MessageResponse, ServiceCategory } from '@groupio/types';
 import { useQuery } from '@tanstack/react-query';
 import { Send, Bot, User, Loader2, Sparkles } from 'lucide-react';
-import { useState, useRef, useEffect, useCallback, type FormEvent } from 'react';
+import { useTranslations } from 'next-intl';
+import { useState, useRef, useEffect, useCallback, useMemo, type FormEvent } from 'react';
 
 import { cn } from '@/lib/utils/cn';
 import { useAccessToken } from '@/lib/stores/authStore';
-
-const AI_THINKING_MESSAGES = [
-  'מחפש קבלנים...',
-  'בודק מחירים...',
-  'מנתח היסטוריה...',
-  'מכין המלצות...',
-];
 
 // ---------------------------------------------------------------------------
 // Types
@@ -73,11 +67,17 @@ export function AIChat({
   welcomeMessage,
   className,
 }: AIChatProps) {
+  const t = useTranslations('chat');
   const baseUrl = apiUrl ?? API_BASE;
   const accessToken = useAccessToken();
 
+  const AI_THINKING_MESSAGES = useMemo(
+    () => [t('thinkingSearch'), t('thinkingPrices'), t('thinkingHistory'), t('thinkingRecommendations')],
+    [t],
+  );
+
   // ---- State ----
-  const welcomeContent = welcomeMessage ?? "Hello! I'm the Groupio assistant. How can I help?";
+  const welcomeContent = welcomeMessage ?? t('welcome');
   const [thinkingMsgIdx, setThinkingMsgIdx] = useState(0);
   const [isSlowResponse, setIsSlowResponse] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -252,7 +252,7 @@ export function AIChat({
             m.id === assistantId
               ? {
                   ...m,
-                  content: 'מצטער, משהו השתבש. נסה שוב.',
+                  content: t('error'),
                   isStreaming: false,
                 }
               : m,
@@ -296,10 +296,10 @@ export function AIChat({
         </div>
         <div>
           <h3 className="text-sm font-semibold text-gray-900">
-            העוזר של גרופיו
+            {t('assistantName')}
           </h3>
           <p className="text-xs text-gray-500">
-            {isLoading ? 'חושב...' : 'מוכן לעזור'}
+            {isLoading ? t('thinking') : t('ready')}
           </p>
         </div>
       </div>
@@ -314,7 +314,7 @@ export function AIChat({
               disabled={isLoadingHistory}
               className="text-sm text-primary-600 hover:text-primary-700 disabled:opacity-50"
             >
-              {isLoadingHistory ? 'טוען...' : 'טוען הודעות ישנות יותר'}
+              {isLoadingHistory ? t('loading') : t('loadOlder')}
             </button>
           </div>
         )}
@@ -353,7 +353,7 @@ export function AIChat({
               )}
             >
               {msg.isStreaming && !msg.content ? (
-                <TypingIndicator thinkingMsg={AI_THINKING_MESSAGES[thinkingMsgIdx]} />
+                <TypingIndicator thinkingMsg={AI_THINKING_MESSAGES[thinkingMsgIdx]} ariaLabel={t('thinking')} />
               ) : (
                 <p className="whitespace-pre-wrap">{msg.content}</p>
               )}
@@ -388,7 +388,7 @@ export function AIChat({
 
       {/* ---- AI disclosure banner ---- */}
       <div className="px-4 py-2 bg-amber-50 border-t border-amber-200 text-xs text-amber-800">
-        תוצאות מחיפוש זה מופקות על ידי בינה מלאכותית ועשויות לדרוש בדיקה אנושית.
+        {t('aiDisclaimer')}
       </div>
 
       {/* ---- Slow-response notice ---- */}
@@ -409,7 +409,7 @@ export function AIChat({
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder={placeholder ?? "הקלד הודעה..."}
+          placeholder={placeholder ?? t('placeholder')}
           disabled={isLoading}
           className={cn(
             'flex-1 rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5',
@@ -422,7 +422,7 @@ export function AIChat({
         <button
           type="submit"
           disabled={isLoading || !input.trim()}
-          aria-label="שלח"
+          aria-label={t('send')}
           className={cn(
             'flex h-10 w-10 items-center justify-center rounded-xl',
             'bg-primary-500 text-white',
@@ -446,12 +446,12 @@ export function AIChat({
 // Typing indicator sub-component
 // ---------------------------------------------------------------------------
 
-function TypingIndicator({ thinkingMsg }: { thinkingMsg?: string }) {
+function TypingIndicator({ thinkingMsg, ariaLabel }: { thinkingMsg?: string; ariaLabel: string }) {
   return (
     <div
       data-testid="typing-indicator"
       className="flex items-center gap-2 py-1"
-      aria-label="חושב..."
+      aria-label={ariaLabel}
     >
       <div className="flex gap-1">
         {[0, 1, 2].map((i) => (

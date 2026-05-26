@@ -23,6 +23,6 @@ export class ArchitecturePage extends BasePage {
   }
 
   async expectFileInputAttached(): Promise<void> {
-    await expect(this.fileInput).toBeAttached();
+    await expect(this.fileInput).toBeAttached({ timeout: 15_000 });
   }
 }

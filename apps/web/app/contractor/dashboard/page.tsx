@@ -142,7 +142,7 @@ export default function ContractorDashboardPage() {
           href="/contractor/offers/create"
           className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl px-5 py-2.5 text-sm transition-colors"
         >
-          <span>{t('newOffer') || 'הצעה חדשה'}</span>
+          <span>{t('newOffer')}</span>
           <ArrowLeft className="h-4 w-4 rtl-flip" />
         </Link>
       </div>
@@ -167,12 +167,12 @@ export default function ContractorDashboardPage() {
               </div>
               <div>
                 <h2 className="text-base font-bold text-slate-900">{t('trustScore.title')}</h2>
-                <p className="text-xs text-slate-400">מבוסס על רישיון, ביטוח, ניסיון וביקורות</p>
+                <p className="text-xs text-slate-400">{t('trustScore.basis')}</p>
               </div>
             </div>
             <div className="text-end">
               <p className="text-3xl font-extrabold text-emerald-600">{trustScore}</p>
-              <p className="text-xs text-slate-400">מתוך 100</p>
+              <p className="text-xs text-slate-400">{t('trustScore.outOf100')}</p>
             </div>
           </div>
 

@@ -168,7 +168,7 @@ export default function ContractorProjectDetailPage() {
             href="/contractor/projects"
             className="text-sky-600 hover:text-sky-700 font-medium"
           >
-            חזרה לפרויקטים
+            {t('backToProjects')}
           </Link>
         </div>
       </div>
@@ -248,7 +248,7 @@ export default function ContractorProjectDetailPage() {
                     disabled={actionLoading !== null}
                     className="px-3 py-1.5 bg-sky-600 text-white text-sm font-medium rounded-lg hover:bg-sky-700 disabled:opacity-50"
                   >
-                    {actionLoading === 'publish' ? '...' : 'פרסם'}
+                    {actionLoading === 'publish' ? '...' : t('publish')}
                   </button>
                   <button
                     type="button"
@@ -256,7 +256,7 @@ export default function ContractorProjectDetailPage() {
                     disabled={actionLoading !== null}
                     className="px-3 py-1.5 bg-white border border-red-300 text-red-600 text-sm font-medium rounded-lg hover:bg-red-50 disabled:opacity-50"
                   >
-                    {actionLoading === 'cancel' ? '...' : 'בטל'}
+                    {actionLoading === 'cancel' ? '...' : t('cancel')}
                   </button>
                 </div>
               )}
@@ -269,7 +269,7 @@ export default function ContractorProjectDetailPage() {
                     disabled={actionLoading !== null}
                     className="px-3 py-1.5 bg-white border border-red-300 text-red-600 text-sm font-medium rounded-lg hover:bg-red-50 disabled:opacity-50"
                   >
-                    {actionLoading === 'cancel' ? '...' : 'בטל הצעה'}
+                    {actionLoading === 'cancel' ? '...' : t('cancelOffer')}
                   </button>
                 </div>
               )}
@@ -283,7 +283,7 @@ export default function ContractorProjectDetailPage() {
         {/* Description */}
         {project.description && (
           <div className="p-6 border-b border-gray-100">
-            <h2 className="text-sm font-semibold text-gray-700 mb-2">תיאור</h2>
+            <h2 className="text-sm font-semibold text-gray-700 mb-2">{t('description')}</h2>
             <p className="text-gray-600 text-sm">{project.description}</p>
           </div>
         )}
@@ -305,7 +305,7 @@ export default function ContractorProjectDetailPage() {
           {expiresAt && (
             <div>
               <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                תאריך יעד
+                {t('targetDate')}
               </h2>
               <p className="text-gray-900">
                 {new Date(expiresAt).toLocaleDateString('he-IL', {
@@ -333,7 +333,7 @@ export default function ContractorProjectDetailPage() {
 
           <div>
             <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
-              קטגוריה
+              {t('category')}
             </h2>
             <p className="text-gray-900">{tCat(project.category)}</p>
           </div>
@@ -346,7 +346,7 @@ export default function ContractorProjectDetailPage() {
           {currentTier && (currentTier.discount > 0 || currentTier.price > 0) && (
             <div>
               <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                דרגת הנחה נוכחית
+                {t('currentTier')}
               </h2>
               <p className="text-gray-900">
                 {Math.round((currentTier.discount ?? 0) * 100)}% — ₪{(currentTier.price ?? 0).toLocaleString('he-IL')}
@@ -358,7 +358,7 @@ export default function ContractorProjectDetailPage() {
         {/* Tiers */}
         {tiers.length > 0 && (
           <div className="p-6 border-t border-gray-100 bg-gray-50">
-            <h2 className="text-sm font-semibold text-gray-700 mb-3">דרגות מחיר</h2>
+            <h2 className="text-sm font-semibold text-gray-700 mb-3">{t('pricingTiers')}</h2>
             <div className="flex flex-wrap gap-2">
               {tiers.map((tier, idx) => (
                 <div
@@ -367,7 +367,7 @@ export default function ContractorProjectDetailPage() {
                     idx === currentTierIdx ? 'bg-sky-100 text-sky-800' : 'bg-white border border-gray-200 text-gray-700'
                   }`}
                 >
-                  {(tier.min ?? 0)}–{tier.max ?? '∞'} משתתפים: {Math.round((tier.discount ?? 0) * 100)}% → ₪
+                  {(tier.min ?? 0)}–{tier.max ?? '∞'} {t('participants')}: {Math.round((tier.discount ?? 0) * 100)}% → ₪
                   {(tier.price ?? 0).toLocaleString('he-IL')}
                 </div>
               ))}

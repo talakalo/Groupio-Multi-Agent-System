@@ -49,7 +49,7 @@ export default function ContractorEarningsPage() {
       {loading && (
         <div className="flex items-center gap-2 text-gray-600 py-12 justify-center">
           <Loader2 className="h-6 w-6 animate-spin" aria-hidden />
-          <span className="text-sm">טוען…</span>
+          <span className="text-sm">{t('loading')}</span>
         </div>
       )}
 

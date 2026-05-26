@@ -204,7 +204,7 @@ function ContractorCard({ contractor }: { contractor: ContractorWithScore }) {
       {expanded && contractor.id ? (
         <div className="mt-4 border-t border-gray-50 pt-4">
           <h4 className="text-sm font-bold text-gray-900 mb-3">
-            {t('reviewsHeading') || 'ביקורות'}
+            {t('reviewsHeading')}
           </h4>
           <ContractorReviewsList contractorId={contractor.id} limit={5} />
         </div>

@@ -24,6 +24,7 @@ interface Participant {
 }
 
 function OfferAnalyticsPanel({ offer }: { offer: Offer }) {
+  const t = useTranslations('contractor.offers.active');
   const [expanded, setExpanded] = useState(false);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [loadingParts, setLoadingParts] = useState(false);
@@ -48,33 +49,33 @@ function OfferAnalyticsPanel({ offer }: { offer: Offer }) {
     <div className="rounded-b-2xl border-t border-slate-100 bg-slate-50">
       {/* Stats row */}
       <div className="flex flex-wrap items-center gap-5 px-5 py-3 text-sm text-slate-600">
-        <span className="flex items-center gap-1.5"><Users className="w-4 h-4 text-sky-500" aria-hidden="true" /><strong>{offer.participants ?? 0}</strong> משתתפים</span>
-        <span className="flex items-center gap-1.5"><DollarSign className="w-4 h-4 text-emerald-500" aria-hidden="true" />הכנסה: <strong>₪{revenue.toLocaleString('he-IL')}</strong></span>
-        <span className="flex items-center gap-1.5"><BarChart2 className="w-4 h-4 text-amber-500" aria-hidden="true" />מחיר בסיס: <strong>₪{(offer.basePrice ?? 0).toLocaleString('he-IL')}</strong></span>
+        <span className="flex items-center gap-1.5"><Users className="w-4 h-4 text-sky-500" aria-hidden="true" /><strong>{offer.participants ?? 0}</strong> {t('participants')}</span>
+        <span className="flex items-center gap-1.5"><DollarSign className="w-4 h-4 text-emerald-500" aria-hidden="true" />{t('revenue')} <strong>₪{revenue.toLocaleString('he-IL')}</strong></span>
+        <span className="flex items-center gap-1.5"><BarChart2 className="w-4 h-4 text-amber-500" aria-hidden="true" />{t('basePrice')} <strong>₪{(offer.basePrice ?? 0).toLocaleString('he-IL')}</strong></span>
         <button type="button" onClick={handleToggle} className="ms-auto flex items-center gap-1 text-emerald-600 hover:text-emerald-700 font-semibold text-sm" aria-expanded={expanded}>
-          {expanded ? (<><ChevronUp className="w-4 h-4" aria-hidden="true" />הסתר משתתפים</>) : (<><ChevronDown className="w-4 h-4" aria-hidden="true" />הצג משתתפים</>)}
+          {expanded ? (<><ChevronUp className="w-4 h-4" aria-hidden="true" />{t('hideParticipants')}</>) : (<><ChevronDown className="w-4 h-4" aria-hidden="true" />{t('showParticipants')}</>)}
         </button>
       </div>
 
       {expanded && (
         <div className="px-5 pb-4">
           {loadingParts ? (
-            <div className="flex items-center gap-2 text-sm text-slate-500 py-2"><Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />טוען משתתפים...</div>
+            <div className="flex items-center gap-2 text-sm text-slate-500 py-2"><Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />{t('loadingParticipants')}</div>
           ) : participantError ? (
-            <p className="text-sm text-red-500 py-2">שגיאה בטעינת המשתתפים. לחץ שוב לניסיון חוזר.</p>
+            <p className="text-sm text-red-500 py-2">{t('errorParticipants')}</p>
           ) : participants.length === 0 ? (
-            <p className="text-sm text-slate-400 py-2">אין משתתפים עדיין.</p>
+            <p className="text-sm text-slate-400 py-2">{t('noParticipants')}</p>
           ) : (
             <ul className="divide-y divide-slate-100">
               {participants.map((part, i) => (
                 <li key={part.id ?? i} className="flex items-center justify-between py-2.5 text-sm">
                   <div>
-                    <p className="font-semibold text-slate-900">{part.full_name ?? 'דייר'}</p>
-                    {part.apartment_number && <p className="text-xs text-slate-400">דירה {part.apartment_number}</p>}
+                    <p className="font-semibold text-slate-900">{part.full_name ?? t('residentLabel')}</p>
+                    {part.apartment_number && <p className="text-xs text-slate-400">{t('apartmentLabel', { number: part.apartment_number })}</p>}
                   </div>
                   <div className="flex items-center gap-3">
-                    {part.email && <a href={'mailto:' + part.email} className="flex items-center gap-1 text-sky-600 hover:underline text-xs" aria-label={'שלח מייל ל-' + (part.full_name ?? 'דייר')}><Mail className="w-3.5 h-3.5" aria-hidden="true" />{part.email}</a>}
-                    {part.phone && <a href={'tel:' + part.phone} className="flex items-center gap-1 text-emerald-600 hover:underline text-xs" aria-label={'התקשר ל-' + (part.full_name ?? 'דייר')}><Phone className="w-3.5 h-3.5" aria-hidden="true" />{part.phone}</a>}
+                    {part.email && <a href={'mailto:' + part.email} className="flex items-center gap-1 text-sky-600 hover:underline text-xs"><Mail className="w-3.5 h-3.5" aria-hidden="true" />{part.email}</a>}
+                    {part.phone && <a href={'tel:' + part.phone} className="flex items-center gap-1 text-emerald-600 hover:underline text-xs"><Phone className="w-3.5 h-3.5" aria-hidden="true" />{part.phone}</a>}
                   </div>
                 </li>
               ))}

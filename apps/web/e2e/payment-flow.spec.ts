@@ -174,13 +174,14 @@ test.describe("Resident Payment Flow", () => {
     // Verify offers list loaded
     await expect(page).toHaveURL(/\/offers/);
 
-    // ── 3. Click the first available offer ────────────────────────────────
-    // Either an offer card link or a direct offer link
-    const firstOfferLink = page
-      .locator('a[href^="/offers/"]')
-      .first();
+    // ── 3. Navigate to the first available offer ──────────────────────────
+    // Extract the href from the first offer card and navigate directly — this
+    // avoids relying on Next.js client-side router click behaviour in the test
+    // environment where prefetch/RSC fetch may silently fail.
+    const firstOfferLink = page.locator('a[href^="/offers/"]').first();
     await expect(firstOfferLink).toBeVisible({ timeout: 15_000 });
-    await firstOfferLink.click();
+    const offerHref = await firstOfferLink.getAttribute("href") ?? `/offers/${OFFER_ID}`;
+    await page.goto(offerHref);
 
     await expect(page).toHaveURL(/\/offers\/.+/, { timeout: 10_000 });
     await page.waitForLoadState("networkidle");

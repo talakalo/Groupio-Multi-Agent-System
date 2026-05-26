@@ -1,5 +1,8 @@
+'use client';
+
 import clsx from "clsx";
 import { Lock } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 interface EscrowBadgeProps {
   variant?: "inline" | "block";
@@ -7,6 +10,8 @@ interface EscrowBadgeProps {
 }
 
 export function EscrowBadge({ variant = "inline", className }: EscrowBadgeProps) {
+  const t = useTranslations("escrow");
+
   if (variant === "block") {
     return (
       <div
@@ -17,11 +22,8 @@ export function EscrowBadge({ variant = "inline", className }: EscrowBadgeProps)
       >
         <Lock className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
         <div>
-          <p className="text-sm font-semibold text-blue-800">תשלום מוגן בנאמנות</p>
-          <p className="text-sm text-blue-700 mt-1">
-            הכסף שלך מוחזק בחשבון נאמנות מאובטח ומשוחרר לקבלן רק לאחר
-            השלמת העבודה לשביעות רצונך
-          </p>
+          <p className="text-sm font-semibold text-blue-800">{t("protectedTitle")}</p>
+          <p className="text-sm text-blue-700 mt-1">{t("protectedDescription")}</p>
         </div>
       </div>
     );
@@ -35,7 +37,7 @@ export function EscrowBadge({ variant = "inline", className }: EscrowBadgeProps)
       )}
     >
       <Lock className="h-3.5 w-3.5" />
-      <span>תשלום מוגן</span>
+      <span>{t("protected")}</span>
     </span>
   );
 }

@@ -50,7 +50,15 @@
     "placeholder": "Type a message...",
     "send": "Send",
     "talkToHuman": "Talk to a human",
-    "quickSuggestions": "Quick suggestions:"
+    "quickSuggestions": "Quick suggestions:",
+    "suggestion_findAC": "Find AC technician",
+    "suggestion_findAC_msg": "I'm looking for an AC technician for my building",
+    "suggestion_activeOffers": "Active Offers",
+    "suggestion_activeOffers_msg": "What group offers are currently active?",
+    "suggestion_priceCheck": "Price Check",
+    "suggestion_priceCheck_msg": "What's the average price for AC installation in my area?",
+    "suggestion_howItWorks": "How does it work?",
+    "suggestion_howItWorks_msg": "How does the group offers system work in Groupio?"
   },
   "profile": {
     "title": "Profile",
@@ -126,22 +134,15 @@
     "continueToLogin": "Continue to login"
   },
   "contractor": {
-    "quickActions": "Quick Actions",
     "createOffer": "Create Offer",
     "myOffers": "My Offers",
     "projects": "Projects",
     "messages": "Messages",
     "activeOffers": "Active Offers",
-    "viewAll": "View All",
     "recentProjects": "Recent Projects",
-    "earnings": "Earnings",
-    "participants": "Participants",
-    "searchOffers": "Search offers...",
-    "noOffers": "No offers",
-    "createNewToStart": "Create a new offer to get started",
-    "myProjects": "My Projects",
-    "noProjects": "No projects",
-    "projectsWillAppear": "Projects will appear when offers are accepted",
+    "revenue": "Revenue",
+    "quickActions": "Quick Actions",
+    "participants": "participants",
     "trustScore": "Trust Score",
     "outOf100": "out of 100",
     "noTrustData": "No trust data available",
@@ -151,15 +152,7 @@
     "insurance": "Insurance",
     "valid": "Valid",
     "documents": "Documents",
-    "uploaded": "Uploaded",
-    "statusAll": "All",
-    "statusActive": "Active",
-    "statusInProgress": "In Progress",
-    "statusCompleted": "Completed",
-    "statusPending": "Pending",
-    "statusDraft": "Draft",
-    "statusCancelled": "Cancelled",
-    "statusExpired": "Expired"
+    "uploaded": "Uploaded"
   },
   "trust": {
     "license": "License",
@@ -181,15 +174,6 @@
     "flooring": "Flooring",
     "windows": "Windows",
     "security": "Security"
-  },
-  "orders": {
-    "noOrders": "No orders",
-    "ordersWillAppear": "Your orders will appear here",
-    "statusPending": "Pending",
-    "statusConfirmed": "Confirmed",
-    "statusInProgress": "In Progress",
-    "statusCompleted": "Completed",
-    "statusCancelled": "Cancelled"
   },
   "orders": {
     "title": "Orders",
@@ -262,27 +246,6 @@
     "next": "Next",
     "done": "Done",
     "comingSoon": "Coming Soon"
-  },
-  "contractor": {
-    "createOffer": "Create Offer",
-    "myOffers": "My Offers",
-    "projects": "Projects",
-    "messages": "Messages",
-    "activeOffers": "Active Offers",
-    "recentProjects": "Recent Projects",
-    "revenue": "Revenue",
-    "quickActions": "Quick Actions",
-    "participants": "participants",
-    "trustScore": "Trust Score",
-    "outOf100": "out of 100",
-    "noTrustData": "No trust data available",
-    "verificationStatus": "Verification Status",
-    "businessLicense": "Business License",
-    "verified": "Verified",
-    "insurance": "Insurance",
-    "valid": "Valid",
-    "documents": "Documents",
-    "uploaded": "Uploaded"
   },
   "status": {
     "active": "Active",

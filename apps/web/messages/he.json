@@ -378,7 +378,8 @@
     "sortByTrust": "לפי אמינות",
     "sortByExperience": "לפי ניסיון",
     "verifiedOnly": "מאומתים בלבד",
-    "noContractorsDescription": "לא נמצאו קבלנים התואמים לחיפוש שלך"
+    "noContractorsDescription": "לא נמצאו קבלנים התואמים לחיפוש שלך",
+    "reviewsHeading": "ביקורות"
   },
   "profile": {
     "title": "פרופיל",
@@ -518,7 +519,15 @@
     "offerNotFound": "ההצעה לא נמצאה. ייתכן שהיא הסתיימה.",
     "unknownError": "שגיאה לא ידועה",
     "cannotProcess": "לא ניתן לעבד את התשלום. נסו שוב.",
-    "unexpectedError": "אירעה שגיאה בלתי צפויה."
+    "unexpectedError": "אירעה שגיאה בלתי צפויה.",
+    "stripe": {
+      "cardError": "שגיאה בפרטי הכרטיס. בדקו ונסו שוב.",
+      "paymentFailed": "התשלום נכשל. נסו שוב או השתמשו בכרטיס אחר.",
+      "processing": "מעבד תשלום...",
+      "confirm": "אשר תשלום",
+      "notConfiguredTitle": "תשלום Stripe לא מוגדר",
+      "notConfiguredDesc": "המפתח NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY לא הוגדר. פנו למנהל המערכת להגדרת Stripe."
+    }
   },
   "notificationPanel": {
     "title": "התראות",
@@ -561,7 +570,9 @@
         "experience": "ניסיון",
         "reputation": "מוניטין",
         "completion": "השלמה",
-        "response": "תגובה"
+        "response": "תגובה",
+        "basis": "מבוסס על רישיון, ביטוח, ניסיון וביקורות",
+        "outOf100": "מתוך 100"
       },
       "pendingOffers": {
         "title": "הצעות ממתינות",
@@ -576,7 +587,8 @@
         "title": "פרויקטים פעילים",
         "viewAll": "הצג הכל",
         "empty": "אין פרויקטים פעילים"
-      }
+      },
+      "newOffer": "הצעה חדשה"
     },
     "offers": {
       "create": {
@@ -746,7 +758,17 @@
           "title": "אין הצעות",
           "description": "עדיין אין לך הצעות. צור הצעה חדשה כדי להתחיל.",
           "cta": "צור הצעה"
-        }
+        },
+        "participants": "משתתפים",
+        "revenue": "הכנסה:",
+        "basePrice": "מחיר בסיס:",
+        "hideParticipants": "הסתר משתתפים",
+        "showParticipants": "הצג משתתפים",
+        "loadingParticipants": "טוען משתתפים...",
+        "errorParticipants": "שגיאה בטעינת המשתתפים. לחץ שוב לניסיון חוזר.",
+        "noParticipants": "אין משתתפים עדיין.",
+        "residentLabel": "דייר",
+        "apartmentLabel": "דירה {number}"
       }
     },
     "profile": {
@@ -927,7 +949,16 @@
       "cancelModalBack": "חזרה",
       "cancelModalConfirm": "כן, בטל הצעה",
       "publishFailed": "פרסום נכשל",
-      "cancelFailed": "הביטול נכשל"
+      "cancelFailed": "הביטול נכשל",
+      "publish": "פרסם",
+      "cancel": "בטל",
+      "cancelOffer": "בטל הצעה",
+      "description": "תיאור",
+      "targetDate": "תאריך יעד",
+      "category": "קטגוריה",
+      "currentTier": "דרגת הנחה נוכחית",
+      "pricingTiers": "דרגות מחיר",
+      "backToProjects": "חזרה לפרויקטים"
     },
     "resendVerification": "שלח שוב אימות",
     "saveError": "שגיאה בשמירה",
@@ -972,6 +1003,14 @@
         "trialing": "תקופת ניסיון",
         "unknown": "לא ידוע"
       }
+    },
+    "trust": {
+      "verified": "מאומת",
+      "pending": "בבדיקה",
+      "rejected": "לא אומת",
+      "reliable": "אמין",
+      "completedJobs": "{count} עבודות שהושלמו",
+      "license": "רישיון: {number}"
     }
   },
   "onboarding": {
@@ -1024,7 +1063,17 @@
       "orderStatus": "מה הסטטוס של ההזמנה שלי?",
       "help": "עזרה"
     },
-    "welcome": "היי! 👋 אני העוזר הדיגיטלי של גרופיו. איך אוכל לעזור?"
+    "welcome": "היי! 👋 אני העוזר הדיגיטלי של גרופיו. איך אוכל לעזור?",
+    "assistantName": "העוזר של גרופיו",
+    "ready": "מוכן לעזור",
+    "loadOlder": "טען הודעות ישנות יותר",
+    "loading": "טוען...",
+    "error": "מצטער, משהו השתבש. נסה שוב.",
+    "aiDisclaimer": "תוצאות מחיפוש זה מופקות על ידי בינה מלאכותית ועשויות לדרוש בדיקה אנושית.",
+    "thinkingSearch": "מחפש קבלנים...",
+    "thinkingPrices": "בודק מחירים...",
+    "thinkingHistory": "מנתח היסטוריה...",
+    "thinkingRecommendations": "מכין המלצות..."
   },
   "categories": {
     "ac_installation": "התקנת מזגנים",
@@ -1465,5 +1514,27 @@
       "done": "עבודה הושלמה",
       "released": "תשלום לקבלן שוחרר"
     }
+  },
+  "escrow": {
+    "protectedTitle": "תשלום מוגן בנאמנות",
+    "protectedDescription": "הכסף שלך מוחזק בחשבון נאמנות מאובטח ומשוחרר לקבלן רק לאחר השלמת העבודה לשביעות רצונך",
+    "protected": "תשלום מוגן"
+  },
+  "contractorEarnings": {
+    "title": "הכנסות",
+    "subtitle": "סיכום הכנסות ופעילות פיננסית",
+    "loading": "טוען…",
+    "loadError": "שגיאה בטעינת הנתונים",
+    "retry": "נסה שוב",
+    "pending": "ממתין",
+    "completed": "הושלם",
+    "heldEscrow": "בנאמנות",
+    "recent": "עסקאות אחרונות",
+    "empty": "אין עסקאות",
+    "offer": "הצעה",
+    "status": "סטטוס",
+    "type": "סוג",
+    "amount": "סכום",
+    "paidAt": "תאריך"
   }
 }

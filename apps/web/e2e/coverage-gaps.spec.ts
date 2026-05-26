@@ -176,7 +176,7 @@ test.describe("Resend Verification Flow", () => {
     await expect(submitBtn).toBeVisible();
     await submitBtn.click();
     await expect(
-      page.getByText(/נשלח|sent|בדוק|תיבת/i),
+      page.getByText(/נשלח|sent|בדוק|תיבת/i).first(),
     ).toBeVisible({ timeout: 10000 });
   });
 });
@@ -226,7 +226,7 @@ test.describe("Building Pages", () => {
       });
     });
     await page.goto("/building/join");
-    await expect(page.locator("main, body")).toBeVisible({ timeout: 15000 });
+    await expect(page.locator("main, body").first()).toBeVisible({ timeout: 15000 });
   });
 });
 
@@ -300,7 +300,7 @@ test.describe("Buildings Manager Pages", () => {
       }),
     );
     await page.goto("/buildings-manager/dashboard");
-    await expect(page.locator("main, body")).toBeVisible({ timeout: 15000 });
+    await expect(page.locator("main, body").first()).toBeVisible({ timeout: 15000 });
   });
 
   test("buildings list page loads", async ({ page }) => {
@@ -323,7 +323,7 @@ test.describe("Buildings Manager Pages", () => {
       }),
     );
     await page.goto("/buildings-manager/buildings");
-    await expect(page.locator("main, body")).toBeVisible({ timeout: 15000 });
+    await expect(page.locator("main, body").first()).toBeVisible({ timeout: 15000 });
   });
 
   test("escalations page loads", async ({ page }) => {
@@ -344,7 +344,7 @@ test.describe("Buildings Manager Pages", () => {
       }),
     );
     await page.goto("/buildings-manager/escalations");
-    await expect(page.locator("main, body")).toBeVisible({ timeout: 15000 });
+    await expect(page.locator("main, body").first()).toBeVisible({ timeout: 15000 });
   });
 });
 
@@ -385,7 +385,7 @@ test.describe("Order Detail Page", () => {
       timeout: 15000,
     });
     // Order detail should show key info (title or amount)
-    await expect(page.getByText(/התקנת מזגנים|4,500|₪/)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(/התקנת מזגנים|4,500|₪/).first()).toBeVisible({ timeout: 5000 });
   });
 });
 
