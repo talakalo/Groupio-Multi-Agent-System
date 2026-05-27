@@ -1414,6 +1414,7 @@
     "roleAdmin": "Admin",
     "myAccount": "My account",
     "myAccountHint": "Name, email & sign out",
+    "accountMenu": "Account menu",
     "profile": "Account",
     "logout": "Log out"
   },
