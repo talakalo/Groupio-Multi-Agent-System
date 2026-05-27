@@ -66,6 +66,7 @@ class AgentStateContract(BaseModel):
     # Metadata
     start_time: str
     tokens_used: int = Field(ge=0)
+    turn_count: int = Field(default=0, ge=0)
 
 
 def validate_agent_state(state: dict[str, Any], *, context: str = "unknown") -> AgentState:

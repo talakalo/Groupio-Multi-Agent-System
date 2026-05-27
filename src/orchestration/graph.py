@@ -30,6 +30,8 @@ from src.rag.pipeline import get_rag_pipeline
 
 logger = logging.getLogger(__name__)
 
+MAX_AGENT_TURNS = 6  # hard cap on router re-entries per invocation
+
 # PERF-5+10: short-TTL context cache so repeat turns in a conversation skip
 # the profile/building/offers round-trip. Kept very short because the
 # orchestrator state evolves quickly (new offers, joined participants).
@@ -248,6 +250,9 @@ class GroupioOrchestrator:
 
     async def _route_message(self, state: AgentState) -> AgentState:
         """Initial routing: enrich context and classify intent."""
+        # Increment turn counter; hard-cap to prevent infinite loops
+        state["turn_count"] = state.get("turn_count", 0) + 1
+
         # Set last_agent_handoff when re-entering after a specialist (continue)
         actions = state.get("actions_taken", [])
         if actions:
@@ -383,6 +388,15 @@ class GroupioOrchestrator:
 
     def _should_continue(self, state: AgentState) -> str:
         """Decide if workflow should continue, end, or escalate."""
+        # Hard cap: prevent infinite routing loops
+        if state.get("turn_count", 0) >= MAX_AGENT_TURNS:
+            logger.warning(
+                "Agent turn cap reached (%d) for conversation %s — forcing end",
+                MAX_AGENT_TURNS,
+                state.get("conversation_id"),
+            )
+            return "end"
+
         # Check escalation
         if state.get("needs_human"):
             return "human"
@@ -513,6 +527,10 @@ class GroupioOrchestrator:
             building_id=building_id,
             conversation_id=conversation_id,
         )
+        # Allow callers to inject extra NotRequired state fields (e.g. notification_type,
+        # notification_channels, entities) without changing the public signature.
+        for key, value in kwargs.items():
+            initial_state[key] = value  # type: ignore[literal-required]
         initial_state = validate_agent_state(initial_state, context="orchestrator.run.initial")
 
         # Run the LangGraph workflow

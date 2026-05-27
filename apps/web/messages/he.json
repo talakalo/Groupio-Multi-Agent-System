@@ -486,7 +486,20 @@
     "share": "שתף",
     "inviteCodeBadge": "קוד הזמנה",
     "inviteCodeHint": "שתפו את הקוד עם שכנים כדי שיוכלו להצטרף לבניין ולקבל הצעות קבוצתיות",
-    "municipalityVerified": "מאומת על ידי העירייה"
+    "municipalityVerified": "מאומת על ידי העירייה",
+    "joinTitle": "הצטרפו לבניין שלכם",
+    "joinSubtitle": "הזינו את קוד ההזמנה שקיבלתם מוועד הבית.",
+    "joinCodeLabel": "קוד הזמנה",
+    "joinCodePlaceholder": "לדוגמה: ABC-1234",
+    "joinCodeRequired": "נא להזין קוד הזמנה.",
+    "joinErrorGeneric": "ההצטרפות לבניין נכשלה. אנא נסו שוב.",
+    "joinSubmit": "הצטרפו לבניין",
+    "joining": "מצטרף...",
+    "joinSuccess": "הצטרפתם לבניין בהצלחה!",
+    "joinSuccessSubtitle": "כעת תוכלו לראות שכנים ולעיין בהצעות קבוצתיות בבניין שלכם.",
+    "joinGoToBuilding": "עברו לבניין שלי",
+    "joinNoCode": "אין לכם קוד?",
+    "joinBack": "חזרה לבניין"
   },
   "checkout": {
     "breadcrumbOffers": "הצעות",

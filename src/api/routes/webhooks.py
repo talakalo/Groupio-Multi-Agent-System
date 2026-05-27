@@ -170,21 +170,18 @@ async def contractor_update_webhook(
 
     logger.info("Contractor update: %s type=%s", contractor_id, update_type)
 
-    # Trigger re-vetting if needed
+    # Trigger re-vetting via full graph so vetting → notification handoffs fire correctly
     if update_type in ("document_uploaded", "license_updated"):
         orchestrator = get_orchestrator()
-        vetting_agent = orchestrator.agents.get("vetting")
-        if vetting_agent:
-            state = create_initial_state(
+        try:
+            await orchestrator.run(
                 user_message=f"Re-vet contractor {contractor_id}",
                 user_id="system",
+                entities={"contractor_id": contractor_id},
+                notification_type="contractor_document_reviewed",
             )
-            state["actions_taken"] = [
-                {
-                    "details": {"entities": {"contractor_id": contractor_id}},
-                }
-            ]
-            await vetting_agent.run(state)
+        except Exception:
+            logger.exception("Re-vetting failed for contractor %s", contractor_id)
 
         if update_type == "document_uploaded":
             try:

@@ -206,7 +206,7 @@ export default function SignupPage(props: PageParamsProps) {
           )}
 
           {step === 'details' && (
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+            <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
               {error && <div role="alert" className="rounded-[12px] px-4 py-3.5 text-sm" style={{ background: '#fef2f2', border: '1px solid rgba(220,38,38,0.14)', color: '#b91c1c' }}>{error}</div>}
 
               <div>

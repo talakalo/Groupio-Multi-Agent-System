@@ -486,7 +486,20 @@
     "share": "Share",
     "inviteCodeBadge": "Invite Code",
     "inviteCodeHint": "Share this code with neighbors so they can join the building and receive group offers",
-    "municipalityVerified": "Municipality verified"
+    "municipalityVerified": "Municipality verified",
+    "joinTitle": "Join Your Building",
+    "joinSubtitle": "Enter the invite code you received from your building committee.",
+    "joinCodeLabel": "Invite Code",
+    "joinCodePlaceholder": "e.g. ABC-1234",
+    "joinCodeRequired": "Please enter an invite code.",
+    "joinErrorGeneric": "Failed to join building. Please try again.",
+    "joinSubmit": "Join Building",
+    "joining": "Joining...",
+    "joinSuccess": "You've joined the building!",
+    "joinSuccessSubtitle": "You can now view neighbors and browse group offers in your building.",
+    "joinGoToBuilding": "Go to My Building",
+    "joinNoCode": "Don't have a code?",
+    "joinBack": "Back to building"
   },
   "checkout": {
     "breadcrumbOffers": "Offers",

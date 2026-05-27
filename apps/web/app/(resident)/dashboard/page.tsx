@@ -256,12 +256,15 @@ export default function ResidentDashboardPage() {
     enabled: !!accessToken,
   });
 
+  const buildingId = useAuthStore((s) => s.user?.buildingId);
+
   const offersQuery = useQuery<{ items: Offer[] }>({
     queryKey: ['resident', 'offers', 'active'],
     queryFn: async () => {
+      const bid = useAuthStore.getState().user?.buildingId;
+      if (!bid) return { items: [], total: 0, page: 1, page_size: 3, has_more: false };
       try {
-        const building = await apiClient.getMyBuilding();
-        return await apiClient.getOffers(building.id, { status: 'active', page_size: 3 });
+        return await apiClient.getOffers(bid, { status: 'active', page_size: 3 });
       } catch (err) {
         if (err instanceof ApiError && err.status === 404) {
           return { items: [], total: 0, page: 1, page_size: 3, has_more: false };
@@ -269,7 +272,7 @@ export default function ResidentDashboardPage() {
         throw err;
       }
     },
-    enabled: !!accessToken,
+    enabled: !!accessToken && !!buildingId,
   });
 
   const activityQuery = useQuery<{ activities: RecentActivity[] }>({

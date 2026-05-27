@@ -278,6 +278,10 @@ class WhatsAppBotService:
                 else "Sorry, an error occurred. Please try again later.",
             )
 
+    async def send_text_message(self, to: str, text: str) -> None:
+        """Send a free-form text message (e.g. agent notifications)."""
+        await self._send_text_message(to, text)
+
     async def _send_text_message(self, to: str, text: str) -> None:
         """Send a simple text message."""
         payload = {
