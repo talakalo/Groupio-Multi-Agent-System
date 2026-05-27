@@ -306,10 +306,10 @@ export default function UsersPage() {
       {/* ---- Page header ---- */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-surface-900">
+          <h1 className="text-2xl font-bold text-surface-900 tracking-tight">
             User Management
           </h1>
-          <p className="text-sm text-surface-500 mt-0.5">
+          <p className="text-sm text-surface-400 mt-0.5">
             Manage platform users, roles, and access
           </p>
         </div>
@@ -326,43 +326,37 @@ export default function UsersPage() {
       {/* Stats                                                              */}
       {/* ================================================================== */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="card p-4 flex items-center gap-3">
-          <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary-50 text-primary-600">
+        <div className="card card-hover p-5 relative overflow-hidden">
+          <div className="absolute inset-x-0 top-0 h-0.5 rounded-t-xl bg-primary-500" />
+          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary-500 text-white mb-3 shadow-sm">
             <Users className="w-5 h-5" />
           </div>
-          <div>
-            <p className="text-2xl font-bold text-surface-900">{stats.total}</p>
-            <p className="text-xs text-surface-500">Total Users</p>
-          </div>
+          <p className="text-2xl font-bold text-surface-900">{stats.total}</p>
+          <p className="text-xs font-medium text-surface-400 uppercase tracking-wide mt-0.5">Total Users</p>
         </div>
-        <div className="card p-4 flex items-center gap-3">
-          <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-success-50 text-success-600">
+        <div className="card card-hover p-5 relative overflow-hidden">
+          <div className="absolute inset-x-0 top-0 h-0.5 rounded-t-xl bg-success-500" />
+          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-success-500 text-white mb-3 shadow-sm">
             <UserCheck className="w-5 h-5" />
           </div>
-          <div>
-            <p className="text-2xl font-bold text-surface-900">{stats.active}</p>
-            <p className="text-xs text-surface-500">Active</p>
-          </div>
+          <p className="text-2xl font-bold text-surface-900">{stats.active}</p>
+          <p className="text-xs font-medium text-surface-400 uppercase tracking-wide mt-0.5">Active</p>
         </div>
-        <div className="card p-4 flex items-center gap-3">
-          <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-danger-50 text-danger-600">
+        <div className="card card-hover p-5 relative overflow-hidden">
+          <div className="absolute inset-x-0 top-0 h-0.5 rounded-t-xl bg-danger-500" />
+          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-danger-500 text-white mb-3 shadow-sm">
             <UserX className="w-5 h-5" />
           </div>
-          <div>
-            <p className="text-2xl font-bold text-surface-900">
-              {stats.suspended}
-            </p>
-            <p className="text-xs text-surface-500">Suspended</p>
-          </div>
+          <p className="text-2xl font-bold text-surface-900">{stats.suspended}</p>
+          <p className="text-xs font-medium text-surface-400 uppercase tracking-wide mt-0.5">Suspended</p>
         </div>
-        <div className="card p-4 flex items-center gap-3">
-          <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-warning-50 text-warning-600">
+        <div className="card card-hover p-5 relative overflow-hidden">
+          <div className="absolute inset-x-0 top-0 h-0.5 rounded-t-xl bg-warning-500" />
+          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-warning-500 text-white mb-3 shadow-sm">
             <Shield className="w-5 h-5" />
           </div>
-          <div>
-            <p className="text-2xl font-bold text-surface-900">{stats.admins}</p>
-            <p className="text-xs text-surface-500">Admins</p>
-          </div>
+          <p className="text-2xl font-bold text-surface-900">{stats.admins}</p>
+          <p className="text-xs font-medium text-surface-400 uppercase tracking-wide mt-0.5">Admins</p>
         </div>
       </div>
 

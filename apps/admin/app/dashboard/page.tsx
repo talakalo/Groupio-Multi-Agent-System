@@ -236,11 +236,17 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       {/* ---- Page header ---- */}
-      <div>
-        <h1 className="text-xl font-bold text-surface-900">Dashboard</h1>
-        <p className="text-sm text-surface-500 mt-0.5">
-          System overview and real-time monitoring
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-surface-900 tracking-tight">Dashboard</h1>
+          <p className="text-sm text-surface-400 mt-0.5">
+            System overview and real-time monitoring
+          </p>
+        </div>
+        <div className="flex items-center gap-2 text-xs text-surface-400">
+          <span className="status-dot status-dot-healthy" />
+          <span>Live</span>
+        </div>
       </div>
 
       {/* ================================================================== */}
@@ -272,46 +278,49 @@ export default function DashboardPage() {
       {/* ================================================================== */}
       {/* System Health Bar                                                   */}
       {/* ================================================================== */}
-      <div className="card p-4">
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
+      <div className={clsx(
+        "rounded-xl border px-5 py-3.5 flex items-center justify-between flex-wrap gap-4",
+        allServicesUp
+          ? "bg-success-50 border-success-100"
+          : "bg-warning-50 border-warning-100"
+      )}>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <span
+              className={clsx(
+                "status-dot",
+                allServicesUp ? "status-dot-healthy" : "status-dot-degraded"
+              )}
+            />
+            <span className={clsx("text-sm font-semibold", allServicesUp ? "text-success-700" : "text-warning-700")}>
+              System {allServicesUp ? "Healthy" : "Degraded"}
+            </span>
+          </div>
+          <div className="h-4 w-px bg-surface-200" />
+          <div className="flex items-center gap-1.5 text-xs text-surface-500">
+            <Activity className="w-3.5 h-3.5" />
+            <span>
+              Uptime:{" "}
+              <span className="font-semibold text-surface-700">
+                {uptimeLabel}
+              </span>
+            </span>
+          </div>
+        </div>
+        <div className="flex items-center gap-4">
+          {Object.entries(healthServices).map(([svc, up]) => (
+            <div key={svc} className="flex items-center gap-1.5 text-xs">
               <span
                 className={clsx(
                   "status-dot",
-                  allServicesUp ? "status-dot-healthy" : "status-dot-degraded"
+                  up ? "status-dot-healthy" : "status-dot-unhealthy"
                 )}
               />
-              <span className="text-sm font-semibold text-surface-800">
-                System {allServicesUp ? "Healthy" : "Degraded"}
+              <span className="text-surface-600 capitalize font-medium">
+                {svc.replace("_", " ")}
               </span>
             </div>
-            <div className="h-5 w-px bg-surface-200" />
-            <div className="flex items-center gap-1.5 text-xs text-surface-500">
-              <Activity className="w-3.5 h-3.5" />
-              <span>
-                Uptime:{" "}
-                <span className="font-semibold text-surface-700">
-                  {uptimeLabel}
-                </span>
-              </span>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            {Object.entries(healthServices).map(([svc, up]) => (
-              <div key={svc} className="flex items-center gap-1.5 text-xs">
-                <span
-                  className={clsx(
-                    "status-dot",
-                    up ? "status-dot-healthy" : "status-dot-unhealthy"
-                  )}
-                />
-                <span className="text-surface-500 capitalize">
-                  {svc.replace("_", " ")}
-                </span>
-              </div>
-            ))}
-          </div>
+          ))}
         </div>
       </div>
 
@@ -372,7 +381,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Pending actions */}
         <div className="lg:col-span-2">
-          <h2 className="text-sm font-semibold text-surface-900 mb-3">
+          <h2 className="text-sm font-semibold text-surface-600 uppercase tracking-wide mb-3">
             Pending Actions
           </h2>
           <div className="card divide-y divide-surface-100">
@@ -419,7 +428,7 @@ export default function DashboardPage() {
 
         {/* System health overview */}
         <div>
-          <h2 className="text-sm font-semibold text-surface-900 mb-3">
+          <h2 className="text-sm font-semibold text-surface-600 uppercase tracking-wide mb-3">
             System Health
           </h2>
           <div className="card p-4 space-y-4">
@@ -453,7 +462,7 @@ export default function DashboardPage() {
       {/* ================================================================== */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2">
-          <h2 className="text-sm font-semibold text-surface-900 mb-3">
+          <h2 className="text-sm font-semibold text-surface-600 uppercase tracking-wide mb-3">
             Agent Performance
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2.5">
@@ -493,7 +502,7 @@ export default function DashboardPage() {
         </div>
 
         <div>
-          <h2 className="text-sm font-semibold text-surface-900 mb-3">
+          <h2 className="text-sm font-semibold text-surface-600 uppercase tracking-wide mb-3">
             Recent Escalations
           </h2>
           <div className="card divide-y divide-surface-100">
@@ -555,7 +564,7 @@ export default function DashboardPage() {
       {/* Real-Time Activity Log                                              */}
       {/* ================================================================== */}
       <div>
-        <h2 className="text-sm font-semibold text-surface-900 mb-3">
+        <h2 className="text-sm font-semibold text-surface-600 uppercase tracking-wide mb-3">
           Activity Log
         </h2>
         <div className="card divide-y divide-surface-100">

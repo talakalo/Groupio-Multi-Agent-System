@@ -86,20 +86,20 @@ function Sidebar({
   return (
     <aside
       className={clsx(
-        "fixed left-0 top-0 z-40 h-screen bg-white border-r border-surface-200",
+        "fixed left-0 top-0 z-40 h-screen bg-surface-900 shadow-sidebar",
         "flex flex-col transition-all duration-200 ease-in-out",
         collapsed ? "w-[72px]" : "w-[var(--sidebar-width)]"
       )}
     >
-      <div className="flex items-center justify-between h-[var(--header-height)] px-4 border-b border-surface-200">
+      <div className="flex items-center justify-between h-[var(--header-height)] px-4 border-b border-surface-800">
         {!collapsed && (
           <div className="flex items-center gap-2.5">
-            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary-600">
+            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary-500">
               <Shield className="w-4.5 h-4.5 text-white" />
             </div>
             <div>
-              <h1 className="text-base font-bold text-surface-900 leading-none">{tShell("productTitle")}</h1>
-              <span className="text-[10px] font-medium text-surface-400 uppercase tracking-widest">
+              <h1 className="text-base font-bold text-white leading-none">{tShell("productTitle")}</h1>
+              <span className="text-[10px] font-medium text-surface-500 uppercase tracking-widest">
                 {tShell("productSubtitle")}
               </span>
             </div>
@@ -107,14 +107,14 @@ function Sidebar({
         )}
         {collapsed && (
           <div className="flex items-center justify-center w-full">
-            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary-600">
+            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary-500">
               <Shield className="w-4.5 h-4.5 text-white" />
             </div>
           </div>
         )}
       </div>
 
-      <nav className="flex-1 overflow-y-auto scrollbar-thin px-3 py-4 space-y-1">
+      <nav className="flex-1 overflow-y-auto scrollbar-thin px-3 py-4 space-y-0.5">
         {NAV_DEF.map((item) => {
           const isActive = pathname.startsWith(item.href);
           const Icon = item.icon;
@@ -125,8 +125,10 @@ function Sidebar({
               href={item.href}
               title={collapsed ? label : undefined}
               className={clsx(
-                "sidebar-link",
-                isActive && "sidebar-link-active",
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150",
+                isActive
+                  ? "bg-primary-600 text-white shadow-sm"
+                  : "text-surface-400 hover:bg-surface-800 hover:text-surface-100",
                 collapsed && "justify-center px-0"
               )}
             >
@@ -137,10 +139,10 @@ function Sidebar({
         })}
       </nav>
 
-      <div className="border-t border-surface-200 p-3">
+      <div className="border-t border-surface-800 p-3">
         <button
           onClick={onToggle}
-          className="sidebar-link w-full justify-center"
+          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium w-full justify-center text-surface-400 hover:bg-surface-800 hover:text-surface-100 transition-all duration-150"
           aria-label={collapsed ? tShell("expandSidebar") : tShell("collapseSidebar")}
         >
           <ChevronLeft
@@ -181,7 +183,7 @@ function Header({ sidebarCollapsed }: { sidebarCollapsed: boolean }) {
       className={clsx(
         "fixed top-0 right-0 z-30 h-[var(--header-height)]",
         "flex items-center justify-between px-6",
-        "bg-white/80 backdrop-blur-md border-b border-surface-200",
+        "bg-white border-b border-surface-100 shadow-xs",
         "transition-all duration-200 ease-in-out",
         sidebarCollapsed ? "left-[72px]" : "left-[var(--sidebar-width)]"
       )}
