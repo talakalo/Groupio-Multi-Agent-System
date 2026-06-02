@@ -1,13 +1,13 @@
 /**
  * Navigation tests for the admin app shell (sidebar + header).
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import React from 'react';
 import { NextIntlClientProvider } from 'next-intl';
+import React from 'react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-import messages from '../messages/en.json';
 import { AdminShell } from '../components/AdminShell';
+import messages from '../messages/en.json';
 
 // ---- next/font/google (layout uses Inter) ----
 vi.mock('next/font/google', () => ({
@@ -76,7 +76,7 @@ describe('AdminLayout — sidebar navigation links', () => {
     renderShell();
     const dashLink = screen.getAllByRole('link').find((l) => l.getAttribute('href') === '/dashboard');
     expect(dashLink).toBeDefined();
-    expect(dashLink!.className).toContain('sidebar-link-active');
+    expect(dashLink?.className).toContain('sidebar-link-active');
   });
 });
 
