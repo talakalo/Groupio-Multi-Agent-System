@@ -81,7 +81,7 @@ class PricingAgent(BaseAgent):
         market_data = await self._get_market_data(category, region)
 
         # Step 3: Calculate tiered pricing
-        base_price = market_data.get("avg_price", 0)
+        base_price = float(market_data.get("avg_price") or 0)
         tiers = self._calculate_tiers(base_price, market_data, category)
 
         # Step 4: Apply seasonal adjustments
@@ -169,7 +169,7 @@ class PricingAgent(BaseAgent):
         # Task 3.4 — Generate a Hebrew pricing rationale and persist to DB
         offer_id_for_rationale = entities.get("offer_id") or context_next.get("offer_id")
         city = region
-        participants_count = int(market_data.get("avg_participants", 1)) or 1
+        participants_count = int(market_data.get("avg_participants") or 1)
         if offer_id_for_rationale and base_price > 0:
             try:
                 rationale_resp = await self._call_llm(
@@ -241,8 +241,8 @@ class PricingAgent(BaseAgent):
         if base_price <= 0:
             return []
 
-        min_price = market_data.get("min_price", base_price * 0.7)
-        avg_price = market_data.get("avg_price", base_price)
+        min_price = float(market_data.get("min_price") or (base_price * 0.7))
+        avg_price = float(market_data.get("avg_price") or base_price)
 
         results: list[dict[str, Any]] = []
         flags: list[str] = []

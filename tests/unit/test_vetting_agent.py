@@ -141,3 +141,52 @@ async def test_vetting_agent_manual_review_escalates(vetting_agent, sample_agent
     # With low scores, should be manual_review or rejected
     action = result["actions_taken"][-1]
     assert action["action"] in ("vetting_manual_review", "vetting_rejected")
+
+
+@pytest.mark.asyncio
+async def test_vetting_agent_consumes_normalized_contractor_documents(vetting_agent, sample_agent_state):
+    """Vetting flow should accept normalized asyncpg contractor documents."""
+    sample_agent_state["actions_taken"] = [{"details": {"entities": {"contractor_id": "con_004"}}}]
+
+    vetting_agent._db.get_contractor_documents = AsyncMock(
+        return_value=[
+            {
+                "id": "doc-1",
+                "contractor_id": "con_004",
+                "doc_type": "license",
+                "document_type": "license",
+                "file_url": "https://files.example/license.pdf",
+                "extracted_text": "Valid contractor license through 2028",
+                "status": "verified",
+                "verification_result": "verified",
+                "metadata": {"verified": True},
+            }
+        ]
+    )
+    vetting_agent.llm_client.create_structured_output = AsyncMock(
+        return_value={
+            "license_valid": True,
+            "insurance_valid": True,
+            "certificates_valid": True,
+            "issues": [],
+            "recommendations": [],
+        }
+    )
+    vetting_agent._graph_store.get_contractor_reputation = AsyncMock(
+        return_value={"total_projects": 12, "avg_review_rating": 4.9}
+    )
+    vetting_agent._graph_store.detect_suspicious_patterns = AsyncMock(return_value={"suspicious": False})
+    vetting_agent._graph_store.get_contractor_building_history = AsyncMock(return_value=[])
+    vetting_agent.rag.retrieve = AsyncMock(return_value=[])
+    vetting_agent.llm_client.create_message = AsyncMock(
+        return_value={
+            "content": [{"type": "text", "text": "Vetting report..."}],
+            "usage": {"input_tokens": 100, "output_tokens": 50},
+        }
+    )
+
+    result = await vetting_agent.run(sample_agent_state)
+
+    assert result["actions_taken"][-1]["action"].startswith("vetting_")
+    structured_messages = vetting_agent.llm_client.create_structured_output.call_args.kwargs["messages"]
+    assert "Type: license" in structured_messages[0]["content"]
