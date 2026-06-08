@@ -141,13 +141,15 @@ class MatchingAgent(BaseAgent):
             state["escalation_reason"] = reason
             if state["actions_taken"]:
                 state["actions_taken"][-1]["requires_human_confirmation"] = True
+            last_action = state["actions_taken"][-1] if state["actions_taken"] else {}
+            handoff_entities = last_action.get("entities_to_pass", {})
             await self._enqueue_pending_decision(
                 state=state,
                 action_type="contractor_match",
                 payload={
-                    "contractor_ids": state.get("actions_taken", [{}])[-1].get("contractor_ids", []),
-                    "category": state.get("actions_taken", [{}])[-1].get("category", ""),
-                    "building_id": state.get("actions_taken", [{}])[-1].get("building_id", ""),
+                    "contractor_ids": handoff_entities.get("contractor_ids", []),
+                    "category": handoff_entities.get("category", ""),
+                    "building_id": handoff_entities.get("building_id", ""),
                     "mode": mode,
                 },
                 escalation_reason=reason,

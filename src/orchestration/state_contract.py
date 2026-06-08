@@ -66,6 +66,7 @@ class AgentStateContract(BaseModel):
     # Metadata
     start_time: str
     tokens_used: int = Field(ge=0)
+    token_usage_available: bool = False
     turn_count: int = Field(default=0, ge=0)
 
 

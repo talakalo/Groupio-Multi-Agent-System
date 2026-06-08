@@ -45,6 +45,7 @@ def create_initial_state(
         final_response=None,
         start_time=_utcnow().isoformat(),
         tokens_used=0,
+        token_usage_available=False,
         turn_count=0,
         state_contract_version=1,
     )

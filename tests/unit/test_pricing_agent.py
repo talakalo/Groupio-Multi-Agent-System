@@ -170,3 +170,44 @@ async def test_pricing_agent_handles_explicit_no_data_market_shape(pricing_agent
 
     assert result["actions_taken"][-1]["action"] == "pricing_analyzed"
     assert result["actions_taken"][-1]["details"]["market_data"]["no_data"] is True
+
+
+@pytest.mark.asyncio
+async def test_pricing_pending_decision_payload_preserves_identifiers(pricing_agent, sample_agent_state):
+    """Pending decision payload must preserve offer/category values from the action handoff."""
+    sample_agent_state["intent"] = "pricing_question"
+    sample_agent_state["messages"] = [{"role": "user", "content": "כמה עולה מזגן?"}]
+    sample_agent_state["context_for_next_agent"] = {"offer_id": "offer-123"}
+
+    pricing_agent.rag.retrieve = AsyncMock(return_value=[])
+    pricing_agent._db.get_market_data = AsyncMock(
+        return_value={
+            "avg_price": 4500,
+            "median_price": 4200,
+            "min_price": 3000,
+            "max_price": 6000,
+            "price_stddev": 800,
+            "avg_participants": 8,
+            "sample_size": 25,
+        }
+    )
+    pricing_agent.llm_client.create_message = AsyncMock(
+        return_value={
+            "content": [{"type": "text", "text": "Pricing analysis..."}],
+            "usage": {"input_tokens": 100, "output_tokens": 50},
+        }
+    )
+
+    with (
+        patch("src.agents.pricing.get_agent_mode", new=AsyncMock(return_value="recommend")),
+        patch.object(pricing_agent, "_enqueue_pending_decision", new_callable=AsyncMock) as mock_enqueue,
+    ):
+        result = await pricing_agent.run(sample_agent_state)
+
+    mock_enqueue.assert_awaited_once()
+    payload = mock_enqueue.await_args.kwargs["payload"]
+    action = result["actions_taken"][-1]
+    assert payload["offer_id"] == action["entities_to_pass"]["offer_id"]
+    assert payload["category"] == action["details"]["category"]
+    assert payload["recommended_price"] == action["details"]["tiers"][0]["price"]
+    assert payload["price_range"]["avg_price"] == action["details"]["market_data"]["avg_price"]

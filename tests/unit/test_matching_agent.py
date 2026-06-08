@@ -108,6 +108,49 @@ async def test_matching_handles_no_results(matching_agent, sample_agent_state):
     assert action["contractors"] == []
 
 
+@pytest.mark.asyncio
+async def test_matching_pending_decision_payload_preserves_identifiers(matching_agent, sample_agent_state):
+    """Pending decision payload must use entities_to_pass values, not missing top-level keys."""
+    sample_agent_state["intent"] = "contractor_search"
+    sample_agent_state["messages"] = [{"role": "user", "content": "need AC contractor"}]
+
+    matching_agent.rag.retrieve = AsyncMock(
+        return_value=[
+            {
+                "id": "doc_1",
+                "text": "AC installation specialist",
+                "score": 0.95,
+                "metadata": {
+                    "contractor_id": "con_001",
+                    "business_name": "Cool Air Ltd",
+                    "rating": 4.8,
+                    "verified": True,
+                },
+            }
+        ]
+    )
+    matching_agent._graph_store.find_matching_contractors = AsyncMock(return_value=[])
+    matching_agent.llm_client.create_message = AsyncMock(
+        return_value={
+            "content": [{"type": "text", "text": "Here are the top matches..."}],
+            "usage": {"input_tokens": 100, "output_tokens": 50},
+        }
+    )
+
+    with (
+        patch("src.agents.matching.get_agent_mode", new=AsyncMock(return_value="recommend")),
+        patch.object(matching_agent, "_enqueue_pending_decision", new_callable=AsyncMock) as mock_enqueue,
+    ):
+        result = await matching_agent.run(sample_agent_state)
+
+    mock_enqueue.assert_awaited_once()
+    payload = mock_enqueue.await_args.kwargs["payload"]
+    entities = result["actions_taken"][-1]["entities_to_pass"]
+    assert payload["contractor_ids"] == entities["contractor_ids"]
+    assert payload["category"] == entities["category"]
+    assert payload["building_id"] == entities["building_id"]
+
+
 def test_match_weights_sum_to_one():
     """Verify that match score weights sum to 1.0."""
     total = sum(MATCH_WEIGHTS.values())

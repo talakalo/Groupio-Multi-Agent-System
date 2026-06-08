@@ -157,6 +157,7 @@ class BaseAgent(ABC):
         self.llm_client = get_llm_client()
         self.rag = get_rag_pipeline() if config.rag_enabled else None
         self._metrics: dict[str, int] = {"calls": 0, "errors": 0, "tokens": 0}
+        self._last_token_usage_available = False
 
     async def run(self, state: AgentState) -> AgentState:
         """Execute agent logic with timing and audit persistence.
@@ -164,8 +165,15 @@ class BaseAgent(ABC):
         Wraps _run_impl with timing and calls _persist_audit on completion.
         """
         start = time.perf_counter()
+        start_tokens = self._metrics.get("tokens", 0)
+        self._last_token_usage_available = False
         result = await self._run_impl(state)
         latency_ms = int((time.perf_counter() - start) * 1000)
+        run_tokens = max(0, self._metrics.get("tokens", 0) - start_tokens)
+        result["tokens_used"] = int(result.get("tokens_used", 0) or 0) + run_tokens
+        result["token_usage_available"] = bool(result.get("token_usage_available", False)) or (
+            self._last_token_usage_available
+        )
 
         input_summary = self._get_last_user_message(state)
         actions = result.get("actions_taken", [])
@@ -176,7 +184,7 @@ class BaseAgent(ABC):
         output_summary = msg or last_action.get("summary_for_next_agent", "") or ""
         if not output_summary and result.get("intent"):
             output_summary = f"intent={result.get('intent')}"
-        tokens_used = self._metrics.get("tokens", 0)
+        tokens_used = run_tokens
 
         self._persist_audit(
             state=result,
@@ -260,7 +268,9 @@ class BaseAgent(ABC):
 
             # Track token usage
             usage = response.get("usage", {})
-            self._metrics["tokens"] += usage.get("input_tokens", 0) + usage.get("output_tokens", 0)
+            used_tokens = int(usage.get("input_tokens", 0) or 0) + int(usage.get("output_tokens", 0) or 0)
+            self._metrics["tokens"] += used_tokens
+            self._last_token_usage_available = "input_tokens" in usage or "output_tokens" in usage
 
             return response
         except TRANSIENT_ERRORS:
@@ -338,13 +348,19 @@ class BaseAgent(ABC):
         if _llm_circuit_breaker.is_open:
             raise ConnectionError("LLM service circuit breaker is open")
         try:
-            result = await self.llm_client.create_structured_output(
+            response = await self.llm_client.create_structured_output(
                 messages=messages,
                 system=system or self.config.system_prompt,
                 output_schema=output_schema,
             )
+            usage = getattr(self.llm_client, "last_usage", None)
+            if not isinstance(usage, dict):
+                usage = {}
+            used_tokens = int(usage.get("input_tokens", 0) or 0) + int(usage.get("output_tokens", 0) or 0)
+            self._metrics["tokens"] += used_tokens
+            self._last_token_usage_available = "input_tokens" in usage or "output_tokens" in usage
             _llm_circuit_breaker.record_success()
-            return result
+            return response
         except TRANSIENT_ERRORS:
             _llm_circuit_breaker.record_failure()
             raise
@@ -354,6 +370,14 @@ class BaseAgent(ABC):
         for msg in reversed(state.get("messages", [])):
             if msg.get("role") == "user":
                 return msg.get("content", "")
+        return ""
+
+    def _extract_text_response(self, response: dict[str, Any]) -> str:
+        """Extract the first text block from an LLM response."""
+        content = response.get("content", [])
+        for block in content:
+            if isinstance(block, dict) and block.get("type") == "text":
+                return block.get("text", "")
         return ""
 
     def _safe_format_value(self, value: Any) -> str:

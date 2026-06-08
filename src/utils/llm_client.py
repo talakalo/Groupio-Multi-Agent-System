@@ -93,6 +93,7 @@ class LLMClient:
         self._max_tokens = settings.MAX_TOKENS
         self._temperature = settings.TEMPERATURE
         self._timeout_secs = settings.LLM_TIMEOUT_SECONDS
+        self.last_usage: dict[str, int] | None = None
         # ~10 rps steady, burst to 15. Tunable via settings later if needed.
         self._rate_limiter = _TokenBucket(rate=10.0, capacity=15)
 
@@ -176,6 +177,11 @@ class LLMClient:
                 )
             raise
 
+        self.last_usage = {
+            "input_tokens": response.usage.input_tokens,
+            "output_tokens": response.usage.output_tokens,
+        }
+
         return {
             "content": [
                 {"type": block.type, "text": getattr(block, "text", "")}
@@ -190,10 +196,7 @@ class LLMClient:
             ],
             "model": response.model,
             "stop_reason": response.stop_reason,
-            "usage": {
-                "input_tokens": response.usage.input_tokens,
-                "output_tokens": response.usage.output_tokens,
-            },
+            "usage": self.last_usage,
         }
 
     async def create_structured_output(
