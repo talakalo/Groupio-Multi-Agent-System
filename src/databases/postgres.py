@@ -145,6 +145,32 @@ _CRM_EXTERNAL_REF_COLS = "id, entity_type, entity_id, crm_entity_type, crm_id, u
 logger = logging.getLogger(__name__)
 
 
+def _coerce_json_object(value: Any) -> dict[str, Any]:
+    """Normalize JSON/JSONB values returned by different drivers into dicts."""
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str) and value:
+        try:
+            parsed = json.loads(value)
+            return parsed if isinstance(parsed, dict) else {}
+        except Exception:
+            return {}
+    return {}
+
+
+def _coerce_json_list(value: Any) -> list[Any]:
+    """Normalize JSON/JSONB values returned by different drivers into lists."""
+    if isinstance(value, list):
+        return value
+    if isinstance(value, str) and value:
+        try:
+            parsed = json.loads(value)
+            return parsed if isinstance(parsed, list) else []
+        except Exception:
+            return []
+    return []
+
+
 def _compute_avg_resolution_hours(rows: list[dict]) -> float:
     """Compute average resolution time in hours from escalation rows."""
     total_seconds = 0.0
@@ -1181,7 +1207,105 @@ class PostgresClient:
                 .execute()
             )
             return result.data or []
-        return []
+        rows = await self._pg_fetch_all(
+            """
+            WITH direct_orders AS (
+                SELECT
+                    o.id,
+                    o.id AS order_id,
+                    NULL::text AS participation_id,
+                    NULL::text AS payment_id,
+                    o.offer_id,
+                    off.matched_contractor_id AS contractor_id,
+                    COALESCE(off.category, o.metadata->>'category', 'general') AS category,
+                    o.status,
+                    COALESCE(o.total_amount, off.base_price, 0)::float8 AS amount,
+                    o.currency,
+                    o.created_at,
+                    o.updated_at,
+                    NULLIF(o.metadata->>'scheduled_at', '')::timestamptz AS scheduled_at,
+                    NULLIF(o.metadata->>'completed_at', '')::timestamptz AS completed_at,
+                    COALESCE(c.business_name, cu.full_name) AS contractor_name,
+                    b.address AS building_address,
+                    off.title AS offer_title,
+                    'orders' AS source
+                FROM orders o
+                LEFT JOIN offers off ON off.id = o.offer_id
+                LEFT JOIN contractors c ON c.id = off.matched_contractor_id
+                LEFT JOIN users cu ON cu.id = c.user_id
+                LEFT JOIN buildings b ON b.id = COALESCE(o.building_id, off.building_id)
+                WHERE o.user_id = $1
+            ),
+            participation_orders AS (
+                SELECT
+                    COALESCE(uo.payment_id, uo.invoice_id, uo.participation_id, uo.offer_id) AS id,
+                    NULL::text AS order_id,
+                    uo.participation_id,
+                    uo.payment_id,
+                    uo.offer_id,
+                    uo.contractor_id,
+                    COALESCE(uo.category, 'general') AS category,
+                    COALESCE(uo.payment_status, uo.participation_status, uo.offer_status, 'pending') AS status,
+                    COALESCE(uo.amount, 0)::float8 AS amount,
+                    'ILS'::text AS currency,
+                    uo.joined_at AS created_at,
+                    COALESCE(uo.paid_at, uo.joined_at) AS updated_at,
+                    NULL::timestamptz AS scheduled_at,
+                    uo.paid_at AS completed_at,
+                    uo.contractor_name,
+                    b.address AS building_address,
+                    uo.offer_title,
+                    'user_orders' AS source
+                FROM user_orders uo
+                LEFT JOIN offers off ON off.id = uo.offer_id
+                LEFT JOIN buildings b ON b.id = off.building_id
+                WHERE uo.user_id = $1
+            )
+            SELECT
+                id,
+                order_id,
+                participation_id,
+                payment_id,
+                offer_id,
+                contractor_id,
+                category,
+                status,
+                amount,
+                currency,
+                created_at,
+                updated_at,
+                scheduled_at,
+                completed_at,
+                contractor_name,
+                building_address,
+                offer_title,
+                source,
+                json_build_object('business_name', COALESCE(contractor_name, 'N/A')) AS contractors,
+                json_build_object('address', building_address) AS buildings
+            FROM (
+                SELECT * FROM direct_orders
+                UNION ALL
+                SELECT * FROM participation_orders
+            ) combined
+            ORDER BY created_at DESC NULLS LAST
+            LIMIT $2
+            """,
+            user_id,
+            limit,
+        )
+        normalized: list[dict[str, Any]] = []
+        for row in rows or []:
+            contractor_payload = _coerce_json_object(row.get("contractors"))
+            building_payload = _coerce_json_object(row.get("buildings"))
+            normalized.append(
+                {
+                    **row,
+                    "amount": float(row.get("amount") or 0),
+                    "contractors": contractor_payload,
+                    "buildings": building_payload,
+                }
+            )
+        return normalized
 
     async def get_market_data(self, category: str, region: str, months: int = 6) -> dict[str, Any]:
         """Get market pricing data for a category and region."""
@@ -1193,14 +1317,137 @@ class PostgresClient:
             ).execute()
             if result.data and len(result.data) > 0:
                 return result.data[0]
+        metrics = await self._pg_fetch_one(
+            """
+            WITH comparable_offers AS (
+                SELECT
+                    o.id,
+                    o.title,
+                    o.category,
+                    b.region,
+                    b.id AS building_id,
+                    COALESCE(
+                        NULLIF(MAX(i.amount), 0),
+                        NULLIF(MAX(i.total), 0),
+                        NULLIF(MAX(p.amount), 0),
+                        NULLIF(o.base_price, 0)
+                    )::float8 AS price,
+                    COALESCE(NULLIF(o.current_participants, 0), 1)::float8 AS participants,
+                    o.created_at
+                FROM offers o
+                LEFT JOIN buildings b ON b.id = o.building_id
+                LEFT JOIN invoices i ON i.offer_id = o.id
+                LEFT JOIN payments p ON p.offer_id = o.id
+                WHERE o.category = $1
+                  AND ($2::text = '' OR COALESCE(b.region, '') = $2)
+                  AND o.created_at >= NOW() - (($3::text || ' months')::interval)
+                GROUP BY o.id, o.title, o.category, b.region, b.id, o.base_price, o.current_participants, o.created_at
+            )
+            SELECT
+                COUNT(*)::int AS sample_size,
+                COUNT(*)::int AS sample_count,
+                AVG(price)::float8 AS avg_price,
+                PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) AS median_price,
+                MIN(price)::float8 AS min_price,
+                MAX(price)::float8 AS max_price,
+                COALESCE(STDDEV_POP(price), 0)::float8 AS price_stddev,
+                AVG(participants)::float8 AS avg_participants
+            FROM comparable_offers
+            WHERE price IS NOT NULL AND price > 0
+            """,
+            category,
+            region,
+            months,
+        )
+        recent_rows = await self._pg_fetch_all(
+            """
+            WITH comparable_offers AS (
+                SELECT
+                    o.id,
+                    o.title,
+                    o.category,
+                    b.region,
+                    b.id AS building_id,
+                    COALESCE(
+                        NULLIF(MAX(i.amount), 0),
+                        NULLIF(MAX(i.total), 0),
+                        NULLIF(MAX(p.amount), 0),
+                        NULLIF(o.base_price, 0)
+                    )::float8 AS price,
+                    COALESCE(NULLIF(o.current_participants, 0), 1)::float8 AS participants,
+                    o.status,
+                    o.created_at
+                FROM offers o
+                LEFT JOIN buildings b ON b.id = o.building_id
+                LEFT JOIN invoices i ON i.offer_id = o.id
+                LEFT JOIN payments p ON p.offer_id = o.id
+                WHERE o.category = $1
+                  AND ($2::text = '' OR COALESCE(b.region, '') = $2)
+                  AND o.created_at >= NOW() - (($3::text || ' months')::interval)
+                GROUP BY
+                    o.id,
+                    o.title,
+                    o.category,
+                    b.region,
+                    b.id,
+                    o.base_price,
+                    o.current_participants,
+                    o.status,
+                    o.created_at
+            )
+            SELECT id, title, category, region, building_id, price, participants, status, created_at
+            FROM comparable_offers
+            WHERE price IS NOT NULL AND price > 0
+            ORDER BY created_at DESC
+            LIMIT 5
+            """,
+            category,
+            region,
+            months,
+        )
+        sample_size = int((metrics or {}).get("sample_size") or 0)
+        if sample_size == 0:
+            return {
+                "category": category,
+                "region": region,
+                "scope": "region" if region else "global",
+                "sample_size": 0,
+                "sample_count": 0,
+                "avg_price": None,
+                "median_price": None,
+                "min_price": None,
+                "max_price": None,
+                "price_stddev": None,
+                "avg_participants": None,
+                "recent_comparable_offers": [],
+                "confidence": "none",
+                "data_quality": "no_data",
+                "no_data": True,
+            }
+        confidence = "high" if sample_size >= 10 else "medium" if sample_size >= 5 else "low"
         return {
-            "avg_price": 0,
-            "median_price": 0,
-            "min_price": 0,
-            "max_price": 0,
-            "price_stddev": 0,
-            "avg_participants": 0,
-            "sample_size": 0,
+            "category": category,
+            "region": region,
+            "scope": "region" if region else "global",
+            "sample_size": sample_size,
+            "sample_count": int((metrics or {}).get("sample_count") or sample_size),
+            "avg_price": float((metrics or {}).get("avg_price") or 0),
+            "median_price": float((metrics or {}).get("median_price") or 0),
+            "min_price": float((metrics or {}).get("min_price") or 0),
+            "max_price": float((metrics or {}).get("max_price") or 0),
+            "price_stddev": float((metrics or {}).get("price_stddev") or 0),
+            "avg_participants": float((metrics or {}).get("avg_participants") or 0),
+            "recent_comparable_offers": [
+                {
+                    **row,
+                    "price": float(row.get("price") or 0),
+                    "participants": float(row.get("participants") or 0),
+                }
+                for row in (recent_rows or [])
+            ],
+            "confidence": confidence,
+            "data_quality": confidence,
+            "no_data": False,
         }
 
     async def create_support_ticket(self, ticket_data: dict[str, Any]) -> dict[str, Any]:
@@ -1209,7 +1456,52 @@ class PostgresClient:
             client = await self._get_client()
             result = await client.table("support_tickets").insert(ticket_data).execute()
             return result.data[0] if result.data else ticket_data
-        return ticket_data
+        user_id = ticket_data.get("user_id")
+        reason = ticket_data.get("reason") or ticket_data.get("message") or ticket_data.get("description")
+        if not user_id:
+            raise ValueError("user_id is required to create a support ticket")
+        if not reason:
+            raise ValueError("reason is required to create a support ticket")
+
+        ticket_id = ticket_data.get("id") or str(uuid4())
+        context = _coerce_json_object(ticket_data.get("context"))
+        category = ticket_data.get("category") or context.get("category") or context.get("intent") or "general"
+        description = ticket_data.get("description") or ticket_data.get("message") or reason
+        context = {
+            **context,
+            "category": category,
+            "message": ticket_data.get("message") or description,
+            "description": description,
+        }
+        row = await self._pg_fetch_one(
+            """
+            INSERT INTO support_tickets
+                (id, user_id, conversation_id, reason, priority, context, status, assigned_to, resolved_at)
+            VALUES
+                ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9)
+            RETURNING id, user_id, conversation_id, reason, priority, context, status,
+                      assigned_to, resolved_at, created_at, updated_at
+            """,
+            ticket_id,
+            user_id,
+            ticket_data.get("conversation_id"),
+            reason,
+            ticket_data.get("priority", "normal"),
+            json.dumps(context),
+            ticket_data.get("status", "open"),
+            ticket_data.get("assigned_to"),
+            ticket_data.get("resolved_at"),
+        )
+        if not row:
+            raise RuntimeError("Failed to create support ticket")
+        normalized_context = _coerce_json_object(row.get("context"))
+        return {
+            **row,
+            "context": normalized_context,
+            "category": normalized_context.get("category", category),
+            "message": normalized_context.get("message", description),
+            "description": normalized_context.get("description", description),
+        }
 
     async def log_conversation(
         self,
@@ -1904,7 +2196,45 @@ class PostgresClient:
             client = await self._get_client()
             result = await client.table("contractor_documents").select("*").eq("contractor_id", contractor_id).execute()
             return result.data or []
-        return []
+        rows = await self._pg_fetch_all(
+            """
+            SELECT
+                cd.id,
+                cd.contractor_id,
+                cd.doc_type,
+                cd.file_url,
+                cd.extracted_text,
+                cd.verified,
+                cd.verified_by,
+                cd.verified_at,
+                cd.uploaded_at,
+                cd.created_at,
+                json_build_object(
+                    'verified', cd.verified,
+                    'verified_by', cd.verified_by,
+                    'created_at', cd.created_at
+                ) AS metadata
+            FROM contractor_documents cd
+            WHERE cd.contractor_id = $1
+            ORDER BY cd.uploaded_at DESC, cd.created_at DESC
+            """,
+            contractor_id,
+        )
+        normalized: list[dict[str, Any]] = []
+        for row in rows or []:
+            metadata = _coerce_json_object(row.get("metadata"))
+            status = "verified" if row.get("verified") else "pending"
+            normalized.append(
+                {
+                    **row,
+                    "document_type": row.get("doc_type"),
+                    "status": status,
+                    "verification_result": "verified" if row.get("verified") else "pending_review",
+                    "file_reference": row.get("file_url"),
+                    "metadata": metadata,
+                }
+            )
+        return normalized
 
     # ------------------------------------------------------------------
     # File Uploads

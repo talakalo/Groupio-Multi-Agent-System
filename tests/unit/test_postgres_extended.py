@@ -705,9 +705,49 @@ async def test_get_offer_participants_returns_empty_list(pg):
 
 
 @pytest.mark.asyncio
-async def test_get_user_orders_returns_empty_list_on_asyncpg(pg):
-    """get_user_orders returns [] on asyncpg path (not implemented)."""
-    result = await pg.get_user_orders("u1")
+async def test_get_user_orders_returns_normalized_rows_on_asyncpg(pg):
+    """get_user_orders normalizes asyncpg rows for support flow consumption."""
+    rows = [
+        {
+            "id": "ord-1",
+            "order_id": "ord-1",
+            "participation_id": None,
+            "payment_id": "pay-1",
+            "offer_id": "off-1",
+            "contractor_id": "con-1",
+            "category": "ac_installation",
+            "status": "paid",
+            "amount": 4200,
+            "currency": "ILS",
+            "created_at": datetime.now(UTC),
+            "updated_at": datetime.now(UTC),
+            "scheduled_at": None,
+            "completed_at": None,
+            "contractor_name": "Cool Air Ltd",
+            "building_address": "1 Main St",
+            "offer_title": "AC Group Buy",
+            "source": "user_orders",
+            "contractors": '{"business_name":"Cool Air Ltd"}',
+            "buildings": {"address": "1 Main St"},
+        }
+    ]
+    with patch.object(pg, "_pg_fetch_all", new_callable=AsyncMock, return_value=rows) as mock_fetch:
+        result = await pg.get_user_orders("u1", limit=3)
+
+    mock_fetch.assert_called_once()
+    assert len(result) == 1
+    assert result[0]["id"] == "ord-1"
+    assert result[0]["status"] == "paid"
+    assert result[0]["amount"] == 4200.0
+    assert result[0]["contractors"]["business_name"] == "Cool Air Ltd"
+    assert result[0]["buildings"]["address"] == "1 Main St"
+
+
+@pytest.mark.asyncio
+async def test_get_user_orders_returns_empty_list_when_no_rows(pg):
+    """get_user_orders returns [] when asyncpg query has no matches."""
+    with patch.object(pg, "_pg_fetch_all", new_callable=AsyncMock, return_value=[]):
+        result = await pg.get_user_orders("u1")
     assert result == []
 
 
@@ -717,12 +757,119 @@ async def test_get_user_orders_returns_empty_list_on_asyncpg(pg):
 
 
 @pytest.mark.asyncio
-async def test_create_support_ticket_returns_ticket_data(pg):
-    """create_support_ticket returns the ticket_data dict on asyncpg path."""
-    ticket_data = {"id": "t1", "user_id": "u1", "subject": "Help needed", "status": "open"}
-    result = await pg.create_support_ticket(ticket_data)
-    assert result == ticket_data
+async def test_create_support_ticket_persists_and_normalizes_asyncpg_row(pg):
+    """create_support_ticket inserts into support_tickets and returns normalized data."""
+    now = datetime.now(UTC)
+    ticket_data = {
+        "id": "t1",
+        "user_id": "u1",
+        "conversation_id": "conv-1",
+        "reason": "Need human follow-up",
+        "priority": "high",
+        "context": {"intent": "complaint"},
+        "status": "open",
+    }
+    inserted = {
+        "id": "t1",
+        "user_id": "u1",
+        "conversation_id": "conv-1",
+        "reason": "Need human follow-up",
+        "priority": "high",
+        "context": (
+            '{"intent":"complaint","category":"complaint","message":"Need human follow-up",'
+            '"description":"Need human follow-up"}'
+        ),
+        "status": "open",
+        "assigned_to": None,
+        "resolved_at": None,
+        "created_at": now,
+        "updated_at": now,
+    }
+    with patch.object(pg, "_pg_fetch_one", new_callable=AsyncMock, return_value=inserted) as mock_fetch:
+        result = await pg.create_support_ticket(ticket_data)
+
+    mock_fetch.assert_called_once()
+    assert "INSERT INTO support_tickets" in mock_fetch.call_args[0][0]
     assert result["id"] == "t1"
+    assert result["category"] == "complaint"
+    assert result["message"] == "Need human follow-up"
+    assert result["description"] == "Need human follow-up"
+    assert result["context"]["intent"] == "complaint"
+
+
+@pytest.mark.asyncio
+async def test_create_support_ticket_requires_user_id(pg):
+    """create_support_ticket rejects payloads without user_id."""
+    with pytest.raises(ValueError, match="user_id is required"):
+        await pg.create_support_ticket({"reason": "Need help"})
+
+
+@pytest.mark.asyncio
+async def test_create_support_ticket_requires_reason(pg):
+    """create_support_ticket rejects payloads without a reason/message."""
+    with pytest.raises(ValueError, match="reason is required"):
+        await pg.create_support_ticket({"user_id": "u1"})
+
+
+# ---------------------------------------------------------------------------
+# get_market_data
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_get_market_data_returns_metrics_and_recent_comparables(pg):
+    """get_market_data returns explicit metrics plus recent comparable offers."""
+    metrics = {
+        "sample_size": 6,
+        "sample_count": 6,
+        "avg_price": 4500,
+        "median_price": 4300,
+        "min_price": 3200,
+        "max_price": 6100,
+        "price_stddev": 700,
+        "avg_participants": 8,
+    }
+    recent = [
+        {
+            "id": "off-1",
+            "title": "AC deal",
+            "category": "ac_installation",
+            "region": "center",
+            "building_id": "b1",
+            "price": 4700,
+            "participants": 9,
+            "status": "completed",
+            "created_at": datetime.now(UTC),
+        }
+    ]
+    with (
+        patch.object(pg, "_pg_fetch_one", new_callable=AsyncMock, return_value=metrics),
+        patch.object(pg, "_pg_fetch_all", new_callable=AsyncMock, return_value=recent),
+    ):
+        result = await pg.get_market_data("ac_installation", "center")
+
+    assert result["category"] == "ac_installation"
+    assert result["region"] == "center"
+    assert result["sample_size"] == 6
+    assert result["avg_price"] == 4500.0
+    assert result["confidence"] == "medium"
+    assert result["no_data"] is False
+    assert result["recent_comparable_offers"][0]["price"] == 4700.0
+
+
+@pytest.mark.asyncio
+async def test_get_market_data_returns_explicit_no_data_shape(pg):
+    """get_market_data returns an explicit no-data response instead of fake zeros."""
+    with (
+        patch.object(pg, "_pg_fetch_one", new_callable=AsyncMock, return_value={"sample_size": 0}),
+        patch.object(pg, "_pg_fetch_all", new_callable=AsyncMock, return_value=[]),
+    ):
+        result = await pg.get_market_data("ac_installation", "north")
+
+    assert result["sample_size"] == 0
+    assert result["avg_price"] is None
+    assert result["data_quality"] == "no_data"
+    assert result["no_data"] is True
 
 
 # ---------------------------------------------------------------------------
@@ -743,6 +890,48 @@ async def test_log_conversation_calls_pg_execute(pg):
         mock_exec.assert_called_once()
         call_args = mock_exec.call_args[0]
         assert "conversation_logs" in call_args[0]
+
+
+# ---------------------------------------------------------------------------
+# get_contractor_documents
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_get_contractor_documents_returns_normalized_rows(pg):
+    """get_contractor_documents maps asyncpg rows into vetting-friendly document objects."""
+    rows = [
+        {
+            "id": "doc-1",
+            "contractor_id": "con-1",
+            "doc_type": "license",
+            "file_url": "https://files.example/doc-1.pdf",
+            "extracted_text": "License text",
+            "verified": True,
+            "verified_by": "admin-1",
+            "verified_at": datetime.now(UTC),
+            "uploaded_at": datetime.now(UTC),
+            "created_at": datetime.now(UTC),
+            "metadata": '{"verified": true, "verified_by": "admin-1"}',
+        }
+    ]
+    with patch.object(pg, "_pg_fetch_all", new_callable=AsyncMock, return_value=rows):
+        result = await pg.get_contractor_documents("con-1")
+
+    assert len(result) == 1
+    assert result[0]["document_type"] == "license"
+    assert result[0]["status"] == "verified"
+    assert result[0]["verification_result"] == "verified"
+    assert result[0]["file_reference"] == "https://files.example/doc-1.pdf"
+    assert result[0]["metadata"]["verified_by"] == "admin-1"
+
+
+@pytest.mark.asyncio
+async def test_get_contractor_documents_returns_empty_list(pg):
+    """get_contractor_documents returns [] when no documents exist."""
+    with patch.object(pg, "_pg_fetch_all", new_callable=AsyncMock, return_value=[]):
+        result = await pg.get_contractor_documents("missing")
+    assert result == []
 
 
 # ---------------------------------------------------------------------------

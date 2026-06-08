@@ -190,15 +190,12 @@ class TestContractorUpdateWebhook:
         with patch("src.api.routes.webhooks.get_settings") as mock_settings:
             mock_settings.return_value.API_KEYS = ["test-key"]
             with patch("src.api.routes.webhooks.get_orchestrator", return_value=mock_orchestrator):
-                with patch(
-                    "src.api.routes.webhooks.create_initial_state", return_value={"messages": [], "actions_taken": []}
-                ):
-                    client = TestClient(app, raise_server_exceptions=False)
-                    resp = client.post(
-                        "/api/v1/webhooks/contractor-update",
-                        json={"contractor_id": "c1", "type": "document_uploaded"},
-                        headers={"X-API-Key": "test-key"},
-                    )
+                client = TestClient(app, raise_server_exceptions=False)
+                resp = client.post(
+                    "/api/v1/webhooks/contractor-update",
+                    json={"contractor_id": "c1", "type": "document_uploaded"},
+                    headers={"X-API-Key": "test-key"},
+                )
         assert resp.status_code == 200
         assert resp.json()["status"] == "processed"
 

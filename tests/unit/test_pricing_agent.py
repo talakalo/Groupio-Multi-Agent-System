@@ -133,3 +133,40 @@ async def test_pricing_agent_runs(pricing_agent, sample_agent_state):
 
     assert len(result["actions_taken"]) > 0
     assert result["actions_taken"][-1]["action"] == "pricing_analyzed"
+
+
+@pytest.mark.asyncio
+async def test_pricing_agent_handles_explicit_no_data_market_shape(pricing_agent, sample_agent_state):
+    """Pricing agent should tolerate explicit no-data market metrics from asyncpg."""
+    sample_agent_state["intent"] = "pricing_question"
+    sample_agent_state["messages"] = [{"role": "user", "content": "כמה עולה התקנת מזגנים?"}]
+
+    pricing_agent.rag.retrieve = AsyncMock(return_value=[])
+    pricing_agent._db.get_market_data = AsyncMock(
+        return_value={
+            "category": "ac_installation",
+            "region": "north",
+            "sample_size": 0,
+            "avg_price": None,
+            "median_price": None,
+            "min_price": None,
+            "max_price": None,
+            "price_stddev": None,
+            "avg_participants": None,
+            "recent_comparable_offers": [],
+            "confidence": "none",
+            "data_quality": "no_data",
+            "no_data": True,
+        }
+    )
+    pricing_agent.llm_client.create_message = AsyncMock(
+        return_value={
+            "content": [{"type": "text", "text": "אין מספיק נתוני שוק כרגע."}],
+            "usage": {"input_tokens": 50, "output_tokens": 25},
+        }
+    )
+
+    result = await pricing_agent.run(sample_agent_state)
+
+    assert result["actions_taken"][-1]["action"] == "pricing_analyzed"
+    assert result["actions_taken"][-1]["details"]["market_data"]["no_data"] is True
