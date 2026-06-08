@@ -17,6 +17,7 @@ from collections.abc import AsyncGenerator
 
 import asyncpg
 import pytest
+import pytest_asyncio
 
 _TEST_DSN = os.getenv(
     "TEST_DATABASE_URL",
@@ -52,7 +53,7 @@ def _run_migrations():
     return True
 
 
-@pytest.fixture(scope="session")
+@pytest_asyncio.fixture(scope="session")
 async def db_pool(_run_migrations) -> AsyncGenerator[asyncpg.Pool, None]:
     """Session-scoped asyncpg connection pool pointed at the test DB."""
     pool = await asyncpg.create_pool(
@@ -65,7 +66,7 @@ async def db_pool(_run_migrations) -> AsyncGenerator[asyncpg.Pool, None]:
     await pool.close()
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def db_conn(db_pool: asyncpg.Pool) -> AsyncGenerator[asyncpg.Connection, None]:
     """Per-test connection with automatic rollback — each test runs in isolation."""
     async with db_pool.acquire() as conn:
