@@ -112,6 +112,33 @@ def _is_schema_not_ready(exc: Exception) -> bool:
         return False
 
 
+async def _check_message_rate_limit(current_user: UserInDB, settings: Any) -> None:
+    """Enforce per-user message rate limits. Fails open on Redis errors.
+
+    Message processing should never hard-fail with an unhandled 500 because
+    Redis is temporarily unavailable. When Redis responds successfully we still
+    preserve the real 429 behavior.
+    """
+    try:
+        redis = get_redis_client()
+        allowed = await redis.check_rate_limit(
+            current_user.id,
+            limit=settings.RATE_LIMIT_PER_USER,
+            window=settings.RATE_LIMIT_WINDOW,
+        )
+        if not allowed:
+            raise HTTPException(status_code=429, detail="Rate limit exceeded")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.warning(
+            "Redis unavailable for message rate limiting — allowing request: user_id=%s environment=%s error=%s",
+            current_user.id,
+            settings.ENVIRONMENT,
+            exc,
+        )
+
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Ensure CORS headers on error responses so browser shows real error, not CORS."""
@@ -250,15 +277,8 @@ async def send_message(
     sanitized_message = sanitize_input(request.message)
 
     # Rate limiting (keyed on authenticated user id — not body-supplied)
-    redis = get_redis_client()
     settings = get_settings()
-    allowed = await redis.check_rate_limit(
-        current_user.id,
-        limit=settings.RATE_LIMIT_PER_USER,
-        window=settings.RATE_LIMIT_WINDOW,
-    )
-    if not allowed:
-        raise HTTPException(status_code=429, detail="Rate limit exceeded")
+    await _check_message_rate_limit(current_user, settings)
 
     try:
         orchestrator = get_orchestrator()
