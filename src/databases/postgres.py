@@ -1384,7 +1384,16 @@ class PostgresClient:
                 WHERE o.category = $1
                   AND ($2::text = '' OR COALESCE(b.region, '') = $2)
                   AND o.created_at >= NOW() - (($3::text || ' months')::interval)
-                GROUP BY o.id, o.title, o.category, b.region, b.id, o.base_price, o.current_participants, o.status, o.created_at
+                GROUP BY
+                    o.id,
+                    o.title,
+                    o.category,
+                    b.region,
+                    b.id,
+                    o.base_price,
+                    o.current_participants,
+                    o.status,
+                    o.created_at
             )
             SELECT id, title, category, region, building_id, price, participants, status, created_at
             FROM comparable_offers

@@ -775,7 +775,10 @@ async def test_create_support_ticket_persists_and_normalizes_asyncpg_row(pg):
         "conversation_id": "conv-1",
         "reason": "Need human follow-up",
         "priority": "high",
-        "context": '{"intent":"complaint","category":"complaint","message":"Need human follow-up","description":"Need human follow-up"}',
+        "context": (
+            '{"intent":"complaint","category":"complaint","message":"Need human follow-up",'
+            '"description":"Need human follow-up"}'
+        ),
         "status": "open",
         "assigned_to": None,
         "resolved_at": None,
