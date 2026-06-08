@@ -1390,17 +1390,16 @@ async def get_payment_summary(
     db = get_postgres_client()
 
     # Aggregate payment totals at DB level to avoid loading all rows
-    payment_agg = await db.execute_query(
-        "SELECT status, SUM(amount) as total FROM payments GROUP BY status"
-    ) or []
+    payment_agg = await db.execute_query("SELECT status, SUM(amount) as total FROM payments GROUP BY status") or []
     payment_by_status: dict[str, float] = {r["status"]: float(r["total"] or 0) for r in payment_agg}
     total_collected = sum(payment_by_status.get(s, 0) for s in ("succeeded", "completed"))
     total_refunded = payment_by_status.get("refunded", 0)
 
     # Aggregate invoice totals at DB level
-    invoice_agg = await db.execute_query(
-        "SELECT status, SUM(total) as total, COUNT(*) as cnt FROM invoices GROUP BY status"
-    ) or []
+    invoice_agg = (
+        await db.execute_query("SELECT status, SUM(total) as total, COUNT(*) as cnt FROM invoices GROUP BY status")
+        or []
+    )
     invoice_by_status: dict[str, dict] = {r["status"]: r for r in invoice_agg}
     total_released = float((invoice_by_status.get("released") or {}).get("total") or 0)
     pending_payouts = int((invoice_by_status.get("paid") or {}).get("cnt") or 0)
@@ -1408,8 +1407,6 @@ async def get_payment_summary(
 
     fee_rate = _platform_fee_rate()
     total_platform_fees = round(total_collected * fee_rate, 2)
-
-
 
     return PaymentSummaryResponse(
         total_collected=total_collected,
@@ -1468,10 +1465,13 @@ async def get_contractor_payouts(
     contractor_ids = list({inv.get("contractor_id") for inv in invoices if inv.get("contractor_id")})
     contractor_names: dict[str, str] = {}
     if contractor_ids:
-        rows = await db.execute_query(
-            "SELECT id, business_name, name FROM contractors WHERE id = ANY($1::uuid[])",
-            contractor_ids,
-        ) or []
+        rows = (
+            await db.execute_query(
+                "SELECT id, business_name, name FROM contractors WHERE id = ANY($1::uuid[])",
+                contractor_ids,
+            )
+            or []
+        )
         for row in rows:
             contractor_names[row["id"]] = row.get("business_name") or row.get("name") or "Unknown"
 

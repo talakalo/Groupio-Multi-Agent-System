@@ -72,11 +72,12 @@ describe('AdminLayout — sidebar navigation links', () => {
     });
   }
 
-  it('highlights the active route (Dashboard) with sidebar-link-active class', () => {
+  it('highlights the active route (Dashboard) with active navigation styles', () => {
     renderShell();
     const dashLink = screen.getAllByRole('link').find((l) => l.getAttribute('href') === '/dashboard');
     expect(dashLink).toBeDefined();
-    expect(dashLink?.className).toContain('sidebar-link-active');
+    expect(dashLink?.className).toContain('bg-primary-600');
+    expect(dashLink?.className).toContain('text-white');
   });
 });
 

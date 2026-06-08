@@ -211,8 +211,8 @@ class OutreachAgent(BaseAgent):
                 "requires_followup": queued,
                 "summary_for_next_agent": (
                     f"Outreach campaign ({campaign_type}) queued, pending admin approval."
-                    if queued else
-                    f"Outreach campaign ({campaign_type}) failed to queue due to a database error."
+                    if queued
+                    else f"Outreach campaign ({campaign_type}) failed to queue due to a database error."
                 ),
             }
         ]
