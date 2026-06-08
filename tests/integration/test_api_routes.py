@@ -149,6 +149,57 @@ class TestMessageEndpoint:
 
         assert response.status_code == 429
 
+    def test_send_message_redis_rate_limit_exception_fails_open(self, client, mock_db, mock_redis):
+        """Redis rate-limit failures must not crash the message endpoint."""
+        override_auth({"id": "user-123", "role": "resident"})
+        mock_redis.check_rate_limit = AsyncMock(side_effect=ConnectionError("Redis is down"))
+        mock_db.log_conversation = AsyncMock()
+        with patch("src.api.main.get_orchestrator") as mock_orch:
+            mock_orch.return_value.run = AsyncMock(
+                return_value={
+                    "conversation_id": "conv-123",
+                    "response": {"message": "Hello!"},
+                    "metadata": {"agent": "support"},
+                }
+            )
+
+            response = client.post(
+                "/api/v1/message",
+                json={
+                    "user_id": "user-123",
+                    "message": "Hello, Redis is unavailable",
+                },
+            )
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["conversation_id"] == "conv-123"
+
+    def test_send_message_redis_client_creation_exception_fails_open(self, client):
+        """Redis client creation failures must not crash the message endpoint."""
+        override_auth({"id": "user-123", "role": "resident"})
+        with (
+            patch("src.api.main.get_redis_client", side_effect=RuntimeError("Redis bootstrap failed")),
+            patch("src.api.main.get_orchestrator") as mock_orch,
+        ):
+            mock_orch.return_value.run = AsyncMock(
+                return_value={
+                    "conversation_id": "conv-123",
+                    "response": {"message": "Hello!"},
+                    "metadata": {"agent": "support"},
+                }
+            )
+
+            response = client.post(
+                "/api/v1/message",
+                json={
+                    "user_id": "user-123",
+                    "message": "Hello, Redis bootstrap failed",
+                },
+            )
+
+            assert response.status_code == 200
+
     def test_send_message_invalid_input(self, client):
         """Test message validation fails."""
         override_auth({"id": "user-123", "role": "resident"})
