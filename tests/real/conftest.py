@@ -1,11 +1,13 @@
 """Fixtures for real-backend integration tests.
 
-These tests require a live PostgreSQL instance.  They are skipped automatically
-when TEST_DATABASE_URL is not set, so CI without the DB service stays green.
+These tests require a live PostgreSQL instance. They are skipped automatically
+when TEST_DATABASE_URL is not set, so environments without the DB service stay
+green.
 
 To run locally:
   docker compose -f docker/docker-compose.test.yml up -d
   TEST_DATABASE_URL=postgresql://groupio_test:groupio_test@localhost:5433/groupio_test \
+  REDIS_URL=redis://localhost:6380 \
     pytest tests/real/ -v
 """
 
