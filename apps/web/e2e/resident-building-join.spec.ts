@@ -15,6 +15,7 @@ import { createMockResponse } from "./helpers/factory.util";
 
 const JOIN_PAGE = "/building/join";
 const VALID_CODE = "INV-ABCD-1234";
+const JOIN_BUTTON_NAME = /join|הצטרפ/i;
 
 test.describe("Resident — Join Building with Invite Code", () => {
   test.beforeEach(async ({ page, setupAuthAndMocks }) => {
@@ -39,7 +40,7 @@ test.describe("Resident — Join Building with Invite Code", () => {
     await page.waitForLoadState("networkidle");
 
     await page.getByRole("textbox").fill(VALID_CODE);
-    await page.getByRole("button", { name: /join|הצטרף/i }).click();
+    await page.getByRole("button", { name: JOIN_BUTTON_NAME }).click();
 
     // Success state: heading or message indicating joined successfully
     await expect(
@@ -60,14 +61,14 @@ test.describe("Resident — Join Building with Invite Code", () => {
     await page.waitForLoadState("networkidle");
 
     await page.getByRole("textbox").fill("INV-BAD-0000");
-    await page.getByRole("button", { name: /join|הצטרף/i }).click();
+    await page.getByRole("button", { name: JOIN_BUTTON_NAME }).click();
 
     await expect(page.getByText(/not found|לא נמצא|invalid|שגוי/i)).toBeVisible({
       timeout: 5000,
     });
   });
 
-  test("submitting an empty code shows validation error without calling API", async ({ page }) => {
+  test("submit button stays disabled until an invite code is entered", async ({ page }) => {
     let apiCalled = false;
     await page.route("**/api/v1/buildings/join", () => {
       apiCalled = true;
@@ -76,11 +77,8 @@ test.describe("Resident — Join Building with Invite Code", () => {
     await page.goto(JOIN_PAGE);
     await page.waitForLoadState("networkidle");
 
-    // Submit without filling the input
-    await page.getByRole("button", { name: /join|הצטרף/i }).click();
-
-    // Validation error visible, API not called
-    await expect(page.getByText(/required|שדה חובה|הכנס קוד/i)).toBeVisible({ timeout: 3000 });
+    const submitButton = page.getByRole("button", { name: JOIN_BUTTON_NAME });
+    await expect(submitButton).toBeDisabled();
     expect(apiCalled).toBe(false);
   });
 
@@ -135,7 +133,7 @@ test.describe("Resident — Join Building with Invite Code (Hebrew locale)", () 
     await page.waitForLoadState("networkidle");
 
     await page.getByRole("textbox").fill(VALID_CODE);
-    await page.getByRole("button", { name: /join|הצטרף/i }).click();
+    await page.getByRole("button", { name: JOIN_BUTTON_NAME }).click();
 
     // Hebrew success message should appear
     await expect(page.getByText(/הצטרפת|הצלחה/)).toBeVisible({ timeout: 5000 });

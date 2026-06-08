@@ -160,13 +160,13 @@ export default function OrderDetailPage(props: PageParamsProps) {
 
   if (loading) {
     return (
-      <main className="max-w-2xl mx-auto space-y-6 p-4 md:p-6" dir="rtl">
+      <div className="max-w-2xl mx-auto space-y-6 p-4 md:p-6" dir="rtl">
         <Skeleton variant="text" className="h-4 w-40" />
         <Skeleton variant="card" className="h-20" />
         <Skeleton variant="card" className="h-48" />
         <Skeleton variant="card" className="h-32" />
         <Skeleton variant="card" className="h-40" />
-      </main>
+      </div>
     );
   }
 
@@ -203,7 +203,7 @@ export default function OrderDetailPage(props: PageParamsProps) {
   const orderTitle = order.offer?.title ?? t("detail.defaultTitle");
 
   return (
-    <main className="max-w-2xl mx-auto space-y-6 p-4 md:p-6" dir="rtl">
+    <div className="max-w-2xl mx-auto space-y-6 p-4 md:p-6" dir="rtl">
       <Breadcrumb
         items={[
           { label: t("detail.breadcrumbHome"), href: "/dashboard" },
@@ -345,6 +345,6 @@ export default function OrderDetailPage(props: PageParamsProps) {
           {t("detail.backToOrders")}
         </Link>
       </div>
-    </main>
+    </div>
   );
 }
