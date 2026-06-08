@@ -200,13 +200,23 @@ class PricingAgent(BaseAgent):
             if state["actions_taken"]:
                 state["actions_taken"][-1]["requires_human_confirmation"] = True
             last_action = state["actions_taken"][-1] if state["actions_taken"] else {}
+            handoff_entities = last_action.get("entities_to_pass", {})
+            details = last_action.get("details", {})
+            recommended_price = tiers[0]["price"] if tiers else None
+            price_range = {
+                "min_price": market_data.get("min_price"),
+                "max_price": market_data.get("max_price"),
+                "avg_price": market_data.get("avg_price"),
+            }
             await self._enqueue_pending_decision(
                 state=state,
                 action_type="pricing_recommendation",
                 payload={
-                    "offer_id": last_action.get("offer_id", ""),
-                    "recommended_price": last_action.get("recommended_price"),
-                    "price_range": last_action.get("price_range"),
+                    "offer_id": handoff_entities.get("offer_id", ""),
+                    "category": handoff_entities.get("category") or details.get("category", ""),
+                    "recommended_price": recommended_price,
+                    "price_range": price_range,
+                    "tiers": details.get("tiers", []),
                     "mode": mode,
                 },
                 escalation_reason=reason,

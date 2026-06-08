@@ -86,5 +86,6 @@ class AgentState(TypedDict):
     # Metadata
     start_time: str
     tokens_used: int
+    token_usage_available: NotRequired[bool]
     turn_count: int  # incremented each router pass; capped at MAX_AGENT_TURNS
     state_contract_version: int

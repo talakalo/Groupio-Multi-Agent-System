@@ -551,6 +551,7 @@ class GroupioOrchestrator:
                 "confidence": final_state.get("confidence", 0),
                 "agents_used": [a.get("agent", "unknown") for a in final_state.get("actions_taken", [])],
                 "tokens_used": final_state.get("tokens_used", 0),
+                "token_usage_available": final_state.get("token_usage_available", False),
                 "duration_ms": calculate_duration_ms(final_state["start_time"]),
                 "needs_human": final_state.get("needs_human", False),
             },

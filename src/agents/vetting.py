@@ -173,13 +173,14 @@ class VettingAgent(BaseAgent):
             if state["actions_taken"]:
                 state["actions_taken"][-1]["requires_human_confirmation"] = True
             last_action = state["actions_taken"][-1] if state["actions_taken"] else {}
+            details = last_action.get("details", {})
             await self._enqueue_pending_decision(
                 state=state,
                 action_type="vetting_decision",
                 payload={
-                    "contractor_id": last_action.get("contractor_id", ""),
-                    "decision": last_action.get("decision", ""),
-                    "trust_score": last_action.get("trust_score"),
+                    "contractor_id": details.get("contractor_id", ""),
+                    "decision": details.get("decision", ""),
+                    "trust_score": details.get("trust_score"),
                     "mode": mode,
                 },
                 escalation_reason=state.get("escalation_reason", reason),
