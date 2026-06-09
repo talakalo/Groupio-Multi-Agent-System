@@ -13,7 +13,7 @@ import pytest_asyncio
 from fastapi.testclient import TestClient
 
 from src.api.main import app
-from src.api.middleware.auth import get_current_user
+from src.api.middleware.auth import get_current_user, hash_password
 from src.config.settings import get_settings
 from src.databases.postgres import get_postgres_client
 from src.databases.redis_client import get_redis_client
@@ -48,18 +48,23 @@ async def _real_service_env():
 async def test_message_endpoint_smoke_uses_real_postgres_and_redis(db_pool, _real_service_env) -> None:
     """POST /api/v1/message should succeed and persist a conversation log."""
     user_id = str(uuid.uuid4())
+    phone_suffix = str(uuid.uuid4().int % 100000000).zfill(8)
     rate_key = f"rate:{user_id}"
     conversation_id = f"conv-{uuid.uuid4()}"
 
     async with db_pool.acquire() as conn:
         await conn.execute(
             """
-            INSERT INTO users (id, email, full_name, role, is_active, is_verified, created_at, updated_at)
-            VALUES ($1, $2, $3, 'resident', true, true, NOW(), NOW())
+            INSERT INTO users
+              (id, email, hashed_password, full_name, phone, role, preferred_language,
+               is_active, is_verified, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, 'resident', 'he', true, true, NOW(), NOW())
             """,
             user_id,
             f"{user_id[:8]}@smoke.example.com",
+            hash_password("test-password"),
             "Smoke Test User",
+            f"05{phone_suffix}",
         )
 
     redis = get_redis_client()

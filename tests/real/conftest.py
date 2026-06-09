@@ -84,16 +84,23 @@ async def db_conn(db_pool: asyncpg.Pool) -> AsyncGenerator[asyncpg.Connection, N
 async def _insert_user(conn: asyncpg.Connection, *, role: str = "resident") -> dict:
     import uuid
 
+    from src.api.middleware.auth import hash_password
+
     uid = str(uuid.uuid4())
+    phone_suffix = str(uuid.uuid4().int % 100000000).zfill(8)
     row = await conn.fetchrow(
         """
-        INSERT INTO users (id, email, full_name, role, is_active, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, true, NOW(), NOW())
-        RETURNING id, email, full_name, role
+        INSERT INTO users
+          (id, email, hashed_password, full_name, phone, role, preferred_language,
+           is_active, is_verified, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, 'he', true, true, NOW(), NOW())
+        RETURNING id, email, full_name, role, phone
         """,
         uid,
         f"{uid[:8]}@test.example.com",
+        hash_password("test-password"),
         "Test User",
+        f"05{phone_suffix}",
         role,
     )
     return dict(row)
