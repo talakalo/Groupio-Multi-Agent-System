@@ -53,9 +53,9 @@ def _run_migrations():
     return True
 
 
-@pytest_asyncio.fixture(scope="session", loop_scope="session")
+@pytest_asyncio.fixture
 async def db_pool(_run_migrations) -> AsyncGenerator[asyncpg.Pool, None]:
-    """Session-scoped asyncpg connection pool pointed at the test DB."""
+    """Per-test asyncpg connection pool bound to the active event loop."""
     pool = await asyncpg.create_pool(
         _TEST_DSN,
         min_size=2,
