@@ -119,8 +119,7 @@ async def test_idempotency_key_unique_per_user(db_conn: asyncpg.Connection) -> N
 
 @pytest.mark.asyncio
 async def test_different_users_can_reuse_same_idempotency_key(db_conn: asyncpg.Connection) -> None:
-    """The partial unique index is (user_id, idempotency_key) so two different users
-    may share the same key string without a constraint violation."""
+    """Idempotency keys are globally unique across payments, even for different users."""
     user_a = await _insert_user(db_conn)
     user_b = await _insert_user(db_conn)
     building = await _insert_building(db_conn, admin_id=user_a["id"])
@@ -130,7 +129,20 @@ async def test_different_users_can_reuse_same_idempotency_key(db_conn: asyncpg.C
 
     shared_key = "shared-key-ok"
 
-    for user, invoice in ((user_a, invoice_a), (user_b, invoice_b)):
+    await db_conn.execute(
+        """
+        INSERT INTO payments (id, invoice_id, user_id, offer_id, amount, currency, status,
+                              provider, idempotency_key, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, 100, 'ILS', 'pending', 'stripe', $5, NOW(), NOW())
+        """,
+        str(uuid.uuid4()),
+        invoice_a["id"],
+        user_a["id"],
+        offer["id"],
+        shared_key,
+    )
+
+    with pytest.raises(asyncpg.UniqueViolationError):
         await db_conn.execute(
             """
             INSERT INTO payments (id, invoice_id, user_id, offer_id, amount, currency, status,
@@ -138,14 +150,11 @@ async def test_different_users_can_reuse_same_idempotency_key(db_conn: asyncpg.C
             VALUES ($1, $2, $3, $4, 100, 'ILS', 'pending', 'stripe', $5, NOW(), NOW())
             """,
             str(uuid.uuid4()),
-            invoice["id"],
-            user["id"],
+            invoice_b["id"],
+            user_b["id"],
             offer["id"],
             shared_key,
         )
-
-    count = await db_conn.fetchval("SELECT COUNT(*) FROM payments WHERE idempotency_key = $1", shared_key)
-    assert count == 2
 
 
 @pytest.mark.asyncio
