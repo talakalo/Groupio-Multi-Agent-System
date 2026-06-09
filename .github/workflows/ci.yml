@@ -188,6 +188,7 @@ jobs:
     env:
       REDIS_URL: redis://localhost:6379
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
       USE_LOCAL_POSTGRES: 'true'
       TESTING: 'true'
       ENVIRONMENT: 'testing'
@@ -243,7 +244,7 @@ jobs:
         run: |
           # Coverage minimum is defined once in pyproject.toml (pytest addopts:
           # --cov-fail-under=50). Do not override here — CLI flags supersede config.
-          pytest tests/ --cov=src --cov-report=xml --cov-report=term-missing
+          pytest tests/ --ignore=tests/real --cov=src --cov-report=xml --cov-report=term-missing
 
       - name: Run integration tests
         env:
@@ -256,6 +257,20 @@ jobs:
           JWT_SECRET_KEY: 'test-secret-key-for-ci-testing-only'
         run: |
           pytest tests/integration/ -v --timeout=30 --no-cov
+
+      - name: Run real database and live backend smoke tests
+        env:
+          REDIS_URL: redis://localhost:6379
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+          USE_LOCAL_POSTGRES: 'true'
+          TESTING: 'true'
+          ENVIRONMENT: 'testing'
+          ANTHROPIC_API_KEY: 'test-key'
+          OPENAI_API_KEY: 'test-key'
+          JWT_SECRET_KEY: 'test-secret-key-for-ci-testing-only'
+        run: |
+          pytest tests/real/ -v --timeout=30 --no-cov -rs
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238 # v4
