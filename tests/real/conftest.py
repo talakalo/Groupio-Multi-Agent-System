@@ -113,11 +113,12 @@ async def _insert_building(conn: asyncpg.Connection, *, admin_id: str) -> dict:
     row = await conn.fetchrow(
         """
         INSERT INTO buildings
-          (id, address, city, region, admin_user_id, total_units, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, 20, NOW(), NOW())
-        RETURNING id, address, city, admin_user_id
+          (id, name, address, city, region, admin_user_id, total_units, floors, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, 20, 5, NOW(), NOW())
+        RETURNING id, name, address, city, admin_user_id
         """,
         bid,
+        "Rothschild Towers",
         "Rothschild 1",
         "Tel Aviv",
         "center",
@@ -133,14 +134,15 @@ async def _insert_offer(conn: asyncpg.Connection, *, building_id: str, admin_id:
     row = await conn.fetchrow(
         """
         INSERT INTO offers
-          (id, title, category, building_id, status, base_price,
+          (id, title, description, category, building_id, status, base_price,
            pricing_tiers, created_by, created_at, updated_at)
-        VALUES ($1, $2, 'ac', $3, 'active', 5000,
-                '[]'::jsonb, $4, NOW(), NOW())
+        VALUES ($1, $2, $3, 'ac', $4, 'active', 5000,
+                '[]'::jsonb, $5, NOW(), NOW())
         RETURNING id, title, status, building_id
         """,
         oid,
         "AC Installation",
+        "Install a new shared AC system",
         building_id,
         admin_id,
     )
