@@ -1,5 +1,4 @@
-curl http://localhost:8000/api/v1/health
-{"status":"degraded","services":{"vector_db":true,"graph_db":true,"redis":true,"postgres":false}}Mac# Groupio Multi-Agent System - Local Setup Guide
+# Groupio Multi-Agent System - Local Setup Guide
 
 This guide walks you through setting up and running the Groupio system locally for development.
 
@@ -26,7 +25,7 @@ source venv/bin/activate   # On Windows: venv\Scripts\activate
 pip install -e ".[dev]"    # Backend + alembic
 
 # 3. Start infrastructure services (from repo root; compose file is under docker/)
-docker compose -f docker/docker-compose.yml up -d
+docker compose -f docker/docker-compose.yml up -d postgres redis qdrant neo4j
 
 # 4. Configure environment
 cp docker/.env.example .env
@@ -41,6 +40,8 @@ python -m uvicorn src.api.main:app --reload --port 8000
 # 7. Start the frontend (in a new terminal)
 cd apps/web && pnpm dev
 ```
+
+If you also want the admin app on `http://localhost:3001`, keep Grafana stopped locally. The current `docker/docker-compose.yml` maps Grafana to host port `3001`, which conflicts with `apps/admin`.
 
 ---
 
@@ -77,21 +78,23 @@ The system requires several services. Use Docker Compose to start them:
 
 ```bash
 # Always run from the repository root (not from docker/)
-docker compose -f docker/docker-compose.yml up -d
+docker compose -f docker/docker-compose.yml up -d postgres redis qdrant neo4j
 ```
 
 If your shell is already in `docker/`, use: `docker compose -f docker-compose.yml up -d`
 
-This starts (typical dev stack):
+For a full stack, run `docker compose -f docker/docker-compose.yml up -d`, but note that the compose file currently maps Grafana to host port `3001`.
+
+The minimal local backend stack above starts:
 | Service | Port | Description |
 |---------|------|-------------|
 | Redis | 6379 | Caching, rate limiting, session storage |
 | Qdrant | 6333 | Vector database for RAG |
 | Neo4j | 7474 (HTTP), 7687 (Bolt) | Graph database |
 | PostgreSQL | 5432 | Main database |
-| Prometheus | 9090 | Metrics |
-| Alertmanager | 9093 | Alerts |
-| Grafana | **3010** | Dashboards (admin UI stays on **3001**) |
+| Prometheus | 9090 | Metrics (only when you start the full compose stack) |
+| Alertmanager | 9093 | Alerts (only when you start the full compose stack) |
+| Grafana | **3001** | Dashboards in the full compose stack; conflicts with the admin app port |
 
 **Verify services are running:**
 ```bash
@@ -325,13 +328,13 @@ docker compose -f docker/docker-compose.yml logs -f
 
 #### Port already in use
 ```bash
-# Find process using port (e.g. 8000 API, 3001 Admin)
+# Find process using port (e.g. 8000 API, 3001 Admin/Grafana)
 lsof -i :8000
 lsof -i :3001
 # Kill it
 kill -9 <PID>
 ```
-Admin uses **3001**; Grafana in Docker is on **3010** so they no longer fight for the same port.
+`apps/admin` uses **3001**, and the full Docker compose stack currently maps Grafana to **3001** as well. For local admin work, either keep Grafana stopped or free the port before starting the admin app.
 
 #### `docker compose` “no such file” (`docker/docker/docker-compose.yml`)
 You ran compose from inside `docker/` with `-f docker/docker-compose.yml`. Either stay in **repo root** and use `-f docker/docker-compose.yml`, or from `docker/` use `-f docker-compose.yml`.
