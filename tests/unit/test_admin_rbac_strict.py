@@ -252,3 +252,105 @@ class TestRefreshVerificationEndpoint:
         assert body["found"] is True
         assert body["verified"] is True
         assert body["confidence"] == pytest.approx(0.7)
+
+
+# ---------------------------------------------------------------------------
+# /api/v1/agents/* — P0 fix: was get_admin_user (allowed BM), now require_admin_only
+# ---------------------------------------------------------------------------
+
+
+class TestAgentsRbac:
+    """After the P0 fix, /api/v1/agents/* must block buildings_manager."""
+
+    def test_agents_status_blocks_buildings_manager(self, client):
+        """buildings_manager must be 403 on agent routes — P0 fix verification."""
+        _override_current_user_only(_make_user(UserRole.BUILDINGS_MANAGER))
+        resp = client.get("/api/v1/agents/")
+        assert resp.status_code == 403, (
+            f"Expected 403 for buildings_manager on /api/v1/agents/, got {resp.status_code}. "
+            "agents.py must use require_admin_only."
+        )
+
+    def test_agents_status_blocks_resident(self, client):
+        _override_current_user_only(_make_user(UserRole.RESIDENT))
+        resp = client.get("/api/v1/agents/")
+        assert resp.status_code == 403
+
+    def test_agents_status_blocks_contractor(self, client):
+        _override_current_user_only(_make_user(UserRole.CONTRACTOR))
+        resp = client.get("/api/v1/agents/")
+        assert resp.status_code == 403
+
+    def test_agents_status_allows_admin(self, client):
+        _override(_make_user(UserRole.ADMIN))
+        with patch("src.api.routes.agents.get_orchestrator") as mock_orch:
+            orch = MagicMock()
+            orch.agents = {}
+            mock_orch.return_value = orch
+            resp = client.get("/api/v1/agents/")
+        assert resp.status_code == 200
+
+    def test_agents_status_allows_super_admin(self, client):
+        _override(_make_user(UserRole.SUPER_ADMIN))
+        with patch("src.api.routes.agents.get_orchestrator") as mock_orch:
+            orch = MagicMock()
+            orch.agents = {}
+            mock_orch.return_value = orch
+            resp = client.get("/api/v1/agents/")
+        assert resp.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# /api/v1/admin/payments/* — P0 fix: router-level require_admin_only
+# ---------------------------------------------------------------------------
+
+
+class TestAdminPaymentsRbac:
+    """After the P0 fix, /api/v1/admin/payments/* must block buildings_manager."""
+
+    def test_payment_summary_blocks_buildings_manager(self, client):
+        """buildings_manager must be 403 on /admin/payments/summary — P0 fix verification."""
+        _override_current_user_only(_make_user(UserRole.BUILDINGS_MANAGER))
+        resp = client.get("/api/v1/admin/payments/summary")
+        assert resp.status_code == 403, (
+            f"Expected 403 for buildings_manager on /admin/payments/summary, got {resp.status_code}. "
+            "payments.py admin_router must use require_admin_only."
+        )
+
+    def test_escrow_blocks_buildings_manager(self, client):
+        _override_current_user_only(_make_user(UserRole.BUILDINGS_MANAGER))
+        resp = client.get("/api/v1/admin/payments/escrow")
+        assert resp.status_code == 403
+
+    def test_payouts_blocks_buildings_manager(self, client):
+        _override_current_user_only(_make_user(UserRole.BUILDINGS_MANAGER))
+        resp = client.get("/api/v1/admin/payments/payouts")
+        assert resp.status_code == 403
+
+    def test_payment_summary_blocks_resident(self, client):
+        _override_current_user_only(_make_user(UserRole.RESIDENT))
+        resp = client.get("/api/v1/admin/payments/summary")
+        assert resp.status_code == 403
+
+    def test_payment_summary_blocks_contractor(self, client):
+        _override_current_user_only(_make_user(UserRole.CONTRACTOR))
+        resp = client.get("/api/v1/admin/payments/summary")
+        assert resp.status_code == 403
+
+    def test_payment_summary_allows_admin(self, client):
+        _override(_make_user(UserRole.ADMIN))
+        with patch("src.api.routes.payments.get_postgres_client") as mock_pg:
+            db = AsyncMock()
+            db.execute_query = AsyncMock(return_value=[])
+            mock_pg.return_value = db
+            resp = client.get("/api/v1/admin/payments/summary")
+        assert resp.status_code == 200
+
+    def test_payment_summary_allows_super_admin(self, client):
+        _override(_make_user(UserRole.SUPER_ADMIN))
+        with patch("src.api.routes.payments.get_postgres_client") as mock_pg:
+            db = AsyncMock()
+            db.execute_query = AsyncMock(return_value=[])
+            mock_pg.return_value = db
+            resp = client.get("/api/v1/admin/payments/summary")
+        assert resp.status_code == 200
