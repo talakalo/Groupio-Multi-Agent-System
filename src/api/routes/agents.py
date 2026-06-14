@@ -5,12 +5,14 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from src.api.middleware.auth import get_admin_user
+from src.api.middleware.auth import require_admin_only
 from src.orchestration.graph import get_orchestrator
 
 router = APIRouter(
     tags=["agents"],
-    dependencies=[Depends(get_admin_user)],  # Require admin auth for all agent routes
+    # P0 SECURITY: agent management is platform-admin only (admin, super_admin).
+    # buildings_manager must NOT have access to agent invocation or metrics.
+    dependencies=[Depends(require_admin_only)],
 )
 
 

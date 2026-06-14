@@ -484,8 +484,11 @@ export default function OffersPage() {
           </div>
 
           {/* Status */}
+          <label htmlFor="offers-status-filter" className="sr-only">Filter by status</label>
           <select
+            id="offers-status-filter"
             className="input"
+            aria-label="Filter by status"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
           >
@@ -502,8 +505,11 @@ export default function OffersPage() {
           </select>
 
           {/* Category */}
+          <label htmlFor="offers-category-filter" className="sr-only">Filter by category</label>
           <select
+            id="offers-category-filter"
             className="input"
+            aria-label="Filter by category"
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
           >

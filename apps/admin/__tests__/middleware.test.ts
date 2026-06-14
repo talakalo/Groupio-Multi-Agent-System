@@ -11,7 +11,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
  *   - unauthenticated requests to non-public paths redirect to /login
  *   - non-admin role hints are bounced to /login
  *   - /login itself is always reachable
- *   - admin role hints plus refresh_token cookie pass through
+ *   - admin / super_admin role hints plus refresh_token cookie pass through
+ *   - buildings_manager is bounced to /login (building-scoped, not a platform admin)
  */
 
 // next-intl pulls in Next internals that don't run under jsdom cleanly.
@@ -112,13 +113,16 @@ describe("apps/admin middleware", () => {
     expect(res.status).toBe(200);
   });
 
-  it("passes through a buildings_manager", () => {
+  it("redirects a buildings_manager to /login (P0 RBAC — not a platform admin)", () => {
+    // buildings_manager is building-scoped; the admin shell is for platform admins only.
+    // The web app (:3000) serves /buildings-manager/dashboard for this role.
     const req = buildRequest("/escalations", {
       refresh_token: "sess",
       "groupio-auth": encodeAuthCookie("buildings_manager"),
     });
     const res = middleware(req);
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(307);
+    expect(res.headers.get("location")).toContain("/login");
   });
 
   it("passes through when refresh cookie is present and role hint is absent", () => {

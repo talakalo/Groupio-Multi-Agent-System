@@ -271,7 +271,7 @@ export default function AgentsPage() {
             Agent Management
           </h1>
           <p className="text-sm text-surface-500 mt-0.5">
-            Monitor, configure, and manage the 7 Groupio AI agents
+            Monitor, configure, and manage Groupio AI agents
           </p>
         </div>
         <button

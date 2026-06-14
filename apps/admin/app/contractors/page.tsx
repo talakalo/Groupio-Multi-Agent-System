@@ -629,7 +629,7 @@ export default function ContractorsPage() {
       const ids = Array.from(selectedIds);
       const results = await Promise.allSettled(
         ids.map((id) =>
-          fetch(`${API_BASE}/admin/contractors/${encodeURIComponent(id)}/request-documents`, {
+          fetch(`${API_BASE}/admin/contractors/${encodeURIComponent(id)}/request-docs`, {
             method: "POST",
             ...fetchOpts(),
             body: JSON.stringify({ message: "Please upload your license, insurance, and business registration documents to complete your verification." }),
@@ -751,8 +751,11 @@ export default function ContractorsPage() {
           </div>
 
           {/* Verification */}
+          <label htmlFor="contractors-verification-filter" className="sr-only">Filter by verification status</label>
           <select
+            id="contractors-verification-filter"
             className="input"
+            aria-label="Filter by verification status"
             value={verificationFilter}
             onChange={(e) =>
               setVerificationFilter(e.target.value as VerificationFilter)
@@ -765,8 +768,11 @@ export default function ContractorsPage() {
           </select>
 
           {/* Category */}
+          <label htmlFor="contractors-category-filter" className="sr-only">Filter by category</label>
           <select
+            id="contractors-category-filter"
             className="input"
+            aria-label="Filter by category"
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
           >
@@ -779,8 +785,11 @@ export default function ContractorsPage() {
           </select>
 
           {/* Region */}
+          <label htmlFor="contractors-region-filter" className="sr-only">Filter by region</label>
           <select
+            id="contractors-region-filter"
             className="input"
+            aria-label="Filter by region"
             value={regionFilter}
             onChange={(e) => setRegionFilter(e.target.value)}
           >
@@ -840,6 +849,8 @@ export default function ContractorsPage() {
               <th className="table-header w-10">
                 <input
                   type="checkbox"
+                  id="contractors-select-all"
+                  aria-label="Select all contractors"
                   className="rounded border-surface-300 text-primary-600 focus:ring-primary-500"
                   checked={allSelected}
                   onChange={toggleSelectAll}

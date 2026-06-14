@@ -114,10 +114,14 @@ export function middleware(request: NextRequest) {
     const url = request.nextUrl.clone();
     if (redirect) {
       url.pathname = redirect;
-    } else if (['admin', 'super_admin', 'buildings_manager'].includes(userRole || '')) {
+    } else if (['admin', 'super_admin'].includes(userRole || '')) {
+      // Platform admins → separate admin app (:3001).
+      // buildings_manager is NOT a platform admin; handled by roleDefaultRoutes below.
       const adminUrl = process.env.NEXT_PUBLIC_ADMIN_URL || 'http://localhost:3001';
       return NextResponse.redirect(`${adminUrl}/dashboard`);
     } else {
+      // Covers: resident, contractor, buildings_manager.
+      // buildings_manager → /buildings-manager/dashboard (via roleDefaultRoutes).
       url.pathname = roleDefaultRoutes[userRole || 'resident'] || '/dashboard';
     }
     url.searchParams.delete('redirect');

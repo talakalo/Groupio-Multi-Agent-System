@@ -248,11 +248,16 @@ class TestEscalationsRBAC:
 
 
 class TestAdminEndpointsRBAC:
-    """Admin API uses get_admin_user (admin, super_admin, buildings_manager)."""
+    """Platform-admin API is restricted to admin and super_admin only (P0 RBAC fix).
 
-    def test_buildings_manager_can_access_admin_status(self, client):
-        """GET /api/v1/admin/status succeeds for buildings_manager."""
-        _override_auth(_make_user(UserRole.BUILDINGS_MANAGER))
+    buildings_manager must NOT have access to /api/v1/admin/* endpoints — doing so
+    would give a building-scoped role access to platform-wide operations (user
+    management, system settings, agent controls, payment overrides, etc.).
+    """
+
+    def test_admin_can_access_admin_status(self, client):
+        """GET /api/v1/admin/status succeeds for admin."""
+        _override_auth(_make_user(UserRole.ADMIN))
 
         with (
             patch("src.orchestration.graph.get_orchestrator") as mock_orch,
@@ -271,6 +276,76 @@ class TestAdminEndpointsRBAC:
             )
 
         assert response.status_code == 200
+
+    def test_super_admin_can_access_admin_status(self, client):
+        """GET /api/v1/admin/status succeeds for super_admin."""
+        _override_auth(_make_user(UserRole.SUPER_ADMIN))
+
+        with (
+            patch("src.orchestration.graph.get_orchestrator") as mock_orch,
+            patch("src.databases.vector_store.get_vector_store") as mock_vs,
+        ):
+            orchestrator = MagicMock()
+            orchestrator.agents = {}
+            mock_orch.return_value = orchestrator
+            vs = AsyncMock()
+            vs.get_collection_info = AsyncMock(return_value={"count": 0})
+            mock_vs.return_value = vs
+
+            response = client.get(
+                "/api/v1/admin/status",
+                headers={"Authorization": "Bearer test-token"},
+            )
+
+        assert response.status_code == 200
+
+    def test_buildings_manager_cannot_access_admin_status(self, client):
+        """buildings_manager must receive 403 on GET /api/v1/admin/status (P0 RBAC fix).
+
+        buildings_manager is a building-scoped role and must not reach platform-admin
+        endpoints even though it previously fell through via get_admin_user.
+        """
+        _override_auth(_make_user(UserRole.BUILDINGS_MANAGER))
+
+        response = client.get(
+            "/api/v1/admin/status",
+            headers={"Authorization": "Bearer test-token"},
+        )
+
+        assert response.status_code == 403
+
+    def test_buildings_manager_cannot_access_admin_users(self, client):
+        """buildings_manager must receive 403 on GET /api/v1/admin/users."""
+        _override_auth(_make_user(UserRole.BUILDINGS_MANAGER))
+
+        response = client.get(
+            "/api/v1/admin/users",
+            headers={"Authorization": "Bearer test-token"},
+        )
+
+        assert response.status_code == 403
+
+    def test_buildings_manager_cannot_access_admin_settings(self, client):
+        """buildings_manager must receive 403 on GET /api/v1/admin/settings."""
+        _override_auth(_make_user(UserRole.BUILDINGS_MANAGER))
+
+        response = client.get(
+            "/api/v1/admin/settings",
+            headers={"Authorization": "Bearer test-token"},
+        )
+
+        assert response.status_code == 403
+
+    def test_buildings_manager_cannot_access_admin_metrics(self, client):
+        """buildings_manager must receive 403 on GET /api/v1/admin/metrics."""
+        _override_auth(_make_user(UserRole.BUILDINGS_MANAGER))
+
+        response = client.get(
+            "/api/v1/admin/metrics",
+            headers={"Authorization": "Bearer test-token"},
+        )
+
+        assert response.status_code == 403
 
     def test_resident_cannot_access_admin_status(self, client):
         """GET /api/v1/admin/status should return 403 for resident."""
