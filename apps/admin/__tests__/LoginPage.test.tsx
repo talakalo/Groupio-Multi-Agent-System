@@ -1,7 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { NextIntlClientProvider } from 'next-intl';
 import React from 'react';
 import LoginPage from '../app/login/page';
+import enMessages from '../messages/en.json';
+
+function renderWithIntl(ui: React.ReactElement) {
+  return render(
+    <NextIntlClientProvider locale="en" messages={enMessages}>
+      {ui}
+    </NextIntlClientProvider>
+  );
+}
 
 // Re-mock useRouter so we can spy on push
 const mockPush = vi.fn();
@@ -25,7 +35,7 @@ describe('LoginPage', () => {
   });
 
   it('renders login form with email input, password input, and login button', () => {
-    render(<LoginPage />);
+    renderWithIntl(<LoginPage />);
 
     expect(screen.getByLabelText(/email address/i)).toBeInTheDocument();
     expect(screen.getByLabelText('Password')).toBeInTheDocument();
@@ -33,7 +43,7 @@ describe('LoginPage', () => {
   });
 
   it('shows validation error on empty submit (HTML5 required prevents submit)', async () => {
-    render(<LoginPage />);
+    renderWithIntl(<LoginPage />);
 
     const submitButton = screen.getByRole('button', { name: /sign in/i });
     // The button should be disabled when email and password are empty
@@ -52,7 +62,7 @@ describe('LoginPage', () => {
       json: async () => ({ role: 'admin' }),
     });
 
-    render(<LoginPage />);
+    renderWithIntl(<LoginPage />);
 
     fireEvent.change(screen.getByLabelText(/email address/i), { target: { value: 'admin@groupio.co.il' } });
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'AdminSecure123!' } });
@@ -70,7 +80,7 @@ describe('LoginPage', () => {
       json: async () => ({ detail: 'Invalid credentials' }),
     });
 
-    render(<LoginPage />);
+    renderWithIntl(<LoginPage />);
 
     const emailInput = screen.getByLabelText(/email address/i);
     const passwordInput = screen.getByLabelText('Password');
@@ -98,7 +108,7 @@ describe('LoginPage', () => {
       json: async () => ({ role: 'user' }),
     });
 
-    render(<LoginPage />);
+    renderWithIntl(<LoginPage />);
 
     fireEvent.change(screen.getByLabelText(/email address/i), {
       target: { value: 'user@groupio.co.il' },
@@ -120,7 +130,7 @@ describe('LoginPage', () => {
       json: async () => ({ detail: 'Internal server error' }),
     });
 
-    render(<LoginPage />);
+    renderWithIntl(<LoginPage />);
 
     fireEvent.change(screen.getByLabelText(/email address/i), {
       target: { value: 'admin@groupio.co.il' },

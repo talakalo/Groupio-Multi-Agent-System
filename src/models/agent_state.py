@@ -1,14 +1,6 @@
 """TypedDict definitions for agent state management in LangGraph."""
 
-import sys
-
-if sys.version_info >= (3, 11):
-    from typing import Annotated, Any, Literal, NotRequired
-else:
-    from typing import Annotated, Any, Literal
-    from typing_extensions import NotRequired  # backport for Python 3.10
-
-from typing_extensions import TypedDict
+from typing import Annotated, Any, Literal, NotRequired, TypedDict
 
 
 def merge_lists(left: list, right: list) -> list:
