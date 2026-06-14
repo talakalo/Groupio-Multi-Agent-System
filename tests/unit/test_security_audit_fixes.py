@@ -222,9 +222,9 @@ class TestHigh02AdminEscalation:
         db.create_user = AsyncMock(return_value=new_user)
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import get_current_user
 
-        app.dependency_overrides[get_admin_user] = lambda: admin
+        app.dependency_overrides[get_current_user] = lambda: admin
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 client = TestClient(app, raise_server_exceptions=False)
@@ -252,9 +252,9 @@ class TestHigh02AdminEscalation:
         db.create_audit_log = AsyncMock()
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import get_current_user
 
-        app.dependency_overrides[get_admin_user] = lambda: admin
+        app.dependency_overrides[get_current_user] = lambda: admin
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 client = TestClient(app, raise_server_exceptions=False)
@@ -277,9 +277,9 @@ class TestHigh02AdminEscalation:
         db.create_audit_log = AsyncMock()
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import get_current_user
 
-        app.dependency_overrides[get_admin_user] = lambda: super_admin
+        app.dependency_overrides[get_current_user] = lambda: super_admin
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 client = TestClient(app, raise_server_exceptions=False)

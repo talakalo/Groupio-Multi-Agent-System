@@ -36,7 +36,7 @@ def clear_overrides():
 
 
 @pytest.mark.usefixtures("clear_overrides")
-def test_buildings_manager_can_access_admin_router() -> None:
+def test_buildings_manager_denied_admin_router() -> None:
     app.dependency_overrides[get_current_user] = lambda: _user(UserRole.BUILDINGS_MANAGER)
     with (
         patch("src.orchestration.graph.get_orchestrator") as mock_orch,
@@ -50,7 +50,7 @@ def test_buildings_manager_can_access_admin_router() -> None:
         mock_vs.return_value = vs
         with TestClient(app) as client:
             r = client.get("/api/v1/admin/status")
-    assert r.status_code == 200
+    assert r.status_code == 403
 
 
 @pytest.mark.usefixtures("clear_overrides")
