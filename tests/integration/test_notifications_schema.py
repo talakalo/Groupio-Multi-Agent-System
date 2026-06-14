@@ -17,6 +17,7 @@ from fastapi.testclient import TestClient
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _db_url() -> str:
     """Return the PostgreSQL connection URL suitable for asyncpg.
 
@@ -63,16 +64,11 @@ async def test_notifications_read_at_column_exists():
               AND column_name  = 'read_at'
             """
         )
-        assert row is not None, (
-            "Column 'read_at' not found on notifications table. "
-            "Run: alembic upgrade head"
-        )
+        assert row is not None, "Column 'read_at' not found on notifications table. Run: alembic upgrade head"
         assert row["data_type"] in ("timestamp with time zone", "timestamptz"), (
             f"Expected 'timestamp with time zone', got: {row['data_type']}"
         )
-        assert row["is_nullable"] == "YES", (
-            "notifications.read_at must be nullable (existing rows have no read_at)"
-        )
+        assert row["is_nullable"] == "YES", "notifications.read_at must be nullable (existing rows have no read_at)"
     finally:
         await conn.close()
 
@@ -101,10 +97,7 @@ async def test_notifications_table_required_columns():
         )
         actual = {row["column_name"] for row in rows}
         missing = expected_columns - actual
-        assert not missing, (
-            f"notifications table is missing columns: {missing}. "
-            "Run: alembic upgrade head"
-        )
+        assert not missing, f"notifications table is missing columns: {missing}. Run: alembic upgrade head"
     finally:
         await conn.close()
 
@@ -163,9 +156,7 @@ def test_list_notifications_returns_200_not_500():
     finally:
         app.dependency_overrides.clear()
 
-    assert response.status_code == 200, (
-        f"Expected 200, got {response.status_code}: {response.text}"
-    )
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
     data = response.json()
     assert "items" in data
     assert "total" in data
@@ -190,9 +181,7 @@ def test_unread_count_returns_200_not_500():
     finally:
         app.dependency_overrides.clear()
 
-    assert response.status_code == 200, (
-        f"Expected 200, got {response.status_code}: {response.text}"
-    )
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
     assert response.json() == {"count": 3}
 
 
