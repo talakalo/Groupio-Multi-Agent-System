@@ -11,9 +11,7 @@ import os
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 from fastapi.testclient import TestClient
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -119,6 +117,7 @@ async def test_notifications_table_required_columns():
 
 def _make_user(role="resident", user_id="user-1"):
     from datetime import UTC, datetime
+
     from src.models.user import UserInDB, UserRole
 
     now = datetime.now(UTC)
@@ -224,6 +223,7 @@ def test_unread_count_unauthenticated_returns_401_not_500():
 def test_list_notifications_with_read_at_in_response():
     """Verify that notification items returned from the list endpoint can contain read_at."""
     from datetime import UTC, datetime
+
     from src.api.main import app
     from src.api.middleware.auth import get_current_user
 

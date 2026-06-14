@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
-from src.api.middleware.auth import get_admin_user, get_current_user, require_admin_only
+from src.api.middleware.auth import get_current_user, require_admin_only
 from src.config.settings import get_settings
 from src.databases.postgres import get_postgres_client
 from src.models.user import UserInDB, UserRole
