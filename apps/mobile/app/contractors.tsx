@@ -1,3 +1,4 @@
+import type { Contractor } from "@groupio/types";
 import { Stack, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
@@ -14,9 +15,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ApiError, getContractors } from "../lib/api";
-import type { Contractor } from "@groupio/types";
 import i18n from "../lib/i18n";
-import { S } from "vitest/dist/reporters-w_64AS5f.js";
+
 
 /**
  * Mobile contractor browse — parity with apps/web/app/(resident)/contractors.

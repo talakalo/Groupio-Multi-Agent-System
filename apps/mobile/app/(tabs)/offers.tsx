@@ -7,17 +7,11 @@ import {
   StyleSheet,
   RefreshControl,
   Pressable,
-  I18nManager,
 } from "react-native";
 import {
   Text,
   FAB,
-  SegmentedButtons,
   useTheme,
-  Portal,
-  Modal,
-  Button,
-  TextInput,
   Snackbar,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";

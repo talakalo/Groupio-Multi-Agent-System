@@ -6,8 +6,8 @@ import { Send, Bot, User, Loader2, Sparkles } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useState, useRef, useEffect, useCallback, useMemo, type FormEvent } from 'react';
 
-import { cn } from '@/lib/utils/cn';
 import { useAccessToken } from '@/lib/stores/authStore';
+import { cn } from '@/lib/utils/cn';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -58,7 +58,7 @@ function generateId(): string {
 
 export function AIChat({
   buildingId,
-  context = 'resident',
+  context: _context = 'resident',
   suggestions = [],
   category: _category,
   userId = 'anonymous',
@@ -167,7 +167,7 @@ export function AIChat({
       2000,
     );
     return () => clearInterval(interval);
-  }, [isLoading]);
+  }, [AI_THINKING_MESSAGES.length, isLoading]);
 
   // Show slow-response notice after 30 seconds
   useEffect(() => {
@@ -264,7 +264,7 @@ export function AIChat({
         setIsSlowResponse(false);
       }
     },
-    [accessToken, baseUrl, buildingId, isLoading, userId],
+    [accessToken, baseUrl, buildingId, isLoading, t, userId],
   );
 
   const handleSubmit = (e: FormEvent) => {

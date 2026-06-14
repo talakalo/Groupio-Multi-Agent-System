@@ -1,6 +1,6 @@
-import { getLocale } from "next-intl/server";
 import { Building2 } from "lucide-react";
 import Link from "next/link";
+import { getLocale } from "next-intl/server";
 import type { ReactNode } from "react";
 
 type ContentLayoutProps = {

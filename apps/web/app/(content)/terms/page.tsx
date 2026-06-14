@@ -1,6 +1,6 @@
+import { FileText } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { FileText } from 'lucide-react';
 
 export const metadata: Metadata = {
   title: 'תנאי שימוש',

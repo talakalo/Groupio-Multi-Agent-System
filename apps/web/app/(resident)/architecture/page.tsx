@@ -2,7 +2,6 @@
 
 import {
   Upload,
-  FileImage,
   Loader2,
   CheckCircle2,
   AlertCircle,
@@ -40,13 +39,6 @@ interface AnalysisResult {
   suggestions: AnalysisSuggestion[];
   summary_he: string;
   summary_en: string;
-}
-
-interface UploadedFile {
-  id: string;
-  file_name: string;
-  analysis_status: string;
-  analysis?: AnalysisResult;
 }
 
 const CATEGORY_ICONS: Record<string, React.ElementType> = {
@@ -158,6 +150,8 @@ export default function ArchitecturePage(props: PageParamsProps) {
             border-2 border-dashed rounded-2xl p-12 text-center transition-colors cursor-pointer
             ${dragOver ? 'border-primary-400 bg-primary-50' : 'border-gray-300 bg-white hover:border-gray-400'}
           `}
+          role="button"
+          tabIndex={0}
           onDragOver={(e) => {
             e.preventDefault();
             setDragOver(true);
@@ -165,6 +159,12 @@ export default function ArchitecturePage(props: PageParamsProps) {
           onDragLeave={() => setDragOver(false)}
           onDrop={onDrop}
           onClick={() => fileRef.current?.click()}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              fileRef.current?.click();
+            }
+          }}
         >
           <input
             ref={fileRef}
@@ -207,7 +207,7 @@ export default function ArchitecturePage(props: PageParamsProps) {
           <h2 className="text-xl font-semibold mt-6 text-gray-900">{t('analyzing.title')}</h2>
           <p className="text-gray-500 mt-2">{t('analyzing.subtitle')}</p>
           <div className="mt-6 flex justify-center gap-2">
-            {['rooms', 'services', 'pricing'].map((step, i) => (
+            {['rooms', 'services', 'pricing'].map((step) => (
               <span
                 key={step}
                 className="px-3 py-1 rounded-full bg-gray-100 text-xs text-gray-600"

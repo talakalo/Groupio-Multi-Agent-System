@@ -19,9 +19,9 @@ import { useRouter } from 'next/navigation';
 import { useTranslations, useLocale } from 'next-intl';
 import { useState, useCallback } from 'react';
 
+import { LanguageToggle } from '@/components/shared/LanguageToggle';
 import { apiClient } from '@/lib/api/client';
 import { cn } from '@/lib/utils/cn';
-import { LanguageToggle } from '@/components/shared/LanguageToggle';
 
 
 // ---------------------------------------------------------------------------

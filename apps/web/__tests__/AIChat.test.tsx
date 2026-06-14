@@ -81,7 +81,9 @@ describe("AIChat", () => {
 
     const input = screen.getByPlaceholderText(/הקלד/);
     fireEvent.change(input, { target: { value: "שלום" } });
-    fireEvent.submit(input.closest("form")!);
+    const form = input.closest("form");
+    expect(form).toBeTruthy();
+    fireEvent.submit(form as HTMLFormElement);
 
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledTimes(1);
@@ -99,7 +101,9 @@ describe("AIChat", () => {
 
     const input = screen.getByPlaceholderText(/הקלד/) as HTMLInputElement;
     fireEvent.change(input, { target: { value: "test" } });
-    fireEvent.submit(input.closest("form")!);
+    const form = input.closest("form");
+    expect(form).toBeTruthy();
+    fireEvent.submit(form as HTMLFormElement);
 
     await waitFor(() => {
       expect(input.disabled).toBe(true);

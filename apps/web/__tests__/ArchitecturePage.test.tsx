@@ -217,8 +217,8 @@ describe('ArchitecturePage', () => {
       types: ['Files'],
     };
 
-    fireEvent.dragOver(dropzone!, { dataTransfer });
-    fireEvent.drop(dropzone!, { dataTransfer });
+    fireEvent.dragOver(dropzone as HTMLElement, { dataTransfer });
+    fireEvent.drop(dropzone as HTMLElement, { dataTransfer });
 
     await waitFor(() => {
       expect(mockUploadArchitecturePlan).toHaveBeenCalledWith(file, 'bld-001');

@@ -8,8 +8,8 @@ import {
   BadgeCheck,
   TrendingDown,
 } from 'lucide-react';
-import { useMemo } from 'react';
 import { useTranslations } from 'next-intl';
+import { useMemo } from 'react';
 
 import { cn } from '@/lib/utils/cn';
 
@@ -90,10 +90,10 @@ export function OfferCard({
   onJoin,
   onViewDetails,
   joined = false,
-  variant = 'resident',
-  showActions = true,
-  showParticipants = true,
-  compact = false,
+  variant: _variant = 'resident',
+  showActions: _showActions = true,
+  showParticipants: _showParticipants = true,
+  compact: _compact = false,
   className,
 }: OfferCardProps) {
   const t = useTranslations('offers');

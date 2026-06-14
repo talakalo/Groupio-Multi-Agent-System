@@ -85,7 +85,12 @@ export function useOffer(
 ) {
   return useQuery({
     queryKey: offerKeys.detail(offerId ?? ''),
-    queryFn: () => apiClient.getOffer(offerId!),
+    queryFn: () => {
+      if (!offerId) {
+        throw new Error('Offer ID is required');
+      }
+      return apiClient.getOffer(offerId);
+    },
     enabled: Boolean(offerId),
     ...options,
   });
@@ -113,7 +118,7 @@ export function useCreateOffer() {
       }
       return response.json() as Promise<Offer>;
     },
-    onSuccess: (_data, variables) => {
+    onSuccess: () => {
       // Invalidate the offers list for the relevant building
       queryClient.invalidateQueries({
         queryKey: offerKeys.lists(),

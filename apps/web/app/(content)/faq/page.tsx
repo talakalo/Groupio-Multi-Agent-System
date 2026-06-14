@@ -1,6 +1,6 @@
+import { ChevronDown, MessageCircle } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { ChevronDown, MessageCircle } from 'lucide-react';
 
 export const metadata: Metadata = {
   title: 'שאלות ותשובות',

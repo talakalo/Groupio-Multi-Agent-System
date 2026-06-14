@@ -231,7 +231,15 @@ export default function ResidentLayout({ children }: { children: React.ReactNode
         <div
           className="fixed inset-0 z-40 lg:hidden"
           style={{ background: 'rgba(4, 26, 18, 0.6)', backdropFilter: 'blur(4px)' }}
+          role="button"
+          tabIndex={0}
           onClick={() => setSidebarOpen(false)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setSidebarOpen(false);
+            }
+          }}
         />
       )}
 

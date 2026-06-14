@@ -1,4 +1,4 @@
-import type { Offer, OfferStatus, ServiceCategory } from "@groupio/types";
+import type { Offer } from "@groupio/types";
 import { useRouter } from "expo-router";
 import React, { useCallback } from "react";
 import {
@@ -150,7 +150,6 @@ export default function HomeScreen() {
 
   const {
     data: offersData,
-    isLoading: offersLoading,
     refetch: refetchOffers,
   } = useOffers(
     { status: "active", buildingId, limit: 5 },

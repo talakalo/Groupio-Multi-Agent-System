@@ -1,10 +1,10 @@
 'use client';
 
 import type { Offer } from '@groupio/types';
-import { useTranslations } from 'next-intl';
-import { useState, useEffect } from 'react';
 import { CheckCircle2, Clock, DollarSign, Star, Briefcase, Loader2 } from 'lucide-react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
+import { useState, useEffect } from 'react';
 
 import { ApiError, apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';

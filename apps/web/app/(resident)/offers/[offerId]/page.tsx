@@ -1,6 +1,6 @@
 'use client';
 
-import type { Offer, PricingTier, Contractor } from '@groupio/types';
+import type { Offer, PricingTier } from '@groupio/types';
 import { formatPrice, formatDate } from '@groupio/utils';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -13,14 +13,11 @@ import {
   Check,
   Loader2,
   Phone,
-  Mail,
-  Calendar,
   TrendingDown,
-  ChevronLeft,
   AlertCircle,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -277,7 +274,6 @@ function StickyJoinCTA({
 export default function OfferDetailPage(props: PageParamsProps) {
   unwrapPageParams(props);
   const params = useParams<{ offerId: string }>();
-  const router = useRouter();
   const queryClient = useQueryClient();
   const t = useTranslations('offers');
   const tCat = useTranslations('categories');

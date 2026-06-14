@@ -58,7 +58,7 @@ export function ToastContainer() {
                 <button
                   type="button"
                   onClick={() => {
-                    n.action!.onClick();
+                    n.action?.onClick();
                     removeNotification(n.id);
                   }}
                   className="mt-1.5 text-xs font-medium underline underline-offset-2 hover:no-underline"
