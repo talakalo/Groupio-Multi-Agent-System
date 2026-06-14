@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
-import { clsx } from "clsx";
 import {
   useQuery,
   useMutation,
   useQueryClient,
 } from "@tanstack/react-query";
+import { clsx } from "clsx";
 import {
   Search,
   Filter,
@@ -26,6 +25,7 @@ import {
   Phone,
   Lock,
 } from "lucide-react";
+import { useState, useMemo, useCallback } from "react";
 
 import { apiV1 } from "@/lib/backend-url";
 
@@ -583,12 +583,21 @@ export default function UsersPage() {
       {showCreateModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
-          onClick={() => setShowCreateModal(false)}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              setShowCreateModal(false);
+            }
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Escape" || event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              setShowCreateModal(false);
+            }
+          }}
+          role="button"
+          tabIndex={0}
         >
-          <div
-            className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4">
             {/* Modal header */}
             <div className="flex items-center justify-between p-5 border-b border-surface-100">
               <h2 className="text-lg font-bold text-surface-900">

@@ -1,13 +1,11 @@
 "use client";
 
-import React, { useState, useMemo, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import {
   Search,
   Filter,
   CheckCircle2,
-  XCircle,
   Clock,
   ChevronDown,
   ChevronUp,
@@ -26,10 +24,12 @@ import {
   Globe,
   UserCheck,
 } from "lucide-react";
+import React, { useState, useMemo, useCallback } from "react";
+
 import { MetricCard } from "@/components/features/metrics/MetricCard";
 import { useContractors } from "@/lib/hooks";
 import type { ContractorListItem } from "@/lib/hooks";
-import type { ServiceCategory, Region } from "@groupio/types";
+
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -1038,12 +1038,21 @@ export default function ContractorsPage() {
       {detailContractor && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
-          onClick={() => setDetailContractor(null)}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              setDetailContractor(null);
+            }
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Escape" || event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              setDetailContractor(null);
+            }
+          }}
+          role="button"
+          tabIndex={0}
         >
-          <div
-            className="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 max-h-[85vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 max-h-[85vh] overflow-y-auto">
             {/* Modal header */}
             <div className="flex items-center justify-between p-5 border-b border-surface-100">
               <div className="flex items-center gap-3">

@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import React from 'react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
 import UsersPage from '../app/users/page';
 
 const MOCK_USERS = [
@@ -127,7 +128,10 @@ describe('UsersPage', () => {
           return url.includes('/api/v1/admin/users/') && opts?.method === 'PUT';
         });
         expect(putCall).toBeDefined();
-        const bodyStr = (putCall![1] as RequestInit)?.body;
+        if (!putCall) {
+          throw new Error('Expected admin user update request');
+        }
+        const bodyStr = (putCall[1] as RequestInit | undefined)?.body;
         if (typeof bodyStr === 'string') {
           expect(JSON.parse(bodyStr)).toMatchObject({ status: 'suspended' });
         }
