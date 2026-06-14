@@ -49,7 +49,9 @@ export default function LoginPage() {
 
         if (meRes.ok) {
           const me = await meRes.json();
-          const adminRoles = ["admin", "super_admin", "buildings_manager"];
+          // Only platform-admin roles are allowed in this console.
+          // buildings_manager is building-scoped — it uses the web app.
+          const adminRoles = ["admin", "super_admin"];
           if (!adminRoles.includes(me.role)) {
             throw new Error("Access denied — this account does not have admin privileges.");
           }

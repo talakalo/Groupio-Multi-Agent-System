@@ -3,13 +3,15 @@ import type { NextRequest } from "next/server";
 
 // Paths served by the admin console that do NOT require authentication.
 // Everything else under the app is gated behind a valid session cookie and
-// an admin / super_admin / buildings_manager role hint.
+// an admin / super_admin role hint.
+// NOTE: buildings_manager is NOT a platform admin — it is building-scoped and
+// must NOT access this console. It is served by the web app at
+// /buildings-manager/dashboard.
 const PUBLIC_PATHS = new Set<string>(["/login"]);
 
 const ALLOWED_ADMIN_ROLES = new Set<string>([
   "admin",
   "super_admin",
-  "buildings_manager",
 ]);
 
 function isPublicPath(pathname: string): boolean {

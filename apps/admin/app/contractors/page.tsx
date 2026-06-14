@@ -629,7 +629,7 @@ export default function ContractorsPage() {
       const ids = Array.from(selectedIds);
       const results = await Promise.allSettled(
         ids.map((id) =>
-          fetch(`${API_BASE}/admin/contractors/${encodeURIComponent(id)}/request-documents`, {
+          fetch(`${API_BASE}/admin/contractors/${encodeURIComponent(id)}/request-docs`, {
             method: "POST",
             ...fetchOpts(),
             body: JSON.stringify({ message: "Please upload your license, insurance, and business registration documents to complete your verification." }),

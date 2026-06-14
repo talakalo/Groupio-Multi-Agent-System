@@ -142,7 +142,10 @@ export default function DashboardPage() {
   // Attention bar counts
   const pendingVetting = vettingStatus?.pendingReview ?? 0;
   const openEscalations = recentEscalations.filter((e) => e.status === "open").length;
-  const pendingPayments = 0; // placeholder until payments hook is available
+  // TODO(Linear): Wire to real payments API — pending payout count not yet available.
+  // Until the payments hook is implemented this stays 0 so the attention bar
+  // never shows a misleading "Pending payments" badge.
+  const pendingPayments = 0;
 
   const attentionItems = useMemo(() => {
     const items: Array<{
