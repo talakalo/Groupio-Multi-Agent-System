@@ -98,7 +98,7 @@ function Sidebar({
               <Shield className="w-4.5 h-4.5 text-white" />
             </div>
             <div>
-              <h1 className="text-base font-bold text-white leading-none">{tShell("productTitle")}</h1>
+              <span className="text-base font-bold text-white leading-none">{tShell("productTitle")}</span>
               <span className="text-[10px] font-medium text-surface-500 uppercase tracking-widest">
                 {tShell("productSubtitle")}
               </span>

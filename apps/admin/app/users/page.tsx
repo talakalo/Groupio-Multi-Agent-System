@@ -374,6 +374,8 @@ export default function UsersPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400" />
             <input
               type="text"
+              id="users-search"
+              aria-label="Search users by name, email, or phone"
               placeholder="Search by name, email, or phone..."
               className="input pl-9"
               value={searchQuery}
@@ -382,8 +384,11 @@ export default function UsersPage() {
           </div>
 
           {/* Role filter */}
+          <label htmlFor="users-role-filter" className="sr-only">Filter by role</label>
           <select
+            id="users-role-filter"
             className="input"
+            aria-label="Filter by role"
             value={roleFilter}
             onChange={(e) => setRoleFilter(e.target.value as RoleFilter)}
           >
@@ -395,8 +400,11 @@ export default function UsersPage() {
           </select>
 
           {/* Status filter */}
+          <label htmlFor="users-status-filter" className="sr-only">Filter by status</label>
           <select
+            id="users-status-filter"
             className="input"
+            aria-label="Filter by status"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
           >

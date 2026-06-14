@@ -2,6 +2,7 @@
 
 import { AlertTriangle, RefreshCw, Home } from "lucide-react";
 import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 interface ErrorProps {
   error: Error & { digest?: string };
@@ -9,9 +10,19 @@ interface ErrorProps {
 }
 
 export default function ResidentError({ error, reset }: ErrorProps) {
+  const router = useRouter();
+
   useEffect(() => {
     console.error("Resident section error:", error);
-  }, [error]);
+    // Redirect to login on auth errors so the page doesn't hang.
+    if (
+      error.message?.toLowerCase().includes("unauthorized") ||
+      error.message?.toLowerCase().includes("401") ||
+      error.message?.toLowerCase().includes("403")
+    ) {
+      router.replace("/login");
+    }
+  }, [error, router]);
 
   return (
     <div className="flex items-center justify-center min-h-[60vh] px-4" dir="rtl">

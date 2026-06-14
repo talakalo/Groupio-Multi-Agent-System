@@ -2,6 +2,7 @@
 
 import { Shield, Mail, Lock, Loader2, AlertCircle, Eye, EyeOff } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { useState, useCallback } from "react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -15,6 +16,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
  */
 export default function LoginPage() {
   const router = useRouter();
+  const t = useTranslations("login");
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -85,8 +87,8 @@ export default function LoginPage() {
           <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-primary-600 shadow-lg shadow-primary-600/25 mb-4">
             <Shield className="w-7 h-7 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-surface-900">Groupio Admin</h1>
-          <p className="text-sm text-surface-500 mt-1">Sign in to the admin dashboard</p>
+          <h1 className="text-2xl font-bold text-surface-900">{t("title")}</h1>
+          <p className="text-sm text-surface-500 mt-1">{t("subtitle")}</p>
         </div>
 
         {/* Card */}
@@ -106,7 +108,7 @@ export default function LoginPage() {
                 htmlFor="email"
                 className="block text-sm font-medium text-surface-700 mb-1.5"
               >
-                Email address
+                {t("emailLabel")}
               </label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-surface-400" />
@@ -129,7 +131,7 @@ export default function LoginPage() {
                 htmlFor="password"
                 className="block text-sm font-medium text-surface-700 mb-1.5"
               >
-                Password
+                {t("passwordLabel")}
               </label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-surface-400" />
@@ -148,7 +150,7 @@ export default function LoginPage() {
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-surface-400 hover:text-surface-600 transition-colors"
                   onClick={() => setShowPassword((v) => !v)}
                   tabIndex={-1}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  aria-label={showPassword ? t("hidePassword") : t("showPassword")}
                 >
                   {showPassword ? (
                     <EyeOff className="w-4.5 h-4.5" />
@@ -168,10 +170,10 @@ export default function LoginPage() {
               {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Signing in...
+                  {t("submitLoading")}
                 </>
               ) : (
-                "Sign in"
+                t("submitIdle")
               )}
             </button>
           </form>
@@ -179,7 +181,7 @@ export default function LoginPage() {
 
         {/* Footer */}
         <p className="text-center text-xs text-surface-400 mt-6">
-          Groupio Admin Panel &middot; Authorized personnel only
+          {t("footer")}
         </p>
       </div>
     </div>

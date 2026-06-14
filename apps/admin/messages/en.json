@@ -39,6 +39,17 @@
     "systemHealth": "System Health",
     "pendingActions": "Pending Actions"
   },
+  "login": {
+    "title": "Groupio Admin",
+    "subtitle": "Sign in to the admin dashboard",
+    "emailLabel": "Email address",
+    "passwordLabel": "Password",
+    "submitIdle": "Sign in",
+    "submitLoading": "Signing in...",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
+    "footer": "Groupio Admin Panel · Authorized personnel only"
+  },
   "shell": {
     "productTitle": "Groupio Admin",
     "productSubtitle": "Operations Dashboard",
