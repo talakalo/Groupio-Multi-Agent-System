@@ -19,7 +19,7 @@ def storage():
         mock_settings.return_value.SUPABASE_KEY = ""
         # _local_signed_url calls get_settings().JWT_SECRET_KEY.encode(); provide
         # a real string so hmac.new() receives bytes instead of a MagicMock.
-        mock_settings.return_value.JWT_SECRET_KEY = "test-secret-key-for-unit-tests"
+        mock_settings.return_value.JWT_SECRET_KEY = "x" * 40
         svc = StorageService()
         yield svc
 

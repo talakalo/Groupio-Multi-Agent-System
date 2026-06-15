@@ -49,7 +49,7 @@ def _make_user(role: UserRole = UserRole.RESIDENT) -> UserInDB:
 def mock_settings():
     s = MagicMock()
     # >= 32 bytes for HS256 to avoid PyJWT InsecureKeyLengthWarning in tests
-    s.JWT_SECRET_KEY = "test-jwt-secret-key-32-bytes-min!!"
+    s.JWT_SECRET_KEY = "x" * 40
     s.JWT_ALGORITHM = "HS256"
     s.ACCESS_TOKEN_EXPIRE_MINUTES = 30
     s.REFRESH_TOKEN_EXPIRE_DAYS = 7

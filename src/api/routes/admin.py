@@ -1308,9 +1308,7 @@ async def refresh_contractor_verification(
             },
         )
     except Exception:
-        logger.warning(
-            "refresh_verification: could not persist metadata for contractor=%s", contractor_id
-        )
+        logger.warning("refresh_verification: could not persist metadata for contractor=%s", contractor_id)
 
     await db.create_audit_log(
         {

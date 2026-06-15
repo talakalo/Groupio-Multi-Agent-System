@@ -41,6 +41,7 @@ def _override(user: MagicMock) -> None:
     require_admin_only skips the real role check, so use _override_current_user_only
     for tests that expect a 403.
     """
+
     async def _dep():
         return user
 
@@ -54,6 +55,7 @@ def _override_current_user_only(user: MagicMock) -> None:
     Use this for tests that expect 403 — the real require_admin_only will inspect
     the user's role returned by get_current_user and raise HTTPException(403).
     """
+
     async def _dep():
         return user
 
@@ -232,9 +234,7 @@ class TestRefreshVerificationEndpoint:
             patch("src.services.enrichment.get_enrichment_service") as mock_svc_factory,
         ):
             db = AsyncMock()
-            db.get_contractor = AsyncMock(
-                return_value={"id": "c-001", "business_name": "Rothschild Contractors Ltd"}
-            )
+            db.get_contractor = AsyncMock(return_value={"id": "c-001", "business_name": "Rothschild Contractors Ltd"})
             db.upsert_contractor_verification = AsyncMock()
             db.create_audit_log = AsyncMock()
             mock_pg.return_value = db
