@@ -39,6 +39,17 @@
     "systemHealth": "תקינות מערכת",
     "pendingActions": "פעולות ממתינות"
   },
+  "login": {
+    "title": "Groupio Admin",
+    "subtitle": "כניסה ללוח הבקרה",
+    "emailLabel": "כתובת אימייל",
+    "passwordLabel": "סיסמה",
+    "submitIdle": "כניסה",
+    "submitLoading": "מתחבר...",
+    "showPassword": "הצג סיסמה",
+    "hidePassword": "הסתר סיסמה",
+    "footer": "פאנל ניהול Groupio · לצוות מורשה בלבד"
+  },
   "shell": {
     "productTitle": "Groupio Admin",
     "productSubtitle": "לוח בקרה תפעולי",

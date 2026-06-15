@@ -1,8 +1,6 @@
 """TypedDict definitions for agent state management in LangGraph."""
 
-from typing import Annotated, Any, Literal, NotRequired
-
-from typing_extensions import TypedDict
+from typing import Annotated, Any, Literal, NotRequired, TypedDict
 
 
 def merge_lists(left: list, right: list) -> list:

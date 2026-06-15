@@ -3,6 +3,7 @@
 import { AlertTriangle, RefreshCw, Home } from "lucide-react";
 import Link from "next/link";
 import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 interface ErrorProps {
   error: Error & { digest?: string };
@@ -10,9 +11,18 @@ interface ErrorProps {
 }
 
 export default function BuildingsManagerError({ error, reset }: ErrorProps) {
+  const router = useRouter();
+
   useEffect(() => {
     console.error("Buildings manager section error:", error);
-  }, [error]);
+    if (
+      error.message?.toLowerCase().includes("unauthorized") ||
+      error.message?.toLowerCase().includes("401") ||
+      error.message?.toLowerCase().includes("403")
+    ) {
+      router.replace("/login");
+    }
+  }, [error, router]);
 
   return (
     <div className="flex items-center justify-center min-h-[60vh] px-4" dir="rtl">

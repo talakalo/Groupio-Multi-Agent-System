@@ -929,7 +929,8 @@ export async function getNotifications(params?: {
 }
 
 export async function markNotificationRead(id: string): Promise<void> {
-  return request<void>("PATCH", `/notifications/${id}/read`);
+  // Backend route: POST /api/v1/notifications/{id}/read (not PATCH)
+  return request<void>("POST", `/notifications/${id}/read`);
 }
 
 export async function markAllNotificationsRead(): Promise<void> {

@@ -42,9 +42,9 @@ def _mock_agent(name="support"):
 
 def _client_with_orchestrator(user, mock_orch):
     from src.api.main import app
-    from src.api.middleware.auth import get_admin_user
+    from src.api.middleware.auth import get_current_user
 
-    app.dependency_overrides[get_admin_user] = lambda: user
+    app.dependency_overrides[get_current_user] = lambda: user
     with patch("src.api.routes.agents.get_orchestrator", return_value=mock_orch):
         yield TestClient(app, raise_server_exceptions=False)
     app.dependency_overrides.clear()
@@ -58,9 +58,9 @@ class TestListAgents:
         mock_orch.agents = {"support": agent, "matching": _mock_agent("matching")}
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import get_current_user
 
-        app.dependency_overrides[get_admin_user] = lambda: user
+        app.dependency_overrides[get_current_user] = lambda: user
         try:
             with patch("src.api.routes.agents.get_orchestrator", return_value=mock_orch):
                 client = TestClient(app, raise_server_exceptions=False)
@@ -80,9 +80,9 @@ class TestGetAgentMetrics:
         mock_orch.agents = {"support": agent}
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import get_current_user
 
-        app.dependency_overrides[get_admin_user] = lambda: user
+        app.dependency_overrides[get_current_user] = lambda: user
         try:
             with patch("src.api.routes.agents.get_orchestrator", return_value=mock_orch):
                 client = TestClient(app, raise_server_exceptions=False)
@@ -98,9 +98,9 @@ class TestGetAgentMetrics:
         mock_orch.agents = {}
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import get_current_user
 
-        app.dependency_overrides[get_admin_user] = lambda: user
+        app.dependency_overrides[get_current_user] = lambda: user
         try:
             with patch("src.api.routes.agents.get_orchestrator", return_value=mock_orch):
                 client = TestClient(app, raise_server_exceptions=False)
@@ -118,9 +118,9 @@ class TestInvokeAgent:
         mock_orch.agents = {"support": agent}
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import get_current_user
 
-        app.dependency_overrides[get_admin_user] = lambda: user
+        app.dependency_overrides[get_current_user] = lambda: user
         try:
             with patch("src.api.routes.agents.get_orchestrator", return_value=mock_orch):
                 client = TestClient(app, raise_server_exceptions=False)
@@ -145,9 +145,9 @@ class TestInvokeAgent:
         mock_orch.agents = {}
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import get_current_user
 
-        app.dependency_overrides[get_admin_user] = lambda: user
+        app.dependency_overrides[get_current_user] = lambda: user
         try:
             with patch("src.api.routes.agents.get_orchestrator", return_value=mock_orch):
                 client = TestClient(app, raise_server_exceptions=False)
