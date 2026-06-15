@@ -234,9 +234,7 @@ class TestRefreshVerificationEndpoint:
             patch("src.services.enrichment.get_enrichment_service") as mock_svc_factory,
         ):
             db = AsyncMock()
-            db.get_contractor = AsyncMock(
-                return_value={"id": "c-001", "business_name": "Rothschild Contractors Ltd"}
-            )
+            db.get_contractor = AsyncMock(return_value={"id": "c-001", "business_name": "Rothschild Contractors Ltd"})
             db.upsert_contractor_verification = AsyncMock()
             db.create_audit_log = AsyncMock()
             mock_pg.return_value = db
