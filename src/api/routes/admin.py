@@ -1299,10 +1299,10 @@ async def refresh_contractor_verification(
     try:
         await db.upsert_contractor_verification(
             contractor_id,
+            "data.gov.il (company registry)",
+            verified,
+            confidence,
             {
-                "source": "data.gov.il (company registry)",
-                "verified": verified,
-                "confidence": confidence,
                 "verified_at": datetime.now(UTC).isoformat(),
                 "metadata": best,
             },
