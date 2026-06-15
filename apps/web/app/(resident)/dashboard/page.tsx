@@ -160,6 +160,7 @@ function UpcomingRow({
 
 function PopularOfferCard({ offer }: { offer: Offer }) {
   const t = useTranslations('offers');
+  const tCat = useTranslations('categories');
 
   const currentTier = offer.tiers[offer.currentTier] ?? offer.tiers[0];
   const discountPercent = currentTier ? Math.round(currentTier.discount * 100) : 0;
