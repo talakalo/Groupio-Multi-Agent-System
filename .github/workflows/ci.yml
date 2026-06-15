@@ -477,6 +477,13 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: http://localhost:54321
           NEXT_PUBLIC_SUPABASE_ANON_KEY: test-key
 
+      - name: Build admin app
+        run: pnpm --filter @groupio/admin build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:8000
+          NEXT_PUBLIC_SUPABASE_URL: http://localhost:54321
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: test-key
+
       - name: Run E2E tests
         run: pnpm --filter @groupio/web exec playwright test --project=chromium
         env:
