@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 _INSECURE_JWT_DEFAULTS = frozenset(
     {
-        "your-secret-key-change-in-production",
+        "change-me-in-production",
         "secret",
         "changeme",
         "",

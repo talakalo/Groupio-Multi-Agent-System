@@ -10,6 +10,10 @@ on:
 jobs:
   chromatic:
     runs-on: ubuntu-latest
+    env:
+      # Expose as env so it can be checked in if: without triggering the
+      # "Unrecognized named-value: secrets" validator error.
+      CHROMATIC_PROJECT_TOKEN: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -30,7 +34,7 @@ jobs:
         # Skip gracefully when the project token has not been configured yet.
         # Add CHROMATIC_PROJECT_TOKEN to GitHub repo secrets once the project
         # is linked at https://www.chromatic.com/start.
-        if: ${{ secrets.CHROMATIC_PROJECT_TOKEN != '' }}
+        if: ${{ env.CHROMATIC_PROJECT_TOKEN != '' }}
         uses: chromaui/action@latest
         with:
           projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}

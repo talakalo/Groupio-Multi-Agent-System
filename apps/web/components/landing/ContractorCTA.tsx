@@ -1,7 +1,7 @@
 import { Users, TrendingUp, BadgeCheck, ArrowLeft, CheckCircle2 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { getTranslations } from "next-intl/server";
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 
 const VALUE_ICONS: LucideIcon[] = [Users, TrendingUp, BadgeCheck];
 

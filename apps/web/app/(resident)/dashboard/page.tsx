@@ -6,7 +6,6 @@ import { useQuery } from '@tanstack/react-query';
 import {
   Tag,
   Users,
-  TrendingDown,
   ArrowLeft,
   Clock,
   Wrench,
@@ -160,8 +159,8 @@ function UpcomingRow({
 // ---------------------------------------------------------------------------
 
 function PopularOfferCard({ offer }: { offer: Offer }) {
-  const tCat = useTranslations('categories');
   const t = useTranslations('offers');
+  const tCat = useTranslations('categories');
 
   const currentTier = offer.tiers[offer.currentTier] ?? offer.tiers[0];
   const discountPercent = currentTier ? Math.round(currentTier.discount * 100) : 0;
@@ -454,7 +453,6 @@ export default function ResidentDashboardPage() {
           ) : upcomingOffers.length > 0 ? (
             <div className="space-y-3">
               {upcomingOffers.map((offer, idx) => {
-                const tCat = (cat: string) => cat;
                 const daysLeft = Math.max(
                   0,
                   Math.ceil((new Date(offer.expiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24))

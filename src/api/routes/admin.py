@@ -1302,7 +1302,10 @@ async def refresh_contractor_verification(
             "data.gov.il (company registry)",
             verified,
             confidence,
-            best,  # raw_response
+            {
+                "verified_at": datetime.now(UTC).isoformat(),
+                "metadata": best,
+            },
         )
     except Exception:
         logger.warning("refresh_verification: could not persist metadata for contractor=%s", contractor_id)

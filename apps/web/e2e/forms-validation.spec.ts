@@ -38,7 +38,7 @@ test.describe("Login form", () => {
 
   test("empty submit shows validation feedback", async ({ page }) => {
     const submit = page.locator('button[type="submit"]').first();
-    await submit.click({ noWaitAfter: true });
+    await submit.click();
 
     // Expect at least one error message or native HTML5 validation
     const hasError = await page
@@ -58,7 +58,7 @@ test.describe("Login form", () => {
 
   test("invalid email format shows error", async ({ page }) => {
     await page.locator('input[type="email"], input[name="email"]').fill("notanemail");
-    await page.locator('button[type="submit"]').first().click({ noWaitAfter: true });
+    await page.locator('button[type="submit"]').first().click();
     // Browser native or custom email validation
     const emailInput = page.locator('input[type="email"], input[name="email"]');
     const validity = await emailInput.evaluate((el: HTMLInputElement) => !el.validity.valid).catch(() => false);
@@ -96,10 +96,6 @@ test.describe("Signup form", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/signup", { waitUntil: "domcontentloaded" });
     await waitForPageInteractive(page);
-    // Signup is a 2-step flow. The resident role is pre-selected by default,
-    // so advance via the actual step CTA instead of a generic button selector.
-    await page.getByRole("button", { name: /^המשך$|^Continue$/i }).click();
-    await page.waitForSelector("#email", { timeout: 10_000 });
   });
 
   test("form has expected inputs", async ({ page }) => {
@@ -119,7 +115,7 @@ test.describe("Signup form", () => {
 
   test("submit with empty fields shows validation", async ({ page }) => {
     const submit = page.locator('button[type="submit"]').first();
-    await submit.click({ noWaitAfter: true });
+    await submit.click();
     // Some validation must appear
     const count = await page.locator("[aria-invalid], :invalid, [role='alert'], .error").count().catch(() => 0);
     expect(count).toBeGreaterThan(0);

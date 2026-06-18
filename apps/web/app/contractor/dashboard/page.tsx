@@ -1,13 +1,13 @@
 'use client';
 
 import type { Offer, ContractorStats } from '@groupio/types';
-import { useTranslations } from 'next-intl';
-import { useState, useEffect } from 'react';
 import {
   Briefcase, CheckCircle2, DollarSign, Star,
   ShieldCheck, AlertCircle, ArrowLeft, Clock, TrendingUp,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
+import { useState, useEffect } from 'react';
 
 import { AIChat } from '@/components/features/chat/AIChat';
 import { OfferCard } from '@/components/features/offers/OfferCard';

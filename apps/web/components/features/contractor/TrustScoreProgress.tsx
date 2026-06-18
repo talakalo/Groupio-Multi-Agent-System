@@ -48,7 +48,12 @@ export function TrustScoreProgress({
   const defaultCategories: ScoreCategory[] = CATEGORY_KEYS.map((k, i) => {
     const icons = [FileText, Shield, Star, Clock];
     const maxScores = [30, 25, 25, 20];
-    return { label: t(`categories.${k}`), score: 0, maxScore: maxScores[i]!, icon: icons[i]! };
+    return {
+      label: t(`categories.${k}`),
+      score: 0,
+      maxScore: maxScores[i] ?? 0,
+      icon: icons[i] ?? FileText,
+    };
   });
   const defaultTips = TIP_KEYS.map((k) => t(`tips.${k}`));
   const categories = categoriesProp ?? defaultCategories;

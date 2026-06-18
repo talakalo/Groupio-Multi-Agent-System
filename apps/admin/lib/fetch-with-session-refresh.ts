@@ -37,7 +37,7 @@ export async function fetchWithSessionRefresh(
     ...init,
     credentials: init?.credentials ?? "include",
   };
-  let res = await fetch(url, next);
+  const res = await fetch(url, next);
   if (res.status !== 401) return res;
   const ok = await refreshAdminAccessToken();
   if (!ok) return res;

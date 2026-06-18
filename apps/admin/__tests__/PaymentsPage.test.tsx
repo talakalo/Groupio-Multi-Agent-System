@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, fireEvent, act, cleanup } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { render, screen, waitFor, fireEvent, act, cleanup } from '@testing-library/react';
 import React from 'react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
 import PaymentsPage from '../app/payments/page';
 
 // ---- Mock fetch responses for payment endpoints ----

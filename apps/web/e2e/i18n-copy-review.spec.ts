@@ -111,12 +111,6 @@ test.describe("English (LTR) copy — public pages", () => {
   test.use({ locale: "en" });
 
   test("/login — LTR dir", async ({ page }) => {
-    // The server reads locale from the NEXT_LOCALE cookie, not the
-    // Accept-Language header. Set the cookie before navigating so the
-    // server returns an English (ltr) page.
-    await page.context().addCookies([
-      { name: "NEXT_LOCALE", value: "en", domain: "localhost", path: "/" },
-    ]);
     await page.goto("/login", { waitUntil: "domcontentloaded" });
     await waitForPageInteractive(page);
     const dir = await page.locator("html").getAttribute("dir");

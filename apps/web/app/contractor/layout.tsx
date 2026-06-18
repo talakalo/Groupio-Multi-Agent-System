@@ -20,11 +20,11 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 
+import { LanguageToggle } from '@/components/shared/LanguageToggle';
+import { NotificationPanel } from '@/components/shared/NotificationPanel';
 import { apiClient } from '@/lib/api/client';
 import { useAuthHasHydrated, useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
-import { NotificationPanel } from '@/components/shared/NotificationPanel';
-import { LanguageToggle } from '@/components/shared/LanguageToggle';
 
 interface NavItem {
   href: string;
@@ -50,7 +50,6 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
   const token = useAuthStore((s) => s.accessToken);
   const user = useAuthStore((s) => s.user);
   const isVerified = user?.isVerified ?? true;
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const [resendSent, setResendSent] = useState(false);
   const [resending, setResending] = useState(false);
   const refreshAccessToken = useAuthStore((s) => s.refreshAccessToken);
@@ -172,7 +171,15 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
       {sidebarOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/30 lg:hidden"
+          role="button"
+          tabIndex={0}
           onClick={() => setSidebarOpen(false)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setSidebarOpen(false);
+            }
+          }}
         />
       )}
 

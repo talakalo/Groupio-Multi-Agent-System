@@ -1,5 +1,5 @@
-import { Stack, useRouter } from "expo-router";
 import * as DocumentPicker from "expo-document-picker";
+import { Stack } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import {
@@ -33,7 +33,6 @@ import i18n from "../lib/i18n";
 
 export default function ContractorProfileScreen() {
   const theme = useTheme();
-  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);

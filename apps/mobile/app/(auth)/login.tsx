@@ -11,7 +11,6 @@ import {
   TextInput,
   Button,
   useTheme,
-  HelperText,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";

@@ -139,7 +139,7 @@ describe('Auth Store', () => {
     });
 
     it('sets loading state during login', async () => {
-      let resolvePromise: () => void;
+      let resolvePromise: (() => void) | undefined;
       const promise = new Promise<void>((resolve) => {
         resolvePromise = resolve;
       });
@@ -158,7 +158,8 @@ describe('Auth Store', () => {
 
       expect(useAuthStore.getState().isLoading).toBe(true);
 
-      resolvePromise!();
+      expect(resolvePromise).toBeDefined();
+      resolvePromise?.();
       await loginPromise.catch(() => {});
 
       expect(useAuthStore.getState().isLoading).toBe(false);

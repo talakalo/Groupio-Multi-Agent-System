@@ -92,11 +92,16 @@ export default function SignupScreen() {
 
     setLoading(true);
     try {
+      if (!role) {
+        setErrors((prev) => ({ ...prev, role: i18n.t("auth.roleRequired") }));
+        setLoading(false);
+        return;
+      }
       const result = await signup({
         fullName: fullName.trim(),
         email: email.trim().toLowerCase(),
         password,
-        role: role!,
+        role,
       });
 
       if (result.requiresVerification) {

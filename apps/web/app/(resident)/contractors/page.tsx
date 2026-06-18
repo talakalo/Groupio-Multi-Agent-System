@@ -1,6 +1,6 @@
 'use client';
 
-import type { Contractor, ServiceCategory, Region, ContractorMatch } from '@groupio/types';
+import type { Contractor, ServiceCategory, Region } from '@groupio/types';
 import { useQuery } from '@tanstack/react-query';
 import {
   Search,
@@ -40,29 +40,6 @@ interface ContractorFilters {
   minRating: number;
   verifiedOnly: boolean;
   sortBy: 'rating' | 'trust' | 'experience';
-}
-
-// ---------------------------------------------------------------------------
-// Trust Score Badge
-// ---------------------------------------------------------------------------
-
-function TrustScoreBadge({ score }: { score: number }) {
-  const t = useTranslations('contractors');
-  const level =
-    score >= 90 ? 'excellent' : score >= 75 ? 'good' : score >= 60 ? 'fair' : 'new';
-  const colorMap = {
-    excellent: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-    good: 'bg-primary-100 text-primary-700 border-primary-200',
-    fair: 'bg-amber-100 text-amber-700 border-amber-200',
-    new: 'bg-gray-100 text-gray-600 border-gray-200',
-  };
-
-  return (
-    <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-medium border', colorMap[level])}>
-      <Shield className="h-3 w-3" />
-      {t('trustScore')}: {score}
-    </span>
-  );
 }
 
 // ---------------------------------------------------------------------------

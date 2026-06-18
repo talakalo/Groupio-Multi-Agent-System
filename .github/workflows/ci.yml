@@ -82,7 +82,7 @@ jobs:
           ENVIRONMENT: 'testing'
           ANTHROPIC_API_KEY: 'test-key'
           OPENAI_API_KEY: 'test-key'
-          JWT_SECRET_KEY: 'test-secret-key-for-ci-testing-only'
+          JWT_SECRET_KEY: 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
         run: |
           heads="$(python -m alembic heads 2>/dev/null | grep -c '(head)' || true)"
           echo "Alembic heads count: $heads"
@@ -169,6 +169,8 @@ jobs:
 
       - name: Run GitLeaks (secret scanning)
         uses: gitleaks/gitleaks-action@dcedce43c6f43de0b836d1fe38946645c9c638dc # v2
+        with:
+          args: detect --no-git --config .gitleaks.toml --redact --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -194,7 +196,7 @@ jobs:
       ENVIRONMENT: 'testing'
       ANTHROPIC_API_KEY: 'test-key'
       OPENAI_API_KEY: 'test-key'
-      JWT_SECRET_KEY: 'test-secret-key-for-ci-testing-only'
+      JWT_SECRET_KEY: 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
 
     services:
       redis:
@@ -254,7 +256,7 @@ jobs:
           ENVIRONMENT: 'testing'
           ANTHROPIC_API_KEY: 'test-key'
           OPENAI_API_KEY: 'test-key'
-          JWT_SECRET_KEY: 'test-secret-key-for-ci-testing-only'
+          JWT_SECRET_KEY: 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
         run: |
           pytest tests/integration/ -v --timeout=30 --no-cov
 
@@ -268,7 +270,7 @@ jobs:
           ENVIRONMENT: 'testing'
           ANTHROPIC_API_KEY: 'test-key'
           OPENAI_API_KEY: 'test-key'
-          JWT_SECRET_KEY: 'test-secret-key-for-ci-testing-only'
+          JWT_SECRET_KEY: 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
         run: |
           pytest tests/real/ -v --timeout=30 --no-cov -rs
 
@@ -394,7 +396,7 @@ jobs:
           PYTHONPATH: .
           TESTING: 'true'
           ENVIRONMENT: testing
-          JWT_SECRET_KEY: ci-test-secret-key-for-openapi-schema-export-only
+          JWT_SECRET_KEY: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
           ANTHROPIC_API_KEY: test-key
           OPENAI_API_KEY: test-key
 
@@ -472,6 +474,13 @@ jobs:
 
       - name: Build web app
         run: pnpm --filter @groupio/web build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:8000
+          NEXT_PUBLIC_SUPABASE_URL: http://localhost:54321
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: test-key
+
+      - name: Build admin app
+        run: pnpm --filter @groupio/admin build
         env:
           NEXT_PUBLIC_API_URL: http://localhost:8000
           NEXT_PUBLIC_SUPABASE_URL: http://localhost:54321

@@ -1,5 +1,5 @@
-import { getTranslations } from "next-intl/server";
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 import type { ReactNode } from "react";
 
 import { AuthHeader } from "@/components/auth/AuthHeader";

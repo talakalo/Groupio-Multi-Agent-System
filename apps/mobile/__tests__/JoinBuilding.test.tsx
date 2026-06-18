@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports, import/first */
+import { render, fireEvent } from "@testing-library/react-native";
 import React from "react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
@@ -39,7 +40,6 @@ vi.mock("expo-router", () => ({
   Stack: { Screen: "Screen" },
 }));
 
-import { render, fireEvent } from "@testing-library/react-native";
 import JoinBuildingScreen from "../app/join-building";
 
 describe("JoinBuildingScreen", () => {

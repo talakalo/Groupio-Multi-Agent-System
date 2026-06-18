@@ -42,7 +42,6 @@ export default function AdminLayout(props: { children: React.ReactNode } & PageP
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const token = useAuthStore((s) => s.accessToken);
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const refreshAccessToken = useAuthStore((s) => s.refreshAccessToken);
@@ -168,7 +167,15 @@ export default function AdminLayout(props: { children: React.ReactNode } & PageP
       {sidebarOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/30 lg:hidden"
+          role="button"
+          tabIndex={0}
           onClick={() => setSidebarOpen(false)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setSidebarOpen(false);
+            }
+          }}
         />
       )}
 

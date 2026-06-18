@@ -1,11 +1,12 @@
 import type { Offer } from "@groupio/types";
 import { render, screen } from "@testing-library/react";
-import { describe, it, expect, vi } from "vitest";
-import React from "react";
 import { NextIntlClientProvider } from "next-intl";
-import messages from "../messages/he.json";
+import React from "react";
+import { describe, it, expect } from "vitest";
 
 import { OfferCard } from "../components/features/offers/OfferCard";
+import messages from "../messages/he.json";
+
 
 function renderOfferCard(props: { offer: Offer }) {
   return render(

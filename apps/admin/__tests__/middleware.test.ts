@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { NextRequest, NextResponse } from "next/server";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * Unit tests for apps/admin/middleware.ts.
@@ -20,13 +21,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // non-redirected traffic, so stub it to the simplest passthrough.
 vi.mock("next-intl/middleware", () => ({
   default: () => {
-    const { NextResponse } = require("next/server");
     return () => NextResponse.next();
   },
 }));
 
 import middleware from "../middleware";
-import { NextRequest } from "next/server";
 
 function buildRequest(
   pathname: string,
@@ -56,7 +55,8 @@ describe("apps/admin middleware", () => {
     const req = buildRequest("/dashboard");
     const res = middleware(req);
     expect(res.status).toBe(307);
-    const location = res.headers.get("location")!;
+    const location = res.headers.get("location");
+    expect(location).toBeTruthy();
     expect(location).toContain("/login");
     expect(location).toContain("redirect=%2Fdashboard");
   });

@@ -1,8 +1,8 @@
 'use client';
 
+import { AlertCircle, Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useState } from 'react';
-import { AlertCircle, Loader2 } from 'lucide-react';
 
 import { apiClient } from '@/lib/api/client';
 

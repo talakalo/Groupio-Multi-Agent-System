@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import React from 'react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
 import LoginPage from '../app/login/page';
 import enMessages from '../messages/en.json';
 

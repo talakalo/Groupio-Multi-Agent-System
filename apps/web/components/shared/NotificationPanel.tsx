@@ -1,8 +1,8 @@
 'use client';
 
 import { Bell, CheckCircle, XCircle, AlertTriangle, Info, CheckCheck, Trash2, Loader2 } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
@@ -209,7 +209,7 @@ export function NotificationPanel() {
     } finally {
       setLoading(false);
     }
-  }, [accessToken, mapRows]);
+  }, [accessToken, mapRows, t]);
 
   useEffect(() => {
     if (!accessToken) return;

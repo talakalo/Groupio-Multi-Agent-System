@@ -20,7 +20,6 @@ import {
   Snackbar,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 
 import { useCreateOffer, useProfile } from "../lib/hooks";
 

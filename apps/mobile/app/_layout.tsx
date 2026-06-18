@@ -9,7 +9,7 @@ import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import React, { createContext, useCallback, useContext , useEffect, useState } from "react";
-import { I18nManager, Platform , useColorScheme } from "react-native";
+import { I18nManager, useColorScheme } from "react-native";
 import {
   PaperProvider,
   MD3DarkTheme,
@@ -211,7 +211,7 @@ export default function RootLayout() {
       // Already authenticated — redirect to main app
       router.replace("/(tabs)");
     }
-  }, [authChecked, isAuthenticated, segments]);
+  }, [authChecked, isAuthenticated, router, segments]);
 
   useEffect(() => {
     if (!isAuthenticated) return;

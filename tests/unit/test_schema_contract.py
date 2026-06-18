@@ -26,6 +26,17 @@ def _read_payment_cols() -> set[str]:
     return {c.strip() for c in raw.split(",") if c.strip()}
 
 
+def _read_named_cols(const_name: str) -> set[str]:
+    """Extract column names from a named *_COLS constant in postgres.py."""
+    src = POSTGRES_PY.read_text()
+    match = re.search(rf"{re.escape(const_name)}\s*=\s*[\"'](.*?)[\"']", src, re.DOTALL)
+    if not match:
+        match = re.search(rf"{re.escape(const_name)}\s*=\s*\((.*?)\)", src, re.DOTALL)
+    assert match, f"{const_name} not found in postgres.py"
+    raw = match.group(1).replace('"', "").replace("'", "").replace("\n", "").replace("\\", "")
+    return {c.strip() for c in raw.split(",") if c.strip()}
+
+
 def _all_migration_text() -> str:
     texts = []
     for path in sorted(MIGRATIONS_DIR.glob("*.py")):
@@ -152,3 +163,17 @@ def test_create_payment_split_asyncpg_uses_only_known_columns() -> None:
 
     missing = insert_cols - db_cols
     assert not missing, f"create_payment_split INSERT uses columns not in any migration: {sorted(missing)}"
+
+
+def test_notification_cols_all_exist_in_migrations() -> None:
+    """Every column in _NOTIFICATION_COLS must exist in Alembic for notifications."""
+    notification_cols = _read_named_cols("_NOTIFICATION_COLS")
+    migration_text = _all_migration_text()
+    db_cols = _columns_added_to_table("notifications", migration_text)
+    db_cols.update({"id", "created_at"})
+
+    missing = notification_cols - db_cols
+    assert not missing, (
+        f"_NOTIFICATION_COLS references columns not found in any migration: {sorted(missing)}\n"
+        "Add an Alembic migration to create the missing notification columns."
+    )

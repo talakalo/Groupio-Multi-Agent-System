@@ -21,7 +21,6 @@ import { z } from 'zod';
 import { CategoryChips } from '@/components/shared/CategoryChips';
 import { StepIndicator } from '@/components/shared/StepIndicator';
 import { apiClient, ApiError } from '@/lib/api/client';
-import { cn } from '@/lib/utils/cn';
 import { unwrapPageParams, PageParamsProps } from '@/lib/utils/unwrapPageParams';
 
 type CreateOfferForm = {

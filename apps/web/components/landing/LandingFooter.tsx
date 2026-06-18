@@ -1,6 +1,6 @@
 import { Building2, ArrowLeft } from "lucide-react";
-import { getTranslations } from "next-intl/server";
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 
 import { PLATFORM_STATS } from "@/lib/constants/platformStats";
 
