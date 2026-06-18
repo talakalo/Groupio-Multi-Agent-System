@@ -77,3 +77,9 @@ GHSA-q4gf-8mx6-v5v3
 CVE-2026-26007      # cryptography 46.0.4 → 46.0.5
 CVE-2026-34070      # langchain-core 1.2.9 → 1.2.22 (path-traversal in legacy load_prompt)
 CVE-2026-32597      # pyjwt 2.11.0 → 2.12.0 (crit header extensions)
+
+# Starlette 0.52.1 is pinned by FastAPI 0.128.5.
+# Upgrading to starlette >=1.1.0 requires a major FastAPI version bump.
+# These CVEs are acknowledged and tracked for the FastAPI upgrade.
+CVE-2026-48818
+CVE-2026-54283

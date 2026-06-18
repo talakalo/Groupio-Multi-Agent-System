@@ -30,7 +30,7 @@
       "fast-xml-parser": ">=5.3.6",
       "rollup": ">=4.59.0",
       "@xmldom/xmldom": ">=0.8.13",
-      "form-data": ">=3.0.5",
+      "form-data": "^4.0.6",
       "protobufjs": ">=8.4.1",
       "ws": ">=8.21.0",
       "next": ">=15.5.18 <16",
