@@ -2,7 +2,6 @@ import { Wind, ChefHat, Droplets, BadgeCheck, ArrowLeft, Users, Clock } from "lu
 import type { LucideIcon } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 import Link from "next/link";
-import { getTranslations } from "next-intl/server";
 
 const OFFER_ICONS: LucideIcon[] = [Wind, ChefHat, Droplets];
 const OFFER_STYLES = [
