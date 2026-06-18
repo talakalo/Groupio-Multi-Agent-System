@@ -4,6 +4,7 @@ import type { PricingTier } from '@groupio/types';
 import { Users, Check, TrendingDown, Sparkles } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useMemo } from 'react';
+import { useTranslations } from 'next-intl';
 
 import { cn } from '@/lib/utils/cn';
 

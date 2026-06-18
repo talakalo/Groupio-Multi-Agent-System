@@ -42,6 +42,7 @@ export default function AdminLayout(props: { children: React.ReactNode } & PageP
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const token = useAuthStore((s) => s.accessToken);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const refreshAccessToken = useAuthStore((s) => s.refreshAccessToken);

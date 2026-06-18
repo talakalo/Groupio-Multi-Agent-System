@@ -2,6 +2,8 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { NextIntlClientProvider } from 'next-intl';
+import messages from '../messages/he.json';
 
 import LoginPage from '../app/(auth)/login/page';
 import messages from '../messages/he.json';
@@ -59,6 +61,14 @@ vi.mock('@/lib/stores/authStore', () => {
   return { useAuthStore };
 });
 
+
+function renderLoginPage() {
+  return render(
+    <NextIntlClientProvider locale="he" messages={messages}>
+      <LoginPage />
+    </NextIntlClientProvider>
+  );
+}
 
 function renderLoginPage() {
   return render(

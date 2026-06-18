@@ -17,6 +17,9 @@ from src.orchestration.graph import get_orchestrator
 # E.164 phone number format (e.g. "972501234567" — digits only, 7-15 digits)
 _E164_PATTERN = re.compile(r"^\d{7,15}$")
 
+# E.164 phone number format (e.g. "972501234567" — digits only, 7-15 digits)
+_E164_PATTERN = re.compile(r"^\d{7,15}$")
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["webhooks"])
@@ -181,6 +184,30 @@ async def contractor_update_webhook(
             )
         except Exception:
             logger.exception("Re-vetting failed for contractor %s", contractor_id)
+
+        if update_type == "document_uploaded":
+            try:
+                from src.messaging.envelope import EventEnvelope
+                from src.messaging.outbox_helpers import try_enqueue_crm
+                from src.messaging.topics import RK_CRM_CONTRACTOR_DOCUMENTS_SUBMITTED
+
+                db = get_postgres_client()
+                env = EventEnvelope(
+                    event_name="crm.contractor.documents_submitted",
+                    entity_type="contractor",
+                    entity_id=str(contractor_id),
+                    idempotency_key=f"crm:contractor:docs:{contractor_id}:{update_type}",
+                    payload={"contractor_id": str(contractor_id), "update_type": update_type},
+                )
+                await try_enqueue_crm(
+                    db,
+                    RK_CRM_CONTRACTOR_DOCUMENTS_SUBMITTED,
+                    env.event_name,
+                    env.to_json_dict(),
+                    idempotency_key=env.idempotency_key,
+                )
+            except Exception:
+                logger.exception("CRM outbox enqueue failed for contractor document webhook (non-fatal)")
 
         if update_type == "document_uploaded":
             try:

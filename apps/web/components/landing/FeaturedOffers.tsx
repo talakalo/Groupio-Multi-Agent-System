@@ -1,5 +1,6 @@
 import { Wind, ChefHat, Droplets, BadgeCheck, ArrowLeft, Users, Clock } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { getTranslations } from "next-intl/server";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 
