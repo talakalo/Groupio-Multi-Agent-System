@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect } from "react";
 import { clsx } from "clsx";
 import {
   RefreshCw,
@@ -10,9 +9,11 @@ import {
   Activity,
   Filter,
 } from "lucide-react";
+import { useState, useMemo, useCallback, useEffect } from "react";
+
 import { AgentCard } from "@/components/features/agents/AgentCard";
-import { AgentOrchestrationGraph } from "@/components/features/agents/AgentOrchestrationGraph";
 import type { AgentStatus } from "@/components/features/agents/AgentCard";
+import { AgentOrchestrationGraph } from "@/components/features/agents/AgentOrchestrationGraph";
 import { AgentMetricsChart } from "@/components/features/metrics/AgentMetricsChart";
 import type { AgentChartSeries } from "@/components/features/metrics/AgentMetricsChart";
 import {
@@ -23,8 +24,6 @@ import {
   usePendingDecisions,
   useApprovePendingDecision,
   useRejectPendingDecision,
-  useAgentAutonomy,
-  useUpdateAgentMode,
 } from "@/lib/hooks";
 
 // ---------------------------------------------------------------------------
@@ -189,7 +188,7 @@ export default function AgentsPage() {
 
   // Derive agent card data from system status
   const agentCards = useMemo(() => {
-    return AGENT_DEFS.map((def, idx) => {
+    return AGENT_DEFS.map((def) => {
       const sysAgent = systemStatus?.agents?.[def.key];
       const calls = sysAgent?.calls ?? 0;
       const errors = sysAgent?.errors ?? 0;
@@ -271,7 +270,7 @@ export default function AgentsPage() {
             Agent Management
           </h1>
           <p className="text-sm text-surface-500 mt-0.5">
-            Monitor, configure, and manage the 7 Groupio AI agents
+            Monitor, configure, and manage Groupio AI agents
           </p>
         </div>
         <button
@@ -301,6 +300,16 @@ export default function AgentsPage() {
                 prev === agent.key ? null : agent.key
               )
             }
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                setSelectedAgent((prev) =>
+                  prev === agent.key ? null : agent.key
+                );
+              }
+            }}
+            role="button"
+            tabIndex={0}
           >
             <AgentCard
               agentKey={agent.key}

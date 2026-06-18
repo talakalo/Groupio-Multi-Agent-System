@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import React from 'react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
 import SettingsPage from '../app/settings/page';
 
 const MOCK_SETTINGS = {
@@ -159,7 +160,10 @@ describe('SettingsPage', () => {
           call[1]?.method === 'PUT'
       );
       expect(saveCall).toBeDefined();
-      const body = JSON.parse(saveCall![1].body);
+      if (!saveCall || !saveCall[1]?.body) {
+        throw new Error('Expected settings save request body');
+      }
+      const body = JSON.parse(String(saveCall[1].body));
       expect(body.general.platformName).toBe('Groupio Updated');
     });
   });

@@ -10,7 +10,7 @@ import {
   I18nManager,
   Pressable,
 } from "react-native";
-import { Text, TextInput, useTheme, IconButton, Chip } from "react-native-paper";
+import { Text, TextInput, useTheme, IconButton } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 
@@ -122,8 +122,6 @@ export default function ChatScreen() {
   const theme = useTheme();
   const flatListRef = useRef<FlatList<Message>>(null);
   const [inputText, setInputText] = useState("");
-  const [keyboardVisible, setKeyboardVisible] = useState(false);
-
   // Profile for user ID
   const { data: profile } = useProfile();
   const userId = profile?.id ?? "anonymous";
@@ -140,12 +138,8 @@ export default function ChatScreen() {
 
   // Keyboard listeners
   useEffect(() => {
-    const showSub = Keyboard.addListener("keyboardDidShow", () =>
-      setKeyboardVisible(true),
-    );
-    const hideSub = Keyboard.addListener("keyboardDidHide", () =>
-      setKeyboardVisible(false),
-    );
+    const showSub = Keyboard.addListener("keyboardDidShow", () => {});
+    const hideSub = Keyboard.addListener("keyboardDidHide", () => {});
     return () => {
       showSub.remove();
       hideSub.remove();

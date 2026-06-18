@@ -9,6 +9,7 @@ import {
   X,
   LogOut,
   ChevronDown,
+  Loader2,
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -40,7 +41,6 @@ export default function BuildingsManagerLayout({ children }: { children: React.R
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const token = useAuthStore((s) => s.accessToken);
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const refreshAccessToken = useAuthStore((s) => s.refreshAccessToken);
@@ -80,11 +80,12 @@ export default function BuildingsManagerLayout({ children }: { children: React.R
     }
   }, [userMenuOpen]);
 
-  if (!hasHydrated) {
-    return null;
-  }
-  if (!token) {
-    return null;
+  if (!hasHydrated || !token) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
+      </div>
+    );
   }
 
   const handleLogout = async () => {
@@ -174,7 +175,15 @@ export default function BuildingsManagerLayout({ children }: { children: React.R
       {sidebarOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/30 lg:hidden"
+          role="button"
+          tabIndex={0}
           onClick={() => setSidebarOpen(false)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setSidebarOpen(false);
+            }
+          }}
         />
       )}
 

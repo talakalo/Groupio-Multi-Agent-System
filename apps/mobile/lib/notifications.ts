@@ -150,14 +150,12 @@ export function addNotificationListeners(
 ) {
   const receivedSubscription = Notifications.addNotificationReceivedListener(
     (notification) => {
-      console.log('Notification received:', notification);
       onNotificationReceived?.(notification);
     }
   );
 
   const responseSubscription = Notifications.addNotificationResponseReceivedListener(
     (response) => {
-      console.log('Notification response:', response);
       onNotificationResponse?.(response);
     }
   );

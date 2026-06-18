@@ -182,29 +182,38 @@ class OutreachAgent(BaseAgent):
         )
 
         pending_id = str(uuid4())
-        await self._db.create_outreach_pending(
-            {
-                "id": pending_id,
-                "user_id": state["user_id"],
-                "campaign_type": campaign_type,
-                "message": personalized,
-                "variant": variant,
-                "status": "pending_approval",
-                "created_at": datetime.now(UTC),
-            }
-        )
+        queued = False
+        try:
+            await self._db.create_outreach_pending(
+                {
+                    "id": pending_id,
+                    "user_id": state["user_id"],
+                    "campaign_type": campaign_type,
+                    "message": personalized,
+                    "variant": variant,
+                    "status": "pending_approval",
+                    "created_at": datetime.now(UTC),
+                }
+            )
+            queued = True
+        except Exception:
+            logger.exception("Failed to queue outreach campaign %s for user %s", campaign_type, state["user_id"])
 
         state["actions_taken"] = [
             {
                 "agent": "outreach",
-                "action": "campaign_queued_for_approval",
-                "details": {"pending_id": pending_id, "campaign_type": campaign_type},
+                "action": "campaign_queued_for_approval" if queued else "campaign_queue_failed",
+                "details": {"pending_id": pending_id if queued else None, "campaign_type": campaign_type},
                 "response": {
-                    "type": "outreach_pending",
-                    "message": "Queued for admin approval",
+                    "type": "outreach_pending" if queued else "outreach_error",
+                    "message": "Queued for admin approval" if queued else "Failed to queue campaign",
                 },
-                "requires_followup": True,
-                "summary_for_next_agent": f"Outreach campaign ({campaign_type}) queued, pending admin approval.",
+                "requires_followup": queued,
+                "summary_for_next_agent": (
+                    f"Outreach campaign ({campaign_type}) queued, pending admin approval."
+                    if queued
+                    else f"Outreach campaign ({campaign_type}) failed to queue due to a database error."
+                ),
             }
         ]
 

@@ -1,8 +1,9 @@
 # Removed deprecated `version` key (Docker Compose v2 ignores it and warns).
-# Lightweight test compose — PostgreSQL only.
+# Lightweight test compose — PostgreSQL + Redis for real backend smoke coverage.
 # Usage:
 #   docker compose -f docker/docker-compose.test.yml up -d
 #   TEST_DATABASE_URL=postgresql://groupio_test:groupio_test@localhost:5433/groupio_test \
+#   REDIS_URL=redis://localhost:6380 \
 #     pytest tests/real/ -v
 #   docker compose -f docker/docker-compose.test.yml down -v
 
@@ -19,6 +20,16 @@ services:
       - /var/lib/postgresql/data  # In-memory for speed; data is ephemeral
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U groupio_test -d groupio_test"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+
+  redis-test:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
       interval: 2s
       timeout: 5s
       retries: 10

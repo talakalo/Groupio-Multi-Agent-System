@@ -1,7 +1,7 @@
-import type { Metadata } from 'next';
-import { getTranslations } from 'next-intl/server';
-import Link from 'next/link';
 import { Mail, Clock, HelpCircle, Shield } from 'lucide-react';
+import type { Metadata } from 'next';
+import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations('contact');

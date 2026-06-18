@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
-from src.api.middleware.auth import get_admin_user, get_current_user, require_admin_only
+from src.api.middleware.auth import get_current_user, require_admin_only
 from src.config.settings import get_settings
 from src.databases.postgres import get_postgres_client
 from src.models.user import UserInDB, UserRole
@@ -1270,7 +1270,13 @@ async def download_invoice_pdf(
 # Admin Escrow & Payout endpoints
 # ---------------------------------------------------------------------------
 
-admin_router = APIRouter(prefix="/admin/payments", tags=["Admin Payments"])
+admin_router = APIRouter(
+    prefix="/admin/payments",
+    tags=["Admin Payments"],
+    # P0 SECURITY: admin payment endpoints are platform-admin only (admin, super_admin).
+    # buildings_manager must NOT access payment summaries, escrow, or payout records.
+    dependencies=[Depends(require_admin_only)],
+)
 
 
 class EscrowAccountResponse(BaseModel):
@@ -1384,23 +1390,22 @@ async def _build_escrow_for_offer(db: Any, offer: dict) -> EscrowAccountResponse
 
 @admin_router.get("/summary", response_model=PaymentSummaryResponse)
 async def get_payment_summary(
-    admin_user: UserInDB = Depends(get_admin_user),
+    admin_user: UserInDB = Depends(require_admin_only),
 ) -> PaymentSummaryResponse:
     """Get a high-level summary of all payment activity for the platform."""
     db = get_postgres_client()
 
     # Aggregate payment totals at DB level to avoid loading all rows
-    payment_agg = await db.execute_query(
-        "SELECT status, SUM(amount) as total FROM payments GROUP BY status"
-    ) or []
+    payment_agg = await db.execute_query("SELECT status, SUM(amount) as total FROM payments GROUP BY status") or []
     payment_by_status: dict[str, float] = {r["status"]: float(r["total"] or 0) for r in payment_agg}
     total_collected = sum(payment_by_status.get(s, 0) for s in ("succeeded", "completed"))
     total_refunded = payment_by_status.get("refunded", 0)
 
     # Aggregate invoice totals at DB level
-    invoice_agg = await db.execute_query(
-        "SELECT status, SUM(total) as total, COUNT(*) as cnt FROM invoices GROUP BY status"
-    ) or []
+    invoice_agg = (
+        await db.execute_query("SELECT status, SUM(total) as total, COUNT(*) as cnt FROM invoices GROUP BY status")
+        or []
+    )
     invoice_by_status: dict[str, dict] = {r["status"]: r for r in invoice_agg}
     total_released = float((invoice_by_status.get("released") or {}).get("total") or 0)
     pending_payouts = int((invoice_by_status.get("paid") or {}).get("cnt") or 0)
@@ -1408,8 +1413,6 @@ async def get_payment_summary(
 
     fee_rate = _platform_fee_rate()
     total_platform_fees = round(total_collected * fee_rate, 2)
-
-
 
     return PaymentSummaryResponse(
         total_collected=total_collected,
@@ -1423,7 +1426,7 @@ async def get_payment_summary(
 
 @admin_router.get("/escrow", response_model=list[EscrowAccountResponse])
 async def get_escrow_accounts(
-    admin_user: UserInDB = Depends(get_admin_user),
+    admin_user: UserInDB = Depends(require_admin_only),
 ) -> list[EscrowAccountResponse]:
     """Get all active escrow accounts (one per offer with payments)."""
     db = get_postgres_client()
@@ -1450,7 +1453,7 @@ async def get_escrow_accounts(
 
 @admin_router.get("/payouts", response_model=list[ContractorPayoutResponse])
 async def get_contractor_payouts(
-    admin_user: UserInDB = Depends(get_admin_user),
+    admin_user: UserInDB = Depends(require_admin_only),
 ) -> list[ContractorPayoutResponse]:
     """Get all contractor payout records."""
     db = get_postgres_client()
@@ -1468,10 +1471,13 @@ async def get_contractor_payouts(
     contractor_ids = list({inv.get("contractor_id") for inv in invoices if inv.get("contractor_id")})
     contractor_names: dict[str, str] = {}
     if contractor_ids:
-        rows = await db.execute_query(
-            "SELECT id, business_name, name FROM contractors WHERE id = ANY($1::uuid[])",
-            contractor_ids,
-        ) or []
+        rows = (
+            await db.execute_query(
+                "SELECT id, business_name, name FROM contractors WHERE id = ANY($1::uuid[])",
+                contractor_ids,
+            )
+            or []
+        )
         for row in rows:
             contractor_names[row["id"]] = row.get("business_name") or row.get("name") or "Unknown"
 

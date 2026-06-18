@@ -1,8 +1,10 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { NextIntlClientProvider } from 'next-intl';
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { NextIntlClientProvider } from 'next-intl';
 import messages from '../messages/he.json';
+
+import LoginPage from '../app/(auth)/login/page';
 
 // ---- next/navigation mock ----
 const mockPush = vi.fn();
@@ -42,10 +44,10 @@ vi.mock('@/lib/utils/unwrapPageParams', () => ({
 const mockSetAccessToken = vi.fn();
 const mockSetUser = vi.fn();
 vi.mock('@/lib/stores/authStore', () => {
+  const mockState: Record<string, unknown> = { accessToken: null, isAuthenticated: false, user: null };
   const useAuthStore = Object.assign(
-    vi.fn(
-      (selector: (s: Record<string, unknown>) => unknown) =>
-        selector({ accessToken: null, isAuthenticated: false })
+    vi.fn((selector?: (s: Record<string, unknown>) => unknown) =>
+      typeof selector === 'function' ? selector(mockState) : mockState
     ),
     {
       getState: vi.fn(() => ({
@@ -57,7 +59,6 @@ vi.mock('@/lib/stores/authStore', () => {
   return { useAuthStore };
 });
 
-import LoginPage from '../app/(auth)/login/page';
 
 function renderLoginPage() {
   return render(

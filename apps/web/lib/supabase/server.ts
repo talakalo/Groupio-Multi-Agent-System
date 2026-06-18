@@ -1,15 +1,15 @@
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? '';
 
 /**
  * Create a Supabase client for server-side usage
  * This uses the service role key for admin operations
  */
 export function createServerClient() {
-  return createClient(supabaseUrl || '', supabaseServiceKey || '', {
+  return createClient(supabaseUrl, supabaseServiceKey, {
     auth: {
       persistSession: false,
       autoRefreshToken: false,

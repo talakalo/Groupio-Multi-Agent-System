@@ -41,32 +41,32 @@ export interface MetricCardProps {
 
 const VARIANT_STYLES: Record<
   NonNullable<MetricCardProps["variant"]>,
-  { iconBg: string; iconText: string; ring: string }
+  { iconBg: string; iconText: string; accentBar: string }
 > = {
   default: {
     iconBg: "bg-surface-100",
     iconText: "text-surface-600",
-    ring: "ring-surface-200",
+    accentBar: "bg-surface-200",
   },
   primary: {
-    iconBg: "bg-primary-50",
-    iconText: "text-primary-600",
-    ring: "ring-primary-100",
+    iconBg: "bg-primary-500",
+    iconText: "text-white",
+    accentBar: "bg-primary-500",
   },
   success: {
-    iconBg: "bg-success-50",
-    iconText: "text-success-600",
-    ring: "ring-success-100",
+    iconBg: "bg-success-500",
+    iconText: "text-white",
+    accentBar: "bg-success-500",
   },
   warning: {
-    iconBg: "bg-warning-50",
-    iconText: "text-warning-600",
-    ring: "ring-warning-100",
+    iconBg: "bg-warning-500",
+    iconText: "text-white",
+    accentBar: "bg-warning-500",
   },
   danger: {
-    iconBg: "bg-danger-50",
-    iconText: "text-danger-600",
-    ring: "ring-danger-100",
+    iconBg: "bg-danger-500",
+    iconText: "text-white",
+    accentBar: "bg-danger-500",
   },
 };
 
@@ -140,23 +140,22 @@ export function MetricCard({
 
   const content = (
     <>
-      {/* Header row: icon + label */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2.5">
-          {icon && (
-            <div
-              className={clsx(
-                "flex items-center justify-center w-9 h-9 rounded-lg ring-1",
-                styles.iconBg,
-                styles.iconText,
-                styles.ring
-              )}
-            >
-              {icon}
-            </div>
-          )}
-          <span className="text-sm font-medium text-surface-500">{label}</span>
-        </div>
+      {/* Colored accent bar at top */}
+      <div className={clsx("absolute inset-x-0 top-0 h-0.5 rounded-t-xl", styles.accentBar)} />
+
+      {/* Header row: icon + arrow */}
+      <div className="flex items-start justify-between mb-4">
+        {icon && (
+          <div
+            className={clsx(
+              "flex items-center justify-center w-10 h-10 rounded-xl shadow-sm",
+              styles.iconBg,
+              styles.iconText
+            )}
+          >
+            {icon}
+          </div>
+        )}
         <div className="flex items-center gap-2">
           {sparklineData && sparklineData.length > 1 && (
             <Sparkline data={sparklineData} />
@@ -168,13 +167,16 @@ export function MetricCard({
       </div>
 
       {/* Value */}
-      <p className="text-2xl font-bold text-surface-900 tracking-tight">
+      <p className="text-2xl font-bold text-surface-900 tracking-tight mb-0.5">
         {value}
       </p>
 
+      {/* Label */}
+      <span className="text-xs font-medium text-surface-400 uppercase tracking-wide">{label}</span>
+
       {/* Trend indicator */}
       {changePercent !== undefined && (
-        <div className="flex items-center gap-1.5 mt-2">
+        <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-surface-100">
           {isPositive && (
             <span className="flex items-center gap-0.5 text-xs font-semibold text-success-600">
               <TrendingUp className="w-3.5 h-3.5" />
@@ -200,7 +202,7 @@ export function MetricCard({
   );
 
   const cardClasses = clsx(
-    "card card-hover p-5 group",
+    "card card-hover p-5 group relative overflow-hidden",
     isClickable && "cursor-pointer",
     className
   );

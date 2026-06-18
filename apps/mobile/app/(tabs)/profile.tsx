@@ -1,5 +1,5 @@
 import * as ImagePicker from "expo-image-picker";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
   View,
   ScrollView,
@@ -17,14 +17,12 @@ import {
   Button,
   useTheme,
   Divider,
-  IconButton,
   ActivityIndicator,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 
-import { uploadAvatar, setAuthToken } from "../../lib/api";
-import type { ProfileResponse } from "../../lib/api";
+import { uploadAvatar } from "../../lib/api";
 import { useProfile, useUpdateProfile, useContractorStats } from "../../lib/hooks";
 import i18n from "../../lib/i18n";
 import { storage } from "../../lib/storage";

@@ -362,8 +362,6 @@ describe('Offer Store', () => {
 
   describe('joinOffer', () => {
     it('posts and refreshes offer', async () => {
-      const offer = createMockOffer({ id: 'offer-join', participants: 10 });
-
       // First call: POST /offers/:id/join
       (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
         ok: true,

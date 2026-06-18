@@ -61,7 +61,7 @@ class TestCritical01MagicByteValidation:
         with patch("src.services.storage.get_settings") as ms:
             ms.return_value.SUPABASE_URL = ""
             ms.return_value.SUPABASE_KEY = ""
-            ms.return_value.JWT_SECRET_KEY = "test-secret"
+            ms.return_value.JWT_SECRET_KEY = "x" * 40
             svc = StorageService()
 
         # Real PDF magic bytes — should not raise
@@ -80,7 +80,7 @@ class TestCritical01MagicByteValidation:
         with patch("src.services.storage.get_settings") as ms:
             ms.return_value.SUPABASE_URL = ""
             ms.return_value.SUPABASE_KEY = ""
-            ms.return_value.JWT_SECRET_KEY = "test-secret"
+            ms.return_value.JWT_SECRET_KEY = "x" * 40
             svc = StorageService()
 
         # MZ header (Windows PE) declared as a JPEG
@@ -100,7 +100,7 @@ class TestCritical01MagicByteValidation:
         with patch("src.services.storage.get_settings") as ms:
             ms.return_value.SUPABASE_URL = ""
             ms.return_value.SUPABASE_KEY = ""
-            ms.return_value.JWT_SECRET_KEY = "test-secret"
+            ms.return_value.JWT_SECRET_KEY = "x" * 40
             svc = StorageService()
 
         jpeg_data = b"\xff\xd8\xff\xe0" + b"\x00" * 100
@@ -113,7 +113,7 @@ class TestCritical01MagicByteValidation:
         with patch("src.services.storage.get_settings") as ms:
             ms.return_value.SUPABASE_URL = ""
             ms.return_value.SUPABASE_KEY = ""
-            ms.return_value.JWT_SECRET_KEY = "test-secret"
+            ms.return_value.JWT_SECRET_KEY = "x" * 40
             svc = StorageService()
 
         png_data = b"\x89PNG\r\n\x1a\n" + b"\x00" * 100
@@ -127,7 +127,7 @@ class TestCritical01MagicByteValidation:
         with patch("src.services.storage.get_settings") as ms:
             ms.return_value.SUPABASE_URL = ""
             ms.return_value.SUPABASE_KEY = ""
-            ms.return_value.JWT_SECRET_KEY = "test-secret"
+            ms.return_value.JWT_SECRET_KEY = "x" * 40
             svc = StorageService()
 
         # Should not raise — no bytes to inspect
@@ -222,9 +222,9 @@ class TestHigh02AdminEscalation:
         db.create_user = AsyncMock(return_value=new_user)
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import get_current_user
 
-        app.dependency_overrides[get_admin_user] = lambda: admin
+        app.dependency_overrides[get_current_user] = lambda: admin
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 client = TestClient(app, raise_server_exceptions=False)
@@ -252,9 +252,9 @@ class TestHigh02AdminEscalation:
         db.create_audit_log = AsyncMock()
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import get_current_user
 
-        app.dependency_overrides[get_admin_user] = lambda: admin
+        app.dependency_overrides[get_current_user] = lambda: admin
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 client = TestClient(app, raise_server_exceptions=False)
@@ -277,9 +277,9 @@ class TestHigh02AdminEscalation:
         db.create_audit_log = AsyncMock()
 
         from src.api.main import app
-        from src.api.middleware.auth import get_admin_user
+        from src.api.middleware.auth import get_current_user
 
-        app.dependency_overrides[get_admin_user] = lambda: super_admin
+        app.dependency_overrides[get_current_user] = lambda: super_admin
         try:
             with patch("src.api.routes.admin.get_postgres_client", return_value=db):
                 client = TestClient(app, raise_server_exceptions=False)
@@ -687,9 +687,9 @@ class TestLow03HealthDbProtected:
         from src.api.main import app
 
         with patch("src.api.middleware.auth.get_settings") as ms:
-            ms.return_value.API_KEYS = ["my-secret-key"]
+            ms.return_value.API_KEYS = ["test-api-key-1"]  # gitleaks:allow
             client = TestClient(app, raise_server_exceptions=False)
-            resp = client.get("/api/v1/health/db", headers={"X-API-Key": "my-secret-key"})
+            resp = client.get("/api/v1/health/db", headers={"X-API-Key": "test-api-key-1"})  # gitleaks:allow
         # DB may not be available but auth should pass (not 401/403)
         assert resp.status_code not in (401, 403)
 
@@ -702,7 +702,7 @@ class TestLow03HealthDbProtected:
 class TestLow04E164PhoneValidation:
     """Phone numbers not matching E.164 digits-only format are silently ignored."""
 
-    def _post_webhook(self, phone: str, secret: str = "test-secret"):
+    def _post_webhook(self, phone: str, secret: str = "x" * 40):
         payload = {"entry": [{"changes": [{"value": {"messages": [{"from": phone, "text": {"body": "Hello"}}]}}]}]}
         payload_bytes = json.dumps(payload).encode()
         sig = _whatsapp_sig(secret, payload_bytes)

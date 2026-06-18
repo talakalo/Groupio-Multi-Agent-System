@@ -6,7 +6,7 @@ title = "gitleaks config"
 useDefault = true
 
 [allowlist]
-description = "Allowlist .env.example files and known test fixtures (placeholder values only)"
+description = "Allowlist tracked example env/config fixtures and known placeholder-only test files"
 commits = [
   "32238b5892ef0a9815a2f8ff746c64fcce67ab48",
 ]
@@ -16,4 +16,13 @@ paths = [
   '''apps/mobile/\.env\.example$''',
   '''apps/admin/\.env\.example$''',
   '''apps/web/\.env\.example$''',
+  '''docker/staging-minimal\.env$''',
+  '''monitoring/prometheus\.yml$''',
+  # E2E test fixture data — passwords are fake test data, not real credentials
+  '''apps/web/e2e/config/test-data\.json$''',
+  '''apps/admin/e2e/config/test-data\.json$''',
+  # Python unit/integration test files — password values are test fixtures, not real credentials
+  '''tests/unit/.*\.py$''',
+  '''tests/integration/.*\.py$''',
+  '''tests/e2e/.*\.py$''',
 ]

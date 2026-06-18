@@ -1,11 +1,13 @@
 """Fixtures for real-backend integration tests.
 
-These tests require a live PostgreSQL instance.  They are skipped automatically
-when TEST_DATABASE_URL is not set, so CI without the DB service stays green.
+These tests require a live PostgreSQL instance. They are skipped automatically
+when TEST_DATABASE_URL is not set, so environments without the DB service stay
+green.
 
 To run locally:
   docker compose -f docker/docker-compose.test.yml up -d
   TEST_DATABASE_URL=postgresql://groupio_test:groupio_test@localhost:5433/groupio_test \
+  REDIS_URL=redis://localhost:6380 \
     pytest tests/real/ -v
 """
 
@@ -15,6 +17,7 @@ from collections.abc import AsyncGenerator
 
 import asyncpg
 import pytest
+import pytest_asyncio
 
 _TEST_DSN = os.getenv(
     "TEST_DATABASE_URL",
@@ -50,9 +53,9 @@ def _run_migrations():
     return True
 
 
-@pytest.fixture(scope="session")
+@pytest_asyncio.fixture
 async def db_pool(_run_migrations) -> AsyncGenerator[asyncpg.Pool, None]:
-    """Session-scoped asyncpg connection pool pointed at the test DB."""
+    """Per-test asyncpg connection pool bound to the active event loop."""
     pool = await asyncpg.create_pool(
         _TEST_DSN,
         min_size=2,
@@ -63,7 +66,7 @@ async def db_pool(_run_migrations) -> AsyncGenerator[asyncpg.Pool, None]:
     await pool.close()
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def db_conn(db_pool: asyncpg.Pool) -> AsyncGenerator[asyncpg.Connection, None]:
     """Per-test connection with automatic rollback — each test runs in isolation."""
     async with db_pool.acquire() as conn:
@@ -81,16 +84,23 @@ async def db_conn(db_pool: asyncpg.Pool) -> AsyncGenerator[asyncpg.Connection, N
 async def _insert_user(conn: asyncpg.Connection, *, role: str = "resident") -> dict:
     import uuid
 
+    from src.api.middleware.auth import hash_password
+
     uid = str(uuid.uuid4())
+    phone_suffix = str(uuid.uuid4().int % 100000000).zfill(8)
     row = await conn.fetchrow(
         """
-        INSERT INTO users (id, email, full_name, role, is_active, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, true, NOW(), NOW())
-        RETURNING id, email, full_name, role
+        INSERT INTO users
+          (id, email, hashed_password, full_name, phone, role, preferred_language,
+           is_active, is_verified, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, 'he', true, true, NOW(), NOW())
+        RETURNING id, email, full_name, role, phone
         """,
         uid,
         f"{uid[:8]}@test.example.com",
+        hash_password("test-password"),
         "Test User",
+        f"05{phone_suffix}",
         role,
     )
     return dict(row)
@@ -103,11 +113,12 @@ async def _insert_building(conn: asyncpg.Connection, *, admin_id: str) -> dict:
     row = await conn.fetchrow(
         """
         INSERT INTO buildings
-          (id, address, city, region, admin_user_id, total_units, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, 20, NOW(), NOW())
-        RETURNING id, address, city, admin_user_id
+          (id, name, address, city, region, admin_user_id, total_units, floors, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, 20, 5, NOW(), NOW())
+        RETURNING id, name, address, city, admin_user_id
         """,
         bid,
+        "Rothschild Towers",
         "Rothschild 1",
         "Tel Aviv",
         "center",
@@ -123,14 +134,15 @@ async def _insert_offer(conn: asyncpg.Connection, *, building_id: str, admin_id:
     row = await conn.fetchrow(
         """
         INSERT INTO offers
-          (id, title, category, building_id, status, base_price,
+          (id, title, description, category, building_id, status, base_price,
            pricing_tiers, created_by, created_at, updated_at)
-        VALUES ($1, $2, 'ac', $3, 'active', 5000,
-                '[]'::jsonb, $4, NOW(), NOW())
+        VALUES ($1, $2, $3, 'ac', $4, 'active', 5000,
+                '[]'::jsonb, $5, NOW(), NOW())
         RETURNING id, title, status, building_id
         """,
         oid,
         "AC Installation",
+        "Install a new shared AC system",
         building_id,
         admin_id,
     )

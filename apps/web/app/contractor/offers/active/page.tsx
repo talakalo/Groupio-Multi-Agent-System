@@ -9,7 +9,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { OfferCard } from '@/components/features/offers/OfferCard';
 import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
-import { cn } from '@/lib/utils/cn';
 
 // ---- Participant + analytics panel ----
 
@@ -89,14 +88,6 @@ function OfferAnalyticsPanel({ offer }: { offer: Offer }) {
 
 type OfferStatus = 'all' | 'pending' | 'accepted' | 'in_progress' | 'completed';
 
-const STATUS_BADGE: Record<string, string> = {
-  active: 'bg-emerald-100 text-emerald-700',
-  pending: 'bg-amber-100 text-amber-700',
-  in_progress: 'bg-sky-100 text-sky-700',
-  completed: 'bg-slate-100 text-slate-600',
-  draft: 'bg-gray-100 text-gray-500',
-};
-
 export default function ContractorActiveOffersPage() {
   const t = useTranslations('contractor.offers');
   const accessToken = useAuthStore((s) => s.accessToken);
@@ -116,7 +107,7 @@ export default function ContractorActiveOffersPage() {
       setIsLoading(true);
       try {
         const data = await apiClient.getOffers(undefined, { status: statusFilter !== 'all' ? statusFilter : undefined, category: categoryFilter !== 'all' ? categoryFilter : undefined });
-        let list = [...(data.items ?? [])];
+        const list = [...(data.items ?? [])];
         if (sortBy === 'date') list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         else if (sortBy === 'price') list.sort((a, b) => { const pa = a.tiers[a.currentTier]?.price ?? a.basePrice; const pb = b.tiers[b.currentTier]?.price ?? b.basePrice; return pa - pb; });
         else if (sortBy === 'participants') list.sort((a, b) => (b.participants ?? 0) - (a.participants ?? 0));

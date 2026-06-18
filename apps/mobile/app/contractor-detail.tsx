@@ -11,8 +11,8 @@ import {
   Text,
   useTheme,
 } from "react-native-paper";
-import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import { SafeAreaView } from "react-native-safe-area-context";
+import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 
 import {
   ApiError,

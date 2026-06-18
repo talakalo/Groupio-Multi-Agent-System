@@ -92,3 +92,27 @@ async def test_support_escalates_after_3_attempts(support_agent, sample_agent_st
 
     # After 3 attempts, should escalate
     assert result["needs_human"] is True
+
+
+@pytest.mark.asyncio
+async def test_support_order_status_includes_asyncpg_order_context(support_agent, sample_agent_state):
+    """Order-status flow consumes normalized asyncpg order rows without breaking prompt generation."""
+    sample_agent_state["intent"] = "order_status"
+    sample_agent_state["user_id"] = "user-1"
+    sample_agent_state["messages"] = [{"role": "user", "content": "מה הסטטוס של ההזמנה שלי?"}]
+    support_agent._db.get_user_orders = AsyncMock(
+        return_value=[
+            {
+                "id": "ord-1",
+                "status": "paid",
+                "contractors": {"business_name": "Cool Air Ltd"},
+            }
+        ]
+    )
+
+    result = await support_agent.run(sample_agent_state)
+
+    assert result["actions_taken"][-1]["action"] == "support_response"
+    llm_messages = support_agent.llm_client.create_message.call_args.kwargs["messages"]
+    assert "[Order Data]" in llm_messages[-1]["content"]
+    assert "Cool Air Ltd" in llm_messages[-1]["content"]

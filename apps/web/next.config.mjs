@@ -85,7 +85,7 @@ const nextConfig = {
   experimental: {
     // Suppress params/searchParams enumeration warning from dev tools (e.g. Cursor
     // element picker) that serialize React props — app code unwraps via use()/await.
-    internal_disableSyncDynamicAPIWarnings: true,
+    // internal_disableSyncDynamicAPIWarnings removed in Next.js 15.5 (flag no longer exists)
     optimizePackageImports: [
       "lucide-react",
       "recharts",          // used in admin charts; tree-shakes unused components

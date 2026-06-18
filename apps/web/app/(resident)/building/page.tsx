@@ -1,6 +1,6 @@
 'use client';
 
-import type { Building, Offer, Resident } from '@groupio/types';
+import type { Building, Offer } from '@groupio/types';
 import { formatPrice, formatDate } from '@groupio/utils';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -124,7 +124,6 @@ function GroupOfferCard({ offer }: { offer: Offer }) {
 export default function BuildingPage(props: PageParamsProps) {
   unwrapPageParams(props);
   const t = useTranslations('building');
-  const tCommon = useTranslations('common');
   const [copiedCode, setCopiedCode] = useState(false);
   const [activeTab, setActiveTab] = useState<'neighbors' | 'offers' | 'settings'>('neighbors');
 

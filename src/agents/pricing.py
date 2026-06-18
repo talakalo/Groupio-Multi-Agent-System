@@ -81,7 +81,7 @@ class PricingAgent(BaseAgent):
         market_data = await self._get_market_data(category, region)
 
         # Step 3: Calculate tiered pricing
-        base_price = market_data.get("avg_price", 0)
+        base_price = float(market_data.get("avg_price") or 0)
         tiers = self._calculate_tiers(base_price, market_data, category)
 
         # Step 4: Apply seasonal adjustments
@@ -169,7 +169,7 @@ class PricingAgent(BaseAgent):
         # Task 3.4 — Generate a Hebrew pricing rationale and persist to DB
         offer_id_for_rationale = entities.get("offer_id") or context_next.get("offer_id")
         city = region
-        participants_count = int(market_data.get("avg_participants", 1)) or 1
+        participants_count = int(market_data.get("avg_participants") or 1)
         if offer_id_for_rationale and base_price > 0:
             try:
                 rationale_resp = await self._call_llm(
@@ -200,13 +200,23 @@ class PricingAgent(BaseAgent):
             if state["actions_taken"]:
                 state["actions_taken"][-1]["requires_human_confirmation"] = True
             last_action = state["actions_taken"][-1] if state["actions_taken"] else {}
+            handoff_entities = last_action.get("entities_to_pass", {})
+            details = last_action.get("details", {})
+            recommended_price = tiers[0]["price"] if tiers else None
+            price_range = {
+                "min_price": market_data.get("min_price"),
+                "max_price": market_data.get("max_price"),
+                "avg_price": market_data.get("avg_price"),
+            }
             await self._enqueue_pending_decision(
                 state=state,
                 action_type="pricing_recommendation",
                 payload={
-                    "offer_id": last_action.get("offer_id", ""),
-                    "recommended_price": last_action.get("recommended_price"),
-                    "price_range": last_action.get("price_range"),
+                    "offer_id": handoff_entities.get("offer_id", ""),
+                    "category": handoff_entities.get("category") or details.get("category", ""),
+                    "recommended_price": recommended_price,
+                    "price_range": price_range,
+                    "tiers": details.get("tiers", []),
                     "mode": mode,
                 },
                 escalation_reason=reason,
@@ -241,8 +251,8 @@ class PricingAgent(BaseAgent):
         if base_price <= 0:
             return []
 
-        min_price = market_data.get("min_price", base_price * 0.7)
-        avg_price = market_data.get("avg_price", base_price)
+        min_price = float(market_data.get("min_price") or (base_price * 0.7))
+        avg_price = float(market_data.get("avg_price") or base_price)
 
         results: list[dict[str, Any]] = []
         flags: list[str] = []

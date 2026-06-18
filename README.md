@@ -8,7 +8,7 @@ Groupio leverages AI agents to automate contractor matching, pricing optimizatio
 
 ### Key Features
 
-- **7 Specialized AI Agents**: Router, Matching, Pricing, Vetting, Support, Outreach, Analytics
+- **11 Registered Backend Agents**: 7 core marketplace agents (Router, Matching, Pricing, Vetting, Support, Outreach, Analytics) plus Architecture, Influencer, Notification, and Payment
 - **RAG Pipeline**: Semantic, hybrid, contextual, and multi-hop retrieval strategies
 - **Multi-Database Architecture**: Qdrant (vector), Neo4j (graph), PostgreSQL, Redis
 - **Real-time Updates**: Supabase Realtime for live offer and chat updates
@@ -55,7 +55,7 @@ Groupio leverages AI agents to automate contractor matching, pricing optimizatio
 ```
 Groupio-Multi-Agent-System/
 ├── src/                      # Backend Python source
-│   ├── agents/               # 7 specialized agents
+│   ├── agents/               # Agent implementations used by the orchestrator
 │   ├── api/                  # FastAPI routes
 │   ├── config/               # Settings & prompts
 │   ├── databases/            # DB clients
@@ -95,13 +95,15 @@ pnpm install
 python -m venv venv && source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -e ".[dev]"
 
-docker compose up -d
+docker compose -f docker/docker-compose.yml up -d postgres redis qdrant neo4j
 cp docker/.env.example .env   # edit with API keys
 alembic upgrade head
 
-uvicorn src.api.main:app --reload --port 8000
+python -m uvicorn src.api.main:app --reload --port 8000
 # In another terminal: pnpm --filter @groupio/web dev
 ```
+
+If you need the admin app on `http://localhost:3001`, do not start the full monitoring stack at the same time: `docker/docker-compose.yml` currently maps Grafana to host port `3001`.
 
 ## AI Agents
 
@@ -114,6 +116,8 @@ uvicorn src.api.main:app --reload --port 8000
 | **Support** | Customer service | FAQ RAG, escalation rules, sentiment analysis |
 | **Outreach** | Campaigns | A/B testing, personalization, scheduling |
 | **Analytics** | NL queries | Natural language to SQL, trend analysis |
+
+Additional agents currently registered in `origin/dev`: `architecture`, `influencer`, `notification`, and `payment`.
 
 ## Database Schema
 
@@ -138,13 +142,14 @@ uvicorn src.api.main:app --reload --port 8000
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/chat` | POST | Main chat endpoint |
-| `/api/offers` | GET/POST | Offer CRUD |
-| `/api/contractors` | GET | Contractor search |
-| `/api/whatsapp/webhook` | POST | WhatsApp incoming |
-| `/api/admin/agents` | GET | Agent status |
-| `/api/admin/escalations` | GET | Escalation queue |
-| `/health` | GET | Health check |
+| `/api/v1/message` | POST | Main authenticated orchestration endpoint |
+| `/api/v1/offers` | GET/POST | Offer CRUD |
+| `/api/v1/contractors` | GET | Contractor search |
+| `/api/v1/webhooks/whatsapp` | GET/POST | WhatsApp verification and incoming webhook |
+| `/api/v1/admin/status` | GET | Admin system status |
+| `/api/v1/escalations` | GET | Escalation queue |
+| `/api/v1/health` | GET | Readiness check across Postgres, Redis, Qdrant, and Neo4j |
+| `/api/v1/health/live` | GET | Liveness probe |
 
 See [API Reference](docs/api_reference.md) for full documentation.
 
@@ -168,10 +173,10 @@ pytest tests/integration/test_end_to_end.py
 
 ```bash
 # Component tests
-pnpm --filter web test
+pnpm --filter @groupio/web test
 
 # E2E tests
-pnpm --filter web test:e2e
+pnpm test:e2e
 
 # All tests
 pnpm test

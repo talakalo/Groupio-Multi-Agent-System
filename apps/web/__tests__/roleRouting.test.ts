@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+
 import { getDefaultRouteForRole } from '@/lib/constants/roleRouting';
 
 describe('getDefaultRouteForRole', () => {

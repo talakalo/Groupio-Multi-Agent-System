@@ -1,7 +1,8 @@
-import { render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
 import DashboardPage from '../app/dashboard/page';
 
 // Mock all hooks so the Dashboard renders with predictable data

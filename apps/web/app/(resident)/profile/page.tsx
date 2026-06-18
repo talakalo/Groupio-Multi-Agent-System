@@ -8,7 +8,6 @@ import {
   Phone,
   Building2,
   Bell,
-  BellOff,
   Globe,
   Shield,
   Save,
@@ -22,7 +21,7 @@ import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
 
-import { apiClient, ApiError } from '@/lib/api/client';
+import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils/cn';
 

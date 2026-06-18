@@ -168,7 +168,15 @@ export default function AdminLayout(props: { children: React.ReactNode } & PageP
       {sidebarOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/30 lg:hidden"
+          role="button"
+          tabIndex={0}
           onClick={() => setSidebarOpen(false)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setSidebarOpen(false);
+            }
+          }}
         />
       )}
 

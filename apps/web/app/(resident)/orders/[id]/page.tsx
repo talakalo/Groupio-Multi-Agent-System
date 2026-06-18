@@ -1,5 +1,6 @@
 "use client";
 
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   CheckCircle2,
   Clock,
@@ -14,7 +15,6 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useCallback, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { OrderTimeline } from "@/components/features/orders/OrderTimeline";
 import { EscrowBadge } from "@/components/features/payments/EscrowBadge";
@@ -96,7 +96,6 @@ export default function OrderDetailPage(props: PageParamsProps) {
     data: order = null,
     isLoading: loading,
     error: loadErr,
-    refetch: fetchOrder,
   } = useApiData<OrderDetail | null>(
     ["orders", id],
     async () => {
@@ -160,13 +159,13 @@ export default function OrderDetailPage(props: PageParamsProps) {
 
   if (loading) {
     return (
-      <main className="max-w-2xl mx-auto space-y-6 p-4 md:p-6" dir="rtl">
+      <div className="max-w-2xl mx-auto space-y-6 p-4 md:p-6" dir="rtl">
         <Skeleton variant="text" className="h-4 w-40" />
         <Skeleton variant="card" className="h-20" />
         <Skeleton variant="card" className="h-48" />
         <Skeleton variant="card" className="h-32" />
         <Skeleton variant="card" className="h-40" />
-      </main>
+      </div>
     );
   }
 
@@ -187,7 +186,7 @@ export default function OrderDetailPage(props: PageParamsProps) {
   if (!order) return null;
 
   const statusKey = STATUS_ICON[order.status] ? order.status : "pending";
-  const StatusIcon = STATUS_ICON[statusKey]!;
+  const StatusIcon = STATUS_ICON[statusKey] ?? Clock;
   const ESCROW_KEYS = ["held", "released", "refunded", "pending"] as const;
   type EscrowKey = (typeof ESCROW_KEYS)[number];
   const escrowLabel = order.escrowStatus
@@ -203,7 +202,7 @@ export default function OrderDetailPage(props: PageParamsProps) {
   const orderTitle = order.offer?.title ?? t("detail.defaultTitle");
 
   return (
-    <main className="max-w-2xl mx-auto space-y-6 p-4 md:p-6" dir="rtl">
+    <div className="max-w-2xl mx-auto space-y-6 p-4 md:p-6" dir="rtl">
       <Breadcrumb
         items={[
           { label: t("detail.breadcrumbHome"), href: "/dashboard" },
@@ -345,6 +344,6 @@ export default function OrderDetailPage(props: PageParamsProps) {
           {t("detail.backToOrders")}
         </Link>
       </div>
-    </main>
+    </div>
   );
 }

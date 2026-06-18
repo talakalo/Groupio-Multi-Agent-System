@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
-import { clsx } from "clsx";
 import {
   useQuery,
   useMutation,
   useQueryClient,
 } from "@tanstack/react-query";
+import { clsx } from "clsx";
 import {
   Search,
   Filter,
@@ -26,6 +25,7 @@ import {
   Phone,
   Lock,
 } from "lucide-react";
+import { useState, useMemo, useCallback } from "react";
 
 import { apiV1 } from "@/lib/backend-url";
 
@@ -306,10 +306,10 @@ export default function UsersPage() {
       {/* ---- Page header ---- */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-surface-900">
+          <h1 className="text-2xl font-bold text-surface-900 tracking-tight">
             User Management
           </h1>
-          <p className="text-sm text-surface-500 mt-0.5">
+          <p className="text-sm text-surface-400 mt-0.5">
             Manage platform users, roles, and access
           </p>
         </div>
@@ -326,43 +326,37 @@ export default function UsersPage() {
       {/* Stats                                                              */}
       {/* ================================================================== */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="card p-4 flex items-center gap-3">
-          <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary-50 text-primary-600">
+        <div className="card card-hover p-5 relative overflow-hidden">
+          <div className="absolute inset-x-0 top-0 h-0.5 rounded-t-xl bg-primary-500" />
+          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary-500 text-white mb-3 shadow-sm">
             <Users className="w-5 h-5" />
           </div>
-          <div>
-            <p className="text-2xl font-bold text-surface-900">{stats.total}</p>
-            <p className="text-xs text-surface-500">Total Users</p>
-          </div>
+          <p className="text-2xl font-bold text-surface-900">{stats.total}</p>
+          <p className="text-xs font-medium text-surface-400 uppercase tracking-wide mt-0.5">Total Users</p>
         </div>
-        <div className="card p-4 flex items-center gap-3">
-          <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-success-50 text-success-600">
+        <div className="card card-hover p-5 relative overflow-hidden">
+          <div className="absolute inset-x-0 top-0 h-0.5 rounded-t-xl bg-success-500" />
+          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-success-500 text-white mb-3 shadow-sm">
             <UserCheck className="w-5 h-5" />
           </div>
-          <div>
-            <p className="text-2xl font-bold text-surface-900">{stats.active}</p>
-            <p className="text-xs text-surface-500">Active</p>
-          </div>
+          <p className="text-2xl font-bold text-surface-900">{stats.active}</p>
+          <p className="text-xs font-medium text-surface-400 uppercase tracking-wide mt-0.5">Active</p>
         </div>
-        <div className="card p-4 flex items-center gap-3">
-          <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-danger-50 text-danger-600">
+        <div className="card card-hover p-5 relative overflow-hidden">
+          <div className="absolute inset-x-0 top-0 h-0.5 rounded-t-xl bg-danger-500" />
+          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-danger-500 text-white mb-3 shadow-sm">
             <UserX className="w-5 h-5" />
           </div>
-          <div>
-            <p className="text-2xl font-bold text-surface-900">
-              {stats.suspended}
-            </p>
-            <p className="text-xs text-surface-500">Suspended</p>
-          </div>
+          <p className="text-2xl font-bold text-surface-900">{stats.suspended}</p>
+          <p className="text-xs font-medium text-surface-400 uppercase tracking-wide mt-0.5">Suspended</p>
         </div>
-        <div className="card p-4 flex items-center gap-3">
-          <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-warning-50 text-warning-600">
+        <div className="card card-hover p-5 relative overflow-hidden">
+          <div className="absolute inset-x-0 top-0 h-0.5 rounded-t-xl bg-warning-500" />
+          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-warning-500 text-white mb-3 shadow-sm">
             <Shield className="w-5 h-5" />
           </div>
-          <div>
-            <p className="text-2xl font-bold text-surface-900">{stats.admins}</p>
-            <p className="text-xs text-surface-500">Admins</p>
-          </div>
+          <p className="text-2xl font-bold text-surface-900">{stats.admins}</p>
+          <p className="text-xs font-medium text-surface-400 uppercase tracking-wide mt-0.5">Admins</p>
         </div>
       </div>
 
@@ -380,6 +374,8 @@ export default function UsersPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400" />
             <input
               type="text"
+              id="users-search"
+              aria-label="Search users by name, email, or phone"
               placeholder="Search by name, email, or phone..."
               className="input pl-9"
               value={searchQuery}
@@ -388,8 +384,11 @@ export default function UsersPage() {
           </div>
 
           {/* Role filter */}
+          <label htmlFor="users-role-filter" className="sr-only">Filter by role</label>
           <select
+            id="users-role-filter"
             className="input"
+            aria-label="Filter by role"
             value={roleFilter}
             onChange={(e) => setRoleFilter(e.target.value as RoleFilter)}
           >
@@ -401,8 +400,11 @@ export default function UsersPage() {
           </select>
 
           {/* Status filter */}
+          <label htmlFor="users-status-filter" className="sr-only">Filter by status</label>
           <select
+            id="users-status-filter"
             className="input"
+            aria-label="Filter by status"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
           >
@@ -589,12 +591,21 @@ export default function UsersPage() {
       {showCreateModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
-          onClick={() => setShowCreateModal(false)}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              setShowCreateModal(false);
+            }
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Escape" || event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              setShowCreateModal(false);
+            }
+          }}
+          role="button"
+          tabIndex={0}
         >
-          <div
-            className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4">
             {/* Modal header */}
             <div className="flex items-center justify-between p-5 border-b border-surface-100">
               <h2 className="text-lg font-bold text-surface-900">

@@ -43,14 +43,16 @@ async def test_create_entity_posts_to_correct_url_with_headers(monkeypatch) -> N
         captured["body"] = request.content
         return httpx.Response(200, json={"id": "crm-1", "name": "Acme"})
 
-    client, patched = _make_client_with_transport("https://crm.example.com/", "secret-key", handler)
+    client, patched = _make_client_with_transport(
+        "https://crm.example.com/", "test-api-key-1", handler
+    )  # gitleaks:allow
     monkeypatch.setattr("src.integrations.espocrm.client.httpx.AsyncClient", patched)
 
     result = await client.create_entity("GroupioContractor", {"name": "Acme"})
 
     assert captured["method"] == "POST"
     assert captured["url"] == "https://crm.example.com/api/v1/GroupioContractor"
-    assert captured["headers"]["x-api-key"] == "secret-key"
+    assert captured["headers"]["x-api-key"] == "test-api-key-1"  # gitleaks:allow
     assert captured["headers"]["content-type"] == "application/json"
     assert b'"name": "Acme"' in captured["body"] or b'"name":"Acme"' in captured["body"]
     assert result == {"id": "crm-1", "name": "Acme"}
@@ -65,7 +67,9 @@ async def test_update_entity_uses_patch_and_includes_id_in_url(monkeypatch) -> N
         captured["method"] = request.method
         return httpx.Response(200, json={"id": "crm-42", "status": "active"})
 
-    client, patched = _make_client_with_transport("https://crm.example.com", "secret-key", handler)
+    client, patched = _make_client_with_transport(
+        "https://crm.example.com", "test-api-key-1", handler
+    )  # gitleaks:allow
     monkeypatch.setattr("src.integrations.espocrm.client.httpx.AsyncClient", patched)
 
     result = await client.update_entity("GroupioContractor", "crm-42", {"status": "active"})

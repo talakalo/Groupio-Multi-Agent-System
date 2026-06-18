@@ -1,12 +1,12 @@
 "use client";
 
-import React, { Component, type ErrorInfo, type ReactNode, useState, useEffect } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import * as Sentry from "@sentry/nextjs";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import React, { Component, type ErrorInfo, type ReactNode, useState, useEffect } from "react";
+
 import { apiClient } from "@/lib/api/client";
-import { useAuthStore } from "@/lib/stores/authStore";
 import { LocaleSyncProvider } from "@/lib/providers/LocaleSyncProvider";
-import { ToastContainer } from "@/components/shared/ToastContainer";
+import { useAuthStore } from "@/lib/stores/authStore";
 
 // PostHog analytics — optional, requires NEXT_PUBLIC_POSTHOG_KEY
 if (typeof window !== "undefined" && process.env.NEXT_PUBLIC_POSTHOG_KEY) {
@@ -156,8 +156,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
         defaultOptions: {
           queries: {
             staleTime: 60 * 1000,
+            gcTime: 5 * 60 * 1000,
             refetchOnWindowFocus: false,
-            retry: 2,
+            retry: 1,
+            retryDelay: 1000,
           },
         },
       })

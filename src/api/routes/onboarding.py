@@ -13,7 +13,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.api.middleware.auth import get_current_user
@@ -83,6 +83,7 @@ class OnboardingResponse(BaseModel):
 @router.post("", response_model=OnboardingResponse, status_code=200)
 async def complete_onboarding(
     request: OnboardingRequest,
+    background_tasks: BackgroundTasks,
     current_user: UserInDB = Depends(get_current_user),
 ) -> OnboardingResponse:
     """Complete onboarding for a resident or contractor.
@@ -217,6 +218,10 @@ async def complete_onboarding(
             raise HTTPException(status_code=500, detail="Failed to update user") from exc
 
         logger.info("Resident onboarding complete for user %s → building %s", user_id, building_id)
+
+        # Fire welcome notification + pre-warm contractor matching in background
+        background_tasks.add_task(_trigger_resident_onboarding, user_id, building_id)
+
         try:
             from src.messaging.envelope import EventEnvelope
             from src.messaging.outbox_helpers import try_enqueue_crm
@@ -311,10 +316,58 @@ async def complete_onboarding(
         except Exception:
             logger.exception("CRM outbox enqueue failed after contractor onboarding (non-fatal)")
 
+        # Auto-trigger vetting agent in background — runs full LangGraph graph
+        # so handoffs (vetting → notification → support) work correctly.
+        background_tasks.add_task(_trigger_contractor_vetting, user_id, contractor_id)
+
         return OnboardingResponse(user=UserResponse.model_validate(updated_user.model_dump()))
 
     # Should never reach here (pydantic validates role)
     raise HTTPException(status_code=400, detail="Invalid role")  # pragma: no cover
+
+
+# ---------------------------------------------------------------------------
+# Background agent triggers
+# ---------------------------------------------------------------------------
+
+
+async def _trigger_contractor_vetting(user_id: str, contractor_id: str) -> None:
+    """Run vetting agent through the full LangGraph graph after contractor onboarding.
+
+    Using orchestrator.run() (not vetting_agent.run() directly) ensures that
+    requires_followup handoffs — e.g. vetting → notification — fire correctly.
+    """
+    try:
+        from src.orchestration.graph import get_orchestrator
+
+        orchestrator = get_orchestrator()
+        await orchestrator.run(
+            user_message=f"Vet new contractor {contractor_id}",
+            user_id=user_id,
+            entities={"contractor_id": contractor_id},
+            notification_type="contractor_verification_started",
+        )
+        logger.info("Vetting agent completed for contractor %s", contractor_id)
+    except Exception:
+        logger.exception("Background vetting trigger failed for contractor %s", contractor_id)
+
+
+async def _trigger_resident_onboarding(user_id: str, building_id: str) -> None:
+    """Send welcome notification after resident onboarding completes."""
+    try:
+        from src.orchestration.graph import get_orchestrator
+
+        orchestrator = get_orchestrator()
+        await orchestrator.run(
+            user_message="Send welcome notification to new resident",
+            user_id=user_id,
+            building_id=building_id,
+            notification_type="welcome",
+            notification_channels=["email", "in_app"],
+        )
+        logger.info("Welcome notification sent for resident %s in building %s", user_id, building_id)
+    except Exception:
+        logger.exception("Background resident onboarding trigger failed for user %s", user_id)
 
 
 # ---------------------------------------------------------------------------

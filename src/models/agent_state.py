@@ -75,7 +75,17 @@ class AgentState(TypedDict):
     # File upload context (set by architecture upload route, absent otherwise)
     architecture_file_id: NotRequired[str | None]
 
+    # Notification context (injected by offers route or admin invoke; absent in chat flows)
+    notification_type: NotRequired[str | None]
+    notification_channels: NotRequired[list[str] | None]
+
+    # Analytics context (injected by admin invoke for NL-to-SQL queries)
+    timeframe: NotRequired[str | None]
+    filters: NotRequired[dict[str, Any] | None]
+
     # Metadata
     start_time: str
     tokens_used: int
+    token_usage_available: NotRequired[bool]
+    turn_count: int  # incremented each router pass; capped at MAX_AGENT_TURNS
     state_contract_version: int

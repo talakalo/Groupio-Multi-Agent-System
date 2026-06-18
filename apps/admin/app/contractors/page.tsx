@@ -1,13 +1,11 @@
 "use client";
 
-import React, { useState, useMemo, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import {
   Search,
   Filter,
   CheckCircle2,
-  XCircle,
   Clock,
   ChevronDown,
   ChevronUp,
@@ -26,10 +24,12 @@ import {
   Globe,
   UserCheck,
 } from "lucide-react";
+import React, { useState, useMemo, useCallback } from "react";
+
 import { MetricCard } from "@/components/features/metrics/MetricCard";
 import { useContractors } from "@/lib/hooks";
 import type { ContractorListItem } from "@/lib/hooks";
-import type { ServiceCategory, Region } from "@groupio/types";
+
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -629,7 +629,7 @@ export default function ContractorsPage() {
       const ids = Array.from(selectedIds);
       const results = await Promise.allSettled(
         ids.map((id) =>
-          fetch(`${API_BASE}/admin/contractors/${encodeURIComponent(id)}/request-documents`, {
+          fetch(`${API_BASE}/admin/contractors/${encodeURIComponent(id)}/request-docs`, {
             method: "POST",
             ...fetchOpts(),
             body: JSON.stringify({ message: "Please upload your license, insurance, and business registration documents to complete your verification." }),
@@ -751,8 +751,11 @@ export default function ContractorsPage() {
           </div>
 
           {/* Verification */}
+          <label htmlFor="contractors-verification-filter" className="sr-only">Filter by verification status</label>
           <select
+            id="contractors-verification-filter"
             className="input"
+            aria-label="Filter by verification status"
             value={verificationFilter}
             onChange={(e) =>
               setVerificationFilter(e.target.value as VerificationFilter)
@@ -765,8 +768,11 @@ export default function ContractorsPage() {
           </select>
 
           {/* Category */}
+          <label htmlFor="contractors-category-filter" className="sr-only">Filter by category</label>
           <select
+            id="contractors-category-filter"
             className="input"
+            aria-label="Filter by category"
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
           >
@@ -779,8 +785,11 @@ export default function ContractorsPage() {
           </select>
 
           {/* Region */}
+          <label htmlFor="contractors-region-filter" className="sr-only">Filter by region</label>
           <select
+            id="contractors-region-filter"
             className="input"
+            aria-label="Filter by region"
             value={regionFilter}
             onChange={(e) => setRegionFilter(e.target.value)}
           >
@@ -840,6 +849,8 @@ export default function ContractorsPage() {
               <th className="table-header w-10">
                 <input
                   type="checkbox"
+                  id="contractors-select-all"
+                  aria-label="Select all contractors"
                   className="rounded border-surface-300 text-primary-600 focus:ring-primary-500"
                   checked={allSelected}
                   onChange={toggleSelectAll}
@@ -1038,12 +1049,21 @@ export default function ContractorsPage() {
       {detailContractor && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
-          onClick={() => setDetailContractor(null)}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              setDetailContractor(null);
+            }
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Escape" || event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              setDetailContractor(null);
+            }
+          }}
+          role="button"
+          tabIndex={0}
         >
-          <div
-            className="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 max-h-[85vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 max-h-[85vh] overflow-y-auto">
             {/* Modal header */}
             <div className="flex items-center justify-between p-5 border-b border-surface-100">
               <div className="flex items-center gap-3">

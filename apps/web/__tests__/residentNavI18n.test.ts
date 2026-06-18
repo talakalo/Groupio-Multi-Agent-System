@@ -8,8 +8,8 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, it, expect } from 'vitest';
 
-import heMessages from '../messages/he.json';
 import enMessages from '../messages/en.json';
+import heMessages from '../messages/he.json';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const MESSAGES_DIR = join(__dirname, '../messages');
@@ -55,9 +55,12 @@ describe('residentNav i18n', () => {
     const he = getResidentNav(heMessages as Record<string, unknown>);
     expect(en, 'en residentNav missing').toBeDefined();
     expect(he, 'he residentNav missing').toBeDefined();
+    if (!en || !he) {
+      throw new Error('residentNav translations missing');
+    }
     for (const key of RESIDENT_NAV_KEYS) {
-      expect(en![key], `Missing en residentNav.${key}`).toBeTruthy();
-      expect(he![key], `Missing he residentNav.${key}`).toBeTruthy();
+      expect(en[key], `Missing en residentNav.${key}`).toBeTruthy();
+      expect(he[key], `Missing he residentNav.${key}`).toBeTruthy();
     }
   });
 

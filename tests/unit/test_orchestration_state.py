@@ -25,6 +25,7 @@ def test_create_initial_state_basic():
     assert state["confidence"] == 0.0
     assert state["needs_human"] is False
     assert state["tokens_used"] == 0
+    assert state["token_usage_available"] is False
     assert state["rag_results"] == []
     assert state["actions_taken"] == []
 

@@ -67,7 +67,9 @@ describe("BuildingCreateModal", () => {
 
   it("validates required fields client-side", async () => {
     renderWithQuery(<BuildingCreateModal open onClose={() => {}} />);
-    fireEvent.submit(screen.getByTestId("building-create-submit").closest("form")!);
+    const form = screen.getByTestId("building-create-submit").closest("form");
+    expect(form).toBeTruthy();
+    fireEvent.submit(form as HTMLFormElement);
     // Empty inputs trigger native required — no API call.
     expect(mockCreateBuilding).not.toHaveBeenCalled();
   });

@@ -224,4 +224,5 @@ def sample_agent_state() -> AgentState:
         final_response=None,
         start_time="2026-01-15T10:00:00",
         tokens_used=0,
+        token_usage_available=False,
     )

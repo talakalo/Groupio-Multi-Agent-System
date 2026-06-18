@@ -72,6 +72,47 @@ def test_list_notifications_happy_path():
     assert data["offset"] == 0
 
 
+def test_list_notifications_returns_200_with_read_at_payload() -> None:
+    """Regression guard: notification rows with read_at must serialize without a 500."""
+    user = _make_user()
+    db = _make_db()
+    now = datetime.now(UTC).isoformat()
+    db.list_notifications = AsyncMock(
+        return_value=(
+            [
+                {
+                    "id": "notif-1",
+                    "user_id": user.id,
+                    "type": "system",
+                    "title": "Welcome",
+                    "body": "Hello",
+                    "data": {"kind": "welcome"},
+                    "read": True,
+                    "read_at": now,
+                    "created_at": now,
+                }
+            ],
+            1,
+        )
+    )
+
+    from src.api.main import app
+    from src.api.middleware.auth import get_current_user
+
+    app.dependency_overrides[get_current_user] = lambda: user
+    try:
+        with patch("src.api.routes.notifications.get_postgres_client", return_value=db):
+            client = TestClient(app, raise_server_exceptions=False)
+            response = client.get("/api/v1/notifications/")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 1
+    assert data["items"][0]["read_at"] == now
+
+
 def test_list_notifications_empty():
     user = _make_user()
     db = _make_db()

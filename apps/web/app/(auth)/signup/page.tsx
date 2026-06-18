@@ -1,10 +1,10 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { User, Wrench, ClipboardList, ArrowLeft, Loader2, Check, Mail, Phone, Lock, Home, Shield } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { User, Wrench, ArrowLeft, Loader2, Check, Mail, Phone, Lock, Home, Shield } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -25,7 +25,8 @@ type SignupFormData = {
   buildingId?: string;
 };
 
-type UserRole = 'resident' | 'contractor' | 'buildings_manager';
+// buildings_manager accounts are created by a platform admin — not via public signup.
+type UserRole = 'resident' | 'contractor';
 
 function coerceAuthStoreRole(role: string): AuthUser['role'] {
   const allowed: AuthUser['role'][] = ['resident','contractor','buildings_manager','admin','super_admin'];
@@ -80,16 +81,8 @@ export default function SignupPage(props: PageParamsProps) {
       description: t("roleContractorDesc"),
       features: [t("roleContractorFeature1"), t("roleContractorFeature2"), t("roleContractorFeature3")],
     },
-    {
-      value: 'buildings_manager' as UserRole,
-      icon: ClipboardList,
-      iconBg: 'bg-violet-50',
-      iconColor: 'text-violet-600',
-      selectedBg: 'bg-violet-500',
-      title: t("roleManagerTitle"),
-      description: t("roleManagerDesc"),
-      features: [t("roleManagerFeature1"), t("roleManagerFeature2"), t("roleManagerFeature3")],
-    },
+    // buildings_manager is admin-created (not self-registerable).
+    // Do not add it here — the backend enforces this via SELF_REGISTERABLE_ROLES.
   ];
 
   const onSubmit = async (data: SignupFormData) => {
@@ -103,7 +96,7 @@ export default function SignupPage(props: PageParamsProps) {
         email: data.email,
         phone: data.phone,
         password: data.password,
-        role: selectedRole === 'buildings_manager' ? 'resident' : selectedRole,
+        role: selectedRole,
         buildingId: data.buildingId || undefined,
       });
       useAuthStore.getState().setAccessToken(response.token);
@@ -131,7 +124,6 @@ export default function SignupPage(props: PageParamsProps) {
       } catch { user = { role: selectedRole }; }
       setAuthCookie(response.token, user);
       Analytics.userSignedUp({ role: selectedRole });
-      if (selectedRole === 'buildings_manager') { router.push('/buildings-manager/dashboard'); return; }
       router.push(selectedRole === 'contractor' ? '/contractor/dashboard' : '/dashboard');
     } catch (err) {
       const status = err instanceof ApiError ? err.status : null;
@@ -206,7 +198,7 @@ export default function SignupPage(props: PageParamsProps) {
           )}
 
           {step === 'details' && (
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+            <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
               {error && <div role="alert" className="rounded-[12px] px-4 py-3.5 text-sm" style={{ background: '#fef2f2', border: '1px solid rgba(220,38,38,0.14)', color: '#b91c1c' }}>{error}</div>}
 
               <div>

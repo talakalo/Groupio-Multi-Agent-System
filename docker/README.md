@@ -9,7 +9,7 @@
    docker compose -f docker/docker-compose.yml run --rm api python scripts/seed_user_accounts.py
    ```
    (From host against port-mapped Postgres: `python scripts/seed_user_accounts.py` — only if your 127.0.0.1:5432 is the Docker Postgres, not a local install.)
-   Creates: tal.akalo@gmail.com / T220782al!@#, takalo878@gmail.com / T2207al!@#, etc.
+   Set `SEED_PASSWORD_*` env vars before running (see `scripts/seed_user_accounts.py` docstring).
 
 3. **Metrics**: `/metrics` returns 403 when `API_KEYS` is set (Prometheus must send auth). For local dev, set `API_KEYS=[]` in docker/.env to allow unauthenticated scraping.
 

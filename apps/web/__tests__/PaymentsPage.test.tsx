@@ -1,7 +1,7 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 // unwrapPageParams uses React.use() — stub in tests
 vi.mock("@/lib/utils/unwrapPageParams", () => ({

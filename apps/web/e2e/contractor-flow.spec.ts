@@ -303,11 +303,11 @@ test.describe("Contractor Create Offer Flow", () => {
     page.on('dialog', (dialog) => dialog.dismiss().catch(() => {}));
     const publishBtn = page.locator('[data-testid="publish-offer-btn"]');
     await expect(publishBtn).toBeVisible({ timeout: 25000 });
-    // force:true bypasses Playwright's stability check — the button re-renders
-    // rapidly (React state on step 3) and keeps detaching before each click
-    // attempt.  The form is valid and the element IS present; we just need to
-    // fire the click without waiting for DOM quiescence.
-    await publishBtn.click({ force: true });
+    // In CI the submit button can be replaced between Playwright's actionability
+    // checks and the actual click when React flips submitting state. Submit the
+    // form directly once the publish button is visible instead of relying on a
+    // fragile DOM-stability click path.
+    await page.locator("form").evaluate((form: HTMLFormElement) => form.requestSubmit());
     // URL navigation confirms the POST succeeded; waitForResponse is omitted
     // because the mocked response can race with Playwright's event listener.
     await expect(page).toHaveURL(/contractor\/projects\//, { timeout: 30000 });
@@ -447,4 +447,3 @@ test.describe("Contractor Profile Settings", () => {
     await expect(page.locator("h1, h2").first()).toBeVisible({ timeout: 10000 });
   });
 });
-

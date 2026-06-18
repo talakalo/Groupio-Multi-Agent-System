@@ -1,8 +1,8 @@
 /** Keys used by app/contractor/profile/page.tsx under contractor.profile */
 import { describe, it, expect } from 'vitest';
 
-import heMessages from '../messages/he.json';
 import enMessages from '../messages/en.json';
+import heMessages from '../messages/he.json';
 
 const PROFILE_KEYS = [
   'contractor.profile.title',
