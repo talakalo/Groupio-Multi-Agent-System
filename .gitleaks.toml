@@ -18,4 +18,7 @@ paths = [
   '''apps/web/\.env\.example$''',
   '''docker/staging-minimal\.env$''',
   '''monitoring/prometheus\.yml$''',
+  # E2E test fixture data — passwords are fake test data, not real credentials
+  '''apps/web/e2e/config/test-data\.json$''',
+  '''apps/admin/e2e/config/test-data\.json$''',
 ]

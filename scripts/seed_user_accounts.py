@@ -17,10 +17,13 @@ or contractors — those are separate. For richer synthetic data see ``scripts/s
 (writing to DB may need updates to match ``PostgresClient``).
 
 Accounts (skips if email already exists):
-- Buildings Manager: groupioappofficial@gmail.com / T2207al!@#
-- Resident: takalo878@gmail.com / T2207al!@#
-- Contractor: testusert612@gmail.com / T2207al!
-- Super Admin: tal.akalo@gmail.com / T220782al!@#
+- Buildings Manager: groupioappofficial@gmail.com
+- Resident: takalo878@gmail.com
+- Contractor: testusert612@gmail.com
+- Super Admin: tal.akalo@gmail.com
+
+Passwords are read from env vars SEED_PASSWORD_* (see ACCOUNTS dict below).
+Set them in your shell or docker/.env before running.
 """
 
 import asyncio
@@ -46,31 +49,33 @@ from src.databases.postgres import get_postgres_client
 from src.models.user import UserRole
 
 
+_DEFAULT_SEED_PASSWORD = "change-me-before-use"
+
 ACCOUNTS = [
     {
         "email": "groupioappofficial@gmail.com",
-        "password": "T2207al!@#",
+        "password": os.getenv("SEED_PASSWORD_BUILDINGS_MANAGER", _DEFAULT_SEED_PASSWORD),
         "full_name": "Buildings Manager",
         "phone": "0500000001",
         "role": UserRole.BUILDINGS_MANAGER,
     },
     {
         "email": "takalo878@gmail.com",
-        "password": "T2207al!@#",
+        "password": os.getenv("SEED_PASSWORD_RESIDENT", _DEFAULT_SEED_PASSWORD),
         "full_name": "Resident User",
         "phone": "0500000002",
         "role": UserRole.RESIDENT,
     },
     {
         "email": "testusert612@gmail.com",
-        "password": "T2207al!",
+        "password": os.getenv("SEED_PASSWORD_CONTRACTOR", _DEFAULT_SEED_PASSWORD),
         "full_name": "Contractor User",
         "phone": "0500000003",
         "role": UserRole.CONTRACTOR,
     },
     {
         "email": "tal.akalo@gmail.com",
-        "password": "T220782al!@#",
+        "password": os.getenv("SEED_PASSWORD_SUPER_ADMIN", _DEFAULT_SEED_PASSWORD),
         "full_name": "Super Admin",
         "phone": "0525140908",
         "role": UserRole.SUPER_ADMIN,

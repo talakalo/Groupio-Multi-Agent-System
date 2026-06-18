@@ -2,7 +2,7 @@
 
 ## 1. Executive Summary
 
-**Login 401 root cause**: Either (a) user does not exist in the database, or (b) wrong password. The backend returns 401 for both cases with "Invalid credentials" to avoid user enumeration. **User must run `scripts/seed_user_accounts.py`** to create demo users (e.g. tal.akalo@gmail.com / T220782al!@#) before login will succeed.
+**Login 401 root cause**: Either (a) user does not exist in the database, or (b) wrong password. The backend returns 401 for both cases with "Invalid credentials" to avoid user enumeration. **User must run `scripts/seed_user_accounts.py`** (with `SEED_PASSWORD_*` env vars set) to create demo users before login will succeed.
 
 **Refresh-after-failed-login**: The frontend's apiClient triggered `refreshAccessToken()` on every 401, including login. Login uses apiClient.login() → request() → 401 → refresh attempted → /auth/refresh called (no cookie) → 401 "Refresh token required". **Fixed**: Auth endpoints (login, signup, refresh, etc.) are now excluded from 401-retry; no refresh call after failed login.
 
@@ -17,7 +17,7 @@
 - **Failure cases returning 401**:
   - `user is None` (get_user_by_email/get_user_by_phone) → UserNotFound
   - `not verify_password(request.password, hashed)` → WrongPassword
-- **DB check**: Run `python scripts/seed_user_accounts.py` with `USE_LOCAL_POSTGRES=1 DOCKER_POSTGRES_LOCALHOST=1` (from host) or equivalent from inside container. Seed creates: tal.akalo@gmail.com / T220782al!@#, takalo878@gmail.com / T2207al!@#, etc.
+- **DB check**: Run `python scripts/seed_user_accounts.py` with `USE_LOCAL_POSTGRES=1 DOCKER_POSTGRES_LOCALHOST=1` (from host) or equivalent from inside container. Set `SEED_PASSWORD_*` env vars before running — see the script docstring for the full list.
 - **Diagnostic logging**: Added `logger.info("Login 401: user not found ...")` and `logger.info("Login 401: invalid password for user_id=...")` for operator diagnostics.
 
 ---
@@ -73,7 +73,7 @@ USE_LOCAL_POSTGRES=1 DOCKER_POSTGRES_LOCALHOST=1 python scripts/seed_user_accoun
 # 2. Login
 curl -X POST http://localhost:8000/api/v1/auth/login/json \
   -H "Content-Type: application/json" \
-  -d '{"email":"tal.akalo@gmail.com","password":"T220782al!@#"}'
+  -d '{"email":"tal.akalo@gmail.com","password":"<your-SEED_PASSWORD_SUPER_ADMIN>"}'
 # Expect 200 with access_token
 
 # 3. Verify no refresh on failed login (browser devtools): login with wrong password → single 401, no /auth/refresh call
@@ -85,4 +85,4 @@ curl -X POST http://localhost:8000/api/v1/auth/login/json \
 
 - **Seed requirement**: Fresh Docker Postgres has no users. Operators must run `seed_user_accounts.py`. Consider adding an optional init container or doc step.
 - **Metrics in dev**: With `API_KEYS` set, Prometheus gets 403. Use `API_KEYS=[]` for local dev if metrics scraping is needed.
-- **Password typos**: tal.akalo password is `T220782al!@#` (with 782, exclamation, @, #). Common typo: missing characters.
+- **Seed passwords**: configured via `SEED_PASSWORD_*` env vars; see `scripts/seed_user_accounts.py`.

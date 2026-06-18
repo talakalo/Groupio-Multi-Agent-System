@@ -283,7 +283,7 @@ pnpm --filter @groupio/admin exec playwright test
 docker compose -f docker/docker-compose.yml up -d postgres redis qdrant neo4j
 
 # Migrations
-DATABASE_URL=postgresql://postgres:T2207al!@localhost:5432/groupio alembic upgrade head
+DATABASE_URL=postgresql://postgres:<db-password>@localhost:5432/groupio alembic upgrade head
 
 # Seed users
 DATABASE_URL=... USE_LOCAL_POSTGRES=1 python scripts/seed_user_accounts.py

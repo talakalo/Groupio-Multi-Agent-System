@@ -37,11 +37,21 @@ export default defineConfig({
       use: { ...devices["iPhone 14"] },
     },
   ],
-  webServer: {
-    // In CI the app is pre-built by the workflow step; serve the production build.
-    // Locally, dev server is used and reused across runs.
-    command: process.env.CI ? "pnpm start" : "pnpm dev",
-    url: envConfig.baseURL,
-    reuseExistingServer: !process.env.CI,
-  },
+  webServer: [
+    {
+      // In CI the app is pre-built by the workflow step; serve the production build.
+      // Locally, dev server is used and reused across runs.
+      command: process.env.CI ? "pnpm start" : "pnpm dev",
+      url: envConfig.baseURL,
+      reuseExistingServer: !process.env.CI,
+    },
+    {
+      // Admin app — needed by rbac-browser.spec.ts tests that verify :3001 blocks non-admin roles.
+      // The admin package.json bakes in --port 3001, so no PORT env var is needed.
+      command: process.env.CI ? "pnpm start" : "pnpm dev",
+      url: "http://localhost:3001",
+      reuseExistingServer: !process.env.CI,
+      cwd: "../admin",
+    },
+  ],
 });
