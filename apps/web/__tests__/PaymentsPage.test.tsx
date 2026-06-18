@@ -2,12 +2,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-
-// unwrapPageParams uses React.use() — stub in tests
-vi.mock("@/lib/utils/unwrapPageParams", () => ({
-  unwrapPageParams: vi.fn(),
-}));
 
 // unwrapPageParams uses React.use() — stub in tests
 vi.mock("@/lib/utils/unwrapPageParams", () => ({
@@ -63,12 +57,6 @@ vi.mock("@/lib/stores/authStore", () => {
 
 import { apiClient } from "../lib/api/client";
 import PaymentsPage from "../app/(resident)/payments/page";
-import { apiClient } from "../lib/api/client";
-
-function renderWithProviders(ui: React.ReactElement) {
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>);
-}
 
 function renderWithProviders(ui: React.ReactElement) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
