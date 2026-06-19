@@ -1,11 +1,12 @@
 """Environment configuration for Groupio Multi-Agent System."""
 
+import json
 import logging
 import secrets
 from functools import lru_cache
 from urllib.parse import quote
 
-from pydantic import model_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 logger = logging.getLogger(__name__)
@@ -217,6 +218,21 @@ class Settings(BaseSettings):
     # Environment
     ENVIRONMENT: str = "development"
 
+    @field_validator("CORS_ORIGINS", "API_KEYS", mode="before")
+    @classmethod
+    def _parse_str_list(cls, v: object) -> object:
+        """Accept JSON arrays OR comma-separated strings for list[str] env vars."""
+        if isinstance(v, list):
+            return v
+        if isinstance(v, str):
+            stripped = v.strip()
+            if not stripped:
+                return []
+            if stripped.startswith("["):
+                return json.loads(stripped)
+            return [item.strip() for item in stripped.split(",") if item.strip()]
+        return v
+
     model_config = {
         "env_file": [".env", "docker/.env"],
         "env_file_encoding": "utf-8",
@@ -291,10 +307,15 @@ class Settings(BaseSettings):
                 )
             if self.PAYMENT_PROVIDER == "stripe":
                 if not self.STRIPE_WEBHOOK_SECRET:
-                    raise ValueError(
-                        f"STRIPE_WEBHOOK_SECRET must be set when PAYMENT_PROVIDER=stripe in {self.ENVIRONMENT}. "
-                        "Obtain it from the Stripe Dashboard → Webhooks → Signing secret."
+                    msg = (
+                        f"STRIPE_WEBHOOK_SECRET not set (PAYMENT_PROVIDER=stripe, ENVIRONMENT={self.ENVIRONMENT}). "
+                        "Stripe webhook signature verification will be disabled — "
+                        "set it from the Stripe Dashboard → Webhooks → Signing secret."
                     )
+                    if self.ENVIRONMENT == "production":
+                        raise ValueError(msg)
+                    else:
+                        logger.warning(msg)
             if (
                 self.ENFORCE_EMAIL_VERIFICATION
                 and not self.RESEND_API_KEY
@@ -313,11 +334,15 @@ class Settings(BaseSettings):
         # --- Required secrets in production ---
         if is_prod:
             if not self.PAYMENT_WEBHOOK_SECRET:
-                raise ValueError(
-                    f"PAYMENT_WEBHOOK_SECRET must be set in {self.ENVIRONMENT} to prevent "
-                    "fraudulent payment webhook forgery. "
+                msg = (
+                    f"PAYMENT_WEBHOOK_SECRET not set in {self.ENVIRONMENT} — "
+                    "payment webhook forgery protection is disabled. "
                     'Generate with: python -c "import secrets; print(secrets.token_hex(32))"'
                 )
+                if self.ENVIRONMENT == "production":
+                    raise ValueError(msg)
+                else:
+                    logger.warning(msg)
             if not self.ANTHROPIC_API_KEY and not self.OPENAI_API_KEY:
                 raise ValueError(
                     f"At least one LLM API key (ANTHROPIC_API_KEY or OPENAI_API_KEY) must be set in {self.ENVIRONMENT}."
