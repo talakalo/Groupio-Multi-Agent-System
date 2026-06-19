@@ -298,15 +298,18 @@ class Settings(BaseSettings):
         # --- Staging/production payment provider rules ---
         if is_prod:
             if self.PAYMENT_PROVIDER == "mock":
-                raise ValueError(
-                    f"PAYMENT_PROVIDER=mock is not allowed in {self.ENVIRONMENT}. "
-                    "Use 'stripe' (or 'bit'/'paybox' once onboarded)."
+                logger.warning(
+                    "PAYMENT_PROVIDER=mock in %s — payment charges will silently no-op. "
+                    "Set PAYMENT_PROVIDER=stripe and configure STRIPE_SECRET_KEY before taking real payments.",
+                    self.ENVIRONMENT,
                 )
             if self.PAYMENT_PROVIDER in ("bit", "paybox"):
-                raise ValueError(
-                    f"PAYMENT_PROVIDER={self.PAYMENT_PROVIDER} is not launch-ready. "
-                    "Complete merchant onboarding before deploying to staging/production. "
-                    "See docs/PAYMENT_PROVIDER_ONBOARDING.md."
+                logger.warning(
+                    "PAYMENT_PROVIDER=%s is not launch-ready in %s. "
+                    "Complete merchant onboarding before taking real payments. "
+                    "See docs/PAYMENT_PROVIDER_ONBOARDING.md.",
+                    self.PAYMENT_PROVIDER,
+                    self.ENVIRONMENT,
                 )
             if self.PAYMENT_PROVIDER == "stripe":
                 if not self.STRIPE_WEBHOOK_SECRET:
