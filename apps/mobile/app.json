@@ -12,7 +12,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#1976D2"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.groupio.app",
@@ -44,8 +46,9 @@
         "origin": false
       },
       "eas": {
-        "projectId": "groupio-mobile"
+        "projectId": "b0a4b2f4-82d0-4bf6-8bcf-4fc135ea6a3e"
       }
-    }
+    },
+    "owner": "talakalo"
   }
 }
