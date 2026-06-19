@@ -167,7 +167,7 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
 
 # CORS middleware - origins loaded from environment
 settings = get_settings()
-cors_origins = list(settings.CORS_ORIGINS)
+cors_origins = settings.get_cors_origins()
 # Only add localhost origins in development — never in production/staging.
 if settings.ENVIRONMENT == "development":
     _dev_origins = [
@@ -391,12 +391,13 @@ async def prometheus_metrics(
 ) -> Response:
     """Expose Prometheus metrics — accepts X-API-Key or Authorization: Bearer <key>."""
     _settings = get_settings()
-    if _settings.API_KEYS:
+    _api_keys = _settings.get_api_keys()
+    if _api_keys:
         bearer = None
         if authorization and authorization.startswith("Bearer "):
             bearer = authorization[7:]
         key = x_api_key or bearer
-        if not key or key not in _settings.API_KEYS:
+        if not key or key not in _api_keys:
             raise HTTPException(status_code=403, detail="Invalid or missing API key")
 
     from prometheus_client import CONTENT_TYPE_LATEST, generate_latest

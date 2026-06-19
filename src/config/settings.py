@@ -6,8 +6,18 @@ import secrets
 from functools import lru_cache
 from urllib.parse import quote
 
-from pydantic import field_validator, model_validator
+from pydantic import model_validator
 from pydantic_settings import BaseSettings
+
+
+def _parse_list_env(value: str) -> list[str]:
+    """Parse a list env var that may be a JSON array or comma-separated string."""
+    stripped = value.strip()
+    if not stripped:
+        return []
+    if stripped.startswith("["):
+        return json.loads(stripped)
+    return [item.strip() for item in stripped.split(",") if item.strip()]
 
 logger = logging.getLogger(__name__)
 
@@ -118,11 +128,11 @@ class Settings(BaseSettings):
     WHATSAPP_PHONE_ID: str = ""
     WHATSAPP_WEBHOOK_SECRET: str = ""
 
-    # CORS Settings
-    CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://localhost:3001"]
+    # CORS Settings — accepts a JSON array or comma-separated string
+    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:3001"
 
-    # API Keys for service-to-service auth
-    API_KEYS: list[str] = []
+    # API Keys for service-to-service auth — accepts a JSON array or comma-separated string
+    API_KEYS: str = ""
 
     # Government / open-data enrichment (optional; stub used when empty)
     GOV_ADDRESS_API_URL: str = ""
@@ -218,20 +228,13 @@ class Settings(BaseSettings):
     # Environment
     ENVIRONMENT: str = "development"
 
-    @field_validator("CORS_ORIGINS", "API_KEYS", mode="before")
-    @classmethod
-    def _parse_str_list(cls, v: object) -> object:
-        """Accept JSON arrays OR comma-separated strings for list[str] env vars."""
-        if isinstance(v, list):
-            return v
-        if isinstance(v, str):
-            stripped = v.strip()
-            if not stripped:
-                return []
-            if stripped.startswith("["):
-                return json.loads(stripped)
-            return [item.strip() for item in stripped.split(",") if item.strip()]
-        return v
+    def get_cors_origins(self) -> list[str]:
+        """Return CORS_ORIGINS parsed from JSON array or comma-separated string."""
+        return _parse_list_env(self.CORS_ORIGINS)
+
+    def get_api_keys(self) -> list[str]:
+        """Return API_KEYS parsed from JSON array or comma-separated string."""
+        return _parse_list_env(self.API_KEYS)
 
     model_config = {
         "env_file": [".env", "docker/.env"],
@@ -347,7 +350,7 @@ class Settings(BaseSettings):
                 raise ValueError(
                     f"At least one LLM API key (ANTHROPIC_API_KEY or OPENAI_API_KEY) must be set in {self.ENVIRONMENT}."
                 )
-            if not self.API_KEYS:
+            if not self.get_api_keys():
                 raise ValueError(f"API_KEYS must be configured for service-to-service auth in {self.ENVIRONMENT}.")
             placeholder_patterns = ("change-me", "your-", "generate-a-")
             if self.DATABASE_URL and any(p in self.DATABASE_URL for p in placeholder_patterns):

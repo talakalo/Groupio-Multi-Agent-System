@@ -342,11 +342,12 @@ async def verify_api_key(
     # Validate against configured API keys using timing-safe comparison.
     # The `in` operator short-circuits and leaks timing information; using
     # hmac.compare_digest for each key prevents timing-oracle attacks.
-    if not settings.API_KEYS:
+    _api_keys = settings.get_api_keys()
+    if not _api_keys:
         logger.warning("No API keys configured - rejecting request")
         raise HTTPException(status_code=401, detail="API key validation not configured")
 
-    if not any(hmac.compare_digest(api_key, k) for k in settings.API_KEYS):
+    if not any(hmac.compare_digest(api_key, k) for k in _api_keys):
         logger.warning("Invalid API key attempted")
         raise HTTPException(status_code=401, detail="Invalid API key")
 

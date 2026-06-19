@@ -160,9 +160,10 @@ async def contractor_update_webhook(
 ) -> dict[str, str]:
     """Handle contractor profile update notifications — requires X-API-Key."""
     settings = get_settings()
-    if not settings.API_KEYS:
+    _api_keys = settings.get_api_keys()
+    if not _api_keys:
         raise HTTPException(status_code=503, detail="Webhook endpoint not configured")
-    if not x_api_key or not any(hmac.compare_digest(x_api_key, k) for k in settings.API_KEYS):
+    if not x_api_key or not any(hmac.compare_digest(x_api_key, k) for k in _api_keys):
         raise HTTPException(status_code=403, detail="Invalid or missing API key")
     contractor_id = payload.get("contractor_id")
     update_type = payload.get("type")
