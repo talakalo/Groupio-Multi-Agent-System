@@ -144,7 +144,9 @@ export default function LoginPage() {
         !is403 &&
         !is503 &&
         !is500 &&
-        (rawMessage.includes("Connection refused") ||
+        (err instanceof TypeError ||
+          rawMessage.includes("Load failed") ||
+          rawMessage.includes("Connection refused") ||
           rawMessage.includes("Failed to fetch") ||
           rawMessage.includes("NetworkError") ||
           rawMessage.includes("ERR_") ||
