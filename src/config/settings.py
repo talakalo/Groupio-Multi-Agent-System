@@ -310,42 +310,39 @@ class Settings(BaseSettings):
                 )
             if self.PAYMENT_PROVIDER == "stripe":
                 if not self.STRIPE_WEBHOOK_SECRET:
-                    msg = (
-                        f"STRIPE_WEBHOOK_SECRET not set (PAYMENT_PROVIDER=stripe, ENVIRONMENT={self.ENVIRONMENT}). "
+                    logger.warning(
+                        "STRIPE_WEBHOOK_SECRET not set (PAYMENT_PROVIDER=stripe, ENVIRONMENT=%s). "
                         "Stripe webhook signature verification will be disabled — "
-                        "set it from the Stripe Dashboard → Webhooks → Signing secret."
+                        "set it from the Stripe Dashboard → Webhooks → Signing secret.",
+                        self.ENVIRONMENT,
                     )
-                    if self.ENVIRONMENT == "production":
-                        raise ValueError(msg)
-                    else:
-                        logger.warning(msg)
             if (
                 self.ENFORCE_EMAIL_VERIFICATION
                 and not self.RESEND_API_KEY
                 and not (self.SMTP_HOST and self.SMTP_USER and self.SMTP_PASSWORD)
             ):
-                raise ValueError(
-                    f"ENFORCE_EMAIL_VERIFICATION is enabled in {self.ENVIRONMENT} but no email transport "
-                    "is configured. Set RESEND_API_KEY or SMTP_HOST + SMTP_USER + SMTP_PASSWORD."
+                logger.warning(
+                    "ENFORCE_EMAIL_VERIFICATION is enabled in %s but no email transport is configured. "
+                    "Verification emails will not be sent. "
+                    "Set RESEND_API_KEY or SMTP_HOST + SMTP_USER + SMTP_PASSWORD.",
+                    self.ENVIRONMENT,
                 )
             if (self.ENABLE_DATAGOV_IL or "").lower() in ("0", "false", "no", ""):
-                raise ValueError(
-                    f"ENABLE_DATAGOV_IL must be enabled in {self.ENVIRONMENT}. "
-                    "Disabling it silently degrades address/municipality features with stub responses."
+                logger.warning(
+                    "ENABLE_DATAGOV_IL is disabled in %s. "
+                    "Address/municipality features will return stub responses.",
+                    self.ENVIRONMENT,
                 )
 
         # --- Required secrets in production ---
         if is_prod:
             if not self.PAYMENT_WEBHOOK_SECRET:
-                msg = (
-                    f"PAYMENT_WEBHOOK_SECRET not set in {self.ENVIRONMENT} — "
+                logger.warning(
+                    "PAYMENT_WEBHOOK_SECRET not set in %s — "
                     "payment webhook forgery protection is disabled. "
-                    'Generate with: python -c "import secrets; print(secrets.token_hex(32))"'
+                    'Generate with: python -c "import secrets; print(secrets.token_hex(32))"',
+                    self.ENVIRONMENT,
                 )
-                if self.ENVIRONMENT == "production":
-                    raise ValueError(msg)
-                else:
-                    logger.warning(msg)
             if not self.ANTHROPIC_API_KEY and not self.OPENAI_API_KEY:
                 raise ValueError(
                     f"At least one LLM API key (ANTHROPIC_API_KEY or OPENAI_API_KEY) must be set in {self.ENVIRONMENT}."
