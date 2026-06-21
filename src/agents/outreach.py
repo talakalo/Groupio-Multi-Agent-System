@@ -9,7 +9,7 @@ from uuid import uuid4
 from src.agents.base import AgentConfig, BaseAgent
 from src.config.prompts.outreach import OUTREACH_SYSTEM_PROMPT
 from src.databases.postgres import get_postgres_client
-from src.databases.redis_client import get_redis_client
+from src.databases.pg_store import get_pg_store
 from src.models.agent_state import AgentState
 from src.utils.monitoring import track_agent_execution
 
@@ -80,7 +80,7 @@ class ABTestManager:
     """Manage A/B tests for outreach campaigns."""
 
     def __init__(self) -> None:
-        self._redis = get_redis_client()
+        self._store = get_pg_store()
 
     async def assign_variant(self, campaign_id: str, user_id: str, variants: dict[str, int] | None = None) -> str:
         """Assign user to a test variant using hash-based assignment."""
@@ -105,11 +105,11 @@ class ABTestManager:
         outcome: str,
     ) -> None:
         """Track campaign conversion."""
-        await self._redis.ab_test_track(campaign_id, variant, outcome)
+        await self._store.ab_test_track(campaign_id, variant, outcome)
 
     async def get_results(self, campaign_id: str, variant: str) -> dict[str, int]:
         """Get A/B test results."""
-        return await self._redis.ab_test_get_results(campaign_id, variant)
+        return await self._store.ab_test_get_results(campaign_id, variant)
 
 
 class OutreachAgent(BaseAgent):

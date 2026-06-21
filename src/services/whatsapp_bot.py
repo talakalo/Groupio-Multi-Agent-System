@@ -14,7 +14,7 @@ import httpx
 from pydantic import BaseModel
 
 from src.config.settings import get_settings
-from src.databases.redis_client import RedisClient
+from src.databases.pg_store import PostgresStore, get_pg_store
 from src.orchestration.graph import GroupioOrchestrator
 from src.utils.hebrew_utils import is_hebrew, normalize_hebrew
 
@@ -62,7 +62,7 @@ class WhatsAppBotService:
     Responsibilities:
     - Verify webhook signatures
     - Parse incoming messages
-    - Maintain conversation context via Redis
+    - Maintain conversation context via PostgresStore
     - Route messages through the orchestrator
     - Send responses back via WhatsApp API
     """
@@ -70,10 +70,10 @@ class WhatsAppBotService:
     def __init__(
         self,
         orchestrator: GroupioOrchestrator,
-        redis_client: RedisClient,
+        store: PostgresStore | None = None,
     ) -> None:
         self.orchestrator = orchestrator
-        self.redis = redis_client
+        self.redis = store or get_pg_store()
         settings = get_settings()
         self.api_url = f"https://graph.facebook.com/v18.0/{settings.WHATSAPP_PHONE_ID}/messages"
         self.http_client = httpx.AsyncClient(
@@ -491,11 +491,9 @@ def get_whatsapp_bot() -> WhatsAppBotService:
     """Get or create the WhatsApp bot service instance."""
     global _whatsapp_bot
     if _whatsapp_bot is None:
-        from src.databases.redis_client import get_redis_client
         from src.orchestration.graph import get_orchestrator
 
         _whatsapp_bot = WhatsAppBotService(
             orchestrator=get_orchestrator(),
-            redis_client=get_redis_client(),
         )
     return _whatsapp_bot

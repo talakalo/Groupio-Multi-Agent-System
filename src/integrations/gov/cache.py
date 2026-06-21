@@ -68,6 +68,48 @@ class InMemoryCacheBackend:
             return len(self._store)
 
 
+class PostgresCacheBackend:
+    """Postgres-backed cache (sync wrapper using a new event loop).
+
+    The gov integration is sync (not async). We bridge by running
+    asyncio coroutines via asyncio.get_event_loop().run_until_complete()
+    or asyncio.run(). Falls back to no-op on any error.
+    """
+
+    def get(self, key: str) -> bytes | None:
+        try:
+            import asyncio
+            from src.databases.pg_store import get_pg_store
+            store = get_pg_store()
+            result = asyncio.get_event_loop().run_until_complete(store.cache_get(key))
+            if result is None:
+                return None
+            import json
+            return json.dumps(result).encode() if not isinstance(result, bytes) else result
+        except Exception:
+            return None
+
+    def set(self, key: str, value: bytes, ttl: int) -> None:
+        try:
+            import asyncio, json
+            from src.databases.pg_store import get_pg_store
+            store = get_pg_store()
+            data = json.loads(value) if isinstance(value, bytes) else value
+            asyncio.get_event_loop().run_until_complete(store.cache_set(key, data, ttl=ttl))
+        except Exception:
+            pass
+
+    def delete(self, key: str) -> None:
+        try:
+            import asyncio
+            from src.databases.pg_store import get_pg_store
+            store = get_pg_store()
+            asyncio.get_event_loop().run_until_complete(store.cache_delete(key))
+        except Exception:
+            pass
+
+
+# Deprecated: use PostgresCacheBackend instead. Redis removed from production stack.
 class RedisCacheBackend:
     """Redis-backed cache backend (sync client, gov: key namespace)."""
 

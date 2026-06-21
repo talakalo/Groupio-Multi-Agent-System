@@ -40,31 +40,25 @@ _CTX_CACHE_TTL_SECONDS = 120
 
 
 async def _cache_get_ctx(user_id: str, building_id: str | None) -> dict[str, Any] | None:
-    """Best-effort read of the enriched orchestration slice from Redis."""
+    """Best-effort read of the enriched orchestration slice from Postgres cache."""
     try:
-        from src.databases.redis_client import get_redis_client
+        from src.databases.pg_store import get_pg_store
 
         key = f"{_CTX_CACHE_PREFIX}{user_id}:{building_id or '-'}"
-        raw = await get_redis_client().get(key)
+        cached = await get_pg_store().cache_get(key)
+        return cached if isinstance(cached, dict) else None
     except Exception as exc:
         logger.debug("orch ctx cache read failed: %s", exc)
-        return None
-    if not raw:
-        return None
-    try:
-        parsed = json.loads(raw)
-        return parsed if isinstance(parsed, dict) else None
-    except (TypeError, ValueError):
         return None
 
 
 async def _cache_set_ctx(user_id: str, building_id: str | None, ctx: dict[str, Any]) -> None:
-    """Best-effort write of the enriched orchestration slice to Redis."""
+    """Best-effort write of the enriched orchestration slice to Postgres cache."""
     try:
-        from src.databases.redis_client import get_redis_client
+        from src.databases.pg_store import get_pg_store
 
         key = f"{_CTX_CACHE_PREFIX}{user_id}:{building_id or '-'}"
-        await get_redis_client().set(key, json.dumps(ctx, default=str), ex=_CTX_CACHE_TTL_SECONDS)
+        await get_pg_store().cache_set(key, ctx, ttl=_CTX_CACHE_TTL_SECONDS)
     except Exception as exc:
         logger.debug("orch ctx cache write failed: %s", exc)
 
