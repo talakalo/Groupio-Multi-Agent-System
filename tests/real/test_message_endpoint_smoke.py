@@ -21,8 +21,8 @@ from src.databases.postgres import get_postgres_client
 @pytest_asyncio.fixture
 async def _real_service_env():
     """Reset cached singletons/settings so tests use TEST_DATABASE_URL."""
-    from src.databases import postgres as postgres_module
     from src.databases import pg_store as pg_store_module
+    from src.databases import postgres as postgres_module
 
     old_db = postgres_module._postgres_client
     old_store = pg_store_module._pg_store
