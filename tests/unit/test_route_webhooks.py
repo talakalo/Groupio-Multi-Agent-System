@@ -139,7 +139,8 @@ class TestContractorUpdateWebhook:
         from src.api.main import app
 
         with patch("src.api.routes.webhooks.get_settings") as mock_settings:
-            mock_settings.return_value.API_KEYS = ["test-key"]
+            mock_settings.return_value.API_KEYS = "test-key"
+            mock_settings.return_value.get_api_keys.return_value = ["test-key"]
             client = TestClient(app, raise_server_exceptions=False)
             resp = client.post(
                 "/api/v1/webhooks/contractor-update",
@@ -154,7 +155,8 @@ class TestContractorUpdateWebhook:
         from src.api.main import app
 
         with patch("src.api.routes.webhooks.get_settings") as mock_settings:
-            mock_settings.return_value.API_KEYS = ["test-key"]
+            mock_settings.return_value.API_KEYS = "test-key"
+            mock_settings.return_value.get_api_keys.return_value = ["test-key"]
             client = TestClient(app, raise_server_exceptions=False)
             resp = client.post(
                 "/api/v1/webhooks/contractor-update",
@@ -169,7 +171,8 @@ class TestContractorUpdateWebhook:
         from src.api.main import app
 
         with patch("src.api.routes.webhooks.get_settings") as mock_settings:
-            mock_settings.return_value.API_KEYS = ["valid-key"]
+            mock_settings.return_value.API_KEYS = "valid-key"
+            mock_settings.return_value.get_api_keys.return_value = ["valid-key"]
             client = TestClient(app, raise_server_exceptions=False)
             resp = client.post(
                 "/api/v1/webhooks/contractor-update",
@@ -188,7 +191,8 @@ class TestContractorUpdateWebhook:
         mock_orchestrator.agents = {"vetting": mock_vetting}
 
         with patch("src.api.routes.webhooks.get_settings") as mock_settings:
-            mock_settings.return_value.API_KEYS = ["test-key"]
+            mock_settings.return_value.API_KEYS = "test-key"
+            mock_settings.return_value.get_api_keys.return_value = ["test-key"]
             with patch("src.api.routes.webhooks.get_orchestrator", return_value=mock_orchestrator):
                 client = TestClient(app, raise_server_exceptions=False)
                 resp = client.post(

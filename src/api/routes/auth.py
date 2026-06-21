@@ -400,7 +400,11 @@ async def login_json(
         logger.info("Login 401: user not found for identifier=%s", masked)
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    lock_ttl = await redis.is_temporarily_locked(user.id)
+    try:
+        lock_ttl = await redis.is_temporarily_locked(user.id)
+    except Exception:
+        logger.warning("Redis unavailable: skipping lockout check for user %s", user.id)
+        lock_ttl = 0
     if lock_ttl > 0:
         raise HTTPException(
             status_code=423,
@@ -411,11 +415,18 @@ async def login_json(
     hashed = await db.get_user_password_hash(user.id)
     if not hashed or not verify_password(request.password, hashed):
         _ip = http_request.client.host if http_request.client else None
-        fail_count = await redis.increment_login_failures(user.id)
+        try:
+            fail_count = await redis.increment_login_failures(user.id)
+        except Exception:
+            logger.warning("Redis unavailable: skipping login failure tracking for user %s", user.id)
+            fail_count = 0
         security_event.failed_login(user.email, ip=_ip)
         if fail_count >= 5:
             lock_seconds = 900
-            await redis.set_temporary_lockout(user.id, lock_seconds)
+            try:
+                await redis.set_temporary_lockout(user.id, lock_seconds)
+            except Exception:
+                logger.warning("Redis unavailable: skipping temporary lockout for user %s", user.id)
             logger.warning("Temporary lockout after failed logins: %s", user.email)
             security_event.account_temporarily_locked(user.email, ip=_ip)
             raise HTTPException(
@@ -442,13 +453,16 @@ async def login_json(
     )
     refresh_token = create_refresh_token(user_id=user.id)
 
-    await redis.set(
-        f"refresh_token:{user.id}",
-        refresh_token,
-        ex=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
-    )
-    await redis.clear_login_failures(user.id)
-    await redis.clear_temporary_lockout(user.id)
+    try:
+        await redis.set(
+            f"refresh_token:{user.id}",
+            refresh_token,
+            ex=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+        )
+        await redis.clear_login_failures(user.id)
+        await redis.clear_temporary_lockout(user.id)
+    except Exception:
+        logger.warning("Redis unavailable: refresh token and failure counters not persisted for user %s", user.id)
 
     await db.update_user(user.id, {"last_login": datetime.now(UTC)})
 

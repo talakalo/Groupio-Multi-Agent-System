@@ -566,7 +566,8 @@ class TestLow01TimingSafeApiKey:
         from src.api.main import app
 
         with patch("src.api.middleware.auth.get_settings") as ms:
-            ms.return_value.API_KEYS = ["valid-key-abc"]
+            ms.return_value.API_KEYS = "valid-key-abc"
+            ms.return_value.get_api_keys.return_value = ["valid-key-abc"]
             client = TestClient(app, raise_server_exceptions=False)
             resp = client.get("/api/v1/health/db", headers={"X-API-Key": "valid-key-abc"})
         # 200 or 500 (no real DB) — not 401/403
@@ -576,7 +577,8 @@ class TestLow01TimingSafeApiKey:
         from src.api.main import app
 
         with patch("src.api.middleware.auth.get_settings") as ms:
-            ms.return_value.API_KEYS = ["valid-key-abc"]
+            ms.return_value.API_KEYS = "valid-key-abc"
+            ms.return_value.get_api_keys.return_value = ["valid-key-abc"]
             client = TestClient(app, raise_server_exceptions=False)
             resp = client.get("/api/v1/health/db", headers={"X-API-Key": "wrong-key"})
         assert resp.status_code in (401, 403)
@@ -678,7 +680,8 @@ class TestLow03HealthDbProtected:
         from src.api.main import app
 
         with patch("src.api.middleware.auth.get_settings") as ms:
-            ms.return_value.API_KEYS = ["some-key"]
+            ms.return_value.API_KEYS = "some-key"
+            ms.return_value.get_api_keys.return_value = ["some-key"]
             client = TestClient(app, raise_server_exceptions=False)
             resp = client.get("/api/v1/health/db")
         assert resp.status_code in (401, 403)
@@ -687,7 +690,8 @@ class TestLow03HealthDbProtected:
         from src.api.main import app
 
         with patch("src.api.middleware.auth.get_settings") as ms:
-            ms.return_value.API_KEYS = ["test-api-key-1"]  # gitleaks:allow
+            ms.return_value.API_KEYS = "test-api-key-1"  # gitleaks:allow
+            ms.return_value.get_api_keys.return_value = ["test-api-key-1"]  # gitleaks:allow
             client = TestClient(app, raise_server_exceptions=False)
             resp = client.get("/api/v1/health/db", headers={"X-API-Key": "test-api-key-1"})  # gitleaks:allow
         # DB may not be available but auth should pass (not 401/403)

@@ -86,7 +86,7 @@ app = FastAPI(
 
 
 def _is_db_connection_error(exc: Exception) -> bool:
-    """True if exception is due to DB (e.g. PostgreSQL) not reachable."""
+    """True if exception is due to DB (PostgreSQL or Redis) not reachable."""
     if isinstance(exc, ConnectionRefusedError):
         return True
     if isinstance(exc, socket.gaierror):
@@ -95,6 +95,13 @@ def _is_db_connection_error(exc: Exception) -> bool:
         code = getattr(exc, "errno", None)
         if code in (errno.ECONNREFUSED, errno.EADDRNOTAVAIL):
             return True
+    try:
+        import redis.exceptions
+
+        if isinstance(exc, redis.exceptions.ConnectionError):
+            return True
+    except ImportError:
+        pass
     return False
 
 
