@@ -2,8 +2,6 @@
 
 import logging
 
-import pytest
-
 from src.config.settings import Settings
 
 

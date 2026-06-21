@@ -11,8 +11,6 @@ to PostgresStore. These tests verify the shim contract:
 
 import warnings
 
-import pytest
-
 
 def test_shim_imports_without_error():
     """Importing the shim must not raise (especially not ImportError for redis package)."""
@@ -67,7 +65,6 @@ def test_get_redis_client_returns_postgres_store():
 
 def test_no_redis_import_in_shim():
     """The shim must not import the redis package at module level."""
-    import importlib
     import sys
 
     # Remove cached module to re-import fresh

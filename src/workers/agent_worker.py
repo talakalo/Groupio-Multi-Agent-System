@@ -124,7 +124,7 @@ class AgentWorker:
                 # Wait up to 5 seconds for a task
                 try:
                     task_data = await asyncio.wait_for(self._queue.get(), timeout=5.0)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     # No task — continue polling
                     continue
 

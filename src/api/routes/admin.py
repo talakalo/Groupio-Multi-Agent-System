@@ -13,8 +13,8 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, EmailStr, model_validator
 
 from src.api.middleware.auth import hash_password, require_admin_only
-from src.databases.postgres import get_postgres_client
 from src.databases.pg_store import get_pg_store
+from src.databases.postgres import get_postgres_client
 from src.databases.vector_store import get_vector_store
 from src.models.contractor import ContractorMembershipAdminUpdate
 from src.models.user import UserInDB

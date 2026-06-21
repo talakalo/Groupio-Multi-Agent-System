@@ -8,8 +8,8 @@ from uuid import uuid4
 
 from src.agents.base import AgentConfig, BaseAgent
 from src.config.prompts.outreach import OUTREACH_SYSTEM_PROMPT
-from src.databases.postgres import get_postgres_client
 from src.databases.pg_store import get_pg_store
+from src.databases.postgres import get_postgres_client
 from src.models.agent_state import AgentState
 from src.utils.monitoring import track_agent_execution
 

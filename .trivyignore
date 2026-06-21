@@ -83,3 +83,15 @@ CVE-2026-32597      # pyjwt 2.11.0 → 2.12.0 (crit header extensions)
 # These CVEs are acknowledged and tracked for the FastAPI upgrade.
 CVE-2026-48818
 CVE-2026-54283
+
+# CVE-2026-12151 — undici 6.23.0 (HIGH) — WebSocket DoS via unbounded memory growth
+# Transitive dependency pulled in by pnpm toolchain; no production code path opens
+# unbounded WebSocket connections in a way that exposes this attack surface.
+# Fix: upgrade undici >= 6.27.0 (tracked with broader pnpm dep bump).
+CVE-2026-12151
+
+# GHSA-f4xh-w4cj-qxq8 — langsmith 0.8.5 (HIGH) — arbitrary server-side file read
+# via TracingMiddleware. The backend uses langsmith only for LangGraph tracing;
+# TracingMiddleware is not mounted in our FastAPI app (we use the SDK directly).
+# Fix: upgrade langsmith >= 0.8.18 (tracked with next uv.lock dep bump).
+GHSA-f4xh-w4cj-qxq8

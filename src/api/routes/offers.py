@@ -10,8 +10,8 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from src.api.middleware.auth import get_current_user
 from src.api.routes.websocket import OFFERS_CHANNEL
 from src.config.settings import get_settings
-from src.databases.postgres import get_postgres_client
 from src.databases.pg_store import get_pg_store
+from src.databases.postgres import get_postgres_client
 from src.databases.vector_store import get_vector_store
 from src.domain.contractor_membership import contractor_membership_allows_offer_creation
 from src.messaging.envelope import EventEnvelope

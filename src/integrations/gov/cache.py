@@ -79,6 +79,7 @@ class PostgresCacheBackend:
     def get(self, key: str) -> bytes | None:
         try:
             import asyncio
+
             from src.databases.pg_store import get_pg_store
             store = get_pg_store()
             result = asyncio.get_event_loop().run_until_complete(store.cache_get(key))
@@ -91,7 +92,9 @@ class PostgresCacheBackend:
 
     def set(self, key: str, value: bytes, ttl: int) -> None:
         try:
-            import asyncio, json
+            import asyncio
+            import json
+
             from src.databases.pg_store import get_pg_store
             store = get_pg_store()
             data = json.loads(value) if isinstance(value, bytes) else value
@@ -102,6 +105,7 @@ class PostgresCacheBackend:
     def delete(self, key: str) -> None:
         try:
             import asyncio
+
             from src.databases.pg_store import get_pg_store
             store = get_pg_store()
             asyncio.get_event_loop().run_until_complete(store.cache_delete(key))

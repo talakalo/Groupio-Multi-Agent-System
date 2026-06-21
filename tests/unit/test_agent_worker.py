@@ -148,7 +148,7 @@ class TestWorkerRun:
         # Stop after the first timeout
         async def stop_after_timeout(*args, **kwargs):
             worker.running = False
-            raise asyncio.TimeoutError()
+            raise TimeoutError()
 
         with patch("asyncio.wait_for", side_effect=stop_after_timeout):
             await worker.run()  # should exit cleanly

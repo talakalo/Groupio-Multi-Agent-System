@@ -454,7 +454,7 @@ class PostgresStore:
             if self._use_supabase_client():
                 # Supabase PostgREST cannot express ON CONFLICT upserts natively;
                 # fall through to asyncpg for correctness.
-                pool_client = await self._get_client()
+                await self._get_client()
                 # Use rpc if available; otherwise gracefully allow
                 logger.debug("check_rate_limit: supabase path — using asyncpg fallback for atomicity")
                 # For supabase path, we degrade to asyncpg style by getting the raw pool
@@ -611,7 +611,6 @@ class PostgresStore:
                 return 0
             locked_until_raw = result.data[0]["locked_until"]
             try:
-                from datetime import timezone
 
                 if isinstance(locked_until_raw, str):
                     locked_until = datetime.fromisoformat(locked_until_raw)
@@ -756,11 +755,11 @@ class PostgresStore:
         # as a proper UUID; otherwise pass None for the user_id FK column.
         import re as _re
 
-        _UUID_RE = _re.compile(
+        _uuid_re = _re.compile(
             r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
             _re.IGNORECASE,
         )
-        db_user_id: str | None = user_id if _UUID_RE.match(user_id) else None
+        db_user_id: str | None = user_id if _uuid_re.match(user_id) else None
 
         if self._use_supabase_client():
             client = await self._get_client()

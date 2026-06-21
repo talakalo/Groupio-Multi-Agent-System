@@ -14,7 +14,6 @@ from fastapi import HTTPException
 @pytest.mark.asyncio
 async def test_check_ip_rate_limit_allows_under_limit():
     """Requests below the limit should return True."""
-    from src.databases.pg_store import get_pg_store
 
     with patch("src.databases.pg_store.get_pg_store") as mock_factory:
         mock_store = AsyncMock()
@@ -28,7 +27,6 @@ async def test_check_ip_rate_limit_allows_under_limit():
 @pytest.mark.asyncio
 async def test_check_ip_rate_limit_blocks_over_limit():
     """21st request from same IP should return False."""
-    from src.databases.pg_store import get_pg_store
 
     with patch("src.databases.pg_store.get_pg_store") as mock_factory:
         mock_store = AsyncMock()

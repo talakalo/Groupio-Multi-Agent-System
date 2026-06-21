@@ -6,8 +6,8 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 
 from src.api.middleware.auth import get_current_user
-from src.databases.postgres import get_postgres_client
 from src.databases.pg_store import get_pg_store
+from src.databases.postgres import get_postgres_client
 from src.models.user import UserInDB
 from src.services.storage import MAX_FILE_SIZE, StorageError, get_storage_service
 
