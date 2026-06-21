@@ -80,8 +80,8 @@ def test_no_redis_import_in_shim():
     for node in ast.walk(tree):
         if isinstance(node, (ast.Import, ast.ImportFrom)):
             for alias in getattr(node, "names", []):
-                assert "redis" not in alias.name or "pg_store" in getattr(
-                    node, "module", ""
-                ), f"Bare redis import found in shim: {alias.name}"
+                assert "redis" not in alias.name or "pg_store" in getattr(node, "module", ""), (
+                    f"Bare redis import found in shim: {alias.name}"
+                )
             module = getattr(node, "module", "") or ""
             assert not module.startswith("redis"), f"Redis module import found: {module}"

@@ -19,6 +19,7 @@ def _parse_list_env(value: str) -> list[str]:
         return json.loads(stripped)
     return [item.strip() for item in stripped.split(",") if item.strip()]
 
+
 logger = logging.getLogger(__name__)
 
 _INSECURE_JWT_DEFAULTS = frozenset(
@@ -330,8 +331,7 @@ class Settings(BaseSettings):
                 )
             if (self.ENABLE_DATAGOV_IL or "").lower() in ("0", "false", "no", ""):
                 logger.warning(
-                    "ENABLE_DATAGOV_IL is disabled in %s. "
-                    "Address/municipality features will return stub responses.",
+                    "ENABLE_DATAGOV_IL is disabled in %s. Address/municipality features will return stub responses.",
                     self.ENVIRONMENT,
                 )
 

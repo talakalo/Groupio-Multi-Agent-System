@@ -634,6 +634,7 @@ def get_gov_client(enabled: bool = True) -> GovDataClient:
             cache: CacheBackend = InMemoryCacheBackend()
             try:
                 from src.integrations.gov.cache import PostgresCacheBackend
+
                 cache = PostgresCacheBackend()
                 logger.info("Gov client: using PostgresCacheBackend for caching")
             except Exception as exc:  # noqa: BLE001

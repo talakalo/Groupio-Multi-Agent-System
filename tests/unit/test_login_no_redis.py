@@ -52,18 +52,12 @@ async def test_login_json_user_not_found_returns_401():
                 json={"email": "noone@example.com", "password": "wrongpassword"},
             )
 
-    assert response.status_code == 401, (
-        f"Expected 401 for unknown user, got {response.status_code}: {response.text}"
-    )
+    assert response.status_code == 401, f"Expected 401 for unknown user, got {response.status_code}: {response.text}"
     body = response.json()
     assert body["detail"] == "Invalid credentials"
     # Confirm no Redis-related error text leaked into the response
-    assert "redis" not in str(body).lower(), (
-        f"Redis error text leaked into response: {body}"
-    )
-    assert "connectionerror" not in str(body).lower(), (
-        f"ConnectionError text leaked into response: {body}"
-    )
+    assert "redis" not in str(body).lower(), f"Redis error text leaked into response: {body}"
+    assert "connectionerror" not in str(body).lower(), f"ConnectionError text leaked into response: {body}"
 
 
 @pytest.mark.asyncio

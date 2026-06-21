@@ -53,6 +53,7 @@ class TaskScheduler:
     async def _try_run_task(self, task: ScheduledTask):
         """Run task if interval has elapsed, using Postgres lock to prevent overlap."""
         from src.databases.pg_store import get_pg_store
+
         store = get_pg_store()
 
         # Ensure the lock row exists (idempotent)
@@ -288,12 +289,11 @@ async def recalculate_trust_scores():
 async def cleanup_stale_conversations():
     """Clean up conversation data older than 90 days."""
     from src.databases.pg_store import get_pg_store as _get_store
+
     store = _get_store()
     try:
         # Postgres conversation_messages rows do not have TTL; delete old rows explicitly.
-        await store._pg_execute(
-            "DELETE FROM conversation_messages WHERE created_at < NOW() - INTERVAL '90 days'"
-        )
+        await store._pg_execute("DELETE FROM conversation_messages WHERE created_at < NOW() - INTERVAL '90 days'")
     except Exception as exc:
         logger.warning("cleanup_stale_conversations: could not delete old rows: %s", exc)
     logger.info("Stale conversation cleanup triggered (90-day cutoff)")
@@ -303,6 +303,7 @@ async def cleanup_stale_conversations():
 async def generate_daily_analytics():
     """Generate and cache daily analytics summary."""
     from src.databases.pg_store import get_pg_store as _get_store
+
     db = get_postgres_client()
     store = _get_store()
 

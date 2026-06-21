@@ -56,7 +56,7 @@ def _classify_key(key: str) -> tuple[str, str]:
         "doc_request:",
     ):
         if key.startswith(prefix):
-            return prefix.rstrip(":"), key[len(prefix):]
+            return prefix.rstrip(":"), key[len(prefix) :]
     return "generic", key
 
 
@@ -92,9 +92,7 @@ class PostgresStore:
         if self._use_supabase is None:
             settings = get_settings()
             force_local = (settings.USE_LOCAL_POSTGRES or "").lower() in ("1", "true", "yes")
-            self._use_supabase = bool(
-                settings.SUPABASE_URL and settings.SUPABASE_KEY and not force_local
-            )
+            self._use_supabase = bool(settings.SUPABASE_URL and settings.SUPABASE_KEY and not force_local)
         return self._use_supabase
 
     async def _get_client(self) -> Any:
@@ -189,12 +187,7 @@ class PostgresStore:
                 client = await self._get_client()
                 # Try to find existing entry for conflict detection
                 existing = (
-                    await client
-                    .table("auth_tokens")
-                    .select("id")
-                    .eq("token_hash", token_hash)
-                    .limit(1)
-                    .execute()
+                    await client.table("auth_tokens").select("id").eq("token_hash", token_hash).limit(1).execute()
                 )
                 if nx and existing.data:
                     return False
@@ -202,8 +195,7 @@ class PostgresStore:
                     "token_type": token_type,
                     "token_hash": token_hash,
                     "expires_at": (
-                        datetime.now(UTC).replace(microsecond=0).isoformat()
-                        + f"+{ttl_seconds // 3600:02d}:00"
+                        datetime.now(UTC).replace(microsecond=0).isoformat() + f"+{ttl_seconds // 3600:02d}:00"
                     ),
                 }
                 # Attempt to resolve value as a UUID (user_id); if it looks like one, store it
@@ -252,35 +244,32 @@ class PostgresStore:
 
         if self._use_supabase_client():
             client = await self._get_client()
-            existing = (
-                await client
-                .table("response_cache")
-                .select("cache_key")
-                .eq("cache_key", key)
-                .limit(1)
-                .execute()
-            )
+            existing = await client.table("response_cache").select("cache_key").eq("cache_key", key).limit(1).execute()
             if nx and existing.data:
                 return False
             data_payload = {"v": value}
             if existing.data:
                 await (
                     client.table("response_cache")
-                    .update({
-                        "data": data_payload,
-                        "expires_at": datetime.now(UTC).isoformat(),
-                    })
+                    .update(
+                        {
+                            "data": data_payload,
+                            "expires_at": datetime.now(UTC).isoformat(),
+                        }
+                    )
                     .eq("cache_key", key)
                     .execute()
                 )
             else:
                 await (
                     client.table("response_cache")
-                    .insert({
-                        "cache_key": key,
-                        "data": data_payload,
-                        "expires_at": datetime.now(UTC).isoformat(),
-                    })
+                    .insert(
+                        {
+                            "cache_key": key,
+                            "data": data_payload,
+                            "expires_at": datetime.now(UTC).isoformat(),
+                        }
+                    )
                     .execute()
                 )
             return True
@@ -329,8 +318,7 @@ class PostgresStore:
             if self._use_supabase_client():
                 client = await self._get_client()
                 result = (
-                    await client
-                    .table("auth_tokens")
+                    await client.table("auth_tokens")
                     .select("user_id")
                     .eq("token_hash", token_hash)
                     .eq("token_type", token_type)
@@ -361,8 +349,7 @@ class PostgresStore:
         if self._use_supabase_client():
             client = await self._get_client()
             result = (
-                await client
-                .table("response_cache")
+                await client.table("response_cache")
                 .select("data")
                 .eq("cache_key", key)
                 .gt("expires_at", datetime.now(UTC).isoformat())
@@ -518,22 +505,10 @@ class PostgresStore:
             client = await self._get_client()
             # PostgREST does not support UPDATE ... RETURNING with arithmetic;
             # fetch then update (two round-trips, acceptable for login path).
-            existing = (
-                await client
-                .table("users")
-                .select("failed_login_count")
-                .eq("id", user_id)
-                .limit(1)
-                .execute()
-            )
+            existing = await client.table("users").select("failed_login_count").eq("id", user_id).limit(1).execute()
             current = existing.data[0]["failed_login_count"] if existing.data else 0
             new_count = current + 1
-            await (
-                client.table("users")
-                .update({"failed_login_count": new_count})
-                .eq("id", user_id)
-                .execute()
-            )
+            await client.table("users").update({"failed_login_count": new_count}).eq("id", user_id).execute()
             return new_count
 
         result = await self._pg_fetchval(
@@ -551,12 +526,7 @@ class PostgresStore:
         """Reset failed_login_count to 0 after a successful login."""
         if self._use_supabase_client():
             client = await self._get_client()
-            await (
-                client.table("users")
-                .update({"failed_login_count": 0})
-                .eq("id", user_id)
-                .execute()
-            )
+            await client.table("users").update({"failed_login_count": 0}).eq("id", user_id).execute()
             return
 
         await self._pg_execute(
@@ -573,12 +543,7 @@ class PostgresStore:
             from datetime import timedelta
 
             locked_until = (datetime.now(UTC) + timedelta(seconds=seconds)).isoformat()
-            await (
-                client.table("users")
-                .update({"locked_until": locked_until})
-                .eq("id", user_id)
-                .execute()
-            )
+            await client.table("users").update({"locked_until": locked_until}).eq("id", user_id).execute()
             return
 
         await self._pg_execute(
@@ -599,19 +564,11 @@ class PostgresStore:
         """
         if self._use_supabase_client():
             client = await self._get_client()
-            result = (
-                await client
-                .table("users")
-                .select("locked_until")
-                .eq("id", user_id)
-                .limit(1)
-                .execute()
-            )
+            result = await client.table("users").select("locked_until").eq("id", user_id).limit(1).execute()
             if not result.data or not result.data[0]["locked_until"]:
                 return 0
             locked_until_raw = result.data[0]["locked_until"]
             try:
-
                 if isinstance(locked_until_raw, str):
                     locked_until = datetime.fromisoformat(locked_until_raw)
                 else:
@@ -635,12 +592,7 @@ class PostgresStore:
         """Remove temporary lockout by setting locked_until = NULL."""
         if self._use_supabase_client():
             client = await self._get_client()
-            await (
-                client.table("users")
-                .update({"locked_until": None})
-                .eq("id", user_id)
-                .execute()
-            )
+            await client.table("users").update({"locked_until": None}).eq("id", user_id).execute()
             return
 
         await self._pg_execute(
@@ -659,11 +611,7 @@ class PostgresStore:
             from datetime import timedelta
 
             expires_at = (datetime.now(UTC) + timedelta(seconds=ttl)).isoformat()
-            await (
-                client.table("revoked_jwts")
-                .insert({"jti": jti, "expires_at": expires_at})
-                .execute()
-            )
+            await client.table("revoked_jwts").insert({"jti": jti, "expires_at": expires_at}).execute()
             return
 
         await self._pg_execute(
@@ -681,8 +629,7 @@ class PostgresStore:
         if self._use_supabase_client():
             client = await self._get_client()
             result = (
-                await client
-                .table("revoked_jwts")
+                await client.table("revoked_jwts")
                 .select("jti")
                 .eq("jti", jti)
                 .gt("expires_at", datetime.now(UTC).isoformat())
@@ -715,8 +662,7 @@ class PostgresStore:
         if self._use_supabase_client():
             client = await self._get_client()
             result = (
-                await client
-                .table("conversation_messages")
+                await client.table("conversation_messages")
                 .select("role, content")
                 .eq("session_id", user_id)
                 .order("created_at", desc=True)
@@ -788,12 +734,7 @@ class PostgresStore:
         """Delete all conversation messages for a session."""
         if self._use_supabase_client():
             client = await self._get_client()
-            await (
-                client.table("conversation_messages")
-                .delete()
-                .eq("session_id", user_id)
-                .execute()
-            )
+            await client.table("conversation_messages").delete().eq("session_id", user_id).execute()
             return
 
         await self._pg_execute(
@@ -815,8 +756,7 @@ class PostgresStore:
             if self._use_supabase_client():
                 client = await self._get_client()
                 result = (
-                    await client
-                    .table("response_cache")
+                    await client.table("response_cache")
                     .select("data")
                     .eq("cache_key", key)
                     .gt("expires_at", datetime.now(UTC).isoformat())
@@ -949,8 +889,7 @@ class PostgresStore:
         if self._use_supabase_client():
             client = await self._get_client()
             result = (
-                await client
-                .table("ab_test_events")
+                await client.table("ab_test_events")
                 .select("outcome")
                 .eq("campaign_id", campaign_id)
                 .eq("variant", variant)
@@ -993,15 +932,10 @@ class PostgresStore:
             now = datetime.now(UTC)
             locked_until = (now + timedelta(seconds=ttl_seconds)).isoformat()
             # Ensure row exists
-            await (
-                client.table("scheduler_locks")
-                .upsert({"task_name": task_name}, on_conflict="task_name")
-                .execute()
-            )
+            await client.table("scheduler_locks").upsert({"task_name": task_name}, on_conflict="task_name").execute()
             # Try to acquire: update only if not currently locked
             existing = (
-                await client
-                .table("scheduler_locks")
+                await client.table("scheduler_locks")
                 .select("task_name, locked_until")
                 .eq("task_name", task_name)
                 .limit(1)
@@ -1054,8 +988,7 @@ class PostgresStore:
         if self._use_supabase_client():
             client = await self._get_client()
             result = (
-                await client
-                .table("scheduler_locks")
+                await client.table("scheduler_locks")
                 .select("last_run_at")
                 .eq("task_name", task_name)
                 .limit(1)
@@ -1078,12 +1011,7 @@ class PostgresStore:
         """Release a scheduler lock early (set locked_until = NULL)."""
         if self._use_supabase_client():
             client = await self._get_client()
-            await (
-                client.table("scheduler_locks")
-                .update({"locked_until": None})
-                .eq("task_name", task_name)
-                .execute()
-            )
+            await client.table("scheduler_locks").update({"locked_until": None}).eq("task_name", task_name).execute()
             return
 
         await self._pg_execute(
