@@ -27,9 +27,9 @@ def mock_db():
 
 @pytest.fixture
 def mock_redis():
-    """Mock Redis client by patching the singleton."""
+    """Mock pg_store (Redis replacement) by patching the singleton."""
     redis = AsyncMock()
-    with patch("src.databases.redis_client._redis_client", redis):
+    with patch("src.databases.pg_store._pg_store", redis):
         yield redis
 
 
@@ -70,7 +70,7 @@ class TestHealthEndpoint:
         with (
             patch("src.api.main.get_vector_store") as mock_vs,
             patch("src.api.main.get_graph_store") as mock_gs,
-            patch("src.api.main.get_redis_client") as mock_redis,
+            patch("src.api.main.get_pg_store") as mock_redis,
             patch("src.api.main.get_postgres_client") as mock_db,
         ):
             mock_vs.return_value.health_check = AsyncMock(return_value=True)
@@ -89,7 +89,7 @@ class TestHealthEndpoint:
         with (
             patch("src.api.main.get_vector_store") as mock_vs,
             patch("src.api.main.get_graph_store") as mock_gs,
-            patch("src.api.main.get_redis_client") as mock_redis,
+            patch("src.api.main.get_pg_store") as mock_redis,
             patch("src.api.main.get_postgres_client") as mock_db,
         ):
             mock_vs.return_value.health_check = AsyncMock(return_value=True)
@@ -179,7 +179,7 @@ class TestMessageEndpoint:
         """Redis client creation failures must not crash the message endpoint."""
         override_auth({"id": "user-123", "role": "resident"})
         with (
-            patch("src.api.main.get_redis_client", side_effect=RuntimeError("Redis bootstrap failed")),
+            patch("src.api.main.get_pg_store", side_effect=RuntimeError("pg_store bootstrap failed")),
             patch("src.api.main.get_orchestrator") as mock_orch,
         ):
             mock_orch.return_value.run = AsyncMock(
@@ -922,7 +922,7 @@ class TestGlobalExceptionHandler:
         redis_mock = AsyncMock()
         redis_mock.check_ip_rate_limit = AsyncMock(return_value=True)
         with TestClient(app, raise_server_exceptions=False) as c:
-            with patch("src.api.routes.auth.get_redis_client", return_value=redis_mock):
+            with patch("src.api.routes.auth.get_pg_store", return_value=redis_mock):
                 with patch("src.api.routes.auth.get_postgres_client") as mock_get_db:
                     db_mock = AsyncMock()
                     db_mock.get_user_by_email = AsyncMock(side_effect=err)
@@ -943,7 +943,7 @@ class TestGlobalExceptionHandler:
         redis_mock = AsyncMock()
         redis_mock.check_ip_rate_limit = AsyncMock(return_value=True)
         with TestClient(app, raise_server_exceptions=False) as c:
-            with patch("src.api.routes.auth.get_redis_client", return_value=redis_mock):
+            with patch("src.api.routes.auth.get_pg_store", return_value=redis_mock):
                 with patch("src.api.routes.auth.get_postgres_client") as mock_get_db:
                     db_mock = AsyncMock()
                     db_mock.get_user_by_email = AsyncMock(side_effect=err)
@@ -962,7 +962,7 @@ class TestGlobalExceptionHandler:
         redis_mock = AsyncMock()
         redis_mock.check_ip_rate_limit = AsyncMock(return_value=True)
         with TestClient(app, raise_server_exceptions=False) as c:
-            with patch("src.api.routes.auth.get_redis_client", return_value=redis_mock):
+            with patch("src.api.routes.auth.get_pg_store", return_value=redis_mock):
                 with patch("src.api.routes.auth.get_postgres_client") as mock_get_db:
                     db_mock = AsyncMock()
                     db_mock.get_user_by_email = AsyncMock(side_effect=err)

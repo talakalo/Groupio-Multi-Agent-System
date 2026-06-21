@@ -18,6 +18,7 @@ from src.api.middleware.security import SecurityHeadersMiddleware
 from src.api.routes import api_router
 from src.config.settings import get_settings
 from src.databases.graph_store import get_graph_store
+from src.databases.pg_store import get_pg_store
 from src.databases.postgres import get_postgres_client
 from src.databases.vector_store import get_vector_store
 from src.models.user import UserInDB
@@ -65,8 +66,6 @@ async def lifespan(app: FastAPI):
     except Exception:
         pass
     try:
-        from src.databases.pg_store import get_pg_store
-
         pg_store = get_pg_store()
         await pg_store.close()
     except Exception:
@@ -121,8 +120,6 @@ async def _check_message_rate_limit(current_user: UserInDB, settings: Any) -> No
     successfully we still preserve the real 429 behavior.
     """
     try:
-        from src.databases.pg_store import get_pg_store
-
         store = get_pg_store()
         allowed = await store.check_rate_limit(
             current_user.id,
@@ -343,8 +340,6 @@ async def health_check() -> dict[str, Any]:
         services["graph_db"] = False
 
     try:
-        from src.databases.pg_store import get_pg_store
-
         pg_store = get_pg_store()
         services["pg_store"] = await pg_store.health_check()
     except Exception:
