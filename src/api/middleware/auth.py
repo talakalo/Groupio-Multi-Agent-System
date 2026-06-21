@@ -148,52 +148,12 @@ def verify_refresh_token(token: str) -> dict | None:
         return None
 
 
-_USER_CACHE_TTL = 300  # seconds
-
-
-async def _get_cached_user(user_id: str) -> UserInDB | None:
-    """Return a cached UserInDB from Redis, or None on cache miss or any Redis error."""
-    try:
-        import json as _json
-
-        from src.databases.redis_client import get_redis_client
-
-        redis = get_redis_client()
-        raw = await redis._redis.get(f"user_cache:{user_id}")
-        if raw is None:
-            return None
-        data = _json.loads(raw)
-        return UserInDB(**data)
-    except Exception:
-        return None
-
-
-async def _set_cached_user(user: UserInDB) -> None:
-    """Write a UserInDB into Redis cache. Silently swallows any Redis errors."""
-    try:
-        import json as _json
-
-        from src.databases.redis_client import get_redis_client
-
-        redis = get_redis_client()
-        await redis._redis.set(
-            f"user_cache:{user.id}",
-            _json.dumps(user.model_dump(mode="json")),
-            ex=_USER_CACHE_TTL,
-        )
-    except Exception:
-        pass
+_USER_CACHE_TTL = 300  # kept for reference, user cache removed
 
 
 async def invalidate_cached_user(user_id: str) -> None:
-    """Remove a user from the Redis cache. Silently swallows any Redis errors."""
-    try:
-        from src.databases.redis_client import get_redis_client
-
-        redis = get_redis_client()
-        await redis._redis.delete(f"user_cache:{user_id}")
-    except Exception:
-        pass
+    """No-op: user cache removed (Redis eliminated). DB fetch is fast enough."""
+    pass
 
 
 async def get_current_user(
@@ -218,10 +178,10 @@ async def get_current_user(
     # Check token denylist (for revoked tokens — logout, password change)
     if payload.jti:
         try:
-            from src.databases.redis_client import get_redis_client
+            from src.databases.pg_store import get_pg_store
 
-            redis = get_redis_client()
-            if await redis.is_token_denylisted(payload.jti):
+            store = get_pg_store()
+            if await store.is_token_denylisted(payload.jti):
                 raise HTTPException(
                     status_code=401,
                     detail="Token has been revoked",
@@ -230,7 +190,7 @@ async def get_current_user(
         except HTTPException:
             raise
         except Exception as exc:
-            logger.warning("Redis unavailable for denylist check — allowing token: %s", exc)
+            logger.warning("Denylist check failed — allowing token: %s", exc)
 
     # Fetch user from database
     from src.databases.postgres import get_postgres_client

@@ -19,7 +19,6 @@ from src.api.routes import api_router
 from src.config.settings import get_settings
 from src.databases.graph_store import get_graph_store
 from src.databases.postgres import get_postgres_client
-from src.databases.redis_client import get_redis_client
 from src.databases.vector_store import get_vector_store
 from src.models.user import UserInDB
 from src.orchestration.graph import get_orchestrator
@@ -66,8 +65,10 @@ async def lifespan(app: FastAPI):
     except Exception:
         pass
     try:
-        redis = get_redis_client()
-        await redis.close()
+        from src.databases.pg_store import get_pg_store
+
+        pg_store = get_pg_store()
+        await pg_store.close()
     except Exception:
         pass
     try:
@@ -86,7 +87,11 @@ app = FastAPI(
 
 
 def _is_db_connection_error(exc: Exception) -> bool:
-    """True if exception is due to DB (PostgreSQL or Redis) not reachable."""
+    """True if exception is due to PostgreSQL not reachable.
+
+    Redis errors (redis.exceptions.ConnectionError) no longer possible —
+    pg_store used instead. Only PostgreSQL connection errors reach here.
+    """
     if isinstance(exc, ConnectionRefusedError):
         return True
     if isinstance(exc, socket.gaierror):
@@ -95,13 +100,6 @@ def _is_db_connection_error(exc: Exception) -> bool:
         code = getattr(exc, "errno", None)
         if code in (errno.ECONNREFUSED, errno.EADDRNOTAVAIL):
             return True
-    try:
-        import redis.exceptions
-
-        if isinstance(exc, redis.exceptions.ConnectionError):
-            return True
-    except ImportError:
-        pass
     return False
 
 
@@ -116,15 +114,17 @@ def _is_schema_not_ready(exc: Exception) -> bool:
 
 
 async def _check_message_rate_limit(current_user: UserInDB, settings: Any) -> None:
-    """Enforce per-user message rate limits. Fails open on Redis errors.
+    """Enforce per-user message rate limits. Fails open on DB errors.
 
     Message processing should never hard-fail with an unhandled 500 because
-    Redis is temporarily unavailable. When Redis responds successfully we still
-    preserve the real 429 behavior.
+    the rate-limit store is temporarily unavailable. When the store responds
+    successfully we still preserve the real 429 behavior.
     """
     try:
-        redis = get_redis_client()
-        allowed = await redis.check_rate_limit(
+        from src.databases.pg_store import get_pg_store
+
+        store = get_pg_store()
+        allowed = await store.check_rate_limit(
             current_user.id,
             limit=settings.RATE_LIMIT_PER_USER,
             window=settings.RATE_LIMIT_WINDOW,
@@ -135,7 +135,7 @@ async def _check_message_rate_limit(current_user: UserInDB, settings: Any) -> No
         raise
     except Exception as exc:
         logger.warning(
-            "Redis unavailable for message rate limiting — allowing request: user_id=%s environment=%s error=%s",
+            "Rate limit check failed — allowing request: user_id=%s environment=%s error=%s",
             current_user.id,
             settings.ENVIRONMENT,
             exc,
@@ -343,10 +343,12 @@ async def health_check() -> dict[str, Any]:
         services["graph_db"] = False
 
     try:
-        redis = get_redis_client()
-        services["redis"] = await redis.health_check()
+        from src.databases.pg_store import get_pg_store
+
+        pg_store = get_pg_store()
+        services["pg_store"] = await pg_store.health_check()
     except Exception:
-        services["redis"] = False
+        services["pg_store"] = False
 
     try:
         db = get_postgres_client()
