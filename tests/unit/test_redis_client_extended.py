@@ -1,290 +1,90 @@
-"""Extended unit tests for RedisClient."""
+"""Tests for the redis_client.py backwards-compatibility shim.
 
-import json
-from unittest.mock import AsyncMock, MagicMock, patch
+The original RedisClient has been replaced by a thin shim that delegates
+to PostgresStore. These tests verify the shim contract:
+
+1. `from src.databases.redis_client import RedisClient` works (no ImportError).
+2. `RedisClient` is an alias for `PostgresStore`.
+3. `get_redis_client()` returns a `PostgresStore` instance and emits a DeprecationWarning.
+4. `from src.databases.redis_client import get_pg_store` works.
+"""
+
+import warnings
 
 import pytest
 
-from src.databases.redis_client import RedisClient
 
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
+def test_shim_imports_without_error():
+    """Importing the shim must not raise (especially not ImportError for redis package)."""
+    from src.databases.redis_client import RedisClient, get_pg_store, get_redis_client  # noqa: F401
 
+    assert callable(get_redis_client)
+    assert callable(get_pg_store)
+    assert RedisClient is not None
 
-@pytest.fixture
-def mock_redis_conn():
-    return AsyncMock()
 
+def test_redis_client_is_postgres_store_alias():
+    """RedisClient should be PostgresStore (backwards-compat alias)."""
+    from src.databases.pg_store import PostgresStore
+    from src.databases.redis_client import RedisClient
 
-@pytest.fixture
-def client(mock_redis_conn):
-    mock_settings = MagicMock()
-    mock_settings.REDIS_URL = "redis://localhost:6379"
-    mock_settings.REDIS_PASSWORD = None
-    with patch("src.databases.redis_client.get_settings", return_value=mock_settings):
-        with patch("src.databases.redis_client.redis") as mock_redis_module:
-            mock_redis_module.from_url = MagicMock(return_value=mock_redis_conn)
-            c = RedisClient()
-    return c, mock_redis_conn
+    assert RedisClient is PostgresStore
 
 
-@pytest.fixture
-def client_with_password(mock_redis_conn):
-    mock_settings = MagicMock()
-    mock_settings.REDIS_URL = "redis://localhost:6379"
-    mock_settings.REDIS_PASSWORD = "secret"
-    with patch("src.databases.redis_client.get_settings", return_value=mock_settings):
-        with patch("src.databases.redis_client.redis") as mock_redis_module:
-            mock_redis_module.from_url = MagicMock(return_value=mock_redis_conn)
-            c = RedisClient()
-    return c, mock_redis_conn
+def test_get_pg_store_re_exported():
+    """get_pg_store is re-exported from the shim for convenience."""
+    from src.databases.pg_store import get_pg_store as canonical
+    from src.databases.redis_client import get_pg_store as shim_export
 
+    assert shim_export is canonical
 
-# ---------------------------------------------------------------------------
-# Conversation memory
-# ---------------------------------------------------------------------------
 
+def test_get_redis_client_emits_deprecation_warning():
+    """get_redis_client() must emit DeprecationWarning when called."""
+    from src.databases.redis_client import get_redis_client
 
-@pytest.mark.asyncio
-async def test_get_conversation_context(client):
-    c, conn = client
-    msg = {"role": "user", "content": "hello"}
-    conn.lrange = AsyncMock(return_value=[json.dumps(msg)])
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        result = get_redis_client()
 
-    result = await c.get_conversation_context("user-1")
-    assert len(result) == 1
-    assert result[0]["role"] == "user"
+    assert len(w) == 1
+    assert issubclass(w[0].category, DeprecationWarning)
+    assert "deprecated" in str(w[0].message).lower()
+    assert result is not None
 
 
-@pytest.mark.asyncio
-async def test_add_conversation_message(client):
-    c, conn = client
-    conn.lpush = AsyncMock()
-    conn.ltrim = AsyncMock()
-    conn.expire = AsyncMock()
+def test_get_redis_client_returns_postgres_store():
+    """get_redis_client() must return a PostgresStore (not a Redis connection)."""
+    from src.databases.pg_store import PostgresStore
+    from src.databases.redis_client import get_redis_client
 
-    await c.add_conversation_message("user-1", {"role": "assistant", "content": "hi"})
-    conn.lpush.assert_awaited_once()
-    conn.ltrim.assert_awaited_once()
-    conn.expire.assert_awaited_once()
+    with warnings.catch_warnings(record=True):
+        warnings.simplefilter("always")
+        result = get_redis_client()
 
+    assert isinstance(result, PostgresStore)
 
-@pytest.mark.asyncio
-async def test_clear_conversation(client):
-    c, conn = client
-    conn.delete = AsyncMock()
-    await c.clear_conversation("user-1")
-    conn.delete.assert_awaited_once_with("conv:user-1")
 
+def test_no_redis_import_in_shim():
+    """The shim must not import the redis package at module level."""
+    import importlib
+    import sys
 
-# ---------------------------------------------------------------------------
-# Caching
-# ---------------------------------------------------------------------------
+    # Remove cached module to re-import fresh
+    for key in list(sys.modules.keys()):
+        if key == "src.databases.redis_client":
+            del sys.modules[key]
 
+    import ast
 
-@pytest.mark.asyncio
-async def test_cache_get_hit(client):
-    c, conn = client
-    conn.get = AsyncMock(return_value=json.dumps({"key": "value"}))
-    result = await c.cache_get("mykey")
-    assert result == {"key": "value"}
+    src = open("src/databases/redis_client.py").read()
+    tree = ast.parse(src)
 
-
-@pytest.mark.asyncio
-async def test_cache_get_miss(client):
-    c, conn = client
-    conn.get = AsyncMock(return_value=None)
-    result = await c.cache_get("missing")
-    assert result is None
-
-
-@pytest.mark.asyncio
-async def test_cache_set(client):
-    c, conn = client
-    conn.set = AsyncMock()
-    await c.cache_set("mykey", {"data": 1}, ttl=600)
-    conn.set.assert_awaited_once()
-
-
-@pytest.mark.asyncio
-async def test_cache_delete(client):
-    c, conn = client
-    conn.delete = AsyncMock()
-    await c.cache_delete("mykey")
-    conn.delete.assert_awaited_once_with("cache:mykey")
-
-
-# ---------------------------------------------------------------------------
-# Rate limiting
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.asyncio
-async def test_check_rate_limit_allowed(client):
-    c, conn = client
-    conn.eval = AsyncMock(return_value=5)
-    result = await c.check_rate_limit("user-1", limit=60, window=60)
-    assert result is True
-
-
-@pytest.mark.asyncio
-async def test_check_rate_limit_exceeded(client):
-    c, conn = client
-    conn.eval = AsyncMock(return_value=61)
-    result = await c.check_rate_limit("user-1", limit=60, window=60)
-    assert result is False
-
-
-@pytest.mark.asyncio
-async def test_check_ip_rate_limit_allowed(client):
-    c, conn = client
-    conn.eval = AsyncMock(return_value=10)
-    result = await c.check_ip_rate_limit("1.2.3.4", limit=20, window=60)
-    assert result is True
-
-
-@pytest.mark.asyncio
-async def test_check_ip_rate_limit_exceeded(client):
-    c, conn = client
-    conn.eval = AsyncMock(return_value=21)
-    result = await c.check_ip_rate_limit("1.2.3.4", limit=20, window=60)
-    assert result is False
-
-
-@pytest.mark.asyncio
-async def test_increment_login_failures(client):
-    c, conn = client
-    conn.eval = AsyncMock(return_value=3)
-    count = await c.increment_login_failures("user-1")
-    assert count == 3
-
-
-@pytest.mark.asyncio
-async def test_clear_login_failures(client):
-    c, conn = client
-    conn.delete = AsyncMock()
-    await c.clear_login_failures("user-1")
-    conn.delete.assert_awaited_once_with("login_fail:user-1")
-
-
-# ---------------------------------------------------------------------------
-# A/B testing
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.asyncio
-async def test_ab_test_track(client):
-    c, conn = client
-    conn.hincrby = AsyncMock()
-    await c.ab_test_track("campaign-1", "variant_a", "click")
-    conn.hincrby.assert_awaited_once()
-
-
-@pytest.mark.asyncio
-async def test_ab_test_get_results(client):
-    c, conn = client
-    conn.hgetall = AsyncMock(return_value={"click": "5", "view": "20"})
-    result = await c.ab_test_get_results("campaign-1", "variant_a")
-    assert result == {"click": 5, "view": 20}
-
-
-# ---------------------------------------------------------------------------
-# Agent state
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.asyncio
-async def test_save_agent_state(client):
-    c, conn = client
-    conn.set = AsyncMock()
-    await c.save_agent_state("conv-1", {"intent": "support"}, ttl=3600)
-    conn.set.assert_awaited_once()
-
-
-@pytest.mark.asyncio
-async def test_get_agent_state_found(client):
-    c, conn = client
-    state = {"intent": "support"}
-    conn.get = AsyncMock(return_value=json.dumps(state))
-    result = await c.get_agent_state("conv-1")
-    assert result == state
-
-
-@pytest.mark.asyncio
-async def test_get_agent_state_not_found(client):
-    c, conn = client
-    conn.get = AsyncMock(return_value=None)
-    result = await c.get_agent_state("conv-1")
-    assert result is None
-
-
-# ---------------------------------------------------------------------------
-# Raw key-value
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.asyncio
-async def test_set_with_ttl(client):
-    c, conn = client
-    conn.set = AsyncMock(return_value=True)
-    result = await c.set("mykey", "myval", ex=300)
-    assert result is True
-
-
-@pytest.mark.asyncio
-async def test_set_nx_false_when_key_exists(client):
-    c, conn = client
-    conn.set = AsyncMock(return_value=None)
-    result = await c.set("existing_key", "val", nx=True)
-    assert result is False
-
-
-@pytest.mark.asyncio
-async def test_get_key(client):
-    c, conn = client
-    conn.get = AsyncMock(return_value="myvalue")
-    result = await c.get("mykey")
-    assert result == "myvalue"
-
-
-@pytest.mark.asyncio
-async def test_delete_key(client):
-    c, conn = client
-    conn.delete = AsyncMock()
-    await c.delete("mykey")
-    conn.delete.assert_awaited_once_with("mykey")
-
-
-# ---------------------------------------------------------------------------
-# Health check
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.asyncio
-async def test_health_check_success(client):
-    c, conn = client
-    conn.ping = AsyncMock()
-    assert await c.health_check() is True
-
-
-@pytest.mark.asyncio
-async def test_health_check_failure(client):
-    c, conn = client
-    conn.ping = AsyncMock(side_effect=Exception("connection refused"))
-    assert await c.health_check() is False
-
-
-# ---------------------------------------------------------------------------
-# close
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.asyncio
-async def test_close(client):
-    c, conn = client
-    conn.aclose = AsyncMock()
-    conn.close = AsyncMock()
-    await c.close()
-    conn.aclose.assert_awaited_once()
-    conn.close.assert_not_awaited()
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Import, ast.ImportFrom)):
+            for alias in getattr(node, "names", []):
+                assert "redis" not in alias.name or "pg_store" in getattr(
+                    node, "module", ""
+                ), f"Bare redis import found in shim: {alias.name}"
+            module = getattr(node, "module", "") or ""
+            assert not module.startswith("redis"), f"Redis module import found: {module}"

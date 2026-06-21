@@ -1,8 +1,13 @@
 """
 Background worker for processing agent tasks.
 
-This worker polls Redis for incoming tasks and dispatches them
-to the appropriate agent for processing.
+This worker was originally Redis-backed (brpop queue). Redis has been replaced
+with Postgres in phase 00-remove-redis. This worker now uses an in-memory asyncio
+queue and can be extended to use RabbitMQ (ENABLE_RABBITMQ=true) when a message
+queue is available.
+
+For single-worker Render deployments, tasks are dispatched via direct async calls
+rather than via a queue broker.
 """
 
 import asyncio
@@ -11,12 +16,10 @@ import signal
 import sys
 from typing import Any
 
-import redis.asyncio as redis
 import structlog
 
 from src.agents.router import RouterAgent
 from src.config.settings import get_settings
-from src.models.agent_state import AgentState
 
 logger = structlog.get_logger(__name__)
 
@@ -25,37 +28,34 @@ settings = get_settings()
 
 
 class AgentWorker:
-    """Background worker that processes agent tasks from Redis queue."""
+    """Background worker that processes agent tasks from an in-memory queue.
+
+    Note: Previously Redis-backed (brpop). Now uses asyncio.Queue internally.
+    Extend with RabbitMQ (ENABLE_RABBITMQ=true) for multi-worker fan-out.
+    """
 
     def __init__(self):
-        self.redis_client: redis.Redis | None = None
+        self._queue: asyncio.Queue = asyncio.Queue()
         self.router_agent: RouterAgent | None = None
         self.running = False
         self.task_queue = "groupio:agent:tasks"
         self.result_queue = "groupio:agent:results"
 
     async def connect(self):
-        """Connect to Redis and initialize agents."""
-        logger.info("Connecting to Redis", url=settings.REDIS_URL)
-        self.redis_client = redis.from_url(
-            settings.REDIS_URL,
-            encoding="utf-8",
-            decode_responses=True,
-        )
-
-        # Test connection
-        await self.redis_client.ping()
-        logger.info("Connected to Redis successfully")
+        """Initialize agents (no external queue broker needed in single-worker mode)."""
+        logger.info("Agent worker initializing (in-memory queue mode)")
 
         # Initialize router agent
         self.router_agent = RouterAgent()
         logger.info("Router agent initialized")
 
     async def disconnect(self):
-        """Disconnect from Redis."""
-        if self.redis_client:
-            await self.redis_client.aclose()
-            logger.info("Disconnected from Redis")
+        """Shutdown — no external connection to close."""
+        logger.info("Agent worker disconnected")
+
+    async def enqueue(self, task_data: dict[str, Any]) -> None:
+        """Enqueue a task for processing. Called by route handlers directly."""
+        await self._queue.put(task_data)
 
     async def process_task(self, task_data: dict[str, Any]) -> dict[str, Any]:
         """
@@ -84,6 +84,8 @@ class AgentWorker:
             # Route the message through the router agent
             if self.router_agent is None:
                 raise RuntimeError("Router agent not initialized")
+
+            from src.models.agent_state import AgentState
 
             state: AgentState = {  # type: ignore[typeddict-item]
                 "messages": [{"role": "user", "content": message}] if message else [],
@@ -115,32 +117,20 @@ class AgentWorker:
     async def run(self):
         """Main worker loop - poll for tasks and process them."""
         self.running = True
-        logger.info("Agent worker starting", queue=self.task_queue)
+        logger.info("Agent worker starting", queue="in-memory asyncio.Queue")
 
         while self.running:
             try:
-                # Block for up to 5 seconds waiting for a task
-                result = await self.redis_client.brpop(self.task_queue, timeout=5)
-
-                if result is None:
-                    # No task received, continue polling
+                # Wait up to 5 seconds for a task
+                try:
+                    task_data = await asyncio.wait_for(self._queue.get(), timeout=5.0)
+                except asyncio.TimeoutError:
+                    # No task — continue polling
                     continue
-
-                _, task_json = result
-                task_data = json.loads(task_json)
 
                 # Process the task
                 result = await self.process_task(task_data)
-
-                # Push result to results queue
-                task_id = task_data.get("task_id")
-                if task_id:
-                    result_key = f"{self.result_queue}:{task_id}"
-                    await self.redis_client.setex(
-                        result_key,
-                        300,  # 5 minute TTL
-                        json.dumps(result),
-                    )
+                logger.info("Task complete", task_id=task_data.get("task_id"), status=result.get("status"))
 
             except asyncio.CancelledError:
                 logger.info("Worker cancelled, shutting down")

@@ -191,35 +191,25 @@ class TestGetEmbeddingClient:
 class TestAgentWorkerLifecycle:
     @pytest.fixture
     def worker(self):
-        with patch("src.workers.agent_worker.get_settings") as mock_settings:
-            mock_settings.return_value = MagicMock(REDIS_URL="redis://localhost:6379")
-            from src.workers.agent_worker import AgentWorker
+        from src.workers.agent_worker import AgentWorker
 
-            return AgentWorker()
+        return AgentWorker()
 
     @pytest.mark.asyncio
     async def test_connect(self, worker):
-        mock_redis = AsyncMock()
-        mock_redis.ping = AsyncMock()
-        with (
-            patch("src.workers.agent_worker.redis.from_url", return_value=mock_redis),
-            patch("src.workers.agent_worker.RouterAgent") as mock_router,
-        ):
+        """connect() initializes the router agent (no Redis ping needed)."""
+        with patch("src.workers.agent_worker.RouterAgent") as mock_router:
             mock_router.return_value = MagicMock()
             await worker.connect()
-            mock_redis.ping.assert_awaited_once()
             assert worker.router_agent is not None
 
     @pytest.mark.asyncio
     async def test_disconnect_with_client(self, worker):
-        mock_redis = AsyncMock()
-        worker.redis_client = mock_redis
-        await worker.disconnect()
-        mock_redis.aclose.assert_awaited_once()
+        """disconnect() is a no-op in the new in-memory queue mode."""
+        await worker.disconnect()  # should not raise
 
     @pytest.mark.asyncio
     async def test_disconnect_without_client(self, worker):
-        worker.redis_client = None
         await worker.disconnect()  # should not raise
 
     def test_stop(self, worker):
