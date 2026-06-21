@@ -68,24 +68,24 @@ async def test_start_logs_task_exception():
 
 
 @pytest.mark.asyncio
-async def test_try_run_task_skips_if_idempotency_key_set():
-    """If the idempotency key is already set the task func is NOT called."""
+async def test_try_run_task_skips_if_lock_not_acquired():
+    """If acquire_scheduler_lock returns False, the task func is NOT called."""
     sched = TaskScheduler()
-    mock_redis = AsyncMock()
-    mock_redis.get = AsyncMock(side_effect=[None, "done"])  # no last_run, but idempotent
-    mock_redis.set = AsyncMock(return_value=True)
-    mock_redis.delete = AsyncMock()
+    mock_store = AsyncMock()
+    mock_store.get_scheduler_last_run = AsyncMock(return_value=None)
+    mock_store.acquire_scheduler_lock = AsyncMock(return_value=False)
+    mock_store.release_scheduler_lock = AsyncMock()
 
     from src.workers.scheduler import ScheduledTask
 
     func = AsyncMock()
     task = ScheduledTask("idem_task", 3600, func)
 
-    with patch("src.workers.scheduler.get_redis_client", return_value=mock_redis):
+    with patch("src.databases.pg_store.get_pg_store", return_value=mock_store):
         await sched._try_run_task(task)
 
     func.assert_not_called()
-    mock_redis.delete.assert_called_once()
+    mock_store.release_scheduler_lock.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -260,10 +260,11 @@ async def test_recalculate_trust_scores_handles_error():
 
 @pytest.mark.asyncio
 async def test_cleanup_stale_conversations_calls_redis():
-    """cleanup_stale_conversations calls get_redis_client (TTL handled by Redis)."""
-    mock_redis = AsyncMock()
+    """cleanup_stale_conversations uses pg_store to delete old conversation rows."""
+    mock_store = AsyncMock()
+    mock_store._pg_execute = AsyncMock()
 
-    with patch("src.workers.scheduler.get_redis_client", return_value=mock_redis):
+    with patch("src.databases.pg_store.get_pg_store", return_value=mock_store):
         await cleanup_stale_conversations()  # should not raise
 
 
@@ -274,20 +275,20 @@ async def test_cleanup_stale_conversations_calls_redis():
 
 @pytest.mark.asyncio
 async def test_generate_daily_analytics_success():
-    """generate_daily_analytics writes summary to Redis."""
+    """generate_daily_analytics writes summary to pg_store cache."""
     db = AsyncMock()
     db.list_offers = AsyncMock(return_value=([], 5))
     db.list_contractors = AsyncMock(return_value=([], 10))
 
-    redis = AsyncMock()
-    redis.set = AsyncMock()
+    store = AsyncMock()
+    store.cache_set = AsyncMock()
 
     with patch("src.workers.scheduler.get_postgres_client", return_value=db):
-        with patch("src.workers.scheduler.get_redis_client", return_value=redis):
+        with patch("src.databases.pg_store.get_pg_store", return_value=store):
             await generate_daily_analytics()
 
-    redis.set.assert_called_once()
-    args = redis.set.call_args
+    store.cache_set.assert_called_once()
+    args = store.cache_set.call_args
     assert "analytics:daily_summary" in args[0][0]
 
 
@@ -297,13 +298,14 @@ async def test_generate_daily_analytics_handles_db_error():
     db = AsyncMock()
     db.list_offers = AsyncMock(side_effect=RuntimeError("db down"))
 
-    redis = AsyncMock()
+    store = AsyncMock()
+    store.cache_set = AsyncMock()
 
     with patch("src.workers.scheduler.get_postgres_client", return_value=db):
-        with patch("src.workers.scheduler.get_redis_client", return_value=redis):
+        with patch("src.databases.pg_store.get_pg_store", return_value=store):
             await generate_daily_analytics()  # should not raise
 
-    redis.set.assert_not_called()
+    store.cache_set.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

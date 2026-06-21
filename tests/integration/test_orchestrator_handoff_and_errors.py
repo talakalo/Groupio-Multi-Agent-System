@@ -19,7 +19,7 @@ def mock_deps():
         patch("src.agents.pricing.get_postgres_client") as mock_pricing_pg,
         patch("src.agents.vetting.get_graph_store") as mock_vetting_graph,
         patch("src.agents.support.get_postgres_client") as mock_support_pg,
-        patch("src.agents.support.get_redis_client") as mock_support_redis,
+        patch("src.agents.support.get_pg_store") as mock_support_redis,
         patch("src.agents.analytics.get_postgres_client") as mock_analytics_pg,
     ):
         llm = AsyncMock()

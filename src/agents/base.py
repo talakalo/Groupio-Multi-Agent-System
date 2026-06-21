@@ -94,11 +94,11 @@ class LLMResponseCache:
     async def get(self, model: str, system: str, messages: list[dict[str, Any]]) -> dict[str, Any] | None:
         """Retrieve a cached LLM response, or None if not cached."""
         try:
-            from src.databases.redis_client import get_redis_client
+            from src.databases.pg_store import get_pg_store
 
-            redis = get_redis_client()
+            store = get_pg_store()
             key = self._make_key(model, system, messages)
-            cached = await redis.cache_get(key)
+            cached = await store.cache_get(key)
             if cached:
                 logger.debug("LLM cache hit for key %s", key[:30])
                 return cached
@@ -116,11 +116,11 @@ class LLMResponseCache:
     ) -> None:
         """Store an LLM response in the cache."""
         try:
-            from src.databases.redis_client import get_redis_client
+            from src.databases.pg_store import get_pg_store
 
-            redis = get_redis_client()
+            store = get_pg_store()
             key = self._make_key(model, system, messages)
-            await redis.cache_set(key, response, ttl=ttl or self._default_ttl)
+            await store.cache_set(key, response, ttl=ttl or self._default_ttl)
         except Exception:
             pass  # Don't fail on cache errors
 

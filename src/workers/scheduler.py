@@ -5,7 +5,6 @@ import logging
 from datetime import UTC, datetime
 
 from src.databases.postgres import get_postgres_client
-from src.databases.redis_client import get_redis_client
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +20,7 @@ class ScheduledTask:
 
 
 class TaskScheduler:
-    """Simple Redis-lock-based task scheduler."""
+    """Simple Postgres-lock-based task scheduler."""
 
     def __init__(self):
         self.tasks: list[ScheduledTask] = []
@@ -52,42 +51,29 @@ class TaskScheduler:
         self._running = False
 
     async def _try_run_task(self, task: ScheduledTask):
-        """Run task if interval has elapsed, using Redis lock to prevent overlap."""
-        redis = get_redis_client()
-        lock_key = f"scheduler:lock:{task.name}"
-        last_run_key = f"scheduler:last_run:{task.name}"
+        """Run task if interval has elapsed, using Postgres lock to prevent overlap."""
+        from src.databases.pg_store import get_pg_store
 
-        # Check if enough time has passed
-        last_run_str = await redis.get(last_run_key)
-        if last_run_str:
-            last_run = datetime.fromisoformat(last_run_str)
-            if (datetime.now(UTC) - last_run).total_seconds() < task.interval_seconds:
+        store = get_pg_store()
+
+        # Ensure the lock row exists (idempotent)
+        last_run = await store.get_scheduler_last_run(task.name)
+        if last_run is not None:
+            elapsed = (datetime.now(UTC) - last_run).total_seconds()
+            if elapsed < task.interval_seconds:
                 return
 
-        # Try to acquire lock
-        acquired = await redis.set(lock_key, "1", ex=task.interval_seconds, nx=True)
+        # Atomic lock acquisition — rowcount=1 means we won
+        acquired = await store.acquire_scheduler_lock(task.name, task.interval_seconds)
         if not acquired:
             return
 
-        idempotency_key = f"scheduler:idempotent:{task.name}:{datetime.now(UTC).strftime('%Y%m%d%H%M')}"
         try:
-            # Check idempotency to prevent double-processing on restart
-            already_ran = await redis.get(idempotency_key)
-            if already_ran:
-                logger.info(
-                    "Task %s already completed in this window (idempotency key exists), skipping",
-                    task.name,
-                )
-                return
-
-            logger.info("Running scheduled task: %s (idempotency=%s)", task.name, idempotency_key)
+            logger.info("Running scheduled task: %s", task.name)
             await task.func()
-            # Mark as completed with TTL matching the task interval
-            await redis.set(idempotency_key, "done", ex=task.interval_seconds)
-            await redis.set(last_run_key, datetime.now(UTC).isoformat())
             logger.info("Task %s completed successfully", task.name)
         finally:
-            await redis.delete(lock_key)
+            await store.release_scheduler_lock(task.name)
 
 
 scheduler = TaskScheduler()
@@ -302,16 +288,24 @@ async def recalculate_trust_scores():
 @scheduler.register("cleanup_stale_conversations", interval_seconds=86400)  # Daily
 async def cleanup_stale_conversations():
     """Clean up conversation data older than 90 days."""
-    get_redis_client()
-    # Redis handles TTL automatically, but we log the cleanup
-    logger.info("Stale conversation cleanup triggered (Redis TTL handles expiry)")
+    from src.databases.pg_store import get_pg_store as _get_store
+
+    store = _get_store()
+    try:
+        # Postgres conversation_messages rows do not have TTL; delete old rows explicitly.
+        await store._pg_execute("DELETE FROM conversation_messages WHERE created_at < NOW() - INTERVAL '90 days'")
+    except Exception as exc:
+        logger.warning("cleanup_stale_conversations: could not delete old rows: %s", exc)
+    logger.info("Stale conversation cleanup triggered (90-day cutoff)")
 
 
 @scheduler.register("generate_daily_analytics", interval_seconds=86400)  # Daily
 async def generate_daily_analytics():
     """Generate and cache daily analytics summary."""
+    from src.databases.pg_store import get_pg_store as _get_store
+
     db = get_postgres_client()
-    redis = get_redis_client()
+    store = _get_store()
 
     try:
         # Count active offers
@@ -331,7 +325,7 @@ async def generate_daily_analytics():
             "generated_at": datetime.now(UTC).isoformat(),
         }
 
-        await redis.set("analytics:daily_summary", str(summary), ex=86400)
+        await store.cache_set("analytics:daily_summary", summary, ttl=86400)
         logger.info("Daily analytics generated: %s", summary)
     except Exception as exc:
         logger.error("Failed to generate daily analytics: %s", exc)

@@ -53,6 +53,14 @@ def mock_redis():
 
 
 @pytest.fixture
+def mock_store():
+    s = AsyncMock()
+    s.get_conversation_context = AsyncMock(return_value=[])
+    s.add_conversation_message = AsyncMock()
+    return s
+
+
+@pytest.fixture
 def mock_settings():
     s = MagicMock()
     s.WHATSAPP_PHONE_ID = "phone123"
@@ -68,7 +76,7 @@ def bot(mock_orchestrator, mock_redis, mock_settings):
             mock_client_cls.return_value = AsyncMock()
             service = WhatsAppBotService(
                 orchestrator=mock_orchestrator,
-                redis_client=mock_redis,
+                store=mock_redis,
             )
     service.http_client = AsyncMock()
     service.http_client.post = AsyncMock(return_value=MagicMock(raise_for_status=MagicMock()))

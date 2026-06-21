@@ -17,8 +17,8 @@ from src.api.middleware.auth import (
     verify_refresh_token,
 )
 from src.config.settings import get_settings
+from src.databases.pg_store import get_pg_store
 from src.databases.postgres import get_postgres_client
-from src.databases.redis_client import get_redis_client
 from src.models.user import (
     SELF_REGISTERABLE_ROLES,
     LoginRequest,
@@ -42,11 +42,11 @@ router = APIRouter(tags=["auth"])
 
 
 async def check_auth_rate_limit(request: Request) -> None:
-    """Enforce IP-based rate limit on auth endpoints (20 req/min). Fails open on Redis errors."""
+    """Enforce IP-based rate limit on auth endpoints (20 req/min). Fails open on DB errors."""
     try:
-        redis = get_redis_client()
+        store = get_pg_store()
         client_ip = request.client.host if request.client else "unknown"
-        allowed = await redis.check_ip_rate_limit(client_ip, limit=20, window=60)
+        allowed = await store.check_ip_rate_limit(client_ip, limit=20, window=60)
         if not allowed:
             raise HTTPException(
                 status_code=429,
@@ -56,7 +56,7 @@ async def check_auth_rate_limit(request: Request) -> None:
     except HTTPException:
         raise
     except Exception:
-        pass  # fail-open: don't block auth when Redis is unavailable
+        pass  # fail-open: don't block auth when DB is unavailable
 
 
 class SignupRequest(BaseModel):
@@ -190,8 +190,8 @@ async def signup(request: SignupRequest, _: None = Depends(check_auth_rate_limit
 
     # Send verification email (if SMTP configured)
     verify_token = str(uuid4())
-    redis = get_redis_client()
-    await redis.set(
+    store = get_pg_store()
+    await store.set(
         f"email_verify:{verify_token}",
         user.id,
         ex=24 * 60 * 60,  # 24 hour expiry
@@ -213,8 +213,7 @@ async def signup(request: SignupRequest, _: None = Depends(check_auth_rate_limit
     )
     refresh_token = create_refresh_token(user_id=user.id)
 
-    redis = get_redis_client()
-    await redis.set(
+    await store.set(
         f"refresh_token:{user.id}",
         refresh_token,
         ex=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
@@ -256,8 +255,8 @@ async def register(request: UserCreate) -> UserResponse:
 
     # Send verification email
     verify_token = str(uuid4())
-    redis = get_redis_client()
-    await redis.set(
+    store = get_pg_store()
+    await store.set(
         f"email_verify:{verify_token}",
         user.id,
         ex=24 * 60 * 60,  # 24 hour expiry
@@ -284,13 +283,13 @@ async def login(
 ) -> TokenResponse:
     """Login and get access token."""
     db = get_postgres_client()
-    redis = get_redis_client()
+    store = get_pg_store()
 
     user = await db.get_user_by_email(form_data.username)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    lock_ttl = await redis.is_temporarily_locked(user.id)
+    lock_ttl = await store.is_temporarily_locked(user.id)
     if lock_ttl > 0:
         raise HTTPException(
             status_code=423,
@@ -302,11 +301,11 @@ async def login(
     hashed = await db.get_user_password_hash(user.id)
     if not hashed or not verify_password(form_data.password, hashed):
         _ip = http_request.client.host if http_request.client else None
-        fail_count = await redis.increment_login_failures(user.id)
+        fail_count = await store.increment_login_failures(user.id)
         security_event.failed_login(user.email, ip=_ip)
         if fail_count >= 5:
             lock_seconds = 900
-            await redis.set_temporary_lockout(user.id, lock_seconds)
+            await store.set_temporary_lockout(user.id, lock_seconds)
             logger.warning("Temporary lockout after failed logins: %s", user.email)
             security_event.account_temporarily_locked(user.email, ip=_ip)
             raise HTTPException(
@@ -334,14 +333,14 @@ async def login(
     )
     refresh_token = create_refresh_token(user_id=user.id)
 
-    # Store refresh token in Redis and clear failure counter
-    await redis.set(
+    # Store refresh token in pg_store and clear failure counter
+    await store.set(
         f"refresh_token:{user.id}",
         refresh_token,
         ex=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
     )
-    await redis.clear_login_failures(user.id)
-    await redis.clear_temporary_lockout(user.id)
+    await store.clear_login_failures(user.id)
+    await store.clear_temporary_lockout(user.id)
 
     # Update last login
     await db.update_user(user.id, {"last_login": datetime.now(UTC)})
@@ -386,7 +385,7 @@ async def login_json(
 ) -> TokenResponse:
     """Login with JSON body (email or phone)."""
     db = get_postgres_client()
-    redis = get_redis_client()
+    store = get_pg_store()
 
     if request.email:
         user = await db.get_user_by_email(request.email)
@@ -400,7 +399,7 @@ async def login_json(
         logger.info("Login 401: user not found for identifier=%s", masked)
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    lock_ttl = await redis.is_temporarily_locked(user.id)
+    lock_ttl = await store.is_temporarily_locked(user.id)
     if lock_ttl > 0:
         raise HTTPException(
             status_code=423,
@@ -411,11 +410,11 @@ async def login_json(
     hashed = await db.get_user_password_hash(user.id)
     if not hashed or not verify_password(request.password, hashed):
         _ip = http_request.client.host if http_request.client else None
-        fail_count = await redis.increment_login_failures(user.id)
+        fail_count = await store.increment_login_failures(user.id)
         security_event.failed_login(user.email, ip=_ip)
         if fail_count >= 5:
             lock_seconds = 900
-            await redis.set_temporary_lockout(user.id, lock_seconds)
+            await store.set_temporary_lockout(user.id, lock_seconds)
             logger.warning("Temporary lockout after failed logins: %s", user.email)
             security_event.account_temporarily_locked(user.email, ip=_ip)
             raise HTTPException(
@@ -442,13 +441,13 @@ async def login_json(
     )
     refresh_token = create_refresh_token(user_id=user.id)
 
-    await redis.set(
+    await store.set(
         f"refresh_token:{user.id}",
         refresh_token,
         ex=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
     )
-    await redis.clear_login_failures(user.id)
-    await redis.clear_temporary_lockout(user.id)
+    await store.clear_login_failures(user.id)
+    await store.clear_temporary_lockout(user.id)
 
     await db.update_user(user.id, {"last_login": datetime.now(UTC)})
 
@@ -499,9 +498,9 @@ async def refresh_token(
     if not user_id or not isinstance(user_id, str):
         raise HTTPException(status_code=401, detail="Invalid refresh token")
 
-    # Verify token in Redis
-    redis = get_redis_client()
-    stored_token = await redis.get(f"refresh_token:{user_id}")
+    # Verify token in pg_store
+    store = get_pg_store()
+    stored_token = await store.get(f"refresh_token:{user_id}")
     if stored_token != token:
         raise HTTPException(status_code=401, detail="Refresh token revoked")
 
@@ -521,7 +520,7 @@ async def refresh_token(
     new_refresh_token = create_refresh_token(user_id=user.id)
 
     # Update stored refresh token
-    await redis.set(
+    await store.set(
         f"refresh_token:{user.id}",
         new_refresh_token,
         ex=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
@@ -561,15 +560,15 @@ async def logout(
 ) -> dict[str, str]:
     """Logout and invalidate tokens.
 
-    Clears refresh_token cookie and adds access-token JTI to Redis denylist
+    Clears refresh_token cookie and adds access-token JTI to pg_store denylist
     so the current bearer token cannot be reused.
     """
-    redis = get_redis_client()
-    await redis.delete(f"refresh_token:{current_user.id}")
+    store = get_pg_store()
+    await store.delete(f"refresh_token:{current_user.id}")
 
     if jti:
         settings = get_settings()
-        await redis.add_token_to_denylist(jti, settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60)
+        await store.add_token_to_denylist(jti, settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60)
 
     response.delete_cookie("refresh_token", path="/")
     response.delete_cookie("access_token", path="/")
@@ -641,9 +640,9 @@ async def change_password(
     new_hashed = hash_password(request.new_password)
     await db.update_user_password(current_user.id, new_hashed)
 
-    # Invalidate all refresh tokens + auth user cache (forces re-fetch of active status)
-    redis = get_redis_client()
-    await redis.delete(f"refresh_token:{current_user.id}")
+    # Invalidate all refresh tokens (forces re-login)
+    store = get_pg_store()
+    await store.delete(f"refresh_token:{current_user.id}")
     from src.api.middleware.auth import invalidate_cached_user
 
     await invalidate_cached_user(current_user.id)
@@ -670,8 +669,8 @@ async def request_password_reset(
     # Create reset token
     reset_token = str(uuid4())
 
-    redis = get_redis_client()
-    await redis.set(
+    store = get_pg_store()
+    await store.set(
         f"password_reset:{reset_token}",
         user.id,
         ex=60 * 60,  # 1 hour expiry
@@ -686,7 +685,7 @@ async def request_password_reset(
             reset_token=reset_token,
         )
     except Exception as exc:
-        await redis.delete(f"password_reset:{reset_token}")
+        await store.delete(f"password_reset:{reset_token}")
         logger.error(
             "password_reset_email_send_failed",
             user_id=user.id,
@@ -708,9 +707,9 @@ async def request_password_reset(
 @router.post("/password/reset/confirm")
 async def confirm_password_reset(request: PasswordResetConfirm) -> dict[str, str]:
     """Confirm password reset with token."""
-    redis = get_redis_client()
+    store = get_pg_store()
 
-    user_id = await redis.get(f"password_reset:{request.token}")
+    user_id = await store.get(f"password_reset:{request.token}")
     if not user_id:
         logger.warning("password_reset_confirm_invalid_token")
         raise HTTPException(status_code=400, detail="Invalid or expired reset token")
@@ -726,10 +725,10 @@ async def confirm_password_reset(request: PasswordResetConfirm) -> dict[str, str
     await db.update_user_password(user.id, new_hashed)
 
     # Delete reset token
-    await redis.delete(f"password_reset:{request.token}")
+    await store.delete(f"password_reset:{request.token}")
 
     # Invalidate all refresh tokens
-    await redis.delete(f"refresh_token:{user.id}")
+    await store.delete(f"refresh_token:{user.id}")
 
     logger.info("Password reset completed for: %s", user.email)
 
@@ -739,15 +738,15 @@ async def confirm_password_reset(request: PasswordResetConfirm) -> dict[str, str
 @router.post("/verify-email/{token}")
 async def verify_email(token: str) -> dict[str, str]:
     """Verify email with token."""
-    redis = get_redis_client()
+    store = get_pg_store()
 
-    user_id = await redis.get(f"email_verify:{token}")
+    user_id = await store.get(f"email_verify:{token}")
     if not user_id:
         raise HTTPException(status_code=400, detail="Invalid or expired verification token")
 
     db = get_postgres_client()
     await db.update_user(user_id, {"is_verified": True})
-    await redis.delete(f"email_verify:{token}")
+    await store.delete(f"email_verify:{token}")
 
     logger.info("Email verified for user: %s", user_id)
 
@@ -771,8 +770,8 @@ async def resend_verification_by_email(
     user = await db.get_user_by_email(request.email)
     if user and not user.is_verified:
         verify_token = str(uuid4())
-        redis = get_redis_client()
-        await redis.set(
+        store = get_pg_store()
+        await store.set(
             f"email_verify:{verify_token}",
             user.id,
             ex=24 * 60 * 60,
@@ -800,8 +799,8 @@ async def resend_verification(
     # Create verification token
     verify_token = str(uuid4())
 
-    redis = get_redis_client()
-    await redis.set(
+    store = get_pg_store()
+    await store.set(
         f"email_verify:{verify_token}",
         current_user.id,
         ex=24 * 60 * 60,  # 24 hour expiry
@@ -833,10 +832,10 @@ async def delete_account(
     refresh-token cookie so the browser session is immediately invalidated.
     """
     db = get_postgres_client()
-    redis = get_redis_client()
+    store = get_pg_store()
 
     # Revoke refresh token first (prevents any concurrent re-auth)
-    await redis.delete(f"refresh_token:{current_user.id}")
+    await store.delete(f"refresh_token:{current_user.id}")
     from src.api.middleware.auth import invalidate_cached_user
 
     await invalidate_cached_user(current_user.id)

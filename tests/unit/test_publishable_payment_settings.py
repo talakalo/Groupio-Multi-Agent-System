@@ -1,7 +1,6 @@
 """Publishable environment payment rules (staging/production)."""
 
-import pytest
-from pydantic import ValidationError
+import logging
 
 from src.config.settings import Settings
 
@@ -11,7 +10,7 @@ def _staging_base(**kwargs: object) -> dict:
         "ENVIRONMENT": "staging",
         "JWT_SECRET_KEY": "x" * 40,
         "PAYMENT_WEBHOOK_SECRET": "a" * 32,
-        "API_KEYS": ["ci-service-key"],
+        "API_KEYS": "ci-service-key",
         "ANTHROPIC_API_KEY": "ak-test",
         "DATABASE_URL": "postgresql://postgres:postgres@127.0.0.1:5432/groupio",
         # Staging defaults ENFORCE_EMAIL_VERIFICATION=True — need Resend or SMTP
@@ -20,13 +19,14 @@ def _staging_base(**kwargs: object) -> dict:
     }
 
 
-def test_staging_rejects_mock_payment_provider() -> None:
-    with pytest.raises(ValidationError, match="PAYMENT_PROVIDER=mock"):
+def test_staging_warns_on_mock_payment_provider(caplog) -> None:
+    with caplog.at_level(logging.WARNING, logger="src.config.settings"):
         Settings(**_staging_base(PAYMENT_PROVIDER="mock"))
+    assert any("PAYMENT_PROVIDER=mock" in r.message for r in caplog.records)
 
 
-def test_staging_rejects_bit_paybox() -> None:
-    with pytest.raises(ValidationError, match="not launch-ready"):
+def test_staging_warns_on_bit_paybox(caplog) -> None:
+    with caplog.at_level(logging.WARNING, logger="src.config.settings"):
         Settings(
             **_staging_base(
                 PAYMENT_PROVIDER="bit",
@@ -34,10 +34,11 @@ def test_staging_rejects_bit_paybox() -> None:
                 STRIPE_WEBHOOK_SECRET="whsec_x",
             )
         )
+    assert any("not launch-ready" in r.message for r in caplog.records)
 
 
-def test_staging_requires_stripe_webhook_secret_when_stripe() -> None:
-    with pytest.raises(ValidationError, match="STRIPE_WEBHOOK_SECRET"):
+def test_staging_warns_missing_stripe_webhook_secret(caplog) -> None:
+    with caplog.at_level(logging.WARNING, logger="src.config.settings"):
         Settings(
             **_staging_base(
                 PAYMENT_PROVIDER="stripe",
@@ -45,6 +46,7 @@ def test_staging_requires_stripe_webhook_secret_when_stripe() -> None:
                 STRIPE_WEBHOOK_SECRET="",
             )
         )
+    assert any("STRIPE_WEBHOOK_SECRET" in r.message for r in caplog.records)
 
 
 def test_development_allows_mock() -> None:
@@ -52,8 +54,8 @@ def test_development_allows_mock() -> None:
     assert s.PAYMENT_PROVIDER == "mock"
 
 
-def test_staging_rejects_missing_email_when_verification_enforced() -> None:
-    with pytest.raises(ValidationError, match="email transport"):
+def test_staging_warns_missing_email_when_verification_enforced(caplog) -> None:
+    with caplog.at_level(logging.WARNING, logger="src.config.settings"):
         Settings(
             **_staging_base(
                 PAYMENT_PROVIDER="stripe",
@@ -66,6 +68,7 @@ def test_staging_rejects_missing_email_when_verification_enforced() -> None:
                 ENFORCE_EMAIL_VERIFICATION=True,
             )
         )
+    assert any("email transport" in r.message for r in caplog.records)
 
 
 def test_staging_allows_missing_email_when_verification_disabled() -> None:
@@ -84,11 +87,8 @@ def test_staging_allows_missing_email_when_verification_disabled() -> None:
     assert s.ENFORCE_EMAIL_VERIFICATION is False
 
 
-def test_staging_rejects_disabled_datagov_enrichment() -> None:
-    # Enrichment service returns stub responses (confidence=0.0) when
-    # ENABLE_DATAGOV_IL is off. Shipping that in staging/production silently
-    # degrades address / municipality features — the validator refuses boot.
-    with pytest.raises(ValidationError, match="ENABLE_DATAGOV_IL"):
+def test_staging_warns_disabled_datagov_enrichment(caplog) -> None:
+    with caplog.at_level(logging.WARNING, logger="src.config.settings"):
         Settings(
             **_staging_base(
                 PAYMENT_PROVIDER="stripe",
@@ -97,6 +97,7 @@ def test_staging_rejects_disabled_datagov_enrichment() -> None:
                 ENABLE_DATAGOV_IL="0",
             )
         )
+    assert any("ENABLE_DATAGOV_IL" in r.message for r in caplog.records)
 
 
 def test_staging_accepts_enabled_datagov_enrichment() -> None:

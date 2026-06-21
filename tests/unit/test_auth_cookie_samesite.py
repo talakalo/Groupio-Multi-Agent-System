@@ -118,7 +118,7 @@ def test_login_json_set_cookie_samesite_matches_environment(env, expected, monke
     redis.clear_login_failures = AsyncMock()
     redis.clear_temporary_lockout = AsyncMock()
     redis.set = AsyncMock()
-    monkeypatch.setattr(auth_route, "get_redis_client", lambda: redis)
+    monkeypatch.setattr(auth_route, "get_pg_store", lambda: redis)
 
     settings_stub = AsyncMock()
     settings_stub.ENVIRONMENT = env

@@ -10,8 +10,8 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from src.api.middleware.auth import get_current_user
 from src.api.routes.websocket import OFFERS_CHANNEL
 from src.config.settings import get_settings
+from src.databases.pg_store import get_pg_store
 from src.databases.postgres import get_postgres_client
-from src.databases.redis_client import get_redis_client
 from src.databases.vector_store import get_vector_store
 from src.domain.contractor_membership import contractor_membership_allows_offer_creation
 from src.messaging.envelope import EventEnvelope
@@ -382,8 +382,8 @@ async def join_offer(
     try:
         updated_offer = await db.get_offer(offer_id)
         if updated_offer:
-            redis = get_redis_client()
-            await redis.publish(
+            store = get_pg_store()
+            await store.publish(
                 OFFERS_CHANNEL,
                 json.dumps(
                     {
@@ -404,8 +404,8 @@ async def join_offer(
 
         async def _mark_converted() -> None:
             try:
-                redis = get_redis_client()
-                inviter_id = await redis.get(f"invite_token:{request.invite_token}")
+                store = get_pg_store()
+                inviter_id = await store.get(f"invite_token:{request.invite_token}")
                 if inviter_id:
                     graph = get_graph_store()
                     await graph.mark_invite_converted(

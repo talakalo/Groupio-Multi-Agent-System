@@ -53,7 +53,8 @@ def mock_settings():
     s.JWT_ALGORITHM = "HS256"
     s.ACCESS_TOKEN_EXPIRE_MINUTES = 30
     s.REFRESH_TOKEN_EXPIRE_DAYS = 7
-    s.API_KEYS = ["valid-key-123"]  # gitleaks:allow
+    s.API_KEYS = "valid-key-123"  # gitleaks:allow
+    s.get_api_keys.return_value = ["valid-key-123"]  # gitleaks:allow
     return s
 
 
@@ -402,7 +403,8 @@ async def test_verify_api_key_invalid(mock_settings):
 async def test_verify_api_key_no_keys_configured(mock_settings):
     from fastapi import HTTPException
 
-    mock_settings.API_KEYS = []
+    mock_settings.API_KEYS = ""
+    mock_settings.get_api_keys.return_value = []
     with patch("src.api.middleware.auth.get_settings", return_value=mock_settings):
         with pytest.raises(HTTPException) as exc:
             await verify_api_key(api_key="any-key")

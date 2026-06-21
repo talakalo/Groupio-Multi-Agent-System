@@ -19,13 +19,13 @@ def scheduler():
 
 
 @pytest.fixture
-def mock_redis():
-    """Mock RedisClient for scheduler lock tests."""
-    r = AsyncMock()
-    r.get = AsyncMock(return_value=None)
-    r.set = AsyncMock(return_value=True)
-    r.delete = AsyncMock()
-    return r
+def mock_store():
+    """Mock PostgresStore for scheduler lock tests."""
+    s = AsyncMock()
+    s.get_scheduler_last_run = AsyncMock(return_value=None)
+    s.acquire_scheduler_lock = AsyncMock(return_value=True)
+    s.release_scheduler_lock = AsyncMock()
+    return s
 
 
 # ------------------------------------------------------------------
@@ -66,47 +66,47 @@ def test_scheduled_task_properties():
 
 
 @pytest.mark.asyncio
-async def test_try_run_task_skips_if_too_recent(scheduler, mock_redis):
-    """If Redis reports a recent last_run, the task is NOT executed."""
-    recent = (datetime.now(UTC) - timedelta(seconds=5)).isoformat()
-    mock_redis.get = AsyncMock(return_value=recent)
+async def test_try_run_task_skips_if_too_recent(scheduler, mock_store):
+    """If Postgres reports a recent last_run, the task is NOT executed."""
+    recent = datetime.now(UTC) - timedelta(seconds=5)
+    mock_store.get_scheduler_last_run = AsyncMock(return_value=recent)
 
     func = AsyncMock()
     task = ScheduledTask("check", interval_seconds=3600, func=func)
 
-    with patch("src.workers.scheduler.get_redis_client", return_value=mock_redis):
+    with patch("src.databases.pg_store.get_pg_store", return_value=mock_store):
         await scheduler._try_run_task(task)
 
     func.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_try_run_task_runs_if_due(scheduler, mock_redis):
+async def test_try_run_task_runs_if_due(scheduler, mock_store):
     """If no last_run recorded and lock acquired, the task function is called."""
-    mock_redis.get = AsyncMock(return_value=None)  # No last_run
-    mock_redis.set = AsyncMock(return_value=True)  # Lock acquired
+    mock_store.get_scheduler_last_run = AsyncMock(return_value=None)  # No last_run
+    mock_store.acquire_scheduler_lock = AsyncMock(return_value=True)  # Lock acquired
 
     func = AsyncMock()
     task = ScheduledTask("check", interval_seconds=3600, func=func)
 
-    with patch("src.workers.scheduler.get_redis_client", return_value=mock_redis):
+    with patch("src.databases.pg_store.get_pg_store", return_value=mock_store):
         await scheduler._try_run_task(task)
 
     func.assert_called_once()
-    # Verify lock was cleaned up
-    mock_redis.delete.assert_called_once()
+    # Verify lock was released in finally block
+    mock_store.release_scheduler_lock.assert_called_once_with("check")
 
 
 @pytest.mark.asyncio
-async def test_try_run_task_skips_if_locked(scheduler, mock_redis):
-    """If another worker holds the lock (set nx=True returns False), skip."""
-    mock_redis.get = AsyncMock(return_value=None)  # No last_run → eligible
-    mock_redis.set = AsyncMock(return_value=False)  # Lock NOT acquired
+async def test_try_run_task_skips_if_locked(scheduler, mock_store):
+    """If another worker holds the lock (acquire returns False), skip."""
+    mock_store.get_scheduler_last_run = AsyncMock(return_value=None)  # No last_run → eligible
+    mock_store.acquire_scheduler_lock = AsyncMock(return_value=False)  # Lock NOT acquired
 
     func = AsyncMock()
     task = ScheduledTask("check", interval_seconds=3600, func=func)
 
-    with patch("src.workers.scheduler.get_redis_client", return_value=mock_redis):
+    with patch("src.databases.pg_store.get_pg_store", return_value=mock_store):
         await scheduler._try_run_task(task)
 
     func.assert_not_called()

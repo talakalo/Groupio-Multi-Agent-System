@@ -1,0 +1,147 @@
+services:
+  - type: web
+    name: groupio-backend
+    runtime: docker
+    dockerfilePath: docker/Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /api/v1/health/live
+    autoDeploy: true
+    envVars:
+      # ── Runtime ────────────────────────────────────────────────────
+      - key: ENVIRONMENT
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      - key: PORT
+        value: "8000"
+
+      # ── Auth ───────────────────────────────────────────────────────
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: JWT_ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "30"
+      - key: REFRESH_TOKEN_EXPIRE_DAYS
+        value: "7"
+      - key: API_KEYS
+        sync: false
+
+      # ── Database (Supabase / PostgreSQL) ───────────────────────────
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: SUPABASE_DB_PASSWORD
+        sync: false
+      - key: USE_LOCAL_POSTGRES
+        value: "0"
+
+      # ── Redis ──────────────────────────────────────────────────────
+      - key: REDIS_URL
+        sync: false
+
+      # ── Vector DB (Qdrant) ─────────────────────────────────────────
+      - key: QDRANT_URL
+        sync: false
+      - key: QDRANT_API_KEY
+        sync: false
+      - key: QDRANT_PREFER_GRPC
+        value: "false"
+      - key: VECTOR_DB_PROVIDER
+        value: qdrant
+
+      # ── Graph DB (Neo4j) ───────────────────────────────────────────
+      - key: NEO4J_URI
+        sync: false
+      - key: NEO4J_USER
+        sync: false
+      - key: NEO4J_PASSWORD
+        sync: false
+
+      # ── LLM ────────────────────────────────────────────────────────
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: PRIMARY_MODEL
+        value: claude-sonnet-4-6
+      - key: EMBEDDING_MODEL
+        value: text-embedding-3-large
+      - key: MAX_TOKENS
+        value: "800"
+      - key: TEMPERATURE
+        value: "0.7"
+
+      # ── Agent tuning ───────────────────────────────────────────────
+      - key: VECTOR_TOP_K
+        value: "10"
+      - key: RERANK_TOP_K
+        value: "5"
+      - key: CHUNK_SIZE
+        value: "512"
+      - key: CHUNK_OVERLAP
+        value: "50"
+      - key: ROUTER_CONFIDENCE_THRESHOLD
+        value: "0.7"
+      - key: HUMAN_ESCALATION_ENABLED
+        value: "true"
+      - key: ENABLE_WEB_SEARCH
+        value: "true"
+      - key: ENABLE_GRAPH_QUERIES
+        value: "true"
+      - key: ENABLE_PREDICTIVE_MODELS
+        value: "false"
+
+      # ── Payments (Stripe) ──────────────────────────────────────────
+      - key: PAYMENT_PROVIDER
+        value: stripe
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_PUBLISHABLE_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: PAYMENT_WEBHOOK_SECRET
+        sync: false
+
+      # ── Email (Resend) ─────────────────────────────────────────────
+      - key: RESEND_API_KEY
+        sync: false
+      - key: SMTP_FROM_EMAIL
+        sync: false
+      - key: SMTP_FROM_NAME
+        value: Groupio
+      - key: FRONTEND_URL
+        sync: false
+
+      # ── WhatsApp ───────────────────────────────────────────────────
+      - key: WHATSAPP_API_TOKEN
+        sync: false
+      - key: WHATSAPP_PHONE_ID
+        sync: false
+      - key: WHATSAPP_WEBHOOK_SECRET
+        sync: false
+
+      # ── CORS ───────────────────────────────────────────────────────
+      - key: CORS_ORIGINS
+        sync: false
+
+      # ── Rate limiting ──────────────────────────────────────────────
+      - key: RATE_LIMIT_PER_USER
+        value: "60"
+      - key: RATE_LIMIT_WINDOW
+        value: "60"
+
+      # ── Message queue (RabbitMQ — optional) ────────────────────────
+      - key: ENABLE_RABBITMQ
+        value: "false"
+      - key: RABBITMQ_URL
+        sync: false
+
+      # ── Observability ──────────────────────────────────────────────
+      - key: SENTRY_DSN
+        sync: false

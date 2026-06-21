@@ -1,7 +1,6 @@
 """Unit tests for AgentWorker."""
 
 import asyncio
-import json
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -60,7 +59,7 @@ class TestProcessTask:
 
 
 # ---------------------------------------------------------------------------
-# AgentWorker.run (main loop)
+# AgentWorker.run (main loop) — now uses asyncio.Queue (not Redis brpop)
 # ---------------------------------------------------------------------------
 
 
@@ -73,49 +72,28 @@ class TestWorkerRun:
         worker.router_agent = AsyncMock()
         worker.router_agent.run = AsyncMock(return_value={"response": "ok"})
 
-        mock_redis = AsyncMock()
         task = {"task_id": "t1", "message": "hello", "user_id": "u1"}
+
+        # Pre-populate the queue with one task
+        await worker._queue.put(task)
+
+        # Stop after one iteration by marking running=False after the first dequeue
+        original_process = worker.process_task
 
         call_count = 0
 
-        async def fake_brpop(queue, timeout):
+        async def fake_process(task_data):
             nonlocal call_count
             call_count += 1
-            if call_count == 1:
-                return ("queue", json.dumps(task))
+            result = await original_process(task_data)
             worker.running = False
-            return None
+            return result
 
-        mock_redis.brpop = fake_brpop
-        mock_redis.setex = AsyncMock()
-        worker.redis_client = mock_redis
+        worker.process_task = fake_process
 
         await worker.run()
 
-        mock_redis.setex.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_run_handles_json_error(self):
-        from src.workers.agent_worker import AgentWorker
-
-        worker = AgentWorker()
-        worker.router_agent = AsyncMock()
-
-        mock_redis = AsyncMock()
-        call_count = 0
-
-        async def fake_brpop(queue, timeout):
-            nonlocal call_count
-            call_count += 1
-            if call_count == 1:
-                return ("queue", "not-valid-json{{{")
-            worker.running = False
-            return None
-
-        mock_redis.brpop = fake_brpop
-        worker.redis_client = mock_redis
-
-        await worker.run()  # should not raise
+        assert call_count == 1
 
     @pytest.mark.asyncio
     async def test_run_handles_general_exception(self):
@@ -124,19 +102,21 @@ class TestWorkerRun:
         worker = AgentWorker()
         worker.router_agent = AsyncMock()
 
-        mock_redis = AsyncMock()
         call_count = 0
 
-        async def fake_brpop(queue, timeout):
+        async def fake_process(task_data):
             nonlocal call_count
             call_count += 1
             if call_count == 1:
-                raise RuntimeError("redis error")
+                raise RuntimeError("process error")
             worker.running = False
-            return None
+            return {"status": "ok"}
 
-        mock_redis.brpop = fake_brpop
-        worker.redis_client = mock_redis
+        worker.process_task = fake_process
+
+        # Put two tasks so we hit the error and then the stop
+        await worker._queue.put({"task_id": "t1", "message": "hello"})
+        await worker._queue.put({"task_id": "t2", "message": "world"})
 
         with patch("asyncio.sleep", new_callable=AsyncMock):
             await worker.run()  # should not raise
@@ -148,29 +128,43 @@ class TestWorkerRun:
         worker = AgentWorker()
         worker.router_agent = AsyncMock()
 
-        mock_redis = AsyncMock()
-
-        async def fake_brpop(queue, timeout):
+        async def fake_process(task_data):
             raise asyncio.CancelledError()
 
-        mock_redis.brpop = fake_brpop
-        worker.redis_client = mock_redis
+        worker.process_task = fake_process
+
+        await worker._queue.put({"task_id": "t1", "message": "hello"})
 
         await worker.run()  # should exit loop cleanly
 
+    @pytest.mark.asyncio
+    async def test_run_timeout_then_stop(self):
+        """Worker exits cleanly when queue is empty and running is set to False."""
+        from src.workers.agent_worker import AgentWorker
+
+        worker = AgentWorker()
+        worker.router_agent = AsyncMock()
+
+        # Stop after the first timeout
+        async def stop_after_timeout(*args, **kwargs):
+            worker.running = False
+            raise TimeoutError()
+
+        with patch("asyncio.wait_for", side_effect=stop_after_timeout):
+            await worker.run()  # should exit cleanly
+
 
 # ---------------------------------------------------------------------------
-# AgentWorker.connect / disconnect
+# AgentWorker.connect / disconnect / enqueue
 # ---------------------------------------------------------------------------
 
 
 class TestConnectDisconnect:
     @pytest.mark.asyncio
-    async def test_disconnect_skips_if_no_redis(self):
+    async def test_disconnect_is_noop(self):
         from src.workers.agent_worker import AgentWorker
 
         worker = AgentWorker()
-        worker.redis_client = None
         await worker.disconnect()  # should not raise
 
     def test_stop_sets_running_false(self):
@@ -180,3 +174,14 @@ class TestConnectDisconnect:
         worker.running = True
         worker.stop()
         assert worker.running is False
+
+    @pytest.mark.asyncio
+    async def test_enqueue_adds_to_queue(self):
+        from src.workers.agent_worker import AgentWorker
+
+        worker = AgentWorker()
+        task = {"task_id": "t1", "message": "hello"}
+        await worker.enqueue(task)
+        assert worker._queue.qsize() == 1
+        retrieved = await worker._queue.get()
+        assert retrieved == task

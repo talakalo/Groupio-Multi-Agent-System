@@ -360,7 +360,7 @@ class TestMedium02UploadRateLimit:
 
         app.dependency_overrides[get_current_user] = lambda: user
         try:
-            with patch("src.api.routes.uploads.get_redis_client", return_value=redis):
+            with patch("src.api.routes.uploads.get_pg_store", return_value=redis):
                 with patch("src.api.routes.uploads.get_postgres_client", return_value=db):
                     with patch("src.api.routes.uploads.get_storage_service") as mock_storage:
                         mock_storage.return_value.validate_file = MagicMock()
@@ -409,7 +409,7 @@ class TestMedium03JtiDenylist:
         app.dependency_overrides[get_current_user] = lambda: user
         app.dependency_overrides[get_token_jti] = lambda: "test-jti-1234"
         try:
-            with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+            with patch("src.api.routes.auth.get_pg_store", return_value=redis):
                 with patch("src.api.routes.auth.get_settings") as ms:
                     ms.return_value.ACCESS_TOKEN_EXPIRE_MINUTES = 30
                     client = TestClient(app, raise_server_exceptions=False)
@@ -433,7 +433,7 @@ class TestMedium03JtiDenylist:
         app.dependency_overrides[get_current_user] = lambda: user
         app.dependency_overrides[get_token_jti] = lambda: None  # no JTI
         try:
-            with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+            with patch("src.api.routes.auth.get_pg_store", return_value=redis):
                 with patch("src.api.routes.auth.get_settings") as ms:
                     ms.return_value.ACCESS_TOKEN_EXPIRE_MINUTES = 30
                     client = TestClient(app, raise_server_exceptions=False)
@@ -466,7 +466,7 @@ class TestMedium04AtomicRefreshTokenSwap:
         app.dependency_overrides.clear()
         try:
             with patch("src.api.routes.auth.get_postgres_client", return_value=db):
-                with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+                with patch("src.api.routes.auth.get_pg_store", return_value=redis):
                     with patch(
                         "src.api.routes.auth.verify_refresh_token",
                         return_value={"sub": "user-1", "type": "refresh"},
@@ -494,7 +494,7 @@ class TestMedium04AtomicRefreshTokenSwap:
         app.dependency_overrides.clear()
         try:
             with patch("src.api.routes.auth.get_postgres_client", return_value=db):
-                with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+                with patch("src.api.routes.auth.get_pg_store", return_value=redis):
                     with patch(
                         "src.api.routes.auth.verify_refresh_token",
                         return_value={"sub": "user-1", "type": "refresh"},
@@ -566,7 +566,8 @@ class TestLow01TimingSafeApiKey:
         from src.api.main import app
 
         with patch("src.api.middleware.auth.get_settings") as ms:
-            ms.return_value.API_KEYS = ["valid-key-abc"]
+            ms.return_value.API_KEYS = "valid-key-abc"
+            ms.return_value.get_api_keys.return_value = ["valid-key-abc"]
             client = TestClient(app, raise_server_exceptions=False)
             resp = client.get("/api/v1/health/db", headers={"X-API-Key": "valid-key-abc"})
         # 200 or 500 (no real DB) — not 401/403
@@ -576,7 +577,8 @@ class TestLow01TimingSafeApiKey:
         from src.api.main import app
 
         with patch("src.api.middleware.auth.get_settings") as ms:
-            ms.return_value.API_KEYS = ["valid-key-abc"]
+            ms.return_value.API_KEYS = "valid-key-abc"
+            ms.return_value.get_api_keys.return_value = ["valid-key-abc"]
             client = TestClient(app, raise_server_exceptions=False)
             resp = client.get("/api/v1/health/db", headers={"X-API-Key": "wrong-key"})
         assert resp.status_code in (401, 403)
@@ -597,7 +599,7 @@ class TestLow01TimingSafeApiKey:
 
 
 class TestLow02TemporaryBruteForce:
-    """After 5 failed login attempts the account is locked via Redis (not DB)."""
+    """After 5 failed login attempts the account is locked via pg_store (not DB is_active=False)."""
 
     def test_fifth_failure_sets_redis_lockout_not_db(self):
         user = _make_user()
@@ -619,7 +621,7 @@ class TestLow02TemporaryBruteForce:
         app.dependency_overrides.clear()
         try:
             with patch("src.api.routes.auth.get_postgres_client", return_value=db):
-                with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+                with patch("src.api.routes.auth.get_pg_store", return_value=redis):
                     with patch("src.api.routes.auth.verify_password", return_value=False):
                         client = TestClient(app, raise_server_exceptions=False)
                         resp = client.post(
@@ -654,7 +656,7 @@ class TestLow02TemporaryBruteForce:
         app.dependency_overrides.clear()
         try:
             with patch("src.api.routes.auth.get_postgres_client", return_value=db):
-                with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+                with patch("src.api.routes.auth.get_pg_store", return_value=redis):
                     client = TestClient(app, raise_server_exceptions=False)
                     resp = client.post(
                         "/api/v1/auth/login/json",
@@ -678,7 +680,8 @@ class TestLow03HealthDbProtected:
         from src.api.main import app
 
         with patch("src.api.middleware.auth.get_settings") as ms:
-            ms.return_value.API_KEYS = ["some-key"]
+            ms.return_value.API_KEYS = "some-key"
+            ms.return_value.get_api_keys.return_value = ["some-key"]
             client = TestClient(app, raise_server_exceptions=False)
             resp = client.get("/api/v1/health/db")
         assert resp.status_code in (401, 403)
@@ -687,7 +690,8 @@ class TestLow03HealthDbProtected:
         from src.api.main import app
 
         with patch("src.api.middleware.auth.get_settings") as ms:
-            ms.return_value.API_KEYS = ["test-api-key-1"]  # gitleaks:allow
+            ms.return_value.API_KEYS = "test-api-key-1"  # gitleaks:allow
+            ms.return_value.get_api_keys.return_value = ["test-api-key-1"]  # gitleaks:allow
             client = TestClient(app, raise_server_exceptions=False)
             resp = client.get("/api/v1/health/db", headers={"X-API-Key": "test-api-key-1"})  # gitleaks:allow
         # DB may not be available but auth should pass (not 401/403)

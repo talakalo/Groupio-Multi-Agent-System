@@ -1,6 +1,6 @@
-"""Reusable Redis-backed TTL cache decorator for async functions.
+"""Reusable PostgresStore-backed TTL cache decorator for async functions.
 
-Built on top of :class:`src.databases.redis_client.RedisClient` so it shares
+Built on top of :class:`src.databases.pg_store.PostgresStore` so it shares
 the same connection pool, JSON serialisation, and graceful-degradation
 semantics as :class:`src.agents.base.LLMResponseCache`.
 
@@ -66,16 +66,16 @@ def cached(
     def decorator(func: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
         @wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> T:
-            from src.databases.redis_client import get_redis_client
+            from src.databases.pg_store import get_pg_store
 
             cache_key: str | None = None
-            redis = None
+            store = None
             try:
                 raw = key_fn(*args, **kwargs) if key_fn else _default_raw_key(args, kwargs)
                 digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()
                 cache_key = f"{prefix}:{digest}"
-                redis = get_redis_client()
-                hit = await redis.cache_get(cache_key)
+                store = get_pg_store()
+                hit = await store.cache_get(cache_key)
                 if hit is not None:
                     logger.debug("cache HIT %s", cache_key[:40])
                     return hit  # type: ignore[return-value]
@@ -85,9 +85,9 @@ def cached(
 
             result = await func(*args, **kwargs)
 
-            if cache_key is not None and redis is not None and result is not None:
+            if cache_key is not None and store is not None and result is not None:
                 try:
-                    await redis.cache_set(cache_key, result, ttl=ttl)
+                    await store.cache_set(cache_key, result, ttl=ttl)
                 except Exception as exc:
                     logger.debug("cache store bypassed for %s: %s", prefix, exc)
 

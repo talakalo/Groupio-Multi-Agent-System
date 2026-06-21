@@ -116,7 +116,7 @@ class TestRecordInviteEndpoint:
     def test_returns_invite_token_and_link(self, client, resident):
         with (
             patch("src.api.routes.graph_features.get_graph_store") as mock_graph,
-            patch("src.api.routes.graph_features.get_redis_client") as mock_redis,
+            patch("src.api.routes.graph_features.get_pg_store") as mock_redis,
         ):
             mock_db = AsyncMock()
             invitee = MagicMock()

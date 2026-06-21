@@ -102,7 +102,7 @@ class TestEmailVerificationGate:
             patch("src.api.middleware.auth.verify_access_token", return_value=mock_payload),
             patch("src.api.middleware.auth.get_settings", return_value=_build_mock_settings(True)),
             patch(
-                "src.databases.redis_client.get_redis_client",
+                "src.databases.pg_store.get_pg_store",
                 return_value=_build_mock_redis(denylisted=False),
             ),
             patch(
@@ -127,7 +127,7 @@ class TestEmailVerificationGate:
             patch("src.api.middleware.auth.verify_access_token", return_value=mock_payload),
             patch("src.api.middleware.auth.get_settings", return_value=_build_mock_settings(True)),
             patch(
-                "src.databases.redis_client.get_redis_client",
+                "src.databases.pg_store.get_pg_store",
                 return_value=_build_mock_redis(denylisted=False),
             ),
             patch(
@@ -150,7 +150,7 @@ class TestEmailVerificationGate:
             patch("src.api.middleware.auth.verify_access_token", return_value=mock_payload),
             patch("src.api.middleware.auth.get_settings", return_value=_build_mock_settings(False)),
             patch(
-                "src.databases.redis_client.get_redis_client",
+                "src.databases.pg_store.get_pg_store",
                 return_value=_build_mock_redis(denylisted=False),
             ),
             patch(
@@ -176,7 +176,7 @@ class TestEmailVerificationGate:
             patch("src.api.middleware.auth.verify_access_token", return_value=mock_payload),
             patch("src.api.middleware.auth.get_settings", return_value=_build_mock_settings(True)),
             patch(
-                "src.databases.redis_client.get_redis_client",
+                "src.databases.pg_store.get_pg_store",
                 return_value=_build_mock_redis(denylisted=False),
             ),
             patch(
@@ -203,7 +203,7 @@ class TestEmailVerificationGate:
             patch("src.api.middleware.auth.verify_access_token", return_value=mock_payload),
             patch("src.api.middleware.auth.get_settings", return_value=_build_mock_settings(True)),
             patch(
-                "src.databases.redis_client.get_redis_client",
+                "src.databases.pg_store.get_pg_store",
                 return_value=_build_mock_redis(denylisted=True),
             ),
             patch(

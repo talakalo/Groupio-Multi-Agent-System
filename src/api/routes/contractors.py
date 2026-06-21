@@ -10,8 +10,8 @@ from pydantic import BaseModel, Field
 from src.api.middleware.auth import get_current_user, get_current_user_optional, is_admin
 from src.config.settings import Settings, get_settings
 from src.databases.graph_store import get_graph_store
+from src.databases.pg_store import get_pg_store
 from src.databases.postgres import get_postgres_client
-from src.databases.redis_client import get_redis_client
 from src.databases.vector_store import get_vector_store
 from src.domain.contractor_membership import (
     contractor_may_view_contractor_profile,
@@ -225,8 +225,8 @@ async def get_my_doc_requests(
     if not current_user.contractor_id:
         return {"items": [], "pending": False}
 
-    redis = get_redis_client()
-    raw = await redis.get(f"doc_request:{current_user.contractor_id}")
+    store = get_pg_store()
+    raw = await store.get(f"doc_request:{current_user.contractor_id}")
     if not raw:
         return {"items": [], "pending": False}
 

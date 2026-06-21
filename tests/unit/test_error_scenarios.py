@@ -189,7 +189,7 @@ class TestSchemaNotReady:
         )
 
         with patch("src.api.routes.auth.get_postgres_client", return_value=db):
-            with patch("src.api.routes.auth.get_redis_client"):
+            with patch("src.api.routes.auth.get_pg_store"):
                 from fastapi.testclient import TestClient
 
                 client = TestClient(app, raise_server_exceptions=False)
@@ -209,21 +209,22 @@ class TestRateLimiting:
     async def test_rate_limit_boundary(self):
         """Exactly at the limit should still allow, one over should block.
 
-        The implementation uses an atomic Lua script (INCR + EXPIRE) that returns
-        the post-increment count. count <= limit means allowed; count > limit means blocked.
+        PostgresStore.check_rate_limit returns True if request is allowed, False if blocked.
+        We mock the underlying _pg_fetchval to simulate the count returned from Postgres.
         """
-        from src.databases.redis_client import RedisClient
+        from unittest.mock import patch
 
-        client = RedisClient.__new__(RedisClient)
-        mock_redis = AsyncMock()
-        client._redis = mock_redis
+        from src.databases.pg_store import PostgresStore
 
-        # Simulate: counter was at 59, after INCR = 60. 60 <= 60 → allowed
-        mock_redis.eval = AsyncMock(return_value=60)
-        allowed = await client.check_rate_limit("user1", limit=60, window=60)
+        store = PostgresStore.__new__(PostgresStore)
+        store._use_supabase = False
+
+        # Simulate: counter at 60. 60 <= 60 → allowed
+        with patch.object(PostgresStore, "_pg_fetchval", return_value=60):
+            allowed = await store.check_rate_limit("user1", limit=60, window=60)
         assert allowed is True
 
-        # Simulate: counter was at 60, after INCR = 61. 61 <= 60 → blocked
-        mock_redis.eval = AsyncMock(return_value=61)
-        allowed = await client.check_rate_limit("user1", limit=60, window=60)
+        # Simulate: counter at 61. 61 > 60 → blocked
+        with patch.object(PostgresStore, "_pg_fetchval", return_value=61):
+            allowed = await store.check_rate_limit("user1", limit=60, window=60)
         assert allowed is False

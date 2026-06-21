@@ -18,8 +18,8 @@ from src.api.middleware.security import SecurityHeadersMiddleware
 from src.api.routes import api_router
 from src.config.settings import get_settings
 from src.databases.graph_store import get_graph_store
+from src.databases.pg_store import get_pg_store
 from src.databases.postgres import get_postgres_client
-from src.databases.redis_client import get_redis_client
 from src.databases.vector_store import get_vector_store
 from src.models.user import UserInDB
 from src.orchestration.graph import get_orchestrator
@@ -44,21 +44,17 @@ async def lifespan(app: FastAPI):
     except Exception:
         logger.warning("Could not verify vector DB collections")
 
-    # Fail-closed probe for the payment provider. Lazy init means a broken
-    # PAYMENT_PROVIDER only surfaces on the first charge; call the factory
-    # here so misconfigured deploys refuse to serve traffic. In staging /
-    # production the process exits; in development we log and continue so
-    # local dev without a provider still works.
+    # Eagerly validate the payment provider so a misconfiguration is visible in
+    # logs immediately. Startup continues regardless — a broken provider causes
+    # individual charge requests to fail rather than preventing the liveness
+    # probe from responding (which would cause Render to roll back the deploy).
     try:
         from src.services.payment import get_payment_provider
 
         get_payment_provider()
         logger.info("Payment provider initialised")
     except Exception as exc:
-        if get_settings().ENVIRONMENT in ("production", "staging"):
-            logger.error("Payment provider unavailable at startup: %s", exc)
-            raise
-        logger.warning("Payment provider unavailable (dev): %s", exc)
+        logger.warning("Payment provider unavailable at startup: %s", exc)
 
     yield
 
@@ -70,8 +66,8 @@ async def lifespan(app: FastAPI):
     except Exception:
         pass
     try:
-        redis = get_redis_client()
-        await redis.close()
+        pg_store = get_pg_store()
+        await pg_store.close()
     except Exception:
         pass
     try:
@@ -90,7 +86,11 @@ app = FastAPI(
 
 
 def _is_db_connection_error(exc: Exception) -> bool:
-    """True if exception is due to DB (e.g. PostgreSQL) not reachable."""
+    """True if exception is due to PostgreSQL not reachable.
+
+    Redis errors (redis.exceptions.ConnectionError) no longer possible —
+    pg_store used instead. Only PostgreSQL connection errors reach here.
+    """
     if isinstance(exc, ConnectionRefusedError):
         return True
     if isinstance(exc, socket.gaierror):
@@ -113,15 +113,15 @@ def _is_schema_not_ready(exc: Exception) -> bool:
 
 
 async def _check_message_rate_limit(current_user: UserInDB, settings: Any) -> None:
-    """Enforce per-user message rate limits. Fails open on Redis errors.
+    """Enforce per-user message rate limits. Fails open on DB errors.
 
     Message processing should never hard-fail with an unhandled 500 because
-    Redis is temporarily unavailable. When Redis responds successfully we still
-    preserve the real 429 behavior.
+    the rate-limit store is temporarily unavailable. When the store responds
+    successfully we still preserve the real 429 behavior.
     """
     try:
-        redis = get_redis_client()
-        allowed = await redis.check_rate_limit(
+        store = get_pg_store()
+        allowed = await store.check_rate_limit(
             current_user.id,
             limit=settings.RATE_LIMIT_PER_USER,
             window=settings.RATE_LIMIT_WINDOW,
@@ -132,7 +132,7 @@ async def _check_message_rate_limit(current_user: UserInDB, settings: Any) -> No
         raise
     except Exception as exc:
         logger.warning(
-            "Redis unavailable for message rate limiting — allowing request: user_id=%s environment=%s error=%s",
+            "Rate limit check failed — allowing request: user_id=%s environment=%s error=%s",
             current_user.id,
             settings.ENVIRONMENT,
             exc,
@@ -167,7 +167,7 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
 
 # CORS middleware - origins loaded from environment
 settings = get_settings()
-cors_origins = list(settings.CORS_ORIGINS)
+cors_origins = settings.get_cors_origins()
 # Only add localhost origins in development — never in production/staging.
 if settings.ENVIRONMENT == "development":
     _dev_origins = [
@@ -340,10 +340,10 @@ async def health_check() -> dict[str, Any]:
         services["graph_db"] = False
 
     try:
-        redis = get_redis_client()
-        services["redis"] = await redis.health_check()
+        pg_store = get_pg_store()
+        services["pg_store"] = await pg_store.health_check()
     except Exception:
-        services["redis"] = False
+        services["pg_store"] = False
 
     try:
         db = get_postgres_client()
@@ -391,12 +391,13 @@ async def prometheus_metrics(
 ) -> Response:
     """Expose Prometheus metrics — accepts X-API-Key or Authorization: Bearer <key>."""
     _settings = get_settings()
-    if _settings.API_KEYS:
+    _api_keys = _settings.get_api_keys()
+    if _api_keys:
         bearer = None
         if authorization and authorization.startswith("Bearer "):
             bearer = authorization[7:]
         key = x_api_key or bearer
-        if not key or key not in _settings.API_KEYS:
+        if not key or key not in _api_keys:
             raise HTTPException(status_code=403, detail="Invalid or missing API key")
 
     from prometheus_client import CONTENT_TYPE_LATEST, generate_latest

@@ -7,8 +7,8 @@ from uuid import uuid4
 from src.agents.base import AgentConfig, BaseAgent
 from src.config.prompts.support import SUPPORT_SYSTEM_PROMPT
 from src.config.settings import get_settings
+from src.databases.pg_store import get_pg_store
 from src.databases.postgres import get_postgres_client
-from src.databases.redis_client import get_redis_client
 from src.models.agent_state import AgentState
 from src.utils.hebrew_utils import detect_language, detect_legal_keywords
 from src.utils.monitoring import track_agent_execution, track_escalation
@@ -51,15 +51,15 @@ class ConversationMemory:
     """Manage short-term and long-term conversation context."""
 
     def __init__(self) -> None:
-        self._redis = get_redis_client()
+        self._store = get_pg_store()
 
     async def get_context(self, user_id: str) -> list[dict]:
         """Get recent conversation history."""
-        return await self._redis.get_conversation_context(user_id)
+        return await self._store.get_conversation_context(user_id)
 
     async def add_message(self, user_id: str, message: dict) -> None:
         """Add message to conversation history."""
-        await self._redis.add_conversation_message(user_id, message)
+        await self._store.add_conversation_message(user_id, message)
 
 
 class SupportAgent(BaseAgent):

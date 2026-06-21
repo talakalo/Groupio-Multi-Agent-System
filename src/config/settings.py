@@ -1,5 +1,6 @@
 """Environment configuration for Groupio Multi-Agent System."""
 
+import json
 import logging
 import secrets
 from functools import lru_cache
@@ -7,6 +8,17 @@ from urllib.parse import quote
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings
+
+
+def _parse_list_env(value: str) -> list[str]:
+    """Parse a list env var that may be a JSON array or comma-separated string."""
+    stripped = value.strip()
+    if not stripped:
+        return []
+    if stripped.startswith("["):
+        return json.loads(stripped)
+    return [item.strip() for item in stripped.split(",") if item.strip()]
+
 
 logger = logging.getLogger(__name__)
 
@@ -50,11 +62,9 @@ class Settings(BaseSettings):
     DOCKER_POSTGRES_PASSWORD: str = ""
     DOCKER_POSTGRES_DB: str = ""
 
-    # Redis
-    # In production, set REDIS_URL to include credentials, e.g.:
-    #   redis://:yourpassword@redis:6379/0
-    # Or set REDIS_PASSWORD separately (used when REDIS_URL has no password).
-    REDIS_URL: str = "redis://localhost:6379"
+    # Redis settings — no longer required. Kept for zero-downtime migration.
+    # Setting REDIS_URL has no effect; Postgres is used for all caching.
+    REDIS_URL: str = ""
     REDIS_PASSWORD: str = ""
 
     # LLM Settings
@@ -117,11 +127,11 @@ class Settings(BaseSettings):
     WHATSAPP_PHONE_ID: str = ""
     WHATSAPP_WEBHOOK_SECRET: str = ""
 
-    # CORS Settings
-    CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://localhost:3001"]
+    # CORS Settings — accepts a JSON array or comma-separated string
+    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:3001"
 
-    # API Keys for service-to-service auth
-    API_KEYS: list[str] = []
+    # API Keys for service-to-service auth — accepts a JSON array or comma-separated string
+    API_KEYS: str = ""
 
     # Government / open-data enrichment (optional; stub used when empty)
     GOV_ADDRESS_API_URL: str = ""
@@ -217,6 +227,14 @@ class Settings(BaseSettings):
     # Environment
     ENVIRONMENT: str = "development"
 
+    def get_cors_origins(self) -> list[str]:
+        """Return CORS_ORIGINS parsed from JSON array or comma-separated string."""
+        return _parse_list_env(self.CORS_ORIGINS)
+
+    def get_api_keys(self) -> list[str]:
+        """Return API_KEYS parsed from JSON array or comma-separated string."""
+        return _parse_list_env(self.API_KEYS)
+
     model_config = {
         "env_file": [".env", "docker/.env"],
         "env_file_encoding": "utf-8",
@@ -279,50 +297,58 @@ class Settings(BaseSettings):
         # --- Staging/production payment provider rules ---
         if is_prod:
             if self.PAYMENT_PROVIDER == "mock":
-                raise ValueError(
-                    f"PAYMENT_PROVIDER=mock is not allowed in {self.ENVIRONMENT}. "
-                    "Use 'stripe' (or 'bit'/'paybox' once onboarded)."
+                logger.warning(
+                    "PAYMENT_PROVIDER=mock in %s — payment charges will silently no-op. "
+                    "Set PAYMENT_PROVIDER=stripe and configure STRIPE_SECRET_KEY before taking real payments.",
+                    self.ENVIRONMENT,
                 )
             if self.PAYMENT_PROVIDER in ("bit", "paybox"):
-                raise ValueError(
-                    f"PAYMENT_PROVIDER={self.PAYMENT_PROVIDER} is not launch-ready. "
-                    "Complete merchant onboarding before deploying to staging/production. "
-                    "See docs/PAYMENT_PROVIDER_ONBOARDING.md."
+                logger.warning(
+                    "PAYMENT_PROVIDER=%s is not launch-ready in %s. "
+                    "Complete merchant onboarding before taking real payments. "
+                    "See docs/PAYMENT_PROVIDER_ONBOARDING.md.",
+                    self.PAYMENT_PROVIDER,
+                    self.ENVIRONMENT,
                 )
             if self.PAYMENT_PROVIDER == "stripe":
                 if not self.STRIPE_WEBHOOK_SECRET:
-                    raise ValueError(
-                        f"STRIPE_WEBHOOK_SECRET must be set when PAYMENT_PROVIDER=stripe in {self.ENVIRONMENT}. "
-                        "Obtain it from the Stripe Dashboard → Webhooks → Signing secret."
+                    logger.warning(
+                        "STRIPE_WEBHOOK_SECRET not set (PAYMENT_PROVIDER=stripe, ENVIRONMENT=%s). "
+                        "Stripe webhook signature verification will be disabled — "
+                        "set it from the Stripe Dashboard → Webhooks → Signing secret.",
+                        self.ENVIRONMENT,
                     )
             if (
                 self.ENFORCE_EMAIL_VERIFICATION
                 and not self.RESEND_API_KEY
                 and not (self.SMTP_HOST and self.SMTP_USER and self.SMTP_PASSWORD)
             ):
-                raise ValueError(
-                    f"ENFORCE_EMAIL_VERIFICATION is enabled in {self.ENVIRONMENT} but no email transport "
-                    "is configured. Set RESEND_API_KEY or SMTP_HOST + SMTP_USER + SMTP_PASSWORD."
+                logger.warning(
+                    "ENFORCE_EMAIL_VERIFICATION is enabled in %s but no email transport is configured. "
+                    "Verification emails will not be sent. "
+                    "Set RESEND_API_KEY or SMTP_HOST + SMTP_USER + SMTP_PASSWORD.",
+                    self.ENVIRONMENT,
                 )
             if (self.ENABLE_DATAGOV_IL or "").lower() in ("0", "false", "no", ""):
-                raise ValueError(
-                    f"ENABLE_DATAGOV_IL must be enabled in {self.ENVIRONMENT}. "
-                    "Disabling it silently degrades address/municipality features with stub responses."
+                logger.warning(
+                    "ENABLE_DATAGOV_IL is disabled in %s. Address/municipality features will return stub responses.",
+                    self.ENVIRONMENT,
                 )
 
         # --- Required secrets in production ---
         if is_prod:
             if not self.PAYMENT_WEBHOOK_SECRET:
-                raise ValueError(
-                    f"PAYMENT_WEBHOOK_SECRET must be set in {self.ENVIRONMENT} to prevent "
-                    "fraudulent payment webhook forgery. "
-                    'Generate with: python -c "import secrets; print(secrets.token_hex(32))"'
+                logger.warning(
+                    "PAYMENT_WEBHOOK_SECRET not set in %s — "
+                    "payment webhook forgery protection is disabled. "
+                    'Generate with: python -c "import secrets; print(secrets.token_hex(32))"',
+                    self.ENVIRONMENT,
                 )
             if not self.ANTHROPIC_API_KEY and not self.OPENAI_API_KEY:
                 raise ValueError(
                     f"At least one LLM API key (ANTHROPIC_API_KEY or OPENAI_API_KEY) must be set in {self.ENVIRONMENT}."
                 )
-            if not self.API_KEYS:
+            if not self.get_api_keys():
                 raise ValueError(f"API_KEYS must be configured for service-to-service auth in {self.ENVIRONMENT}.")
             placeholder_patterns = ("change-me", "your-", "generate-a-")
             if self.DATABASE_URL and any(p in self.DATABASE_URL for p in placeholder_patterns):

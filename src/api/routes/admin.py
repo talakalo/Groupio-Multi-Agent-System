@@ -13,8 +13,8 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, EmailStr, model_validator
 
 from src.api.middleware.auth import hash_password, require_admin_only
+from src.databases.pg_store import get_pg_store
 from src.databases.postgres import get_postgres_client
-from src.databases.redis_client import get_redis_client
 from src.databases.vector_store import get_vector_store
 from src.models.contractor import ContractorMembershipAdminUpdate
 from src.models.user import UserInDB
@@ -890,10 +890,10 @@ async def suspend_user(
             "ip_address": request.client.host if request.client else None,
         }
     )
-    from src.databases.redis_client import get_redis_client as _get_redis
+    from src.databases.pg_store import get_pg_store as _get_store
 
-    redis = _get_redis()
-    await redis.delete(f"refresh_token:{user_id}")
+    store = _get_store()
+    await store.delete(f"refresh_token:{user_id}")
     logger.info("Admin %s suspended user %s", admin.id, user_id)
     return {"status": "suspended", "user_id": user_id}
 
@@ -1358,7 +1358,7 @@ async def request_contractor_docs(
     if not contractor:
         raise HTTPException(status_code=404, detail="Contractor not found")
 
-    redis = get_redis_client()
+    store = get_pg_store()
     default_msg = "Please upload additional documents to complete your verification."
     payload = {
         "requested_at": datetime.now(UTC).isoformat(),
@@ -1366,7 +1366,7 @@ async def request_contractor_docs(
         "requested_by_email": admin.email,
         "message": (body.message if body else "") or default_msg,
     }
-    await redis.set(
+    await store.set(
         f"doc_request:{contractor_id}",
         json.dumps(payload),
         ex=30 * 24 * 60 * 60,  # 30 days

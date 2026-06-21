@@ -71,7 +71,7 @@ class TestSignup:
         app.dependency_overrides.clear()
         try:
             with patch("src.api.routes.auth.get_postgres_client", return_value=db):
-                with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+                with patch("src.api.routes.auth.get_pg_store", return_value=redis):
                     with patch("src.api.routes.auth.hash_password", return_value="hashed"):
                         with patch(
                             "src.api.routes.auth.create_access_token",
@@ -109,7 +109,7 @@ class TestSignup:
         app.dependency_overrides.clear()
         try:
             with patch("src.api.routes.auth.get_postgres_client", return_value=db):
-                with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+                with patch("src.api.routes.auth.get_pg_store", return_value=redis):
                     client = TestClient(app, raise_server_exceptions=False)
                     resp = client.post(
                         "/api/v1/auth/signup",
@@ -137,7 +137,7 @@ class TestSignup:
         app.dependency_overrides.clear()
         try:
             with patch("src.api.routes.auth.get_postgres_client", return_value=db):
-                with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+                with patch("src.api.routes.auth.get_pg_store", return_value=redis):
                     client = TestClient(app, raise_server_exceptions=False)
                     resp = client.post(
                         "/api/v1/auth/signup",
@@ -160,7 +160,7 @@ class TestSignup:
 
         app.dependency_overrides.clear()
         try:
-            with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+            with patch("src.api.routes.auth.get_pg_store", return_value=redis):
                 client = TestClient(app, raise_server_exceptions=False)
                 resp = client.post(
                     "/api/v1/auth/signup",
@@ -200,7 +200,7 @@ class TestRegister:
         app.dependency_overrides.clear()
         try:
             with patch("src.api.routes.auth.get_postgres_client", return_value=db):
-                with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+                with patch("src.api.routes.auth.get_pg_store", return_value=redis):
                     with patch("src.api.routes.auth.get_email_service", return_value=email_svc):
                         with patch("src.api.routes.auth.hash_password", return_value="hashed"):
                             client = TestClient(app, raise_server_exceptions=False)
@@ -292,7 +292,7 @@ class TestLoginJson:
         app.dependency_overrides.clear()
         try:
             with patch("src.api.routes.auth.get_postgres_client", return_value=db):
-                with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+                with patch("src.api.routes.auth.get_pg_store", return_value=redis):
                     with patch("src.api.routes.auth.verify_password", return_value=True):
                         with patch(
                             "src.api.routes.auth.create_access_token",
@@ -327,7 +327,7 @@ class TestLoginJson:
         app.dependency_overrides.clear()
         try:
             with patch("src.api.routes.auth.get_postgres_client", return_value=db):
-                with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+                with patch("src.api.routes.auth.get_pg_store", return_value=redis):
                     client = TestClient(app, raise_server_exceptions=False)
                     resp = client.post(
                         "/api/v1/auth/login/json",
@@ -354,7 +354,7 @@ class TestLoginJson:
         app.dependency_overrides.clear()
         try:
             with patch("src.api.routes.auth.get_postgres_client", return_value=db):
-                with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+                with patch("src.api.routes.auth.get_pg_store", return_value=redis):
                     with patch("src.api.routes.auth.verify_password", return_value=False):
                         client = TestClient(app, raise_server_exceptions=False)
                         resp = client.post(
@@ -383,7 +383,7 @@ class TestLoginJson:
         app.dependency_overrides.clear()
         try:
             with patch("src.api.routes.auth.get_postgres_client", return_value=db):
-                with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+                with patch("src.api.routes.auth.get_pg_store", return_value=redis):
                     with patch("src.api.routes.auth.verify_password", return_value=False):
                         client = TestClient(app, raise_server_exceptions=False)
                         resp = client.post(
@@ -409,7 +409,7 @@ class TestLoginJson:
         app.dependency_overrides.clear()
         try:
             with patch("src.api.routes.auth.get_postgres_client", return_value=db):
-                with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+                with patch("src.api.routes.auth.get_pg_store", return_value=redis):
                     with patch("src.api.routes.auth.verify_password", return_value=True):
                         client = TestClient(app, raise_server_exceptions=False)
                         resp = client.post(
@@ -442,7 +442,7 @@ class TestLoginJson:
         app.dependency_overrides.clear()
         try:
             with patch("src.api.routes.auth.get_postgres_client", return_value=db):
-                with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+                with patch("src.api.routes.auth.get_pg_store", return_value=redis):
                     with patch("src.api.routes.auth.verify_password", return_value=True):
                         with patch("src.api.routes.auth.get_settings", return_value=mock_settings):
                             client = TestClient(app, raise_server_exceptions=False)
@@ -474,7 +474,7 @@ class TestLoginJson:
         app.dependency_overrides.clear()
         try:
             with patch("src.api.routes.auth.get_postgres_client", return_value=db):
-                with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+                with patch("src.api.routes.auth.get_pg_store", return_value=redis):
                     with patch("src.api.routes.auth.verify_password", return_value=True):
                         with patch(
                             "src.api.routes.auth.create_access_token",
@@ -514,7 +514,7 @@ class TestRefreshToken:
         app.dependency_overrides.clear()
         try:
             with patch("src.api.routes.auth.get_postgres_client", return_value=db):
-                with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+                with patch("src.api.routes.auth.get_pg_store", return_value=redis):
                     with patch(
                         "src.api.routes.auth.verify_refresh_token",
                         return_value={"sub": "user-1"},
@@ -571,7 +571,7 @@ class TestRefreshToken:
 
         app.dependency_overrides.clear()
         try:
-            with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+            with patch("src.api.routes.auth.get_pg_store", return_value=redis):
                 with patch(
                     "src.api.routes.auth.verify_refresh_token",
                     return_value={"sub": "user-1"},
@@ -602,7 +602,7 @@ class TestLogout:
 
         app.dependency_overrides[get_current_user] = lambda: user
         try:
-            with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+            with patch("src.api.routes.auth.get_pg_store", return_value=redis):
                 client = TestClient(app, raise_server_exceptions=False)
                 resp = client.post("/api/v1/auth/logout")
             assert resp.status_code == 200
@@ -707,7 +707,7 @@ class TestChangePassword:
         app.dependency_overrides[get_current_user] = lambda: user
         try:
             with patch("src.api.routes.auth.get_postgres_client", return_value=db):
-                with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+                with patch("src.api.routes.auth.get_pg_store", return_value=redis):
                     with patch("src.api.routes.auth.verify_password", return_value=True):
                         with patch("src.api.routes.auth.hash_password", return_value="new-hashed"):
                             client = TestClient(app, raise_server_exceptions=False)
@@ -768,7 +768,7 @@ class TestPasswordReset:
         app.dependency_overrides.clear()
         try:
             with patch("src.api.routes.auth.get_postgres_client", return_value=db):
-                with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+                with patch("src.api.routes.auth.get_pg_store", return_value=redis):
                     with patch("src.api.routes.auth.get_email_service", return_value=email_svc):
                         client = TestClient(app, raise_server_exceptions=False)
                         resp = client.post(
@@ -799,7 +799,7 @@ class TestPasswordReset:
         app.dependency_overrides.clear()
         try:
             with patch("src.api.routes.auth.get_postgres_client", return_value=db):
-                with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+                with patch("src.api.routes.auth.get_pg_store", return_value=redis):
                     with patch("src.api.routes.auth.get_email_service", return_value=email_svc):
                         client = TestClient(app, raise_server_exceptions=False)
                         resp = client.post(
@@ -823,7 +823,7 @@ class TestPasswordReset:
         app.dependency_overrides.clear()
         try:
             with patch("src.api.routes.auth.get_postgres_client", return_value=db):
-                with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+                with patch("src.api.routes.auth.get_pg_store", return_value=redis):
                     client = TestClient(app, raise_server_exceptions=False)
                     resp = client.post(
                         "/api/v1/auth/password/reset",
@@ -857,7 +857,7 @@ class TestPasswordResetConfirm:
         app.dependency_overrides.clear()
         try:
             with patch("src.api.routes.auth.get_postgres_client", return_value=db):
-                with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+                with patch("src.api.routes.auth.get_pg_store", return_value=redis):
                     with patch("src.api.routes.auth.hash_password", return_value="new-hash"):
                         client = TestClient(app, raise_server_exceptions=False)
                         resp = client.post(
@@ -877,7 +877,7 @@ class TestPasswordResetConfirm:
 
         app.dependency_overrides.clear()
         try:
-            with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+            with patch("src.api.routes.auth.get_pg_store", return_value=redis):
                 client = TestClient(app, raise_server_exceptions=False)
                 resp = client.post(
                     "/api/v1/auth/password/reset/confirm",
@@ -907,7 +907,7 @@ class TestVerifyEmail:
         app.dependency_overrides.clear()
         try:
             with patch("src.api.routes.auth.get_postgres_client", return_value=db):
-                with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+                with patch("src.api.routes.auth.get_pg_store", return_value=redis):
                     client = TestClient(app, raise_server_exceptions=False)
                     resp = client.post("/api/v1/auth/verify-email/valid-token")
             assert resp.status_code == 200
@@ -923,7 +923,7 @@ class TestVerifyEmail:
 
         app.dependency_overrides.clear()
         try:
-            with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+            with patch("src.api.routes.auth.get_pg_store", return_value=redis):
                 client = TestClient(app, raise_server_exceptions=False)
                 resp = client.post("/api/v1/auth/verify-email/bad-token")
             assert resp.status_code == 400
@@ -958,7 +958,7 @@ class TestResendVerificationByEmail:
         app.dependency_overrides.clear()
         try:
             with patch("src.api.routes.auth.get_postgres_client", return_value=db):
-                with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+                with patch("src.api.routes.auth.get_pg_store", return_value=redis):
                     with patch("src.api.routes.auth.get_email_service", return_value=email_svc):
                         with patch("src.api.routes.auth.get_settings", return_value=mock_settings):
                             client = TestClient(app, raise_server_exceptions=False)
@@ -985,7 +985,7 @@ class TestResendVerificationByEmail:
         app.dependency_overrides.clear()
         try:
             with patch("src.api.routes.auth.get_postgres_client", return_value=db):
-                with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+                with patch("src.api.routes.auth.get_pg_store", return_value=redis):
                     client = TestClient(app, raise_server_exceptions=False)
                     resp = client.post(
                         "/api/v1/auth/resend-verification-by-email",
@@ -1010,7 +1010,7 @@ class TestResendVerificationByEmail:
         app.dependency_overrides.clear()
         try:
             with patch("src.api.routes.auth.get_postgres_client", return_value=db):
-                with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+                with patch("src.api.routes.auth.get_pg_store", return_value=redis):
                     client = TestClient(app, raise_server_exceptions=False)
                     resp = client.post(
                         "/api/v1/auth/resend-verification-by-email",
@@ -1040,7 +1040,7 @@ class TestResendVerification:
 
         app.dependency_overrides[get_current_user] = lambda: user
         try:
-            with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+            with patch("src.api.routes.auth.get_pg_store", return_value=redis):
                 with patch("src.api.routes.auth.get_email_service", return_value=email_svc):
                     client = TestClient(app, raise_server_exceptions=False)
                     resp = client.post("/api/v1/auth/resend-verification")
@@ -1084,7 +1084,7 @@ class TestDeleteAccount:
         app.dependency_overrides[get_current_user] = lambda: user
         try:
             with patch("src.api.routes.auth.get_postgres_client", return_value=db):
-                with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+                with patch("src.api.routes.auth.get_pg_store", return_value=redis):
                     client = TestClient(app, raise_server_exceptions=False)
                     resp = client.delete("/api/v1/auth/me")
             assert resp.status_code == 200
@@ -1107,7 +1107,7 @@ class TestDeleteAccount:
         app.dependency_overrides[get_current_user] = lambda: user
         try:
             with patch("src.api.routes.auth.get_postgres_client", return_value=db):
-                with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+                with patch("src.api.routes.auth.get_pg_store", return_value=redis):
                     client = TestClient(app, raise_server_exceptions=False)
                     resp = client.delete("/api/v1/auth/me")
             assert resp.status_code == 200
@@ -1141,7 +1141,7 @@ class TestLoginForm:
         app.dependency_overrides.clear()
         try:
             with patch("src.api.routes.auth.get_postgres_client", return_value=db):
-                with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+                with patch("src.api.routes.auth.get_pg_store", return_value=redis):
                     with patch("src.api.routes.auth.verify_password", return_value=True):
                         with patch(
                             "src.api.routes.auth.create_access_token",
@@ -1176,7 +1176,7 @@ class TestLoginForm:
         app.dependency_overrides.clear()
         try:
             with patch("src.api.routes.auth.get_postgres_client", return_value=db):
-                with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+                with patch("src.api.routes.auth.get_pg_store", return_value=redis):
                     client = TestClient(app, raise_server_exceptions=False)
                     resp = client.post(
                         "/api/v1/auth/login",
@@ -1203,7 +1203,7 @@ class TestLoginForm:
         app.dependency_overrides.clear()
         try:
             with patch("src.api.routes.auth.get_postgres_client", return_value=db):
-                with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+                with patch("src.api.routes.auth.get_pg_store", return_value=redis):
                     with patch("src.api.routes.auth.verify_password", return_value=False):
                         client = TestClient(app, raise_server_exceptions=False)
                         resp = client.post(
@@ -1232,7 +1232,7 @@ class TestLoginForm:
         app.dependency_overrides.clear()
         try:
             with patch("src.api.routes.auth.get_postgres_client", return_value=db):
-                with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+                with patch("src.api.routes.auth.get_pg_store", return_value=redis):
                     with patch("src.api.routes.auth.verify_password", return_value=False):
                         client = TestClient(app, raise_server_exceptions=False)
                         resp = client.post(
@@ -1258,7 +1258,7 @@ class TestLoginForm:
         app.dependency_overrides.clear()
         try:
             with patch("src.api.routes.auth.get_postgres_client", return_value=db):
-                with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+                with patch("src.api.routes.auth.get_pg_store", return_value=redis):
                     with patch("src.api.routes.auth.verify_password", return_value=True):
                         client = TestClient(app, raise_server_exceptions=False)
                         resp = client.post(
