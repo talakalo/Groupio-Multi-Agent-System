@@ -180,7 +180,7 @@ def test_record_invite_happy_path():
             patch("src.api.routes.graph_features.get_graph_store", return_value=graph),
             # get_postgres_client is imported inside the function body, so patch at the source
             patch("src.databases.postgres.get_postgres_client", return_value=mock_db),
-            patch("src.api.routes.graph_features.get_redis_client", return_value=mock_redis),
+            patch("src.api.routes.graph_features.get_pg_store", return_value=mock_redis),
         ):
             client = TestClient(app, raise_server_exceptions=False)
             response = client.post(
@@ -219,7 +219,7 @@ def test_record_invite_invitee_not_found_returns_404():
         with (
             patch("src.api.routes.graph_features.get_graph_store", return_value=graph),
             patch("src.databases.postgres.get_postgres_client", return_value=mock_db),
-            patch("src.api.routes.graph_features.get_redis_client", return_value=mock_redis),
+            patch("src.api.routes.graph_features.get_pg_store", return_value=mock_redis),
         ):
             client = TestClient(app, raise_server_exceptions=False)
             response = client.post(
@@ -253,7 +253,7 @@ def test_record_invite_graph_exception_returns_500():
         with (
             patch("src.api.routes.graph_features.get_graph_store", return_value=graph),
             patch("src.databases.postgres.get_postgres_client", return_value=mock_db),
-            patch("src.api.routes.graph_features.get_redis_client", return_value=mock_redis),
+            patch("src.api.routes.graph_features.get_pg_store", return_value=mock_redis),
         ):
             client = TestClient(app, raise_server_exceptions=False)
             response = client.post(

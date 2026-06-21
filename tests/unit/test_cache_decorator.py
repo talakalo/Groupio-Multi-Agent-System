@@ -1,4 +1,4 @@
-"""Unit tests for the reusable async Redis TTL cache decorator."""
+"""Unit tests for the reusable async PostgresStore TTL cache decorator."""
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -7,8 +7,8 @@ import pytest
 from src.databases.cache import cached
 
 
-class _FakeRedis:
-    """Minimal RedisClient stand-in that mirrors cache_get/cache_set."""
+class _FakeStore:
+    """Minimal PostgresStore stand-in that mirrors cache_get/cache_set."""
 
     def __init__(self) -> None:
         self.store: dict[str, object] = {}
@@ -27,8 +27,8 @@ class _FakeRedis:
 
 @pytest.fixture
 def fake_redis():
-    fake = _FakeRedis()
-    with patch("src.databases.redis_client.get_redis_client", return_value=fake):
+    fake = _FakeStore()
+    with patch("src.databases.pg_store.get_pg_store", return_value=fake):
         yield fake
 
 
@@ -107,10 +107,10 @@ async def test_cached_does_not_cache_none(fake_redis):
 async def test_cached_falls_through_on_redis_failure():
     calls = {"n": 0}
     broken = MagicMock()
-    broken.cache_get = AsyncMock(side_effect=ConnectionError("redis down"))
-    broken.cache_set = AsyncMock(side_effect=ConnectionError("redis down"))
+    broken.cache_get = AsyncMock(side_effect=ConnectionError("store down"))
+    broken.cache_set = AsyncMock(side_effect=ConnectionError("store down"))
 
-    with patch("src.databases.redis_client.get_redis_client", return_value=broken):
+    with patch("src.databases.pg_store.get_pg_store", return_value=broken):
 
         @cached(prefix="t", ttl=60)
         async def compute(x: int) -> int:

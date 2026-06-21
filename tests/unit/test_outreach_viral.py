@@ -19,7 +19,7 @@ def agent():
         patch("src.agents.base.get_llm_client") as mock_llm,
         patch("src.agents.base.get_rag_pipeline"),
         patch("src.agents.outreach.get_postgres_client") as mock_db,
-        patch("src.agents.outreach.get_redis_client") as mock_redis,
+        patch("src.agents.outreach.get_pg_store") as mock_redis,
     ):
         mock_llm.return_value = AsyncMock()
         db = AsyncMock()

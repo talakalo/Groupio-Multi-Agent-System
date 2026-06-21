@@ -30,7 +30,7 @@ class _FakeRedis:
 @pytest.fixture
 def fake_redis():
     fake = _FakeRedis()
-    with patch("src.databases.redis_client.get_redis_client", return_value=fake):
+    with patch("src.databases.pg_store.get_pg_store", return_value=fake):
         yield fake
 
 
@@ -160,7 +160,7 @@ async def test_graph_cache_falls_through_when_redis_unavailable(store):
     broken.cache_set = AsyncMock(side_effect=ConnectionError("redis down"))
     store.execute = AsyncMock(return_value=[{"reputation": {"contractor_id": "c1"}}])
 
-    with patch("src.databases.redis_client.get_redis_client", return_value=broken):
+    with patch("src.databases.pg_store.get_pg_store", return_value=broken):
         first = await store.get_contractor_reputation("c1")
         second = await store.get_contractor_reputation("c1")
 

@@ -360,7 +360,7 @@ class TestMedium02UploadRateLimit:
 
         app.dependency_overrides[get_current_user] = lambda: user
         try:
-            with patch("src.api.routes.uploads.get_redis_client", return_value=redis):
+            with patch("src.api.routes.uploads.get_pg_store", return_value=redis):
                 with patch("src.api.routes.uploads.get_postgres_client", return_value=db):
                     with patch("src.api.routes.uploads.get_storage_service") as mock_storage:
                         mock_storage.return_value.validate_file = MagicMock()

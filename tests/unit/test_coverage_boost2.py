@@ -63,38 +63,38 @@ class TestLLMResponseCache:
 
     @pytest.mark.asyncio
     async def test_get_returns_none_on_miss(self):
-        mock_redis = AsyncMock()
-        mock_redis.cache_get = AsyncMock(return_value=None)
-        with patch("src.databases.redis_client.get_redis_client", return_value=mock_redis):
+        mock_store = AsyncMock()
+        mock_store.cache_get = AsyncMock(return_value=None)
+        with patch("src.databases.pg_store.get_pg_store", return_value=mock_store):
             result = await self.cache.get("m", "s", [])
         assert result is None
 
     @pytest.mark.asyncio
     async def test_get_returns_cached_value(self):
         cached = {"content": "cached response"}
-        mock_redis = AsyncMock()
-        mock_redis.cache_get = AsyncMock(return_value=cached)
-        with patch("src.databases.redis_client.get_redis_client", return_value=mock_redis):
+        mock_store = AsyncMock()
+        mock_store.cache_get = AsyncMock(return_value=cached)
+        with patch("src.databases.pg_store.get_pg_store", return_value=mock_store):
             result = await self.cache.get("m", "s", [{"role": "user", "content": "q"}])
         assert result == cached
 
     @pytest.mark.asyncio
     async def test_get_returns_none_on_redis_error(self):
-        with patch("src.databases.redis_client.get_redis_client", side_effect=Exception("Redis down")):
+        with patch("src.databases.pg_store.get_pg_store", side_effect=Exception("store down")):
             result = await self.cache.get("m", "s", [])
         assert result is None
 
     @pytest.mark.asyncio
     async def test_set_stores_value(self):
-        mock_redis = AsyncMock()
-        mock_redis.cache_set = AsyncMock()
-        with patch("src.databases.redis_client.get_redis_client", return_value=mock_redis):
+        mock_store = AsyncMock()
+        mock_store.cache_set = AsyncMock()
+        with patch("src.databases.pg_store.get_pg_store", return_value=mock_store):
             await self.cache.set("m", "s", [], {"content": "resp"})
-        mock_redis.cache_set.assert_awaited_once()
+        mock_store.cache_set.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_set_swallows_redis_error(self):
-        with patch("src.databases.redis_client.get_redis_client", side_effect=Exception("Redis down")):
+        with patch("src.databases.pg_store.get_pg_store", side_effect=Exception("store down")):
             await self.cache.set("m", "s", [], {"content": "resp"})  # should not raise
 
 
