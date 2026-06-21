@@ -61,11 +61,9 @@ class Settings(BaseSettings):
     DOCKER_POSTGRES_PASSWORD: str = ""
     DOCKER_POSTGRES_DB: str = ""
 
-    # Redis
-    # In production, set REDIS_URL to include credentials, e.g.:
-    #   redis://:yourpassword@redis:6379/0
-    # Or set REDIS_PASSWORD separately (used when REDIS_URL has no password).
-    REDIS_URL: str = "redis://localhost:6379"
+    # Redis settings — no longer required. Kept for zero-downtime migration.
+    # Setting REDIS_URL has no effect; Postgres is used for all caching.
+    REDIS_URL: str = ""
     REDIS_PASSWORD: str = ""
 
     # LLM Settings
