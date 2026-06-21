@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 from src.api.middleware.auth import get_current_user, is_admin
 from src.databases.graph_store import get_graph_store
-from src.databases.redis_client import get_redis_client
+from src.databases.pg_store import get_pg_store
 from src.models.user import UserInDB
 
 logger = logging.getLogger(__name__)
@@ -63,7 +63,7 @@ async def record_invite(
     from src.databases.postgres import get_postgres_client
 
     db = get_postgres_client()
-    redis = get_redis_client()
+    store = get_pg_store()
 
     # Resolve invitee by phone (must be a registered resident)
     invitee = await db.get_user_by_phone(request.invitee_phone)
@@ -84,9 +84,9 @@ async def record_invite(
         logger.warning("Failed to record invite event: %s", exc)
         raise HTTPException(status_code=500, detail="Failed to record invite")
 
-    # Generate a short-lived invite token stored in Redis (24h)
+    # Generate a short-lived invite token stored in Postgres (24h)
     invite_token = str(uuid4()).replace("-", "")[:16]
-    await redis.set(f"invite_token:{invite_token}", current_user.id, ex=86400)
+    await store.set(f"invite_token:{invite_token}", current_user.id, ex=86400)
 
     invite_link = f"/join/{offer_id}?invite={invite_token}"
     return {"invite_token": invite_token, "invite_link": invite_link}

@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 
 from src.api.middleware.auth import get_current_user
 from src.databases.postgres import get_postgres_client
-from src.databases.redis_client import get_redis_client
+from src.databases.pg_store import get_pg_store
 from src.models.user import UserInDB
 from src.services.storage import MAX_FILE_SIZE, StorageError, get_storage_service
 
@@ -25,8 +25,8 @@ _UPLOAD_RATE_WINDOW = 60  # per 60 seconds
 async def _check_upload_rate_limit(current_user: UserInDB) -> None:
     """Enforce per-user rate limit on upload endpoints (10 uploads/min)."""
     try:
-        redis = get_redis_client()
-        allowed = await redis.check_rate_limit(
+        store = get_pg_store()
+        allowed = await store.check_rate_limit(
             f"upload:{current_user.id}",
             limit=_UPLOAD_RATE_LIMIT,
             window=_UPLOAD_RATE_WINDOW,
@@ -40,7 +40,7 @@ async def _check_upload_rate_limit(current_user: UserInDB) -> None:
     except HTTPException:
         raise
     except Exception as exc:
-        logger.warning("Redis unavailable for upload rate limiting — allowing request: %s", exc)
+        logger.warning("Rate limit check unavailable for upload — allowing request: %s", exc)
 
 
 # ------------------------------------------------------------------
