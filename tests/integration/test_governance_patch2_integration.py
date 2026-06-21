@@ -146,7 +146,7 @@ class TestEmailVerificationEnforcedAtMiddleware:
         with (
             patch("src.api.middleware.auth.verify_access_token", return_value=mock_payload),
             patch("src.api.middleware.auth.get_settings", return_value=mock_settings),
-            patch("src.databases.redis_client.get_redis_client", return_value=mock_redis),
+            patch("src.databases.pg_store.get_pg_store", return_value=mock_redis),
             patch("src.databases.postgres.get_postgres_client", return_value=mock_db_auth),
         ):
             client = TestClient(app, raise_server_exceptions=False)
@@ -181,7 +181,7 @@ class TestEmailVerificationEnforcedAtMiddleware:
         with (
             patch("src.api.middleware.auth.verify_access_token", return_value=mock_payload),
             patch("src.api.middleware.auth.get_settings", return_value=mock_settings),
-            patch("src.databases.redis_client.get_redis_client", return_value=mock_redis),
+            patch("src.databases.pg_store.get_pg_store", return_value=mock_redis),
             # Auth path uses src.databases.postgres; payment route uses its own import
             patch("src.databases.postgres.get_postgres_client", return_value=mock_db_auth),
             patch("src.api.routes.payments.get_postgres_client", return_value=mock_db_auth),
@@ -217,7 +217,7 @@ class TestEmailVerificationEnforcedAtMiddleware:
         with (
             patch("src.api.middleware.auth.verify_access_token", return_value=mock_payload),
             patch("src.api.middleware.auth.get_settings", return_value=mock_settings),
-            patch("src.databases.redis_client.get_redis_client", return_value=mock_redis),
+            patch("src.databases.pg_store.get_pg_store", return_value=mock_redis),
             patch("src.databases.postgres.get_postgres_client", return_value=mock_db_auth),
         ):
             client = TestClient(app, raise_server_exceptions=False)

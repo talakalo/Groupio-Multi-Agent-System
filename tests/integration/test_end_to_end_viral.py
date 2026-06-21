@@ -137,7 +137,7 @@ def _build_orchestrator(llm, pg, graph, rag, redis):
     patches = [
         patch("src.agents.base.get_llm_client", return_value=llm),
         patch("src.agents.base.get_rag_pipeline", return_value=rag),
-        patch("src.databases.redis_client.get_redis_client", return_value=redis),
+        patch("src.databases.pg_store.get_pg_store", return_value=redis),
         patch("src.agents.outreach.get_postgres_client", return_value=pg),
         patch("src.agents.outreach.get_pg_store", return_value=redis),
         patch("src.agents.influencer.get_postgres_client", return_value=pg),
