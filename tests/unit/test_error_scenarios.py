@@ -189,7 +189,7 @@ class TestSchemaNotReady:
         )
 
         with patch("src.api.routes.auth.get_postgres_client", return_value=db):
-            with patch("src.api.routes.auth.get_redis_client"):
+            with patch("src.api.routes.auth.get_pg_store"):
                 from fastapi.testclient import TestClient
 
                 client = TestClient(app, raise_server_exceptions=False)

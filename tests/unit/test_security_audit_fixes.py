@@ -409,7 +409,7 @@ class TestMedium03JtiDenylist:
         app.dependency_overrides[get_current_user] = lambda: user
         app.dependency_overrides[get_token_jti] = lambda: "test-jti-1234"
         try:
-            with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+            with patch("src.api.routes.auth.get_pg_store", return_value=redis):
                 with patch("src.api.routes.auth.get_settings") as ms:
                     ms.return_value.ACCESS_TOKEN_EXPIRE_MINUTES = 30
                     client = TestClient(app, raise_server_exceptions=False)
@@ -433,7 +433,7 @@ class TestMedium03JtiDenylist:
         app.dependency_overrides[get_current_user] = lambda: user
         app.dependency_overrides[get_token_jti] = lambda: None  # no JTI
         try:
-            with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+            with patch("src.api.routes.auth.get_pg_store", return_value=redis):
                 with patch("src.api.routes.auth.get_settings") as ms:
                     ms.return_value.ACCESS_TOKEN_EXPIRE_MINUTES = 30
                     client = TestClient(app, raise_server_exceptions=False)
@@ -466,7 +466,7 @@ class TestMedium04AtomicRefreshTokenSwap:
         app.dependency_overrides.clear()
         try:
             with patch("src.api.routes.auth.get_postgres_client", return_value=db):
-                with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+                with patch("src.api.routes.auth.get_pg_store", return_value=redis):
                     with patch(
                         "src.api.routes.auth.verify_refresh_token",
                         return_value={"sub": "user-1", "type": "refresh"},
@@ -494,7 +494,7 @@ class TestMedium04AtomicRefreshTokenSwap:
         app.dependency_overrides.clear()
         try:
             with patch("src.api.routes.auth.get_postgres_client", return_value=db):
-                with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+                with patch("src.api.routes.auth.get_pg_store", return_value=redis):
                     with patch(
                         "src.api.routes.auth.verify_refresh_token",
                         return_value={"sub": "user-1", "type": "refresh"},
@@ -599,7 +599,7 @@ class TestLow01TimingSafeApiKey:
 
 
 class TestLow02TemporaryBruteForce:
-    """After 5 failed login attempts the account is locked via Redis (not DB)."""
+    """After 5 failed login attempts the account is locked via pg_store (not DB is_active=False)."""
 
     def test_fifth_failure_sets_redis_lockout_not_db(self):
         user = _make_user()
@@ -621,7 +621,7 @@ class TestLow02TemporaryBruteForce:
         app.dependency_overrides.clear()
         try:
             with patch("src.api.routes.auth.get_postgres_client", return_value=db):
-                with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+                with patch("src.api.routes.auth.get_pg_store", return_value=redis):
                     with patch("src.api.routes.auth.verify_password", return_value=False):
                         client = TestClient(app, raise_server_exceptions=False)
                         resp = client.post(
@@ -656,7 +656,7 @@ class TestLow02TemporaryBruteForce:
         app.dependency_overrides.clear()
         try:
             with patch("src.api.routes.auth.get_postgres_client", return_value=db):
-                with patch("src.api.routes.auth.get_redis_client", return_value=redis):
+                with patch("src.api.routes.auth.get_pg_store", return_value=redis):
                     client = TestClient(app, raise_server_exceptions=False)
                     resp = client.post(
                         "/api/v1/auth/login/json",

@@ -53,10 +53,10 @@ async def test_check_auth_rate_limit_raises_429():
     mock_request = AsyncMock()
     mock_request.client.host = "1.2.3.4"
 
-    with patch("src.api.routes.auth.get_redis_client") as mock_get_redis:
-        mock_redis = AsyncMock()
-        mock_redis.check_ip_rate_limit = AsyncMock(return_value=False)
-        mock_get_redis.return_value = mock_redis
+    with patch("src.api.routes.auth.get_pg_store") as mock_get_store:
+        mock_store = AsyncMock()
+        mock_store.check_ip_rate_limit = AsyncMock(return_value=False)
+        mock_get_store.return_value = mock_store
 
         with pytest.raises(HTTPException) as exc_info:
             await check_auth_rate_limit(mock_request)
