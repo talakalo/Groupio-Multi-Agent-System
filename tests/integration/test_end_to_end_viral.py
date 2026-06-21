@@ -139,7 +139,7 @@ def _build_orchestrator(llm, pg, graph, rag, redis):
         patch("src.agents.base.get_rag_pipeline", return_value=rag),
         patch("src.databases.redis_client.get_redis_client", return_value=redis),
         patch("src.agents.outreach.get_postgres_client", return_value=pg),
-        patch("src.agents.outreach.get_redis_client", return_value=redis),
+        patch("src.agents.outreach.get_pg_store", return_value=redis),
         patch("src.agents.influencer.get_postgres_client", return_value=pg),
         patch("src.agents.influencer.get_graph_store", return_value=graph),
         patch("src.agents.pricing.get_postgres_client", return_value=pg),
@@ -147,7 +147,7 @@ def _build_orchestrator(llm, pg, graph, rag, redis):
         patch("src.agents.matching.get_graph_store", return_value=graph),
         patch("src.agents.vetting.get_graph_store", return_value=graph),
         patch("src.agents.support.get_postgres_client", return_value=pg),
-        patch("src.agents.support.get_redis_client", return_value=redis),
+        patch("src.agents.support.get_pg_store", return_value=redis),
         patch("src.agents.analytics.get_postgres_client", return_value=pg),
         patch("src.orchestration.graph.get_postgres_client", return_value=pg),
         patch("src.orchestration.graph.get_rag_pipeline", return_value=rag),
@@ -359,7 +359,7 @@ class TestE2EInviteConversionOnJoin:
         ):
             with TestClient(app) as c:
                 with (
-                    patch("src.databases.redis_client._redis_client", mock_redis),
+                    patch("src.databases.pg_store._pg_store", mock_redis),
                     patch("src.databases.graph_store._graph_store", mock_graph),
                 ):
                     resp = c.post(
