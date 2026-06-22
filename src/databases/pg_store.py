@@ -29,6 +29,12 @@ from src.config.settings import get_settings
 logger = logging.getLogger(__name__)
 
 
+def _is_missing_table_error(exc: Exception) -> bool:
+    """Return True when the exception indicates a table does not exist in Supabase/PostgREST."""
+    msg = str(exc).lower()
+    return "pgrst205" in msg or "schema cache" in msg or "does not exist" in msg
+
+
 def _sha256(value: str) -> str:
     """Return the SHA-256 hex digest of a string value."""
     return hashlib.sha256(value.encode()).hexdigest()
@@ -244,34 +250,30 @@ class PostgresStore:
 
         if self._use_supabase_client():
             client = await self._get_client()
-            existing = await client.table("response_cache").select("cache_key").eq("cache_key", key).limit(1).execute()
-            if nx and existing.data:
-                return False
-            data_payload = {"v": value}
-            if existing.data:
-                await (
-                    client.table("response_cache")
-                    .update(
-                        {
-                            "data": data_payload,
-                            "expires_at": datetime.now(UTC).isoformat(),
-                        }
+            try:
+                existing = await client.table("response_cache").select("cache_key").eq("cache_key", key).limit(1).execute()
+                if nx and existing.data:
+                    return False
+                data_payload = {"v": value}
+                expires = (datetime.now(UTC).replace(microsecond=0).isoformat() if True else "")
+                if existing.data:
+                    await (
+                        client.table("response_cache")
+                        .update({"data": data_payload, "expires_at": expires})
+                        .eq("cache_key", key)
+                        .execute()
                     )
-                    .eq("cache_key", key)
-                    .execute()
-                )
-            else:
-                await (
-                    client.table("response_cache")
-                    .insert(
-                        {
-                            "cache_key": key,
-                            "data": data_payload,
-                            "expires_at": datetime.now(UTC).isoformat(),
-                        }
+                else:
+                    await (
+                        client.table("response_cache")
+                        .insert({"cache_key": key, "data": data_payload, "expires_at": expires})
+                        .execute()
                     )
-                    .execute()
-                )
+            except Exception as exc:
+                if _is_missing_table_error(exc):
+                    logger.warning("response_cache table missing — skipping cache write. Run migration 042.")
+                    return True
+                raise
             return True
 
         # asyncpg path
@@ -348,14 +350,20 @@ class PostgresStore:
         # response_cache path (refresh_token, doc_request, generic)
         if self._use_supabase_client():
             client = await self._get_client()
-            result = (
-                await client.table("response_cache")
-                .select("data")
-                .eq("cache_key", key)
-                .gt("expires_at", datetime.now(UTC).isoformat())
-                .limit(1)
-                .execute()
-            )
+            try:
+                result = (
+                    await client.table("response_cache")
+                    .select("data")
+                    .eq("cache_key", key)
+                    .gt("expires_at", datetime.now(UTC).isoformat())
+                    .limit(1)
+                    .execute()
+                )
+            except Exception as exc:
+                if _is_missing_table_error(exc):
+                    logger.warning("response_cache table missing — cache miss returned. Run migration 042.")
+                    return None
+                raise
             if result.data:
                 data = result.data[0]["data"]
                 if isinstance(data, dict):
@@ -418,7 +426,13 @@ class PostgresStore:
         # response_cache (refresh_token, doc_request, generic)
         if self._use_supabase_client():
             client = await self._get_client()
-            await client.table("response_cache").delete().eq("cache_key", key).execute()
+            try:
+                await client.table("response_cache").delete().eq("cache_key", key).execute()
+            except Exception as exc:
+                if _is_missing_table_error(exc):
+                    logger.warning("response_cache table missing — skipping cache delete. Run migration 042.")
+                    return
+                raise
             return
 
         await self._pg_execute(
