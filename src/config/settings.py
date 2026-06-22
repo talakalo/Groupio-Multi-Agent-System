@@ -129,6 +129,9 @@ class Settings(BaseSettings):
 
     # CORS Settings — accepts a JSON array or comma-separated string
     CORS_ORIGINS: str = "http://localhost:3000,http://localhost:3001"
+    # Regex patterns for dynamic origins (e.g. Vercel preview URLs).
+    # Example: "https://.*\\.vercel\\.app,https://.*\\.groupio\\.co\\.il"
+    CORS_ORIGIN_PATTERNS: str = ""
 
     # API Keys for service-to-service auth — accepts a JSON array or comma-separated string
     API_KEYS: str = ""
@@ -230,6 +233,10 @@ class Settings(BaseSettings):
     def get_cors_origins(self) -> list[str]:
         """Return CORS_ORIGINS parsed from JSON array or comma-separated string."""
         return _parse_list_env(self.CORS_ORIGINS)
+
+    def get_cors_origin_patterns(self) -> list[str]:
+        """Return CORS_ORIGIN_PATTERNS as a list of regex strings."""
+        return _parse_list_env(self.CORS_ORIGIN_PATTERNS)
 
     def get_api_keys(self) -> list[str]:
         """Return API_KEYS parsed from JSON array or comma-separated string."""

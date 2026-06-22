@@ -543,7 +543,14 @@ class PostgresStore:
             from datetime import timedelta
 
             locked_until = (datetime.now(UTC) + timedelta(seconds=seconds)).isoformat()
-            await client.table("users").update({"locked_until": locked_until}).eq("id", user_id).execute()
+            try:
+                await client.table("users").update({"locked_until": locked_until}).eq("id", user_id).execute()
+            except Exception as exc:
+                err_msg = str(exc).lower()
+                if "locked_until" in err_msg or "42703" in err_msg or "does not exist" in err_msg:
+                    logger.warning("users.locked_until column missing — cannot set lockout. Run migration 042.")
+                    return
+                raise
             return
 
         await self._pg_execute(
@@ -564,7 +571,15 @@ class PostgresStore:
         """
         if self._use_supabase_client():
             client = await self._get_client()
-            result = await client.table("users").select("locked_until").eq("id", user_id).limit(1).execute()
+            try:
+                result = await client.table("users").select("locked_until").eq("id", user_id).limit(1).execute()
+            except Exception as exc:
+                # Column missing (migration not yet applied) — treat as not locked.
+                err_msg = str(exc).lower()
+                if "locked_until" in err_msg or "42703" in err_msg or "does not exist" in err_msg:
+                    logger.warning("users.locked_until column missing — skipping lockout check. Run migration 042.")
+                    return 0
+                raise
             if not result.data or not result.data[0]["locked_until"]:
                 return 0
             locked_until_raw = result.data[0]["locked_until"]
@@ -592,7 +607,14 @@ class PostgresStore:
         """Remove temporary lockout by setting locked_until = NULL."""
         if self._use_supabase_client():
             client = await self._get_client()
-            await client.table("users").update({"locked_until": None}).eq("id", user_id).execute()
+            try:
+                await client.table("users").update({"locked_until": None}).eq("id", user_id).execute()
+            except Exception as exc:
+                err_msg = str(exc).lower()
+                if "locked_until" in err_msg or "42703" in err_msg or "does not exist" in err_msg:
+                    logger.warning("users.locked_until column missing — skipping lockout clear. Run migration 042.")
+                    return
+                raise
             return
 
         await self._pg_execute(
