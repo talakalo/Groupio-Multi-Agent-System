@@ -267,16 +267,39 @@ class PostgresClient:
             )
         return self._asyncpg_pool
 
+    async def _get_asyncpg_pool(self) -> Any:
+        """Always return the asyncpg connection pool (never the Supabase client).
+
+        Used by _pg_fetch_one/_pg_fetch_all/_pg_execute so that methods
+        without an explicit Supabase branch still work when DATABASE_URL
+        is configured alongside Supabase credentials.
+        """
+        if self._asyncpg_pool is None:
+            import asyncpg
+
+            settings = get_settings()
+            db_url = settings.DATABASE_URL
+            if db_url.startswith("postgres://"):
+                db_url = db_url.replace("postgres://", "postgresql://", 1)
+            self._asyncpg_pool = await asyncpg.create_pool(
+                db_url,
+                min_size=5,
+                max_size=25,
+                max_inactive_connection_lifetime=300,
+                command_timeout=60,
+            )
+        return self._asyncpg_pool
+
     async def _pg_fetch_one(self, query: str, *args: Any) -> dict | None:
         """Fetch one row via asyncpg."""
-        pool = await self._get_client()
+        pool = await self._get_asyncpg_pool()
         async with pool.acquire() as conn:
             row = await conn.fetchrow(query, *args)
             return dict(row) if row else None
 
     async def _pg_fetch_all(self, query: str, *args: Any) -> list[dict]:
         """Fetch all rows via asyncpg."""
-        pool = await self._get_client()
+        pool = await self._get_asyncpg_pool()
         async with pool.acquire() as conn:
             rows = await conn.fetch(query, *args)
             return [dict(r) for r in rows]
@@ -327,7 +350,7 @@ class PostgresClient:
 
     async def _pg_execute(self, query: str, *args: Any) -> None:
         """Execute query via asyncpg."""
-        pool = await self._get_client()
+        pool = await self._get_asyncpg_pool()
         async with pool.acquire() as conn:
             await conn.execute(query, *args)
 
