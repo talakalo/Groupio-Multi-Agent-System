@@ -251,7 +251,13 @@ class PostgresStore:
         if self._use_supabase_client():
             client = await self._get_client()
             try:
-                existing = await client.table("response_cache").select("cache_key").eq("cache_key", key).limit(1).execute()
+                existing = (
+                    await client.table("response_cache")
+                    .select("cache_key")
+                    .eq("cache_key", key)
+                    .limit(1)
+                    .execute()
+                )
                 if nx and existing.data:
                     return False
                 data_payload = {"v": value}
