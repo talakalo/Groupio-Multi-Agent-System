@@ -252,16 +252,12 @@ class PostgresStore:
             client = await self._get_client()
             try:
                 existing = (
-                    await client.table("response_cache")
-                    .select("cache_key")
-                    .eq("cache_key", key)
-                    .limit(1)
-                    .execute()
+                    await client.table("response_cache").select("cache_key").eq("cache_key", key).limit(1).execute()
                 )
                 if nx and existing.data:
                     return False
                 data_payload = {"v": value}
-                expires = (datetime.now(UTC).replace(microsecond=0).isoformat() if True else "")
+                expires = datetime.now(UTC).replace(microsecond=0).isoformat() if True else ""
                 if existing.data:
                     await (
                         client.table("response_cache")
