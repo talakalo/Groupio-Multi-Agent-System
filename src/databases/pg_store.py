@@ -29,6 +29,12 @@ from src.config.settings import get_settings
 logger = logging.getLogger(__name__)
 
 
+def _is_missing_table_error(exc: Exception) -> bool:
+    """Return True when the exception indicates a table does not exist in Supabase/PostgREST."""
+    msg = str(exc).lower()
+    return "pgrst205" in msg or "schema cache" in msg or "does not exist" in msg
+
+
 def _sha256(value: str) -> str:
     """Return the SHA-256 hex digest of a string value."""
     return hashlib.sha256(value.encode()).hexdigest()
@@ -244,34 +250,32 @@ class PostgresStore:
 
         if self._use_supabase_client():
             client = await self._get_client()
-            existing = await client.table("response_cache").select("cache_key").eq("cache_key", key).limit(1).execute()
-            if nx and existing.data:
-                return False
-            data_payload = {"v": value}
-            if existing.data:
-                await (
-                    client.table("response_cache")
-                    .update(
-                        {
-                            "data": data_payload,
-                            "expires_at": datetime.now(UTC).isoformat(),
-                        }
-                    )
-                    .eq("cache_key", key)
-                    .execute()
+            try:
+                existing = (
+                    await client.table("response_cache").select("cache_key").eq("cache_key", key).limit(1).execute()
                 )
-            else:
-                await (
-                    client.table("response_cache")
-                    .insert(
-                        {
-                            "cache_key": key,
-                            "data": data_payload,
-                            "expires_at": datetime.now(UTC).isoformat(),
-                        }
+                if nx and existing.data:
+                    return False
+                data_payload = {"v": value}
+                expires = datetime.now(UTC).replace(microsecond=0).isoformat() if True else ""
+                if existing.data:
+                    await (
+                        client.table("response_cache")
+                        .update({"data": data_payload, "expires_at": expires})
+                        .eq("cache_key", key)
+                        .execute()
                     )
-                    .execute()
-                )
+                else:
+                    await (
+                        client.table("response_cache")
+                        .insert({"cache_key": key, "data": data_payload, "expires_at": expires})
+                        .execute()
+                    )
+            except Exception as exc:
+                if _is_missing_table_error(exc):
+                    logger.warning("response_cache table missing — skipping cache write. Run migration 042.")
+                    return True
+                raise
             return True
 
         # asyncpg path
@@ -348,14 +352,20 @@ class PostgresStore:
         # response_cache path (refresh_token, doc_request, generic)
         if self._use_supabase_client():
             client = await self._get_client()
-            result = (
-                await client.table("response_cache")
-                .select("data")
-                .eq("cache_key", key)
-                .gt("expires_at", datetime.now(UTC).isoformat())
-                .limit(1)
-                .execute()
-            )
+            try:
+                result = (
+                    await client.table("response_cache")
+                    .select("data")
+                    .eq("cache_key", key)
+                    .gt("expires_at", datetime.now(UTC).isoformat())
+                    .limit(1)
+                    .execute()
+                )
+            except Exception as exc:
+                if _is_missing_table_error(exc):
+                    logger.warning("response_cache table missing — cache miss returned. Run migration 042.")
+                    return None
+                raise
             if result.data:
                 data = result.data[0]["data"]
                 if isinstance(data, dict):
@@ -418,7 +428,13 @@ class PostgresStore:
         # response_cache (refresh_token, doc_request, generic)
         if self._use_supabase_client():
             client = await self._get_client()
-            await client.table("response_cache").delete().eq("cache_key", key).execute()
+            try:
+                await client.table("response_cache").delete().eq("cache_key", key).execute()
+            except Exception as exc:
+                if _is_missing_table_error(exc):
+                    logger.warning("response_cache table missing — skipping cache delete. Run migration 042.")
+                    return
+                raise
             return
 
         await self._pg_execute(
@@ -543,7 +559,14 @@ class PostgresStore:
             from datetime import timedelta
 
             locked_until = (datetime.now(UTC) + timedelta(seconds=seconds)).isoformat()
-            await client.table("users").update({"locked_until": locked_until}).eq("id", user_id).execute()
+            try:
+                await client.table("users").update({"locked_until": locked_until}).eq("id", user_id).execute()
+            except Exception as exc:
+                err_msg = str(exc).lower()
+                if "locked_until" in err_msg or "42703" in err_msg or "does not exist" in err_msg:
+                    logger.warning("users.locked_until column missing — cannot set lockout. Run migration 042.")
+                    return
+                raise
             return
 
         await self._pg_execute(
@@ -564,7 +587,15 @@ class PostgresStore:
         """
         if self._use_supabase_client():
             client = await self._get_client()
-            result = await client.table("users").select("locked_until").eq("id", user_id).limit(1).execute()
+            try:
+                result = await client.table("users").select("locked_until").eq("id", user_id).limit(1).execute()
+            except Exception as exc:
+                # Column missing (migration not yet applied) — treat as not locked.
+                err_msg = str(exc).lower()
+                if "locked_until" in err_msg or "42703" in err_msg or "does not exist" in err_msg:
+                    logger.warning("users.locked_until column missing — skipping lockout check. Run migration 042.")
+                    return 0
+                raise
             if not result.data or not result.data[0]["locked_until"]:
                 return 0
             locked_until_raw = result.data[0]["locked_until"]
@@ -592,7 +623,14 @@ class PostgresStore:
         """Remove temporary lockout by setting locked_until = NULL."""
         if self._use_supabase_client():
             client = await self._get_client()
-            await client.table("users").update({"locked_until": None}).eq("id", user_id).execute()
+            try:
+                await client.table("users").update({"locked_until": None}).eq("id", user_id).execute()
+            except Exception as exc:
+                err_msg = str(exc).lower()
+                if "locked_until" in err_msg or "42703" in err_msg or "does not exist" in err_msg:
+                    logger.warning("users.locked_until column missing — skipping lockout clear. Run migration 042.")
+                    return
+                raise
             return
 
         await self._pg_execute(

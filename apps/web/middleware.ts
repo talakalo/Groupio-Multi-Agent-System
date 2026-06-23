@@ -81,9 +81,13 @@ export function middleware(request: NextRequest) {
       const authData = JSON.parse(decodeURIComponent(authCookie.value));
       // Role is used for UX routing only — APIs enforce roles server-side.
       userRole = authData?.state?.user?.role ?? null;
-      // If the Zustand cookie exists but there is no refresh cookie,
-      // the session has expired — treat as unauthenticated.
-      if (!hasRefreshCookie) {
+      // In cross-domain deployments (e.g. Vercel frontend + Render backend) the
+      // refresh_token cookie is scoped to the backend domain and is not visible
+      // here. Fall back to the groupio-auth cookie's isAuthenticated flag for
+      // routing decisions — API calls are still independently JWT-authenticated.
+      if (!hasRefreshCookie && authData?.state?.isAuthenticated) {
+        isAuthenticated = true;
+      } else if (!hasRefreshCookie) {
         isAuthenticated = false;
         userRole = null;
       }

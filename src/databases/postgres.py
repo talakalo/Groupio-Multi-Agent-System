@@ -503,7 +503,8 @@ class PostgresClient:
 
         if self._use_supabase_client():
             client = await self._get_client()
-            result = await client.table("users").update(filtered).eq("id", user_id).execute()
+            serialized = {k: v.isoformat() if isinstance(v, datetime) else v for k, v in filtered.items()}
+            result = await client.table("users").update(serialized).eq("id", user_id).execute()
             row = result.data[0] if result.data else None
         else:
             query, args = self._build_safe_update("users", filtered, "id", user_id)

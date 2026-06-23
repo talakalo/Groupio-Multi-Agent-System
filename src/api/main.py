@@ -2,6 +2,7 @@
 
 import errno
 import logging
+import re
 import socket
 from contextlib import asynccontextmanager
 from typing import Any
@@ -168,6 +169,7 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
 # CORS middleware - origins loaded from environment
 settings = get_settings()
 cors_origins = settings.get_cors_origins()
+cors_origin_patterns = [re.compile(p) for p in settings.get_cors_origin_patterns() if p]
 # Only add localhost origins in development — never in production/staging.
 if settings.ENVIRONMENT == "development":
     _dev_origins = [
@@ -179,14 +181,53 @@ if settings.ENVIRONMENT == "development":
     for origin in _dev_origins:
         if origin not in cors_origins:
             cors_origins.append(origin)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=cors_origins,
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "X-API-Key", "X-Request-ID"],
-    expose_headers=[],
-)
+
+if cors_origin_patterns:
+    # Use allow_origins=["*"] so FastAPI doesn't filter by origin list — we handle
+    # origin validation ourselves via the patterns below. Credentials mode is kept.
+    # The custom middleware below replaces the wildcard origin with the actual request
+    # origin when it matches a pattern, satisfying browsers' CORS credential rules.
+    from starlette.middleware.base import BaseHTTPMiddleware
+    from starlette.requests import Request as StarletteRequest
+    from starlette.responses import Response as StarletteResponse
+
+    _cors_exact = set(cors_origins)
+    _cors_patterns = cors_origin_patterns
+    _cors_methods = "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+    _cors_headers = "Authorization, Content-Type, X-API-Key, X-Request-ID"
+
+    class PatternCORSMiddleware(BaseHTTPMiddleware):
+        async def dispatch(self, request: StarletteRequest, call_next):  # type: ignore[override]
+            origin = request.headers.get("origin", "")
+            allowed = origin in _cors_exact or any(p.fullmatch(origin) for p in _cors_patterns)
+            if request.method == "OPTIONS" and allowed:
+                return StarletteResponse(
+                    status_code=204,
+                    headers={
+                        "Access-Control-Allow-Origin": origin,
+                        "Access-Control-Allow-Credentials": "true",
+                        "Access-Control-Allow-Methods": _cors_methods,
+                        "Access-Control-Allow-Headers": _cors_headers,
+                        "Access-Control-Max-Age": "600",
+                    },
+                )
+            response = await call_next(request)
+            if allowed:
+                response.headers["Access-Control-Allow-Origin"] = origin
+                response.headers["Access-Control-Allow-Credentials"] = "true"
+                response.headers["Vary"] = "Origin"
+            return response
+
+    app.add_middleware(PatternCORSMiddleware)
+else:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origins,
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "X-API-Key", "X-Request-ID"],
+        expose_headers=[],
+    )
 
 # Security headers middleware (HSTS, CSP, X-Frame-Options, etc.)
 app.add_middleware(SecurityHeadersMiddleware, environment=settings.ENVIRONMENT)
