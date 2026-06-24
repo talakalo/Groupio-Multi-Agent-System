@@ -76,7 +76,7 @@ async def test_outreach_queue_db_methods():
     mock_acquire.__aexit__ = AsyncMock(return_value=False)
     mock_pool.acquire = MagicMock(return_value=mock_acquire)
 
-    with patch.object(db, "_get_client", AsyncMock(return_value=mock_pool)):
+    with patch.object(db, "_get_asyncpg_pool", AsyncMock(return_value=mock_pool)):
         from datetime import UTC, datetime
 
         await db.create_outreach_pending(

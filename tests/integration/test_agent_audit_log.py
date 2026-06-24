@@ -38,7 +38,7 @@ async def test_create_agent_audit_entry_asyncpg():
         "created_at": datetime.now(UTC),
     }
 
-    with patch.object(db, "_get_client", AsyncMock(return_value=mock_pool)):
+    with patch.object(db, "_get_asyncpg_pool", AsyncMock(return_value=mock_pool)):
         await db.create_agent_audit_entry(entry)
 
     mock_conn.execute.assert_called_once()
@@ -63,7 +63,7 @@ async def test_list_agent_audit_log_asyncpg():
     mock_pool = MagicMock()
     mock_pool.acquire = MagicMock(return_value=mock_acquire)
 
-    with patch.object(db, "_get_client", AsyncMock(return_value=mock_pool)):
+    with patch.object(db, "_get_asyncpg_pool", AsyncMock(return_value=mock_pool)):
         items, total = await db.list_agent_audit_log(page=1, page_size=20, agent_name="matching")
 
     assert items == []
