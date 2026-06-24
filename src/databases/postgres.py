@@ -981,7 +981,7 @@ class PostgresClient:
             client = await self._get_client()
             result = (
                 await client.table("offers")
-                .select("*, contractors(business_name, rating, verified)")
+                .select("*, contractors(business_name, average_rating, verified)")
                 .eq("building_id", building_id)
                 .eq("status", "active")
                 .order("created_at", desc=True)
