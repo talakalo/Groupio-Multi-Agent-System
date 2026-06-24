@@ -258,13 +258,14 @@ class PostgresClient:
             db_url = settings.DATABASE_URL
             if db_url.startswith("postgres://"):
                 db_url = db_url.replace("postgres://", "postgresql://", 1)
+            _is_remote = "localhost" not in db_url and "127.0.0.1" not in db_url
             self._asyncpg_pool = await asyncpg.create_pool(
                 db_url,
                 min_size=5,
                 max_size=25,
                 max_inactive_connection_lifetime=300,
                 command_timeout=60,
-                ssl="require",
+                ssl="require" if _is_remote else None,
             )
         return self._asyncpg_pool
 
@@ -282,13 +283,14 @@ class PostgresClient:
             db_url = settings.DATABASE_URL
             if db_url.startswith("postgres://"):
                 db_url = db_url.replace("postgres://", "postgresql://", 1)
+            _is_remote = "localhost" not in db_url and "127.0.0.1" not in db_url
             self._asyncpg_pool = await asyncpg.create_pool(
                 db_url,
                 min_size=5,
                 max_size=25,
                 max_inactive_connection_lifetime=300,
                 command_timeout=60,
-                ssl="require",
+                ssl="require" if _is_remote else None,
             )
         return self._asyncpg_pool
 
