@@ -264,6 +264,7 @@ class PostgresClient:
                 max_size=25,
                 max_inactive_connection_lifetime=300,
                 command_timeout=60,
+                ssl="require",
             )
         return self._asyncpg_pool
 
@@ -287,6 +288,7 @@ class PostgresClient:
                 max_size=25,
                 max_inactive_connection_lifetime=300,
                 command_timeout=60,
+                ssl="require",
             )
         return self._asyncpg_pool
 
