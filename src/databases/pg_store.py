@@ -21,7 +21,7 @@ No Redis import anywhere in this file.
 import hashlib
 import json
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from src.config.settings import get_settings
@@ -200,9 +200,7 @@ class PostgresStore:
                 payload: dict[str, Any] = {
                     "token_type": token_type,
                     "token_hash": token_hash,
-                    "expires_at": (
-                        datetime.now(UTC).replace(microsecond=0).isoformat() + f"+{ttl_seconds // 3600:02d}:00"
-                    ),
+                    "expires_at": (datetime.now(UTC) + timedelta(seconds=ttl_seconds)).replace(microsecond=0).isoformat(),
                 }
                 # Attempt to resolve value as a UUID (user_id); if it looks like one, store it
                 payload["user_id"] = value  # value = user_id string
@@ -257,7 +255,7 @@ class PostgresStore:
                 if nx and existing.data:
                     return False
                 data_payload = {"v": value}
-                expires = datetime.now(UTC).replace(microsecond=0).isoformat() if True else ""
+                expires = (datetime.now(UTC) + timedelta(seconds=ttl_seconds)).replace(microsecond=0).isoformat()
                 if existing.data:
                     await (
                         client.table("response_cache")
