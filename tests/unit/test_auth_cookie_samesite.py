@@ -1,11 +1,9 @@
 """Cookie SameSite hardening (C6).
 
 Login, login-json, and refresh-token responses set cookies with
-``samesite="strict"`` in production and ``samesite="lax"`` everywhere else.
-``samesite="strict"`` blocks the cookie from being sent on cross-site
-requests entirely (mitigating CSRF), but breaks the localhost dev flow
-where the web app on :3000 and the API on :8000 are technically
-different sites.
+``samesite="none"`` in production (required for cross-origin cookie delivery
+between the Vercel frontend and the Render backend) and ``samesite="lax"``
+everywhere else.
 
 This module mixes two test styles intentionally:
   * a static source-level invariant (no FastAPI app import — runs without
@@ -28,7 +26,7 @@ import pytest
 
 
 _AUTH_SRC = Path(__file__).resolve().parents[2] / "src" / "api" / "routes" / "auth.py"
-_SAMESITE_EXPR = 'samesite="strict" if settings.ENVIRONMENT == "production" else "lax"'
+_SAMESITE_EXPR = 'samesite="none" if settings.ENVIRONMENT == "production" else "lax"'
 
 
 def test_all_set_cookie_sites_use_environment_aware_samesite() -> None:
@@ -48,7 +46,7 @@ def test_all_set_cookie_sites_use_environment_aware_samesite() -> None:
 
 def test_no_unconditional_samesite_lax_remains_in_auth_routes() -> None:
     """Bare ``samesite="lax"`` lines are forbidden in auth routes — they'd
-    weaken CSRF protection in production. Allowed only inside the conditional
+    bypass the env-aware ternary. Allowed only inside the conditional
     expression above."""
     text = _AUTH_SRC.read_text()
     # Strip out the conditional expression to detect any *standalone*
@@ -80,14 +78,14 @@ def _samesite_for(set_cookie_headers: list[str], cookie_name: str) -> str | None
 @pytest.mark.parametrize(
     "env, expected",
     [
-        ("production", "strict"),
+        ("production", "none"),
         ("staging", "lax"),
         ("development", "lax"),
         ("testing", "lax"),
     ],
 )
 def test_login_json_set_cookie_samesite_matches_environment(env, expected, monkeypatch):
-    """Production gets SameSite=strict; every other env gets SameSite=lax."""
+    """Production gets SameSite=none (cross-origin); every other env gets SameSite=lax."""
     pytest.importorskip("bcrypt")
     pytest.importorskip("asyncpg")
     from unittest.mock import AsyncMock, patch
