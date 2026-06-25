@@ -60,7 +60,7 @@ class OfferCreate(OfferBase):
     """Create offer request."""
 
     building_id: str
-    created_by: str
+    created_by: str | None = None  # Set from auth context in the route handler
 
 
 class OfferUpdate(BaseModel):

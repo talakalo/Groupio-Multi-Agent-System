@@ -1039,6 +1039,8 @@ class PostgresClient:
             q = client.table("offers").select("*", count="exact")
             if filters.get("building_id"):
                 q = q.eq("building_id", filters["building_id"])
+            elif filters.get("building_ids"):
+                q = q.in_("building_id", filters["building_ids"])
             if filters.get("category"):
                 q = q.eq("category", filters["category"])
             if filters.get("status"):
@@ -1053,6 +1055,11 @@ class PostgresClient:
         if filters.get("building_id"):
             args.append(filters["building_id"])
             where_parts.append("building_id = $%d" % len(args))
+        elif filters.get("building_ids"):
+            building_ids = filters["building_ids"]
+            placeholders = ", ".join("$%d" % (len(args) + i + 1) for i in range(len(building_ids)))
+            args.extend(building_ids)
+            where_parts.append(f"building_id IN ({placeholders})")
         if filters.get("category"):
             args.append(filters["category"])
             where_parts.append("category = $%d" % len(args))
