@@ -29,7 +29,7 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: https://*.supabase.co",
       "font-src 'self'",
-      `connect-src 'self' https://api.groupio.co.il wss://api.groupio.co.il${extraOrigins}`,
+      `connect-src 'self'${extraOrigins}`,
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",

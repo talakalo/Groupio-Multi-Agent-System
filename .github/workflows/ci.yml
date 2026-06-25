@@ -404,7 +404,7 @@ jobs:
       - name: Build all packages
         run: pnpm build
         env:
-          NEXT_PUBLIC_API_URL: https://api.groupio.co.il
+          NEXT_PUBLIC_API_URL: https://groupio-backend-khbg.onrender.com
           NEXT_PUBLIC_APP_URL: https://groupio.co.il
           NEXT_PUBLIC_SUPABASE_URL: https://supabase.groupio.co.il
           NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-key

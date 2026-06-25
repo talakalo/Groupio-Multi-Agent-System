@@ -265,7 +265,7 @@ class PostgresClient:
                 max_size=25,
                 max_inactive_connection_lifetime=300,
                 command_timeout=60,
-                ssl="require" if _is_remote else None,
+                ssl="require" if _is_remote else False,
             )
         return self._asyncpg_pool
 
@@ -290,7 +290,7 @@ class PostgresClient:
                 max_size=25,
                 max_inactive_connection_lifetime=300,
                 command_timeout=60,
-                ssl="require" if _is_remote else None,
+                ssl="require" if _is_remote else False,
             )
         return self._asyncpg_pool
 
@@ -985,7 +985,7 @@ class PostgresClient:
             client = await self._get_client()
             result = (
                 await client.table("offers")
-                .select("*, contractors(business_name, average_rating, verified)")
+                .select("*, contractors(business_name, average_rating, verification_status)")
                 .eq("building_id", building_id)
                 .eq("status", "active")
                 .order("created_at", desc=True)

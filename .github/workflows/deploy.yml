@@ -160,7 +160,7 @@ jobs:
         run: |
           echo "Waiting 15s for service to initialise..."
           sleep 15
-          HEALTH_URL="https://api.groupio.co.il/api/v1/health/live"
+          HEALTH_URL="https://groupio-backend-khbg.onrender.com/api/v1/health/live"
           for i in 1 2 3 4 5; do
             echo "Health check attempt ${i}/5..."
             if curl -sf --max-time 10 "${HEALTH_URL}"; then

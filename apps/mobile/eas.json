@@ -59,7 +59,7 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api.groupio.co.il",
+        "EXPO_PUBLIC_API_URL": "https://groupio-backend-khbg.onrender.com",
         "EXPO_PUBLIC_SUPABASE_URL": "https://supabase.groupio.co.il",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "your-production-anon-key"
       }
