@@ -16,7 +16,16 @@ export interface PaginatedPayments {
   pages: number;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const _rawApiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+// Auto-upgrade http:// → https:// when the page is served over HTTPS to prevent
+// mixed-content blocks (happens when NEXT_PUBLIC_API_URL is misconfigured with http://).
+const API_BASE_URL =
+  typeof window !== "undefined" &&
+  window.location.protocol === "https:" &&
+  _rawApiBase.startsWith("http://") &&
+  !_rawApiBase.includes("localhost")
+    ? _rawApiBase.replace("http://", "https://")
+    : _rawApiBase;
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 8_000;
 

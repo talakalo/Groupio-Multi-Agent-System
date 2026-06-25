@@ -7,7 +7,13 @@ const isDev = process.env.NODE_ENV !== "production";
 // Derive allowed API origins from NEXT_PUBLIC_API_URL at runtime, so that
 // docker-compose (which sets this to http://localhost:8000) works without
 // needing NODE_ENV=development inside the container.
-const configuredApiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
+// In production builds, auto-upgrade http:// → https:// so a misconfigured
+// env var (http:// instead of https://) never causes CSP/mixed-content blocks.
+const _rawApiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
+const configuredApiUrl =
+  !isDev && _rawApiUrl.startsWith("http://") && !_rawApiUrl.includes("localhost")
+    ? _rawApiUrl.replace("http://", "https://")
+    : _rawApiUrl;
 const configuredWsUrl = configuredApiUrl
   .replace(/^https:/, "wss:")
   .replace(/^http:/, "ws:");

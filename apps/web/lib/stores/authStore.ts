@@ -56,7 +56,14 @@ interface RegisterData {
   role?: 'resident' | 'contractor';
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const _rawAuthUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_URL =
+  typeof window !== 'undefined' &&
+  window.location.protocol === 'https:' &&
+  _rawAuthUrl.startsWith('http://') &&
+  !_rawAuthUrl.includes('localhost')
+    ? _rawAuthUrl.replace('http://', 'https://')
+    : _rawAuthUrl;
 
 // Maps the snake_case API response to the camelCase User interface.
 // Handles both snake_case (from API) and camelCase (from already-mapped data).
