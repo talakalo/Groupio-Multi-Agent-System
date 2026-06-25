@@ -200,7 +200,9 @@ class PostgresStore:
                 payload: dict[str, Any] = {
                     "token_type": token_type,
                     "token_hash": token_hash,
-                    "expires_at": (datetime.now(UTC) + timedelta(seconds=ttl_seconds)).replace(microsecond=0).isoformat(),
+                    "expires_at": (
+                        (datetime.now(UTC) + timedelta(seconds=ttl_seconds)).replace(microsecond=0).isoformat()
+                    ),
                 }
                 # Attempt to resolve value as a UUID (user_id); if it looks like one, store it
                 payload["user_id"] = value  # value = user_id string
