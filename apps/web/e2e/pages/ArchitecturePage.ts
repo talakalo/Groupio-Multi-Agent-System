@@ -5,7 +5,8 @@ import { BasePage } from "./BasePage";
 export class ArchitecturePage extends BasePage {
   readonly pageHeading = this.page.getByRole("heading", { level: 1 });
   readonly dropzoneTitle = this.page.getByText(/העלה את תוכנית הדירה|Upload your floor plan/i);
-  readonly uploadButton = this.page.getByRole("button", { name: /בחר קובץ|Choose file|upload/i });
+  // Use locator('button') to exclude the dropzone div[role="button"] which also contains the text
+  readonly uploadButton = this.page.locator("button").filter({ hasText: /בחר קובץ|Choose file/i });
   readonly fileInput = this.page.locator('input[type="file"]');
 
   constructor(page: Page) {

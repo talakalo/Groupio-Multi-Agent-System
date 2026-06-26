@@ -92,6 +92,14 @@ test.describe("Login form", () => {
 
 // ─── Signup Form ──────────────────────────────────────────────────────────────
 
+// Signup is a 2-step wizard: step 1 = role selection, step 2 = email/password/submit.
+// Advance to step 2 by clicking the continue button before asserting on inputs.
+async function advanceSignupToDetailsStep(page: import('@playwright/test').Page) {
+  // Click any role card to ensure one is selected, then click the continue button.
+  const continueBtn = page.locator('button[type="button"]').filter({ hasText: /המשך|Continue/i });
+  await continueBtn.click();
+}
+
 test.describe("Signup form", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/signup", { waitUntil: "domcontentloaded" });
@@ -99,6 +107,7 @@ test.describe("Signup form", () => {
   });
 
   test("form has expected inputs", async ({ page }) => {
+    await advanceSignupToDetailsStep(page);
     // At minimum: email + password; optionally name/phone
     await expect(page.locator('input[type="email"], input[name="email"]')).toBeVisible();
     await expect(page.locator('input[type="password"], input[name="password"]').first()).toBeVisible();
@@ -114,6 +123,7 @@ test.describe("Signup form", () => {
   });
 
   test("submit with empty fields shows validation", async ({ page }) => {
+    await advanceSignupToDetailsStep(page);
     const submit = page.locator('button[type="submit"]').first();
     await submit.click();
     // Some validation must appear
